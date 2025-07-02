@@ -669,6 +669,11 @@ public class BlockStates extends ExtendedBlockstateProvider
 			createRotatedBlock(MetalDevices.ELECTROMAGNET, magnetModel, IEProperties.FACING_ALL, ImmutableList.of(), -90, 0);
 			itemModel(MetalDevices.ELECTROMAGNET, magnetModel);
 		}
+		{
+			ModelFile model = models().getExistingFile(modLoc("block/metal_device/hatch"));
+			createRotatedBlock(MetalDevices.HATCH, model, IEProperties.FACING_ALL, List.of(), 00, 0);
+			itemModel(MetalDevices.HATCH, model);
+		}
 
 		createHemp();
 		{

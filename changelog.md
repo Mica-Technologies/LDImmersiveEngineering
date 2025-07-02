@@ -3,13 +3,14 @@
 - Add "fluid" as an optional element in cloche recipes (BluSunrize)
     - Crimson and warped fungi are now grown with lava
     - If not specified, the recipe will use water
+- Add the item hatch, which allows pulling a single stack from an inventory (BluSunrize)
 - Change extracting conveyors to have configurable stack-size instead of configurable tickrate (BluSunrize)
     - This requires existing conveyors to be adjusted again
 - Change insertion logic for the storage shelf (BluSunrize)
     - Will now try to fill slots with the same item, otherwise place in slots immediately after that item
     - This should keep individual crates on the shelf more organized
     - Works for shift-clicking and automatic insertion!
-- Change illager loot tables
+- Change illager loot tables (BluSunrize)
     - Fusiliers and bulwarks now respect looting
     - Commandos no longer drop emeralds
 - Fix mixer accidentally crafting a lingering awkward potion (BluSunrize)

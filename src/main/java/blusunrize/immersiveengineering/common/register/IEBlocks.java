@@ -660,6 +660,9 @@ public final class IEBlocks
 		public static final BlockEntry<PipeValveBlock> PIPE_VALVE = new BlockEntry<>(
 				"pipe_valve", METAL_PROPERTIES_NO_OCCLUSION, PipeValveBlock::new
 		);
+		public static final BlockEntry<HatchBlock> HATCH = new BlockEntry<>(
+				"hatch", METAL_PROPERTIES_NO_OCCLUSION, HatchBlock::new
+		);
 
 		private static void init()
 		{

@@ -1,0 +1,27 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "immersiveengineering:block/metal_device/hatch",
+      "x": -90
+    },
+    "facing=east": {
+      "model": "immersiveengineering:block/metal_device/hatch",
+      "y": 270
+    },
+    "facing=north": {
+      "model": "immersiveengineering:block/metal_device/hatch",
+      "y": 180
+    },
+    "facing=south": {
+      "model": "immersiveengineering:block/metal_device/hatch"
+    },
+    "facing=up": {
+      "model": "immersiveengineering:block/metal_device/hatch",
+      "x": 90
+    },
+    "facing=west": {
+      "model": "immersiveengineering:block/metal_device/hatch",
+      "y": 90
+    }
+  }
+}

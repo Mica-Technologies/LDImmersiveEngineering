@@ -406,7 +406,7 @@ public class IEBlockTags extends BlockTagsProvider
 		MetalDevices.CHUTES.values().forEach(entry -> tag.add(entry.get()));
 		MetalDevices.DYED_CHUTES.values().forEach(entry -> tag.add(entry.get()));
 		// fluid machines
-		tag.add(MetalDevices.BARREL.get(), MetalDevices.FLUID_PUMP.get(), MetalDevices.FLUID_PIPE.get(), MetalDevices.FLUID_PLACER.get(), MetalDevices.PIPE_VALVE.get());
+		tag.add(MetalDevices.BARREL.get(), MetalDevices.FLUID_PUMP.get(), MetalDevices.FLUID_PIPE.get(), MetalDevices.FLUID_PLACER.get(), MetalDevices.PIPE_VALVE.get(), MetalDevices.HATCH.get());
 		// other machines
 		tag.add(MetalDevices.BLAST_FURNACE_PREHEATER.get(), MetalDevices.FURNACE_HEATER.get(), MetalDevices.DYNAMO.get(), MetalDevices.THERMOELECTRIC_GEN.get(),
 				MetalDevices.ELECTRIC_LANTERN.get(), MetalDevices.SAMPLE_DRILL.get(), MetalDevices.FLOODLIGHT.get(), MetalDevices.ELECTROMAGNET.get());
@@ -590,6 +590,7 @@ public class IEBlockTags extends BlockTagsProvider
 				MetalDevices.CLOCHE,
 				MetalDevices.ELECTROMAGNET,
 				MetalDevices.PIPE_VALVE,
+				MetalDevices.HATCH,
 				MetalDecoration.LV_COIL,
 				MetalDecoration.MV_COIL,
 				MetalDecoration.HV_COIL,
