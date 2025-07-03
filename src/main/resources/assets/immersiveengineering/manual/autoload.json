@@ -46,6 +46,7 @@
       "storage_minecarts",
       "conveyor_belts",
       "strip_curtains",
+      "item_hatch",
       "chutes",
       "item_router",
       "item_batcher",

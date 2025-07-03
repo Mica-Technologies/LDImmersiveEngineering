@@ -744,6 +744,14 @@ public class DeviceRecipes extends IERecipeProvider
 				.define('r', Tags.Items.DUSTS_REDSTONE)
 				.unlockedBy("has_fluid_pipe", has(MetalDevices.FLUID_PIPE))
 				.save(out, toRL(toPath(MetalDevices.PIPE_VALVE)));
+
+		shapedMisc(MetalDevices.HATCH)
+				.pattern("rr")
+				.pattern("pp")
+				.define('r', IETags.ironRod)
+				.define('p', IETags.getTagsFor(EnumMetals.IRON).plate)
+				.unlockedBy("has_plate", has(IETags.getTagsFor(EnumMetals.IRON).plate))
+				.save(out, toRL(toPath(MetalDevices.HATCH)));
 	}
 
 	private void addCoveyorCoveringRecipe(ItemLike basic, RecipeOutput out)

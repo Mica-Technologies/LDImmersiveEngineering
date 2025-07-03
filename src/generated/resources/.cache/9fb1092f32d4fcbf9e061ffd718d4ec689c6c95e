@@ -1,4 +1,4 @@
-// 1.21.1	2025-06-30T18:13:57.5608593	Recipes
+// 1.21.1	2025-07-02T19:12:54.6375153	Recipes
 e46a17053b96b7062a3dbf804ed3e25c134fc397 data/immersiveengineering/advancement/recipes/misc/crafting/alloybrick.json
 6a92fb93f1478200a7237b19770f94285cc3d955 data/immersiveengineering/advancement/recipes/misc/crafting/alloybrick_from_slab.json
 bba88ea9b8e42c09c4e5df2344ccef6ad7ed4b8d data/immersiveengineering/advancement/recipes/misc/crafting/alloybrick_to_slab.json
@@ -184,6 +184,7 @@ b2c58bfd3da05ed4222c4b98fcf8ce1bc40e2d94 data/immersiveengineering/advancement/r
 cbc9fbe986f39306e73af9771005b7b6b5a7568c data/immersiveengineering/advancement/recipes/misc/crafting/gunpowder_barrel.json
 c01077c9f9de0643fbead844b433b994c096aeea data/immersiveengineering/advancement/recipes/misc/crafting/gunpowder_from_dusts.json
 17bad6ad9e50b6ed56143be608213f9267d2f00a data/immersiveengineering/advancement/recipes/misc/crafting/hammer.json
+c39ef977502e4d17db164e1134d951873d267ba9 data/immersiveengineering/advancement/recipes/misc/crafting/hatch.json
 df4f6bd4091fbb42a0fbece627bbcf9f56eaef66 data/immersiveengineering/advancement/recipes/misc/crafting/heavy_engineering.json
 bc6a2f60bc1ee0639c3263b048d9e774684068c4 data/immersiveengineering/advancement/recipes/misc/crafting/hempcrete.json
 9f67c0d28350cf38ea410ad17edf7b6b354f1a44 data/immersiveengineering/advancement/recipes/misc/crafting/hempcrete_brick.json
@@ -1091,6 +1092,7 @@ abb5fcc1c76a6683d21f0d52a0904cb553324670 data/immersiveengineering/recipe/crafti
 c14c89972abcd096c6d7765591a4867cea931e33 data/immersiveengineering/recipe/crafting/hammercrushing_tungsten.json
 3b753c298e7987867f37393d53540d95283d0119 data/immersiveengineering/recipe/crafting/hammercrushing_uranium.json
 d613c87308593b05b61118c0f7031aba6826e7c1 data/immersiveengineering/recipe/crafting/hammercrushing_zinc.json
+45d37cd5d996b749372be411b6ad4a72ceee6814 data/immersiveengineering/recipe/crafting/hatch.json
 d29b7f263e5dee2ef2b8b95cbe38422e1d15dd71 data/immersiveengineering/recipe/crafting/heavy_engineering.json
 9f8d555bdeb94bb4cc08972c9363549a00aadb50 data/immersiveengineering/recipe/crafting/hempcrete.json
 7829b6864b8a26f68d5b2559ad428cbf7079153e data/immersiveengineering/recipe/crafting/hempcrete_brick.json
