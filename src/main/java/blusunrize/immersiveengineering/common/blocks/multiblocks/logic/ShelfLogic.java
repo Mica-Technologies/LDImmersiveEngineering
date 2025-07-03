@@ -182,6 +182,17 @@ public class ShelfLogic implements IMultiblockLogic<State>, MBOverlayText<State>
 			var dir = position.side();
 			if(position.posInMultiblock().getY()==0||dir==null||dir==RelativeBlockFace.DOWN)
 				return null;
+			if(dir==RelativeBlockFace.UP&&position.posInMultiblock().getY()!=3)
+				return null;
+			if(dir==RelativeBlockFace.LEFT&&position.posInMultiblock().getX()!=3)
+				return null;
+			if(dir==RelativeBlockFace.RIGHT&&position.posInMultiblock().getX()!=0)
+				return null;
+			if(dir==RelativeBlockFace.FRONT&&position.posInMultiblock().getZ()!=0)
+				return null;
+			if(dir==RelativeBlockFace.BACK&&position.posInMultiblock().getZ()!=1)
+				return null;
+
 			int length = switch(dir)
 			{
 				case UP -> 3;
