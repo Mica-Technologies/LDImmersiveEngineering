@@ -10,13 +10,16 @@ package blusunrize.immersiveengineering.common.blocks.multiblocks;
 
 import blusunrize.immersiveengineering.api.EnumMetals;
 import blusunrize.immersiveengineering.api.IEApi;
+import blusunrize.immersiveengineering.api.IEProperties;
 import blusunrize.immersiveengineering.api.IETags;
 import blusunrize.immersiveengineering.api.IETags.MetalTags;
 import blusunrize.immersiveengineering.api.multiblocks.BlockMatcher;
 import blusunrize.immersiveengineering.api.multiblocks.BlockMatcher.Result;
 import blusunrize.immersiveengineering.api.multiblocks.MultiblockHandler;
 import blusunrize.immersiveengineering.api.multiblocks.MultiblockHandler.IMultiblock;
+import blusunrize.immersiveengineering.common.blocks.generic.WindowBlock;
 import blusunrize.immersiveengineering.common.blocks.multiblocks.UnionMultiblock.TransformedMultiblock;
+import blusunrize.immersiveengineering.common.register.IEBlocks;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.core.Vec3i;
 import net.minecraft.tags.TagKey;
@@ -106,6 +109,13 @@ public class IEMultiblocks
 		//Ignore sculk sensor properties
 		BlockMatcher.addPreprocessor((expected, found, world, pos) -> {
 			if(expected.getBlock()==Blocks.CALIBRATED_SCULK_SENSOR&&found.getBlock()==Blocks.CALIBRATED_SCULK_SENSOR)
+				return expected;
+			return found;
+		});
+		//Ignore mirrored windows
+		BlockMatcher.addPreprocessor((expected, found, world, pos) -> {
+			if(expected.getBlock() instanceof WindowBlock&&expected.getBlock()==found.getBlock()
+					&&expected.getValue(IEProperties.FACING_ALL).getAxis()==found.getValue(IEProperties.FACING_ALL).getAxis())
 				return expected;
 			return found;
 		});
