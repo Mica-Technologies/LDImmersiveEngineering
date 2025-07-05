@@ -20,6 +20,7 @@
 - Fix engineer illagers not dropping their raid banner (BluSunrize)
 - Fix shelves causing crashes when accessed from unexpected sides (BluSunrize)
 - Fix windows used in multiblocks being too directionally dependent (BluSunrize)
+- Fix backpack antenna not (visually) disconnecting from wires (BluSunrize)
 
 ##### Version 1.21.1-12.4.1-193
 - Add variable lightlevel for lanterns and cage lamps (BluSunrize)

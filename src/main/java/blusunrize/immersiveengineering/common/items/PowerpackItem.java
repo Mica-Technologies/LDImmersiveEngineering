@@ -223,7 +223,7 @@ public class PowerpackItem extends UpgradeableToolItem
 			{
 				PLAYER_ATTACHED_TO.remove(player.getUUID());
 				PacketDistributor.sendToAllPlayers(new MessagePowerpackAntenna(
-						player.getUUID(), false, conn.getEndA().position(), conn.getEndB().position()
+						player.getUUID(), true, conn.getEndA().position(), conn.getEndB().position()
 				));
 				break tooFar;
 			}
