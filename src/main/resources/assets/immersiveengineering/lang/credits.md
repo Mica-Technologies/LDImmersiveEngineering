@@ -4,7 +4,7 @@ CODE
 	- AtomicBlom for porting *everything* to 1.11.2!
 
 LOCALIZATION
-	- zh_CN: 3TUSK, Amamiya-Nagisa, bakaxyf, CannonFotter, crafteverywhere, IamAchang, Joccob, LYDfalse, UUUii, Fodoth_jinzi89, Cactusstudent, SlimeSB, mc-kaishixiaxue, JustAlkaid
+	- zh_CN: 3TUSK, Amamiya-Nagisa, bakaxyf, CannonFotter, crafteverywhere, IamAchang, Joccob, LYDfalse, UUUii, Fodoth_jinzi89, Cactusstudent, SlimeSB, mc-kaishixiaxue, JustAlkaid, qingfeng13579
 	- ru_RU: lex1975, Bytegm
 	- zh_TW: xaxa123, vongola12324
 	- es_ES: FrannDzs, docanuto
