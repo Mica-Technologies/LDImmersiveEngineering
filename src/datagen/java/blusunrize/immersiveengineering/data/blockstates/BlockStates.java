@@ -184,7 +184,7 @@ public class BlockStates extends ExtendedBlockstateProvider
 		multiEightCubeAll(StoneDecoration.CONCRETE_BRICK, rl("block/stone_decoration/concrete_brick/concrete_brick"));
 		cubeAll(StoneDecoration.CONCRETE_BRICK_CRACKED, rl("block/stone_decoration/concrete_brick_cracked"));
 		cubeAll(StoneDecoration.CONCRETE_CHISELED, rl("block/stone_decoration/concrete_chiseled"));
-		cubeSideVertical(StoneDecoration.CONCRETE_PILLAR, rl("block/stone_decoration/concrete_pillar"), rl("block/stone_decoration/concrete_tile/concrete_tile0"));
+		axisBlock(StoneDecoration.CONCRETE_PILLAR, rl("block/stone_decoration/concrete_pillar"), rl("block/stone_decoration/concrete_tile/concrete_tile0"));
 		cubeAll(StoneDecoration.CONCRETE_LEADED, rl("block/stone_decoration/concrete_leaded"));
 		cubeAll(StoneDecoration.CONCRETE_REINFORCED, rl("block/stone_decoration/concrete_reinforced"));
 		cubeAll(StoneDecoration.CONCRETE_REINFORCED_TILE, rl("block/stone_decoration/concrete_reinforced_tile"));
@@ -193,7 +193,7 @@ public class BlockStates extends ExtendedBlockstateProvider
 		multiEightCubeAll(StoneDecoration.HEMPCRETE_BRICK, rl("block/stone_decoration/hempcrete_brick/hempcrete_brick"));
 		cubeAll(StoneDecoration.HEMPCRETE_BRICK_CRACKED, rl("block/stone_decoration/hempcrete_brick_cracked"));
 		cubeAll(StoneDecoration.HEMPCRETE_CHISELED, rl("block/stone_decoration/hempcrete_chiseled"));
-		cubeSideVertical(StoneDecoration.HEMPCRETE_PILLAR, rl("block/stone_decoration/hempcrete_pillar"), rl("block/stone_decoration/hempcrete/hempcrete0"));
+		axisBlock(StoneDecoration.HEMPCRETE_PILLAR, rl("block/stone_decoration/hempcrete_pillar"), rl("block/stone_decoration/hempcrete/hempcrete0"));
 		cubeAll(StoneDecoration.INSULATING_GLASS, rl("block/stone_decoration/insulating_glass"), translucent());
 		cubeAll(StoneDecoration.SLAG_GLASS, rl("block/stone_decoration/slag_glass"), translucent());
 		cubeAll(StoneDecoration.ALLOYBRICK, rl("block/stone_decoration/alloybrick"));

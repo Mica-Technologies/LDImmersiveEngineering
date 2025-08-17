@@ -1,7 +1,16 @@
 {
   "variants": {
-    "": {
+    "axis=x": {
+      "model": "immersiveengineering:block/concrete_pillar_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
       "model": "immersiveengineering:block/concrete_pillar"
+    },
+    "axis=z": {
+      "model": "immersiveengineering:block/concrete_pillar_horizontal",
+      "x": 90
     }
   }
 }

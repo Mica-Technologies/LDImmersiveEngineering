@@ -1,5 +1,5 @@
 {
-  "parent": "minecraft:block/cube_column",
+  "parent": "minecraft:block/cube_column_horizontal",
   "textures": {
     "end": "immersiveengineering:block/stone_decoration/hempcrete/hempcrete0",
     "side": "immersiveengineering:block/stone_decoration/hempcrete_pillar"

@@ -195,12 +195,12 @@ public final class IEBlocks
 		public static final BlockEntry<IEBaseBlock> HEMPCRETE_BRICK = BlockEntry.simple("hempcrete_brick", STONE_DECO_STONE_BRICK_PROPS);
 		public static final BlockEntry<IEBaseBlock> HEMPCRETE_BRICK_CRACKED = BlockEntry.simple("hempcrete_brick_cracked", STONE_DECO_STONE_BRICK_PROPS);
 		public static final BlockEntry<IEBaseBlock> HEMPCRETE_CHISELED = BlockEntry.simple("hempcrete_chiseled", STONE_DECO_PROPS);
-		public static final BlockEntry<IEBaseBlock> HEMPCRETE_PILLAR = BlockEntry.simple("hempcrete_pillar", STONE_DECO_PROPS);
+		public static final BlockEntry<RotatedPillarBlock> HEMPCRETE_PILLAR = BlockEntry.pillar("hempcrete_pillar", STONE_DECO_PROPS);
 		public static final BlockEntry<IEBaseBlock> CONCRETE = BlockEntry.simple("concrete", STONE_DECO_PROPS);
 		public static final BlockEntry<IEBaseBlock> CONCRETE_BRICK = BlockEntry.simple("concrete_brick", STONE_DECO_STONE_BRICK_PROPS);
 		public static final BlockEntry<IEBaseBlock> CONCRETE_BRICK_CRACKED = BlockEntry.simple("concrete_brick_cracked", STONE_DECO_STONE_BRICK_PROPS);
 		public static final BlockEntry<IEBaseBlock> CONCRETE_CHISELED = BlockEntry.simple("concrete_chiseled", STONE_DECO_PROPS);
-		public static final BlockEntry<IEBaseBlock> CONCRETE_PILLAR = BlockEntry.simple("concrete_pillar", STONE_DECO_PROPS);
+		public static final BlockEntry<RotatedPillarBlock> CONCRETE_PILLAR = BlockEntry.pillar("concrete_pillar", STONE_DECO_PROPS);
 		public static final BlockEntry<IEBaseBlock> CONCRETE_TILE = BlockEntry.simple("concrete_tile", STONE_DECO_PROPS);
 		public static final BlockEntry<IEBaseBlock> CONCRETE_LEADED = BlockEntry.simple(
 				"concrete_leaded", STONE_DECO_LEADED_PROPS
@@ -967,6 +967,11 @@ public final class IEBlocks
 		{
 			return simple(name, properties, $ -> {
 			});
+		}
+
+		public static BlockEntry<RotatedPillarBlock> pillar(String name, Supplier<Properties> properties)
+		{
+			return new BlockEntry<>(name, properties, RotatedPillarBlock::new);
 		}
 
 		public static BlockEntry<IEEntityBlock<?>> barrel(String name, boolean metal)

@@ -29,10 +29,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.PackOutput;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackType;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.SlabBlock;
-import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.*;
 import net.neoforged.neoforge.client.model.generators.*;
@@ -135,6 +132,14 @@ public abstract class ExtendedBlockstateProvider extends BlockStateProvider
 		for(int i = 0; i < 8; i++)
 			textures[i] = texture.withSuffix(Integer.toString(i));
 		multiCubeAll(b, textures);
+	}
+
+	protected void axisBlock(Supplier<? extends RotatedPillarBlock> b, ResourceLocation side, ResourceLocation vertical)
+	{
+		ModelFile modelVertical = models().cubeColumn(name(b), side, vertical);
+		ModelFile modelHorizontal = models().cubeColumnHorizontal(name(b)+"_horizontal", side, vertical);
+		axisBlock(b.get(), modelVertical, modelHorizontal);
+		itemModel(b, modelVertical);
 	}
 
 	protected void scaffold(Supplier<? extends Block> b, ResourceLocation others, ResourceLocation top)
