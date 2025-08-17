@@ -185,7 +185,7 @@ public class ChunkLoaderLogic
 		public State(IInitialMultiblockContext<State> ctx)
 		{
 			this.inventory = SlotwiseItemHandler.makeWithGroups(
-					List.of(new IOConstraintGroup(new IOConstraint(true, i -> i.is(IETags.paper)), 1)),
+					List.of(new IOConstraintGroup(new IOConstraint(true, i -> i.is(IETags.observerMaterial)), 1)),
 					ctx.getMarkDirtyRunnable()
 			);
 			this.input = new WrappingItemHandler(inventory, true, false);

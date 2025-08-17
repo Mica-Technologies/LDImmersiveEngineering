@@ -124,8 +124,9 @@ public class IETags
 	public static final TagKey<Item> toolboxTools = createItemWrapper(ieLoc("toolbox/tools"));
 	public static final TagKey<Item> toolboxFood = createItemWrapper(ieLoc("toolbox/food"));
 	public static final TagKey<Item> toolboxWiring = createItemWrapper(ieLoc("toolbox/wiring"));
-	public static final TagKey<Item> connectorInsulator = createItemWrapper(ieLoc("connector_insulator"));;
+	public static final TagKey<Item> connectorInsulator = createItemWrapper(ieLoc("connector_insulator"));
 	public static final TagKey<Item> repairsAutomaton = createItemWrapper(ieLoc("repairs_automaton"));
+	public static final TagKey<Item> observerMaterial = createItemWrapper(ieLoc("observer_material"));
 	public static final TagKey<Block> hammerHarvestable = createBlockWrapper(ieLoc("mineable/hammer"));
 	public static final TagKey<Block> wirecutterHarvestable = createBlockWrapper(ieLoc("mineable/wirecutter"));
 	public static final TagKey<Block> drillHarvestable = createBlockWrapper(ieLoc("mineable/drill"));

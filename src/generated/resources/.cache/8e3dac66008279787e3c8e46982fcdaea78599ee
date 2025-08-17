@@ -1,4 +1,4 @@
-// 1.21.1	2025-05-16T17:55:11.8627016	Tags for minecraft:item mod id immersiveengineering
+// 1.21.1	2025-08-17T22:03:21.0249732	Tags for minecraft:item mod id immersiveengineering
 0ec28c858b1b91c5bff32d09a6c333dd450fa2da data/curios/tags/item/back.json
 929bbfcc2e578a06d498a3ac24c23dfc1e69677c data/curios/tags/item/head.json
 d0562e49ea1662a8e02805b805f76658ebd3ea7c data/c/tags/item/armors.json
@@ -135,6 +135,7 @@ d6dd4d8bc65e07b1262b11dc0177d1fe5fbf9680 data/immersiveengineering/tags/item/cir
 9f68aab51771ffcf2d804182251d3e06913ef5bc data/immersiveengineering/tags/item/cut_blocks/copper.json
 3e4fc91069da2d49ed9c3bd132c947b9879bdd0c data/immersiveengineering/tags/item/cut_slabs/copper.json
 240d783ca901747689edbff6ec068e1ebafd3dc6 data/immersiveengineering/tags/item/cut_stairs/copper.json
+35290fc4e6542abc96c7e17e8127984e175cabba data/immersiveengineering/tags/item/observer_material.json
 6c0dde6d4ee345ac357d2c738281761c579e09e9 data/immersiveengineering/tags/item/recycling/ignored_components.json
 9b803eb2eff5a43c330d3d61a1467efc24e7d2af data/immersiveengineering/tags/item/repairs_automaton.json
 586d8c57de0cdcef9e768494366ce79e22d75223 data/immersiveengineering/tags/item/scaffoldings/aluminum.json

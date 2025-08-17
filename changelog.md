@@ -1,4 +1,6 @@
 ##### Version 1.21.1-12.4.3-pre
+- Add tag "immersiveengineering:observer_material" to define valid items from the Resonanz Observer (BluSunrize)
+    - By default this tag simply contains paper, but modpack developers can extend it
 - Change concrete and hempcrete pillars to place like vanilla pillars (BluSunrize)
     - Do the same for LV, MV and HV coil blocks
 - Fix secret achievement for the Drill triggering to easily (BluSunrize)

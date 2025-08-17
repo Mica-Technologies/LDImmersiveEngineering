@@ -136,6 +136,7 @@ public class IEItemTags extends ItemTagsProvider
 				.addTag(ItemTags.TERRACOTTA)
 				.add(IEBlocks.StoneDecoration.DUROPLAST.asItem());
 		tag(IETags.repairsAutomaton).addTag(IETags.plates);
+		tag(IETags.observerMaterial).addTag(IETags.paper);
 		tag(ItemTags.CLUSTER_MAX_HARVESTABLES).add(Tools.STEEL_PICK.get());
 
 		generateTagsForToolbox();
