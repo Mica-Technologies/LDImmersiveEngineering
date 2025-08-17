@@ -21,6 +21,7 @@ import blusunrize.immersiveengineering.common.blocks.cloth.ShaderBannerStandingB
 import blusunrize.immersiveengineering.common.blocks.cloth.ShaderBannerWallBlock;
 import blusunrize.immersiveengineering.common.items.IEItemInterfaces.IColouredItem;
 import blusunrize.immersiveengineering.common.register.IEBlocks.Cloth;
+import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
@@ -29,6 +30,7 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
@@ -39,16 +41,19 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nonnull;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ShaderItem extends IEBaseItem implements IShaderItem, IColouredItem
 {
 	private final ResourceLocation shaderName;
 
-	public ShaderItem(ResourceLocation shaderName)
+	public ShaderItem(ResourceLocation shaderName, Rarity rarity)
 	{
-		super(new Properties().stacksTo(1));
+		super(new Properties().stacksTo(1).rarity(rarity));
 		this.shaderName = shaderName;
 	}
 
@@ -105,10 +110,13 @@ public class ShaderItem extends IEBaseItem implements IShaderItem, IColouredItem
 	@Override
 	public void appendHoverText(ItemStack stack, TooltipContext ctx, List<Component> list, TooltipFlag flag)
 	{
-		//TODO proper translation
-		list.add(Component.translatable(Lib.DESC_INFO+"shader.level")
-				.append(stack.getRarity().color().toString())
-				.append(Component.translatable(Lib.DESC_INFO+"shader.rarity."+stack.getRarity().name().toLowerCase(Locale.US))).withStyle(ChatFormatting.GRAY)
+		Rarity rarity = stack.getRarity();
+		String rarityKey = rarity.name().toLowerCase(Locale.US);
+		String rarityName = Arrays.stream(rarityKey.split("_")).map(Utils::toCamelCase).collect(Collectors.joining(" "));
+		list.add(Component.translatable(Lib.DESC_INFO+"shader.level").withStyle(ChatFormatting.GRAY)
+				.append(Component.translatableWithFallback(Lib.DESC_INFO+"shader.rarity."+rarityName, rarityName)
+						.withStyle(rarity.getStyleModifier())
+				)
 		);
 		if(!Screen.hasShiftDown())
 			list.add(Component.translatable(Lib.DESC_INFO+"shader.applyTo")

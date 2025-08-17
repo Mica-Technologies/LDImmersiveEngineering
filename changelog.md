@@ -1,5 +1,6 @@
 ##### Version 1.21.1-12.4.3-pre
 - Fix secret achievement for the Drill triggering to easily (BluSunrize)
+- Fix rarity on shader items (BluSunrize)
 
 ##### Version 1.21.1-12.4.2-194
 - Add feature for the item router to filter by mod in addition to tags (BluSunrize)

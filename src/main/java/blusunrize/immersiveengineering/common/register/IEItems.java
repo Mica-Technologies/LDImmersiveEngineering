@@ -334,12 +334,13 @@ public final class IEItems
 					IEItems.Misc.FARADAY_SUIT.put(slot, register(
 							"armor_faraday_"+slot.name().toLowerCase(Locale.ENGLISH), () -> new FaradaySuitItem(slot)
 					));
-			for(var shader : ShaderRegistry.shaderRegistry.keySet())
+			for(var shader : ShaderRegistry.shaderRegistry.entrySet())
 			{
-				String path = shader.getNamespace().equals(Lib.MODID)?
-						shader.getPath():
-						(shader.getNamespace()+'_'+shader.getPath());
-				SHADERS.put(shader, register("shader_"+path, () -> new ShaderItem(shader)));
+				ResourceLocation shaderLoc = shader.getKey();
+				String path = shaderLoc.getNamespace().equals(Lib.MODID)?
+						shaderLoc.getPath():
+						(shaderLoc.getNamespace()+'_'+shaderLoc.getPath());
+				SHADERS.put(shaderLoc, register("shader_"+path, () -> new ShaderItem(shaderLoc, shader.getValue().getRarity())));
 			}
 		}
 
