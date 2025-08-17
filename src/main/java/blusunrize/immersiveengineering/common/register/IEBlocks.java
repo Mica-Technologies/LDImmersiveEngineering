@@ -478,9 +478,9 @@ public final class IEBlocks
 
 	public static final class MetalDecoration
 	{
-		public static final BlockEntry<IEBaseBlock> LV_COIL = BlockEntry.simple("coil_lv", DEFAULT_METAL_PROPERTIES);
-		public static final BlockEntry<IEBaseBlock> MV_COIL = BlockEntry.simple("coil_mv", DEFAULT_METAL_PROPERTIES);
-		public static final BlockEntry<IEBaseBlock> HV_COIL = BlockEntry.simple("coil_hv", DEFAULT_METAL_PROPERTIES);
+		public static final BlockEntry<RotatedPillarBlock> LV_COIL = BlockEntry.pillar("coil_lv", DEFAULT_METAL_PROPERTIES);
+		public static final BlockEntry<RotatedPillarBlock> MV_COIL = BlockEntry.pillar("coil_mv", DEFAULT_METAL_PROPERTIES);
+		public static final BlockEntry<RotatedPillarBlock> HV_COIL = BlockEntry.pillar("coil_hv", DEFAULT_METAL_PROPERTIES);
 		public static final BlockEntry<IEBaseBlock> ENGINEERING_RS = BlockEntry.simple("rs_engineering", DEFAULT_METAL_PROPERTIES);
 		public static final BlockEntry<IEBaseBlock> ENGINEERING_HEAVY = BlockEntry.simple("heavy_engineering", DEFAULT_METAL_PROPERTIES);
 		public static final BlockEntry<IEBaseBlock> ENGINEERING_LIGHT = BlockEntry.simple("light_engineering", DEFAULT_METAL_PROPERTIES);

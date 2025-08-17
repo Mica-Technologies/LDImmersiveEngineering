@@ -203,9 +203,9 @@ public class BlockStates extends ExtendedBlockstateProvider
 			cubeAll(WoodenDecoration.TREATED_WOOD.get(style), rl("block/wooden_decoration/treated_wood_"+style.name().toLowerCase(Locale.ENGLISH)));
 		cubeAll(WoodenDecoration.FIBERBOARD, rl("block/wooden_decoration/fiberboard"));
 		cubeAll(WoodenDecoration.BASIC_ENGINEERING, rl("block/wooden_decoration/basic_engineering"));
-		cubeSideVertical(MetalDecoration.LV_COIL, rl("block/metal_decoration/coil_lv_side"), rl("block/metal_decoration/coil_lv_top"));
-		cubeSideVertical(MetalDecoration.MV_COIL, rl("block/metal_decoration/coil_mv_side"), rl("block/metal_decoration/coil_mv_top"));
-		cubeSideVertical(MetalDecoration.HV_COIL, rl("block/metal_decoration/coil_hv_side"), rl("block/metal_decoration/coil_hv_top"));
+		axisBlock(MetalDecoration.LV_COIL, rl("block/metal_decoration/coil_lv_side"), rl("block/metal_decoration/coil_lv_top"));
+		axisBlock(MetalDecoration.MV_COIL, rl("block/metal_decoration/coil_mv_side"), rl("block/metal_decoration/coil_mv_top"));
+		axisBlock(MetalDecoration.HV_COIL, rl("block/metal_decoration/coil_hv_side"), rl("block/metal_decoration/coil_hv_top"));
 		cubeAll(MetalDecoration.ENGINEERING_RS, rl("block/metal_decoration/redstone_engineering"));
 		cubeAll(MetalDecoration.ENGINEERING_HEAVY, rl("block/metal_decoration/heavy_engineering"));
 		cubeAll(MetalDecoration.ENGINEERING_LIGHT, rl("block/metal_decoration/light_engineering"));

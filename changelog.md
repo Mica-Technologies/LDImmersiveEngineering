@@ -1,5 +1,6 @@
 ##### Version 1.21.1-12.4.3-pre
 - Change concrete and hempcrete pillars to place like vanilla pillars (BluSunrize)
+    - Do the same for LV, MV and HV coil blocks
 - Fix secret achievement for the Drill triggering to easily (BluSunrize)
 - Fix rarity on shader items (BluSunrize)
 - Fix crashes when trying to craft a common shader bag into a lower tier (BluSunrize)
