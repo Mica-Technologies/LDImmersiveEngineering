@@ -9,6 +9,7 @@
 - Fix transformers not distributing power correctly (voidsong-dragonfly)
 - Fix potential exploit with the coke oven (MelodicCougar7)
 - Fix resonanz observer consuming far less energy than it was supposed to (BluSunrize)
+- Fix resonanz observer consuming leftover progress when turned off (BluSunrize)
 
 ##### Version 1.21.1-12.4.2-194
 - Add feature for the item router to filter by mod in addition to tags (BluSunrize)
