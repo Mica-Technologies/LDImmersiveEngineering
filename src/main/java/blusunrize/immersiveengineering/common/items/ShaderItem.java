@@ -114,7 +114,7 @@ public class ShaderItem extends IEBaseItem implements IShaderItem, IColouredItem
 		String rarityKey = rarity.name().toLowerCase(Locale.US);
 		String rarityName = Arrays.stream(rarityKey.split("_")).map(Utils::toCamelCase).collect(Collectors.joining(" "));
 		list.add(Component.translatable(Lib.DESC_INFO+"shader.level").withStyle(ChatFormatting.GRAY)
-				.append(Component.translatableWithFallback(Lib.DESC_INFO+"shader.rarity."+rarityName, rarityName)
+				.append(Component.translatableWithFallback(Lib.DESC_INFO+"shader.rarity."+rarityKey, rarityName)
 						.withStyle(rarity.getStyleModifier())
 				)
 		);
