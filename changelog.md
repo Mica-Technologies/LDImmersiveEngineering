@@ -1,6 +1,7 @@
 ##### Version 1.21.1-12.4.3-pre
 - Fix secret achievement for the Drill triggering to easily (BluSunrize)
 - Fix rarity on shader items (BluSunrize)
+- Fix crashes when trying to craft a common shader bag into a lower tier (BluSunrize)
 
 ##### Version 1.21.1-12.4.2-194
 - Add feature for the item router to filter by mod in addition to tags (BluSunrize)

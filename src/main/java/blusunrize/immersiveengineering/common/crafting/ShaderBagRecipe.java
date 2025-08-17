@@ -63,9 +63,9 @@ public class ShaderBagRecipe extends CustomRecipe
 			if(!stackInSlot.isEmpty())
 			{
 				Rarity next = ShaderRegistry.getLowerRarity(stackInSlot.getRarity());
-				ItemStack output = new ItemStack(Misc.SHADER_BAG.get(next), next!=stackInSlot.getRarity()?2: 1);
 				if(next!=null)
 				{
+					ItemStack output = new ItemStack(Misc.SHADER_BAG.get(next), next!=stackInSlot.getRarity()?2: 1);
 					output.set(DataComponents.RARITY, next);
 					return output;
 				}
