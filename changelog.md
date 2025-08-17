@@ -8,6 +8,7 @@
 - Fix crashes when trying to craft a common shader bag into a lower tier (BluSunrize)
 - Fix transformers not distributing power correctly (voidsong-dragonfly)
 - Fix potential exploit with the coke oven (MelodicCougar7)
+- Fix resonanz observer consuming far less energy than it was supposed to (BluSunrize)
 
 ##### Version 1.21.1-12.4.2-194
 - Add feature for the item router to filter by mod in addition to tags (BluSunrize)

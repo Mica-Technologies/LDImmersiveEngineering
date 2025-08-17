@@ -88,16 +88,17 @@ public class ChunkLoaderLogic
 		int energy_required = IEServerConfig.MACHINES.resonanz_observer_consumption.get();
 		if(state.rsState.isEnabled(context)&&state.energy.extractEnergy(energy_required, true)==energy_required)
 		{
+			// consume energy
+			state.energy.extractEnergy(energy_required, false);
+			// reduce timer
 			if(state.refreshTimer > 0)
 				state.refreshTimer--;
-
+			// reset timer if possible
 			if(state.refreshTimer <= 0)
 				if(!state.inventory.getStackInSlot(0).isEmpty())
 				{
 					// consume paper
 					state.inventory.getStackInSlot(0).shrink(1);
-					// consume energy
-					state.energy.extractEnergy(energy_required, false);
 					// set timer to the seconds configured in the config
 					state.refreshTimer = 20*IEServerConfig.MACHINES.resonanz_observer_paper_duration.get();
 					// mark chunks for loading
