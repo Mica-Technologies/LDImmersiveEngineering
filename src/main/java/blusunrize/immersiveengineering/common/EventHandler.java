@@ -282,7 +282,9 @@ public class EventHandler
 			float mod = 1.5f+((amp*amp)*.5f);
 			event.setNewDamage(event.getNewDamage()*mod);
 		}
-		if(event.getNewDamage() >= event.getEntity().getHealth()&&event.getSource().getEntity() instanceof Player&&((Player)event.getSource().getEntity()).getItemInHand(InteractionHand.MAIN_HAND).getItem() instanceof DrillItem)
+
+		boolean isBoss = event.getEntity().getType().is(EntityTypes.BOSSES);
+		if(isBoss&&event.getNewDamage() >= event.getEntity().getHealth()&&event.getSource().getEntity() instanceof Player&&((Player)event.getSource().getEntity()).getItemInHand(InteractionHand.MAIN_HAND).getItem() instanceof DrillItem)
 			Utils.unlockIEAdvancement((Player)event.getSource().getEntity(), "tools/secret_drillbreak");
 	}
 
