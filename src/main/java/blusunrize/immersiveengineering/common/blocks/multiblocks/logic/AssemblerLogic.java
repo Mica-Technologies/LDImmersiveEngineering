@@ -8,7 +8,6 @@
 
 package blusunrize.immersiveengineering.common.blocks.multiblocks.logic;
 
-import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.energy.MutableEnergyStorage;
 import blusunrize.immersiveengineering.api.multiblocks.blocks.component.ComparatorManager;
 import blusunrize.immersiveengineering.api.multiblocks.blocks.component.ComparatorManager.SimpleComparatorValue;
@@ -50,6 +49,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.neoforged.neoforge.capabilities.Capabilities.EnergyStorage;
@@ -165,12 +165,11 @@ public class AssemblerLogic implements IMultiblockLogic<State>, IServerTickableC
 			NonNullList<ItemStack> outputList = NonNullList.create();//List of all outputs for the current recipe. This includes discarded containers
 			outputList.add(output);
 
-			RecipeInputSources sources = new RecipeInputSources(pattern);
+			CraftingInput craftingInput = InventoryCraftingFalse.createFilledCraftingInventory(3, 3, pattern.inv);
+			RecipeInputSources sources = new RecipeInputSources(craftingInput);
 			this.consumeIngredients(state, queries, availableStacks, true, sources);
 
-			NonNullList<ItemStack> remainingItems = pattern.recipe.getRemainingItems(
-					InventoryCraftingFalse.createFilledCraftingInventory(3, 3, sources.gridItems)
-			);
+			NonNullList<ItemStack> remainingItems = pattern.recipe.getRemainingItems(craftingInput);
 			for(int i = 0; i < remainingItems.size(); i++)
 			{
 				ItemStack rem = remainingItems.get(i);
@@ -269,7 +268,7 @@ public class AssemblerLogic implements IMultiblockLogic<State>, IServerTickableC
 			{
 				tankFluid.shrink(query.getFluidSize());
 				if(sources!=null)
-					sources.providedByNonItem.set(sources.getSlotForQueryIndex(queryIndex), true);
+					sources.providedByNonItem.set(queryIndex, true);
 				return true;
 			}
 		return false;
@@ -284,7 +283,7 @@ public class AssemblerLogic implements IMultiblockLogic<State>, IServerTickableC
 		int taken = Math.min(maxConsume, next.getCount());
 		ItemStack forGrid = next.split(taken);
 		if(sources!=null)
-			sources.gridItems.set(sources.getSlotForQueryIndex(queryIndex), forGrid);
+			sources.gridItems.set(queryIndex, forGrid);
 		return taken;
 	}
 
@@ -444,18 +443,9 @@ public class AssemblerLogic implements IMultiblockLogic<State>, IServerTickableC
 
 	private record RecipeInputSources(List<ItemStack> gridItems, BooleanList providedByNonItem)
 	{
-		public RecipeInputSources(CrafterPatternInventory pattern)
+		public RecipeInputSources(CraftingInput pattern)
 		{
-			this(new ArrayList<>(pattern.inv), new BooleanArrayList(new boolean[9]));
-		}
-
-		public int getSlotForQueryIndex(int queryIdx)
-		{
-			int slot = 0;
-			for(; slot < gridItems.size(); slot++)
-				if(!this.gridItems.get(slot).isEmpty()&&--queryIdx < 0)
-					return slot;
-			return 0;
+			this(new ArrayList<>(pattern.items()), new BooleanArrayList(new boolean[pattern.size()]));
 		}
 	}
 }
