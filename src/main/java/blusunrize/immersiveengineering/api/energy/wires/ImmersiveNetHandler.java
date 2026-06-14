@@ -116,7 +116,9 @@ public class ImmersiveNetHandler
 		if(conns!=null)
 			for(Connection con : conns)
 				addBlockData(te.getWorld(), con);
-		resetCachedIndirectConnections(te.getWorld(), te.getPos());
+		//Defer + coalesce the cache flood to next tick start instead of flooding the whole network now
+		//for every connector that loads (avoids redundant flood storms during chunk streaming).
+		queueConnectivityFlood(te.getWorld(), te.getPos());
 		setProxy(new DimensionBlockPos(te), null);
 	}
 
@@ -283,7 +285,20 @@ public class ImmersiveNetHandler
 	 * @param w     the world to reset the cache in
 	 * @param start the starting block. If this is null, all cached connections for the dimension will be reset
 	 */
+	//Chunk-load cache invalidations are deferred to the next server tick start and coalesced (see
+	//flushPendingFloods) instead of flooding the whole network immediately for every connector that
+	//loads. Connection add/remove still flood immediately. Per dimension -> set of flood-start nodes.
+	private final Map<Integer, Set<BlockPos>> pendingFloodStarts = new ConcurrentHashMap<>();
+
 	public void resetCachedIndirectConnections(World w, @Nullable BlockPos start)
+	{
+		floodConnectivityUpdate(w, start, null);
+	}
+
+	//Evicts the cached indirect-connection routes for the whole network reachable from `start` (or for
+	//every node when start==null) by firing onConnectivityUpdate on each. If visitedOut!=null every
+	//visited node is recorded into it, letting a batch of floods skip networks already covered.
+	private void floodConnectivityUpdate(World w, @Nullable BlockPos start, @Nullable Set<BlockPos> visitedOut)
 	{
 		if(FMLCommonHandler.instance().getEffectiveSide()!=Side.SERVER)
 		{
@@ -315,6 +330,8 @@ public class ImmersiveNetHandler
 			BlockPos next = it.next();
 			it.remove();
 			closed.add(next);
+			if(visitedOut!=null)
+				visitedOut.add(next);
 			IImmersiveConnectable iic = toIIC(next, w);
 			if(iic!=null)
 				iic.onConnectivityUpdate(next, dimension);
@@ -323,6 +340,35 @@ public class ImmersiveNetHandler
 				for(Connection c : connsAtBlock)
 					if(!closed.contains(c.end))
 						open.add(c.end);
+		}
+	}
+
+	//Queues a deferred, coalesced cache flood for a connector that just (re)loaded, flushed at the next
+	//server tick start. A chunk streaming in many connectors of one network then floods that network
+	//once next tick instead of once per connector this tick.
+	public void queueConnectivityFlood(World w, BlockPos start)
+	{
+		pendingFloodStarts.computeIfAbsent(w.provider.getDimension(),
+				k -> newSetFromMap(new ConcurrentHashMap<>())).add(start);
+	}
+
+	//Runs the deferred chunk-load cache floods for one dimension, coalescing overlapping networks so each
+	//is flooded only once. Called at server world-tick START -- before any connector reads the route
+	//cache -- so there is no stale read within a tick (worst case a just-loaded wire is recognised one
+	//tick late, which self-corrects).
+	public void flushPendingFloods(World w)
+	{
+		Set<BlockPos> pending = pendingFloodStarts.get(w.provider.getDimension());
+		if(pending==null||pending.isEmpty())
+			return;
+		Set<BlockPos> starts = new HashSet<>(pending);
+		pending.clear();
+		Set<BlockPos> floodedThisFlush = new HashSet<>();
+		for(BlockPos start : starts)
+		{
+			if(floodedThisFlush.contains(start))
+				continue;
+			floodConnectivityUpdate(w, start, floodedThisFlush);
 		}
 	}
 

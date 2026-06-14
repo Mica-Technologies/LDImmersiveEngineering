@@ -367,6 +367,8 @@ public class EventHandler
 	@SubscribeEvent
 	public void onWorldTick(WorldTickEvent event)
 	{
+		if(event.phase==TickEvent.Phase.START&&FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
+			ImmersiveNetHandler.INSTANCE.flushPendingFloods(event.world);
 		if(event.phase==TickEvent.Phase.START&&validateConnsNextTick&&FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
 		{
 			boolean validateConnections = IEConfig.validateConnections;
