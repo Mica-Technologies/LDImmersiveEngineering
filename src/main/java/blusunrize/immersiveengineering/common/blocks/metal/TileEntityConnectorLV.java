@@ -374,7 +374,23 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
 			if(end==null||!end.allowEnergyToPass(null))
 				continue;
-			powerLeft -= end.outputEnergy(powerLeft, false, 0);
+			int sent = end.outputEnergy(powerLeft, false, 0);
+			powerLeft -= sent;
+			//Notify in-line connectables (e.g. the Energy Meter) of throughput so they still measure power
+			//in city mode. City mode is lossless, so the full amount passes through every sub-connection.
+			if(sent > 0)
+			{
+				HashSet<IImmersiveConnectable> passed = new HashSet<>();
+				for(Connection sub : con.subConnections)
+				{
+					IImmersiveConnectable subStart = ApiUtils.toIIC(sub.start, world);
+					if(subStart!=null&&passed.add(subStart))
+						subStart.onEnergyPassthrough(sent);
+					IImmersiveConnectable subEnd = ApiUtils.toIIC(sub.end, world);
+					if(subEnd!=null&&passed.add(subEnd))
+						subEnd.onEnergyPassthrough(sent);
+				}
+			}
 		}
 		int consumed = available-powerLeft;
 		if(consumed > 0)
