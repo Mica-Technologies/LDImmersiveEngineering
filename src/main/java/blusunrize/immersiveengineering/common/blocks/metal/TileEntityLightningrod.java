@@ -83,8 +83,9 @@ public class TileEntityLightningrod extends TileEntityMultiblockPart<TileEntityL
 					this.energyStorage.setEnergy(IEConfig.Machines.lightning_output);
 					BlockPos pos = fenceNet.get(Utils.RAND.nextInt(fenceNet.size()));
 					EntityLightningBolt entityLightningBolt = new EntityLightningBolt(world, pos.getX(), pos.getY(), pos.getZ(), true);
+					//addWeatherEffect already registers and syncs the bolt; spawnEntity would add it a second
+					//time, doubling its damage/ignition/effect ticks.
 					world.addWeatherEffect(entityLightningBolt);
-					world.spawnEntity(entityLightningBolt);
 				}
 			}
 		}
