@@ -217,8 +217,10 @@ public class TileEntityBlastFurnace extends TileEntityMultiblockPart<TileEntityB
 		BlastFurnaceRecipe recipe = BlastFurnaceRecipe.findRecipe(inventory.get(0));
 		if(recipe==null)
 			return null;
-		if((inventory.get(0).getCount() >= ((recipe.input instanceof ItemStack)?((ItemStack)recipe.input).getCount(): 1)
-				&&inventory.get(2).isEmpty()||(OreDictionary.itemMatches(inventory.get(2), recipe.output, true)&&inventory.get(2).getCount()+recipe.output.getCount() <= getSlotLimit(2)))
+		//Parenthesised so the input-count check gates the whole recipe, not just the empty-output-slot branch.
+		//Without it, a partially-filled matching output slot would let the recipe fire with insufficient input.
+		if(inventory.get(0).getCount() >= ((recipe.input instanceof ItemStack)?((ItemStack)recipe.input).getCount(): 1)
+				&&(inventory.get(2).isEmpty()||(OreDictionary.itemMatches(inventory.get(2), recipe.output, true)&&inventory.get(2).getCount()+recipe.output.getCount() <= getSlotLimit(2)))
 				&&(inventory.get(3).isEmpty()||(OreDictionary.itemMatches(inventory.get(3), recipe.slag, true)&&inventory.get(3).getCount()+recipe.slag.getCount() <= getSlotLimit(3))))
 			return recipe;
 		return null;

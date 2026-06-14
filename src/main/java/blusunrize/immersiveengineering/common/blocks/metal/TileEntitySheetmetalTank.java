@@ -225,7 +225,7 @@ public class TileEntitySheetmetalTank extends TileEntityMultiblockPart<TileEntit
 
 	private void updateComparatorValuesPart2()
 	{
-		int vol = tank.getCapacity()/6;
+		int vol = tank.getCapacity()/4;
 		if((15*tank.getFluidAmount())/tank.getCapacity()!=masterCompOld)
 			world.notifyNeighborsOfStateChange(getPos(), getBlockType(), true);
 		for(int i = 0; i < 4; i++)

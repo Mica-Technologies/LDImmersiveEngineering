@@ -269,6 +269,9 @@ public class TileEntitySilo extends TileEntityMultiblockPart<TileEntitySilo> imp
 				return ItemStack.EMPTY;
 			else
 			{
+				//Resolve the master like insert/extract do, so the capability reports real contents
+				//even when it is accessed through a dummy block of the multiblock.
+				TileEntitySilo silo = this.silo.master();
 				int maxSize = Math.min(silo.storageAmount, silo.identStack.getMaxStackSize());
 				return ApiUtils.copyStackWithAmount(silo.identStack, maxSize);
 			}
