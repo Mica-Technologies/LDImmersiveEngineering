@@ -85,7 +85,10 @@ public class TileEntityBelljar extends TileEntityIEBase implements ITickable, ID
 			return BelljarHandler.getFluidFertilizerHandler(fluid)!=null;
 		}
 	};
-	public FluxStorage energyStorage = new FluxStorage(16000, Math.max(256, IEConfig.Machines.belljar_consumption));
+	// Cap the input rate close to actual consumption so the cloche draws a steady trickle from the grid
+	// instead of slurping a 256 FE/t inrush to refill its buffer and then coasting. The large buffer still
+	// rides out brief power dips; only the peak load the generators see is reduced.
+	public FluxStorage energyStorage = new FluxStorage(16000, Math.max(IEConfig.Machines.belljar_consumption*2, 8));
 
 	private IPlantHandler curPlantHandler;
 	public int fertilizerAmount = 0;
