@@ -46,3 +46,6 @@ desktop.ini
 
 # local-only Claude Code state
 .claude/settings.local.json
+
+# local-only agent/dev plans (kept private, not published)
+docs/agent-plans/
