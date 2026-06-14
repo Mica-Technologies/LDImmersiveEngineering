@@ -82,7 +82,14 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 					}
 				}
 				addAvailableEnergy(-1F, null);
-				notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
+				//notifyAvailableEnergy only advertises this connector's energy to the rest of the
+				//network for the wire-damage feature (the pull-side "sources" list is consumed solely
+				//by getDamageAmount/applyDamage); machine power delivery is the push above. In city
+				//mode we skip this whole-network broadcast -- the single biggest connector hot spot --
+				//and rely on the lossless push. Local wire damage still works from each connector's own
+				//energy (added by addAvailableEnergy above).
+				if(!Config.IEConfig.cityMode)
+					notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
 			}
 			currentTickToMachine = 0;
 			currentTickToNet = 0;
