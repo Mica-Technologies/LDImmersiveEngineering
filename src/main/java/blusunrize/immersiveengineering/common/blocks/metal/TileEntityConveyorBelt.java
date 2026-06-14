@@ -80,7 +80,9 @@ public class TileEntityConveyorBelt extends TileEntityIEBase implements IDirecti
 		if(nbt.hasKey("conveyorBeltSubtype"))
 		{
 			conveyorBeltSubtype = ConveyorHandler.getConveyor(new ResourceLocation(nbt.getString("conveyorBeltSubtype")), this);
-			conveyorBeltSubtype.readConveyorNBT(nbt.getCompoundTag("conveyorBeltSubtypeNBT"));
+			//Guard against a save referencing a conveyor type that is no longer registered (removed/renamed addon)
+			if(conveyorBeltSubtype!=null)
+				conveyorBeltSubtype.readConveyorNBT(nbt.getCompoundTag("conveyorBeltSubtypeNBT"));
 		}
 
 		if(descPacket&&world!=null)

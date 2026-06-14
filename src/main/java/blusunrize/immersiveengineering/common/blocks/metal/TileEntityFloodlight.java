@@ -291,7 +291,7 @@ public class TileEntityFloodlight extends TileEntityImmersiveConnectable impleme
 		super.readCustomNBT(nbt, descPacket);
 		boolean oldActive = active;
 		active = nbt.getBoolean("active");
-		energyStorage = nbt.getInteger("energy");
+		energyStorage = nbt.getInteger("energyStorage");
 		redstoneControlInverted = nbt.getBoolean("redstoneControlInverted");
 		facing = EnumFacing.byIndex(nbt.getInteger("facing"));
 		side = EnumFacing.byIndex(nbt.getInteger("side"));

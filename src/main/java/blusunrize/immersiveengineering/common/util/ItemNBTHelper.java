@@ -206,8 +206,8 @@ public class ItemNBTHelper
 		assert (data.length%2==0);
 		for(int i = 0; i < data.length/2; i++)
 		{
-			Object key = data[i];
-			Object value = data[i+1];
+			Object key = data[2*i];
+			Object value = data[2*i+1];
 			if(key instanceof String)
 			{
 				if(value instanceof Boolean)
