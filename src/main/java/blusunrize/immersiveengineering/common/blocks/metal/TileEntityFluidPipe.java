@@ -66,6 +66,26 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 		IAdvancedSelectionBounds, IAdvancedCollisionBounds, IAdditionalDrops, INeighbourChangeTile
 {
 	static ConcurrentHashMap<BlockPos, Set<DirectionalFluidOutput>> indirectConnections = new ConcurrentHashMap<BlockPos, Set<DirectionalFluidOutput>>();
+	//A pipe place/break/hammer used to clear the WHOLE endpoint cache immediately, forcing every pump on
+	//every network to re-flood on its next fill. Instead, mark it dirty and clear it at most once per
+	//server tick (flushDirtyCache, called from EventHandler.onWorldTick), so a burst of pipe edits (or
+	//chunk streaming) coalesces into a single re-flood. Worst case a fluid route is one tick stale, which
+	//self-corrects.
+	private static volatile boolean indirectConnectionsDirty = false;
+
+	public static void markIndirectConnectionsDirty()
+	{
+		indirectConnectionsDirty = true;
+	}
+
+	public static void flushDirtyCache()
+	{
+		if(indirectConnectionsDirty)
+		{
+			indirectConnections.clear();
+			indirectConnectionsDirty = false;
+		}
+	}
 	public static ArrayList<Function<ItemStack, Boolean>> validPipeCovers = new ArrayList<>();
 	public static ArrayList<Function<ItemStack, Boolean>> climbablePipeCovers = new ArrayList<>();
 
@@ -192,7 +212,7 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 	{
 		super.invalidate();
 		if(!world.isRemote)
-			indirectConnections.clear();
+			markIndirectConnectionsDirty();
 	}
 
 
@@ -1053,7 +1073,7 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 		{
 			toggleSide(fd.ordinal());
 			this.markContainingBlockForUpdate(null);
-			TileEntityFluidPipe.indirectConnections.clear();
+			TileEntityFluidPipe.markIndirectConnectionsDirty();
 			return true;
 		}
 		return false;
