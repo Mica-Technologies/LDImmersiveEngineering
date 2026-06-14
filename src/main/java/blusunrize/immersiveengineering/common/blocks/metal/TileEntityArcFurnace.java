@@ -485,7 +485,7 @@ public class TileEntityArcFurnace extends TileEntityMultiblockMetal<TileEntityAr
 		{
 			if(this.inventory.get(22).isEmpty())
 				this.inventory.set(22, process.recipe.slag.copy());
-			else if(ItemHandlerHelper.canItemStacksStack(this.inventory.get(22), process.recipe.slag)||inventory.get(22).getCount()+process.recipe.slag.getCount() > getSlotLimit(22))
+			else if(ItemHandlerHelper.canItemStacksStack(this.inventory.get(22), process.recipe.slag)&&inventory.get(22).getCount()+process.recipe.slag.getCount() <= getSlotLimit(22))
 				this.inventory.get(22).grow(process.recipe.slag.getCount());
 		}
 	}
