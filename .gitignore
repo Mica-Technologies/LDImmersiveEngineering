@@ -25,3 +25,24 @@ libs
 
 gradle.properties
 *.jks
+
+# minecraft runtime / dev environment
+crash-reports
+logs
+*.log
+
+# editors
+.vscode
+
+# os cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# secrets
+*.env
+.env.*
+*credentials*
+
+# local-only Claude Code state
+.claude/settings.local.json

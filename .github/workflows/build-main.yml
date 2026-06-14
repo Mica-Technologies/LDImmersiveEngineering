@@ -1,0 +1,45 @@
+name: Build Mod (Main Branch)
+
+# Builds the mod on every push to main and on manual dispatch, then uploads the
+# resulting jar as a private GitHub Actions artifact (visible only to repo
+# collaborators). It deliberately does NOT create public GitHub Releases:
+# "Blu's License of Common Sense" forbids redistributing compiled builds without
+# BluSunrize's explicit permission, so we keep builds private to this repo.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_mod:
+    name: Build Mod
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Legacy Forge 1.12.2 (ForgeGradle 2.3 / Gradle 4.1) must build on JDK 8.
+      - name: Set Up JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble mod with Gradle
+        run: ./gradlew setupCiWorkspace build -Dhttp.socketTimeout=60000 -Dhttp.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.http.connectionTimeout=60000
+
+      # Private artifact only — NOT a public release. See the note at the top of this file.
+      - name: Upload mod jar (private artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: immersiveengineering-jar
+          path: build/libs/*.jar
+          retention-days: 90
+          if-no-files-found: error

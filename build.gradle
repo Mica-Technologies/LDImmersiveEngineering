@@ -6,10 +6,14 @@ def buildNumber = "98"
 // For those who want the bleeding edge
 buildscript {
     repositories {
-        jcenter()
-        maven {
-            name = "forge"
-            url = "http://files.minecraftforge.net/maven"
+        mavenCentral()
+        maven { // serves ForgeGradle 2.3, MCP mappings, forge userdev, etc.
+            name = "MinecraftForge"
+            url = "https://maven.minecraftforge.net/"
+        }
+        maven { // fallback mirror for legacy ForgeGradle 2.3 artifacts
+            name = "GTNH"
+            url = "https://nexus.gtnewhorizons.com/repository/public/"
         }
     }
     dependencies {
