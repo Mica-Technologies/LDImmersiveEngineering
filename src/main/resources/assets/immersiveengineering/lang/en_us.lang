@@ -245,12 +245,16 @@ tile.immersiveengineering.fluidCreosote.name=Creosote Oil
 tile.immersiveengineering.fluidPlantoil.name=Plant Oil
 tile.immersiveengineering.fluidEthanol.name=Ethanol
 tile.immersiveengineering.fluidBiodiesel.name=Biodiesel
+tile.immersiveengineering.fluidPropane.name=Propane
+tile.immersiveengineering.fluidNaturalGas.name=Natural Gas
 tile.immersiveengineering.fluidConcrete.name=Liquid Concrete
 
 fluid.creosote=Creosote Oil
 fluid.plantoil=Plant Oil
 fluid.ethanol=Ethanol
 fluid.biodiesel=Biodiesel
+fluid.propane=Propane
+fluid.natural_gas=Natural Gas
 fluid.concrete=Liquid Concrete
 fluid.potion=Potion
 

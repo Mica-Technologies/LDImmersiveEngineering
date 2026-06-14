@@ -164,6 +164,8 @@ public class IEContent
 	public static BlockIEFluid blockFluidPlantoil;
 	public static BlockIEFluid blockFluidEthanol;
 	public static BlockIEFluid blockFluidBiodiesel;
+	public static BlockIEFluid blockFluidPropane;
+	public static BlockIEFluid blockFluidNaturalGas;
 	public static BlockIEFluid blockFluidConcrete;
 
 	public static ItemIEBase itemMaterial;
@@ -208,6 +210,8 @@ public class IEContent
 	public static Fluid fluidPlantoil;
 	public static Fluid fluidEthanol;
 	public static Fluid fluidBiodiesel;
+	public static Fluid fluidPropane;
+	public static Fluid fluidNaturalGas;
 	public static Fluid fluidConcrete;
 
 	public static Fluid fluidPotion;
@@ -218,6 +222,9 @@ public class IEContent
 		fluidPlantoil = setupFluid(new Fluid("plantoil", new ResourceLocation("immersiveengineering:blocks/fluid/plantoil_still"), new ResourceLocation("immersiveengineering:blocks/fluid/plantoil_flow")).setDensity(925).setViscosity(2000));
 		fluidEthanol = setupFluid(new Fluid("ethanol", new ResourceLocation("immersiveengineering:blocks/fluid/ethanol_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ethanol_flow")).setDensity(789).setViscosity(1000));
 		fluidBiodiesel = setupFluid(new Fluid("biodiesel", new ResourceLocation("immersiveengineering:blocks/fluid/biodiesel_still"), new ResourceLocation("immersiveengineering:blocks/fluid/biodiesel_flow")).setDensity(789).setViscosity(1000));
+		// Stored as pressurised liquids (LPG/LNG), so they behave like the other fuel fluids in tanks and pipes.
+		fluidPropane = setupFluid(new Fluid("propane", new ResourceLocation("immersiveengineering:blocks/fluid/propane_still"), new ResourceLocation("immersiveengineering:blocks/fluid/propane_flow")).setDensity(493).setViscosity(800));
+		fluidNaturalGas = setupFluid(new Fluid("natural_gas", new ResourceLocation("immersiveengineering:blocks/fluid/natural_gas_still"), new ResourceLocation("immersiveengineering:blocks/fluid/natural_gas_flow")).setDensity(450).setViscosity(600));
 		fluidConcrete = setupFluid(new Fluid("concrete", new ResourceLocation("immersiveengineering:blocks/fluid/concrete_still"), new ResourceLocation("immersiveengineering:blocks/fluid/concrete_flow")).setDensity(2400).setViscosity(4000));
 		fluidPotion = setupFluid(new FluidPotion("potion", new ResourceLocation("immersiveengineering:blocks/fluid/potion_still"), new ResourceLocation("immersiveengineering:blocks/fluid/potion_flow")));
 
@@ -286,6 +293,8 @@ public class IEContent
 		blockFluidPlantoil = new BlockIEFluid("fluidPlantoil", fluidPlantoil, Material.WATER);
 		blockFluidEthanol = new BlockIEFluid("fluidEthanol", fluidEthanol, Material.WATER).setFlammability(60, 600);
 		blockFluidBiodiesel = new BlockIEFluid("fluidBiodiesel", fluidBiodiesel, Material.WATER).setFlammability(60, 200);
+		blockFluidPropane = new BlockIEFluid("fluidPropane", fluidPropane, Material.WATER).setFlammability(80, 400);
+		blockFluidNaturalGas = new BlockIEFluid("fluidNaturalGas", fluidNaturalGas, Material.WATER).setFlammability(80, 500);
 		blockFluidConcrete = new BlockIEFluidConcrete("fluidConcrete", fluidConcrete, Material.WATER);
 
 		itemMaterial = new ItemMaterial();
@@ -453,8 +462,14 @@ public class IEContent
 		FermenterRecipe.addRecipe(new FluidStack(fluidEthanol, 80), ItemStack.EMPTY, Items.MELON, 6400);
 		FermenterRecipe.addRecipe(new FluidStack(fluidEthanol, 80), ItemStack.EMPTY, Items.APPLE, 6400);
 		FermenterRecipe.addRecipe(new FluidStack(fluidEthanol, 80), ItemStack.EMPTY, "cropPotato", 6400);
+		// Anaerobic digestion of organic waste yields biogas (natural gas).
+		FermenterRecipe.addRecipe(new FluidStack(fluidNaturalGas, 80), ItemStack.EMPTY, Items.ROTTEN_FLESH, 6400);
+		FermenterRecipe.addRecipe(new FluidStack(fluidNaturalGas, 40), ItemStack.EMPTY, "treeLeaves", 6400);
 
-		RefineryRecipe.addRecipe(new FluidStack(fluidBiodiesel, 16), new FluidStack(fluidPlantoil, 8), new FluidStack(fluidEthanol, 8), 80);
+		// Transesterification: biodiesel is mostly refined plant oil with a small alcohol catalyst, not a 50/50 blend.
+		RefineryRecipe.addRecipe(new FluidStack(fluidBiodiesel, 16), new FluidStack(fluidPlantoil, 14), new FluidStack(fluidEthanol, 2), 80);
+		// Propane is fractionated out of natural gas (single-input refining).
+		RefineryRecipe.addRecipe(new FluidStack(fluidPropane, 12), new FluidStack(fluidNaturalGas, 24), null, 80);
 
 		MixerRecipe.addRecipe(new FluidStack(fluidConcrete, 500), new FluidStack(FluidRegistry.WATER, 500), new Object[]{"sand", "sand", Items.CLAY_BALL, "gravel"}, 3200);
 
@@ -790,6 +805,9 @@ public class IEContent
 		DieselHandler.registerFuel(fluidBiodiesel, 125);
 		DieselHandler.registerFuel(FluidRegistry.getFluid("fuel"), 375);
 		DieselHandler.registerFuel(FluidRegistry.getFluid("diesel"), 175);
+		// Energy-dense gaseous fuels burn cleaner and more efficiently than biodiesel (higher = less consumed per tick).
+		DieselHandler.registerFuel(fluidNaturalGas, 200);
+		DieselHandler.registerFuel(fluidPropane, 250);
 		DieselHandler.registerDrillFuel(fluidBiodiesel);
 		DieselHandler.registerDrillFuel(FluidRegistry.getFluid("fuel"));
 		DieselHandler.registerDrillFuel(FluidRegistry.getFluid("diesel"));
@@ -797,6 +815,8 @@ public class IEContent
 		blockFluidCreosote.setPotionEffects(new PotionEffect(IEPotions.flammable, 100, 0));
 		blockFluidEthanol.setPotionEffects(new PotionEffect(MobEffects.NAUSEA, 40, 0));
 		blockFluidBiodiesel.setPotionEffects(new PotionEffect(IEPotions.flammable, 100, 1));
+		blockFluidPropane.setPotionEffects(new PotionEffect(IEPotions.flammable, 100, 1), new PotionEffect(MobEffects.NAUSEA, 60, 0));
+		blockFluidNaturalGas.setPotionEffects(new PotionEffect(IEPotions.flammable, 100, 1), new PotionEffect(MobEffects.NAUSEA, 60, 0));
 		blockFluidConcrete.setPotionEffects(new PotionEffect(MobEffects.SLOWNESS, 20, 3, false, false));
 
 		ChemthrowerHandler.registerEffect(FluidRegistry.WATER, new ChemthrowerEffect_Extinguish());
@@ -886,6 +906,8 @@ public class IEContent
 		ChemthrowerHandler.registerEffect(fluidBiodiesel, new ChemthrowerEffect_Potion(null, 0, IEPotions.flammable, 140, 1));
 		ChemthrowerHandler.registerFlammable(fluidBiodiesel);
 		ChemthrowerHandler.registerFlammable(fluidEthanol);
+		ChemthrowerHandler.registerFlammable(fluidPropane);
+		ChemthrowerHandler.registerFlammable(fluidNaturalGas);
 		ChemthrowerHandler.registerEffect("oil", new ChemthrowerEffect_Potion(null, 0, new PotionEffect(IEPotions.flammable, 140, 0), new PotionEffect(MobEffects.BLINDNESS, 80, 1)));
 		ChemthrowerHandler.registerFlammable("oil");
 		ChemthrowerHandler.registerEffect("fuel", new ChemthrowerEffect_Potion(null, 0, IEPotions.flammable, 100, 1));
@@ -1059,6 +1081,8 @@ public class IEContent
 		fluidPlantoil = FluidRegistry.getFluid("plantoil");
 		fluidEthanol = FluidRegistry.getFluid("ethanol");
 		fluidBiodiesel = FluidRegistry.getFluid("biodiesel");
+		fluidPropane = FluidRegistry.getFluid("propane");
+		fluidNaturalGas = FluidRegistry.getFluid("natural_gas");
 		fluidConcrete = FluidRegistry.getFluid("concrete");
 		fluidPotion = FluidRegistry.getFluid("potion");
 	}
