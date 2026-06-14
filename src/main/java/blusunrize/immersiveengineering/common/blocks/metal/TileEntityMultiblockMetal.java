@@ -350,6 +350,23 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 
 	public abstract IFluidTank[] getInternalTanks();
 
+	/**
+	 * Throttles the per-tick "look for a new recipe to start" scan that in-machine processors run.
+	 * Re-scanning the whole recipe list every tick for a machine that is already busy (queue
+	 * topping up) or holding non-matching input is wasted CPU. Callers should still scan
+	 * immediately while the queue is empty (so nothing is starved); once at least one process is
+	 * queued, a running machine only needs to refill its queue every {@code RECIPE_SCAN_INTERVAL}
+	 * ticks, which is imperceptible for queues of depth &gt; 1 and changes no recipe outputs or
+	 * processing rates. Staggered by block position so neighbouring machines don't all scan on the
+	 * same tick.
+	 */
+	protected static final int RECIPE_SCAN_INTERVAL = 8;
+
+	protected boolean shouldThrottledRecipeScan()
+	{
+		return world.getTotalWorldTime()%RECIPE_SCAN_INTERVAL==((getPos().getX()^getPos().getZ())&(RECIPE_SCAN_INTERVAL-1));
+	}
+
 	public abstract R findRecipeForInsertion(ItemStack inserting);
 
 	public abstract int[] getOutputSlots();

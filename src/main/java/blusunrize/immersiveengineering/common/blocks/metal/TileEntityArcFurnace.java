@@ -106,7 +106,7 @@ public class TileEntityArcFurnace extends TileEntityMultiblockMetal<TileEntityAr
 						//						update = true;
 					}
 
-			if(this.processQueue.size() < this.getProcessQueueMaxLength())
+			if(this.processQueue.size() < this.getProcessQueueMaxLength()&&(this.processQueue.isEmpty()||shouldThrottledRecipeScan()))
 			{
 				Map<Integer, Integer> usedInvSlots = new HashMap<Integer, Integer>();
 				for(MultiblockProcess<ArcFurnaceRecipe> process : processQueue)

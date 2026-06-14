@@ -98,7 +98,7 @@ public class TileEntitySqueezer extends TileEntityMultiblockMetal<TileEntitySque
 		else
 		{
 			boolean update = false;
-			if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength())
+			if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&(processQueue.isEmpty()||shouldThrottledRecipeScan()))
 			{
 				final int[] usedInvSlots = new int[8];
 				for(MultiblockProcess process : processQueue)
