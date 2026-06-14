@@ -401,8 +401,13 @@ public class TileEntityBelljar extends TileEntityIEBase implements ITickable, ID
 	{
 		if(slot==SLOT_FERTILIZER)
 			return BelljarHandler.getItemFertilizerHandler(stack)!=null;
-		else
-			return true;
+		if(slot==SLOT_SEED)
+			return BelljarHandler.getHandler(stack)!=null;
+		if(slot==SLOT_SOIL)
+			//Accept anything that isn't itself a seed or fertilizer, so an automated mixed stream routes
+			//seeds and fertilizer to their own slots rather than landing in the soil slot.
+			return BelljarHandler.getHandler(stack)==null&&BelljarHandler.getItemFertilizerHandler(stack)==null;
+		return true;
 	}
 
 	@Override
@@ -435,7 +440,10 @@ public class TileEntityBelljar extends TileEntityIEBase implements ITickable, ID
 		return super.hasCapability(capability, facing);
 	}
 
-	IItemHandler inputHandler = new IEInventoryHandler(1, this, 2, true, false);
+	//Expose all three input slots (soil, seed, fertilizer) to automation, not just fertilizer, so
+	//conveyors / item pipes can fully stock a cloche. Per-slot validation (isStackValid) keeps each
+	//item type routed to the right slot; getSlotLimit still caps soil and seed at 1.
+	IItemHandler inputHandler = new IEInventoryHandler(3, this, 0, true, false);
 	IItemHandler outputHandler = new IEInventoryHandler(4, this, 3, false, true);
 
 	@Override
