@@ -50,6 +50,9 @@ public class TileEntityFluidSorter extends TileEntityIEBase implements IGuiTile
 		if(!world.isRemote&&canRoute())
 		{
 			boolean first = startRouting();
+			//Work on a copy: doInsert decrements the amount as it distributes across outputs, and we must
+			//not mutate the caller's FluidStack (it does so even when simulating, which would void fluid).
+			stack = stack.copy();
 			EnumFacing[][] validOutputs = getValidOutputs(inputSide, stack);
 			ret += doInsert(stack, validOutputs[0], doFill);
 			ret += doInsert(stack, validOutputs[1], doFill);

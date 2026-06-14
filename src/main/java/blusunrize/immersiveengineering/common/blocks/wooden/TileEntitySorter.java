@@ -185,8 +185,10 @@ public class TileEntitySorter extends TileEntityIEBase implements IGuiTile
 								{
 									if(first)
 										routed = null;
+									//Return what was actually extracted, not the simulated stack, so a handler
+									//whose real extraction differs from its simulation can't dupe or void items.
 									if(!simulate)
-										itemHandler.extractItem(i, amount, false);
+										return itemHandler.extractItem(i, amount, false);
 									return extractItem;
 								}
 							}

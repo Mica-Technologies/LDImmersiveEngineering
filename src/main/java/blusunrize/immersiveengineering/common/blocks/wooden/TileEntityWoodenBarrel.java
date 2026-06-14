@@ -61,11 +61,12 @@ public class TileEntityWoodenBarrel extends TileEntityIEBase implements ITickabl
 				if(te!=null&&te.hasCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, f.getOpposite()))
 				{
 					IFluidHandler handler = te.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, f.getOpposite());
-					int accepted = handler.fill(Utils.copyFluidStackWithAmount(tank.getFluid(), out, false), false);
-					FluidStack drained = this.tank.drain(accepted, true);
-					if(drained!=null)
+					//Fill for real first, then drain exactly what was accepted, so a handler whose
+					//simulated and actual fill disagree can never make fluid disappear.
+					int filled = handler.fill(Utils.copyFluidStackWithAmount(tank.getFluid(), out, false), true);
+					if(filled > 0)
 					{
-						handler.fill(drained, true);
+						this.tank.drain(filled, true);
 						update = true;
 					}
 				}
@@ -114,7 +115,7 @@ public class TileEntityWoodenBarrel extends TileEntityIEBase implements ITickabl
 	{
 		sideConfig = nbt.getIntArray("sideConfig");
 		if(sideConfig==null||sideConfig.length < 2)
-			sideConfig = new int[]{-1, 0};
+			sideConfig = new int[]{1, 0};
 		this.readTank(nbt);
 	}
 
