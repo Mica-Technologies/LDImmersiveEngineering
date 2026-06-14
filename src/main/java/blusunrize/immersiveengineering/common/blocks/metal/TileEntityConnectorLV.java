@@ -39,6 +39,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -330,6 +331,11 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 		return 0;
 	}
 
+	//Reused within transferEnergy to avoid re-resolving each connection's endpoint (ApiUtils.toIIC ->
+	//world.getTileEntity) once per output loop, twice per tick. Server-thread only and never re-entrant
+	//(outputEnergy on the far side doesn't call back into this method), so a single reusable map is safe.
+	private final Map<AbstractConnection, IImmersiveConnectable> transferEndCache = new HashMap<>();
+
 	public int transferEnergy(int energy, boolean simulate, final int energyType)
 	{
 		int received = 0;
@@ -343,6 +349,8 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			if(outputs.isEmpty())
 				return 0;
 
+			transferEndCache.clear();
+			Map<Connection, Integer> transferedRates = ImmersiveNetHandler.INSTANCE.getTransferedRates(world.provider.getDimension());
 			int sum = 0;
 			//TreeMap to prioritize outputs close to this connector if more energy is requested than available
 			//(energy will be provided to the nearby outputs rather than some random ones)
@@ -358,6 +366,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 						if(tempR > 0)
 						{
 							powerSorting.put(con, tempR);
+							transferEndCache.put(con, end);
 							sum += tempR;
 						}
 					}
@@ -366,7 +375,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			if(sum > 0)
 				for(AbstractConnection con : powerSorting.keySet())
 				{
-					IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
+					IImmersiveConnectable end = transferEndCache.get(con);
 					if(con.cableType!=null&&end!=null)
 					{
 						float prio = powerSorting.get(con)/(float)sum;
@@ -387,11 +396,11 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 							float mod = (((maxInput-tempR)/(float)maxInput)/.25f)*.1f;
 							intermediaryLoss = MathHelper.clamp(intermediaryLoss+length*(baseLoss+baseLoss*mod), 0, 1);
 
-							int transferredPerCon = ImmersiveNetHandler.INSTANCE.getTransferedRates(world.provider.getDimension()).getOrDefault(sub, 0);
+							int transferredPerCon = transferedRates.getOrDefault(sub, 0);
 							transferredPerCon += r;
 							if(!simulate)
 							{
-								ImmersiveNetHandler.INSTANCE.getTransferedRates(world.provider.getDimension()).put(sub, transferredPerCon);
+								transferedRates.put(sub, transferredPerCon);
 								IImmersiveConnectable subStart = ApiUtils.toIIC(sub.start, world);
 								IImmersiveConnectable subEnd = ApiUtils.toIIC(sub.end, world);
 								if(subStart!=null&&passedConnectors.add(subStart))
