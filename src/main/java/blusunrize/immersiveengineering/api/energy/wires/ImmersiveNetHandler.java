@@ -500,7 +500,10 @@ public class ImmersiveNetHandler
 
 		PriorityQueue<Pair<IImmersiveConnectable, Float>> queue = new PriorityQueue<>(Comparator.comparingDouble(Pair::getRight));
 		Set<AbstractConnection> closedList = newSetFromMap(new ConcurrentHashMap<AbstractConnection, Boolean>());
-		List<BlockPos> checked = new ArrayList<>();
+		// HashSet (not ArrayList): this set is only ever used for add/contains membership tests, never
+		// iterated or indexed, so the result is identical while contains() drops from O(n) to O(1) -- the
+		// previous ArrayList.contains made the path-find O(V^2) on every cache miss.
+		Set<BlockPos> checked = new HashSet<>();
 		HashMap<BlockPos, BlockPos> backtracker = new HashMap<>();
 
 		checked.add(node);
@@ -530,7 +533,7 @@ public class ImmersiveNetHandler
 				boolean isOutput = next.isEnergyOutput();
 				if(ignoreIsEnergyOutput||isOutput)
 				{
-					BlockPos last = toBlockPos(next);
+					BlockPos last = nextPos;
 					WireType minimumType = null;
 					int distance = 0;
 					List<Connection> connectionParts = new ArrayList<>();
@@ -554,10 +557,10 @@ public class ImmersiveNetHandler
 									}
 						}
 					}
-					closedList.add(new AbstractConnection(toBlockPos(node), toBlockPos(next), minimumType, distance, isOutput, connectionParts.toArray(new Connection[connectionParts.size()])));
+					closedList.add(new AbstractConnection(toBlockPos(node), nextPos, minimumType, distance, isOutput, connectionParts.toArray(new Connection[connectionParts.size()])));
 				}
 
-				Set<Connection> conLN = getConnections(world, toBlockPos(next));
+				Set<Connection> conLN = getConnections(world, nextPos);
 				if(conLN!=null)
 					for(Connection con : conLN)
 						if(next.allowEnergyToPass(con))
@@ -571,10 +574,10 @@ public class ImmersiveNetHandler
 							{
 								existing.ifPresent(p1 -> queue.removeIf((p2) -> p1.getLeft()==p2.getLeft()));
 								queue.add(new ImmutablePair<>(end, newLoss));
-								backtracker.put(con.end, toBlockPos(next));
+								backtracker.put(con.end, nextPos);
 							}
 						}
-				checked.add(toBlockPos(next));
+				checked.add(nextPos);
 			}
 		}
 		if(FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
