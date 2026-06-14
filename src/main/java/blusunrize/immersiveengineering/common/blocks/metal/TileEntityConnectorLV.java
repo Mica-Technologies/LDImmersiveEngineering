@@ -70,11 +70,16 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			//				}
 			if(energyStorage.getEnergyStored() > 0)
 			{
-				int temp = this.transferEnergy(energyStorage.getEnergyStored(), true, 0);
-				if(temp > 0)
+				if(Config.IEConfig.cityMode)
+					cityModeTransfer();
+				else
 				{
-					energyStorage.modifyEnergyStored(-this.transferEnergy(temp, false, 0));
-					markDirty();
+					int temp = this.transferEnergy(energyStorage.getEnergyStored(), true, 0);
+					if(temp > 0)
+					{
+						energyStorage.modifyEnergyStored(-this.transferEnergy(temp, false, 0));
+						markDirty();
+					}
 				}
 				addAvailableEnergy(-1F, null);
 				notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
@@ -336,6 +341,42 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 	//(outputEnergy on the far side doesn't call back into this method), so a single reusable map is safe.
 	private final Map<AbstractConnection, IImmersiveConnectable> transferEndCache = new HashMap<>();
 
+	/**
+	 * "City mode" power push (see {@link Config.IEConfig#cityMode}). A single, lossless pass that sends
+	 * this connector's stored energy straight to the devices reachable on its wire network, skipping the
+	 * realistic grid's per-wire loss, distance weighting, proportional split and double simulate/transfer
+	 * pass. Conductive wires (transfer rate &gt; 0) carry power with no per-wire cap beyond this
+	 * connector's own output rate; non-conductive wires (structural rope, cable, redstone) still do not
+	 * transfer. Energy is still conserved -- only what a device actually accepts is drawn from storage.
+	 */
+	private void cityModeTransfer()
+	{
+		if(world.isRemote)
+			return;
+		Set<AbstractConnection> outputs = ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(Utils.toCC(this), world, true);
+		if(outputs.isEmpty())
+			return;
+		int available = Math.min(getMaxOutput(), energyStorage.getEnergyStored());
+		int powerLeft = available;
+		for(AbstractConnection con : outputs)
+		{
+			if(powerLeft <= 0)
+				break;
+			if(!con.isEnergyOutput||con.cableType==null||con.cableType.getTransferRate() <= 0)
+				continue;
+			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
+			if(end==null||!end.allowEnergyToPass(null))
+				continue;
+			powerLeft -= end.outputEnergy(powerLeft, false, 0);
+		}
+		int consumed = available-powerLeft;
+		if(consumed > 0)
+		{
+			energyStorage.modifyEnergyStored(-consumed);
+			markDirty();
+		}
+	}
+
 	public int transferEnergy(int energy, boolean simulate, final int energyType)
 	{
 		int received = 0;
@@ -437,7 +478,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 
 	private Pair<Float, Consumer<Float>> getEnergyForConnection(@Nullable AbstractConnection c)
 	{
-		float loss = c!=null?c.getAverageLossRate(): 0;
+		float loss = (c!=null&&!Config.IEConfig.cityMode)?c.getAverageLossRate(): 0;
 		float max = (1-loss)*energyStorage.getEnergyStored();
 		Consumer<Float> extract = (energy) -> {
 			energyStorage.modifyEnergyStored((int)(-energy/(1-loss)));

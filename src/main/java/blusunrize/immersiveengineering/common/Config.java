@@ -73,6 +73,10 @@ public class Config
 		@RequiresWorldRestart
 		public static boolean blocksBreakWires = true;
 
+		@Comment({"\"City mode\": treats the IE wire network as simple, lossless power. When enabled, a powered connector pushes energy straight to the devices on its network with no per-wire loss and no distance/path weighting -- the realistic-grid simulation (loss, proportional distribution, the double simulate/transfer pass) is skipped.",
+				"This keeps the look and feel of connectors, relays, transformers and catenary wires while greatly reducing the wire network's server-tick cost. Intended for decorative / city packs that don't want power management. Existing worlds are unaffected; toggling this only changes how power is distributed at runtime."})
+		public static boolean cityMode = false;
+
 		@Comment({"By default all devices that accept cables have increased renderbounds to show cables even if the block itself is not in view.", "Disabling this reduces them to their minimum sizes, which might improve FPS on low-power PCs"})
 		//TODO this is for TESR wires. Remove?
 		public static boolean increasedRenderboxes = true;
