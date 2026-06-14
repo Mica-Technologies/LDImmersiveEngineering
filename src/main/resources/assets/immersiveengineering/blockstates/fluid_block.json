@@ -17,6 +17,12 @@
 		"biodiesel": [{
 			"custom": { "fluid": "biodiesel" }
 		}],
+		"propane": [{
+			"custom": { "fluid": "propane" }
+		}],
+		"natural_gas": [{
+			"custom": { "fluid": "natural_gas" }
+		}],
 		"concrete": [{
 			"custom": { "fluid": "concrete" }
 		}],
