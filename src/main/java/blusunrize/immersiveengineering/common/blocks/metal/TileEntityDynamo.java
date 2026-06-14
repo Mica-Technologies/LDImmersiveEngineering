@@ -36,11 +36,15 @@ public class TileEntityDynamo extends TileEntityIEBase implements IIEInternalFlu
 		if(side!=this.facing.getOpposite())
 			return;
 		int output = (int)(IEConfig.Machines.dynamo_output*rotation);
+		if(output <= 0)
+			return;
 		for(EnumFacing fd : EnumFacing.VALUES)
 		{
 			BlockPos outputPos = getPos().offset(fd);
 			TileEntity te = Utils.getExistingTileEntity(world, outputPos);
 			output -= EnergyHelper.insertFlux(te, fd.getOpposite(), output, false);
+			if(output <= 0)
+				break;
 		}
 	}
 

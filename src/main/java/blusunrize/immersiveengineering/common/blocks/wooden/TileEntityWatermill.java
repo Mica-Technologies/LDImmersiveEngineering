@@ -49,6 +49,16 @@ public class TileEntityWatermill extends TileEntityIEBase implements ITickable, 
 //		return true;
 //	}
 
+	//Cached so isBlocked()'s ~8 block-state checks (run on this wheel and each neighbour via canUse every
+	//tick) recompute at most every 64 ticks -- the geometry around a running wheel is static.
+	private boolean cachedBlocked = false;
+	private long lastBlockedCheck = -64;
+	//Cached accumulator/dynamo on the output side; re-resolved only when it goes invalid instead of a
+	//getTileEntity lookup every tick.
+	private TileEntity cachedAcc = null;
+	//Reused across the two neighbour loops so they don't each re-fetch the same watermill TEs every tick.
+	private final java.util.List<TileEntityWatermill> sharedWheels = new java.util.ArrayList<>();
+
 	@Override
 	public void update()
 	{
@@ -69,15 +79,19 @@ public class TileEntityWatermill extends TileEntityIEBase implements ITickable, 
 		}
 		prevRotation = rotation;
 
-		TileEntity acc = Utils.getExistingTileEntity(world, getPos().offset(facing.getOpposite()));
+		if(cachedAcc==null||cachedAcc.isInvalid())
+			cachedAcc = Utils.getExistingTileEntity(world, getPos().offset(facing.getOpposite()));
+		TileEntity acc = cachedAcc;
 		if(!multiblock&&acc instanceof IRotationAcceptor)
 		{
 			double power = getPower();
+			sharedWheels.clear();
 			int l = 1;
 			TileEntity tileEntity = Utils.getExistingTileEntity(world, getPos().offset(facing, l));
 			while(l < 3
 					&&canUse(tileEntity))
 			{
+				sharedWheels.add((TileEntityWatermill)tileEntity);
 				power += ((TileEntityWatermill)tileEntity).getPower();
 				l++;
 				tileEntity = Utils.getExistingTileEntity(world, getPos().offset(facing, l));
@@ -87,16 +101,13 @@ public class TileEntityWatermill extends TileEntityIEBase implements ITickable, 
 			canTurn = perTick!=0;
 			rotation += perTick;
 			rotation %= 1;
-			for(int l2 = 1; l2 < l; l2++)
+			//Reuse the wheels gathered above instead of a second round of world.getTileEntity lookups.
+			for(TileEntityWatermill wheel : sharedWheels)
 			{
-				tileEntity = world.getTileEntity(getPos().offset(facing, l2));
-				if(tileEntity instanceof TileEntityWatermill)
-				{
-					((TileEntityWatermill)tileEntity).rotation = rotation;
-					((TileEntityWatermill)tileEntity).canTurn = canTurn;
-					((TileEntityWatermill)tileEntity).perTick = perTick;
-					((TileEntityWatermill)tileEntity).multiblock = true;
-				}
+				wheel.rotation = rotation;
+				wheel.canTurn = canTurn;
+				wheel.perTick = perTick;
+				wheel.multiblock = true;
 			}
 
 			if(!world.isRemote)
@@ -134,6 +145,17 @@ public class TileEntityWatermill extends TileEntityIEBase implements ITickable, 
 	{
 		if(world==null)
 			return true;
+		long now = world.getTotalWorldTime();
+		if(now-lastBlockedCheck >= 64)
+		{
+			cachedBlocked = computeBlocked();
+			lastBlockedCheck = now;
+		}
+		return cachedBlocked;
+	}
+
+	private boolean computeBlocked()
+	{
 		for(EnumFacing fdY : new EnumFacing[]{EnumFacing.UP, EnumFacing.DOWN})
 			for(EnumFacing fdW : facing.getAxis()==Axis.Z?new EnumFacing[]{EnumFacing.EAST, EnumFacing.WEST}: new EnumFacing[]{EnumFacing.SOUTH, EnumFacing.NORTH})
 			{
