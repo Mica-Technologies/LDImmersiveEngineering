@@ -876,6 +876,14 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 		TileEntityMultiblockMetal multiblock;
 		float transformationPoint = .5f;
 		boolean doProcessStacking = false;
+		//Per-tick memo for the insertion recipe lookup. Hoppers/pipes probe insertItem with
+		//simulate=true and then simulate=false for the same stack in the same tick, so without this the
+		//recipe list is scanned twice for every insertion attempt (and once per attempt for items that
+		//never match). The cache is only honoured within the same world tick, so it self-expires every
+		//tick and can never go stale across a recipe reload.
+		private ItemStack lastQueriedStack = ItemStack.EMPTY;
+		private IMultiblockRecipe lastQueriedRecipe = null;
+		private long lastQueryTick = Long.MIN_VALUE;
 
 		public MultiblockInventoryHandler_DirectProcessing(TileEntityMultiblockMetal multiblock)
 		{
@@ -910,7 +918,18 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 		public ItemStack insertItem(int slot, ItemStack stack, boolean simulate)
 		{
 			stack = stack.copy();
-			IMultiblockRecipe recipe = this.multiblock.findRecipeForInsertion(stack);
+			long now = multiblock.getWorld()!=null?multiblock.getWorld().getTotalWorldTime(): 0;
+			IMultiblockRecipe recipe;
+			if(now==lastQueryTick&&!lastQueriedStack.isEmpty()&&ItemStack.areItemsEqual(lastQueriedStack, stack)
+					&&lastQueriedStack.getCount()==stack.getCount()&&ItemStack.areItemStackTagsEqual(lastQueriedStack, stack))
+				recipe = lastQueriedRecipe;
+			else
+			{
+				recipe = this.multiblock.findRecipeForInsertion(stack);
+				lastQueriedStack = stack.copy();
+				lastQueriedRecipe = recipe;
+				lastQueryTick = now;
+			}
 			if(recipe==null)
 				return stack;
 			ItemStack displayStack = recipe.getDisplayStack(stack);
