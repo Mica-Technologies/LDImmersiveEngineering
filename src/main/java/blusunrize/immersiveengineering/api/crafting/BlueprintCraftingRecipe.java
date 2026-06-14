@@ -311,19 +311,24 @@ public class BlueprintCraftingRecipe extends MultiblockRecipe
 		List<BlueprintCraftingRecipe> recipeList = BlueprintCraftingRecipe.recipeList.get(nbt.getString("blueprintCategory"));
 		for(BlueprintCraftingRecipe recipe : recipeList)
 		{
-			boolean b = false;
-			for(int i = 0; i < inputs.length; i++)
+			//Every saved input must match one of the recipe's inputs (and the counts must line up),
+			//otherwise a recipe that merely shares its first ingredient could be picked by mistake.
+			if(recipe.inputs.length!=inputs.length)
+				continue;
+			boolean allMatch = true;
+			for(int i = 0; i < inputs.length&&allMatch; i++)
 			{
+				boolean matched = false;
 				for(int j = 0; j < recipe.inputs.length; j++)
 					if(recipe.inputs[j].matches(inputs[i]))
 					{
-						b = true;
+						matched = true;
 						break;
 					}
-				if(!b)
-					break;
+				if(!matched)
+					allMatch = false;
 			}
-			if(b)
+			if(allMatch)
 				return recipe;
 		}
 		return null;

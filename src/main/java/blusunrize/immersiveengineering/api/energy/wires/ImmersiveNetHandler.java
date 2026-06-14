@@ -819,9 +819,11 @@ public class ImmersiveNetHandler
 			if(tag==null)
 				return null;
 			int[] iStart = tag.getIntArray("start");
-			BlockPos start = new BlockPos(iStart[0], iStart[1], iStart[2]);
-
 			int[] iEnd = tag.getIntArray("end");
+			//Guard against truncated/corrupt save data so one bad connection can't abort loading the rest
+			if(iStart.length < 3||iEnd.length < 3)
+				return null;
+			BlockPos start = new BlockPos(iStart[0], iStart[1], iStart[2]);
 			BlockPos end = new BlockPos(iEnd[0], iEnd[1], iEnd[2]);
 
 			WireType type = ApiUtils.getWireTypeFromNBT(tag, "cableType");
