@@ -88,8 +88,10 @@ public class TileEntityTurretChem extends TileEntityTurret
 				{
 					Vec3d vecDir = v.add(Utils.RAND.nextGaussian()*scatter, Utils.RAND.nextGaussian()*scatter, Utils.RAND.nextGaussian()*scatter);
 					Vec3d throwerPos = getGunPosition();
-					EntityChemthrowerShot chem = new EntityChemthrowerShot(world, throwerPos.x+v.x*0.875, throwerPos.y+v.y*0.875,
-							throwerPos.z+v.z*0.875, 0, 0, 0, fs);
+					//Spawn along the scattered direction (like the gun turret) so the spray actually fans out
+					//from the muzzle instead of every shot starting on the same unscattered line.
+					EntityChemthrowerShot chem = new EntityChemthrowerShot(world, throwerPos.x+vecDir.x*0.875, throwerPos.y+vecDir.y*0.875,
+							throwerPos.z+vecDir.z*0.875, 0, 0, 0, fs);
 					chem.motionX = vecDir.x*range;
 					chem.motionY = vecDir.y*range;
 					chem.motionZ = vecDir.z*range;

@@ -236,7 +236,10 @@ public abstract class TileEntityTurret extends TileEntityIEBase implements ITick
 		if(!(entity instanceof EntityPlayer)&&!(entity instanceof EntityAnimal)&&!entity.isCreatureType(EnumCreatureType.MONSTER, false)&&!attackNeutrals)
 			return false;
 
-		if(target==null||entity.getDistanceSq(getPos()) < target.getDistanceSq(getPos())) return true;
+		//A valid target must actually be shootable when requested. The old distance-vs-current-target
+		//short-circuit returned true before this check, letting the turret lock onto a target behind a
+		//wall. getTarget() only runs when there is no shootable target anyway, so the distance preference
+		//never drove target switching - dropping it loses nothing and closes the line-of-sight hole.
 		return !checkCanShoot||canShootEntity(entity);
 	}
 
