@@ -217,28 +217,55 @@ def build_pdf(path, chart_a, chart_b):
     S = []
     S.append(Paragraph("City Mode", h1))
     S.append(Paragraph(
-        "A config-gated power simulation for Immersive Engineering 1.12.2 that keeps the "
-        "wiring and removes the grid maths.", sub))
+        "A config-gated mode for Immersive Engineering 1.12.2 that keeps the look of the mod and "
+        "removes the simulation behind it.", sub))
 
     S.append(Paragraph(
-        "City mode keeps every visible part of the electrical system — connectors, relays, "
-        "transformers, breaker switches, energy meters and the catenary wires between them — "
-        "while replacing the simulation behind them with a single lossless push. It exists because "
-        "on a large build the realistic grid is the most expensive thing this mod does per tick.", body))
-    S.append(Paragraph(
-        "It is <b>off by default</b>. With <font face='Courier'>cityMode = false</font> none of the "
-        "paths described here are entered and behaviour is byte-identical to stock.", body))
+        "City mode trades simulation detail for server tick time. It is aimed at city and roleplay "
+        "packs where the mod's machinery is set dressing rather than an engineering puzzle: you keep "
+        "the entire look of the build and give up the physics behind it. It covers four subsystems.", body))
 
-    S.append(Paragraph("Modelled performance", h2))
+    rows = [
+        ["Subsystem", "What is simplified"],
+        ["Wires", "One lossless push per connector instead of loss, distance weighting, proportional split, a double simulate/real pass and a network-wide broadcast."],
+        ["Floodlights", "Beams re-traced only when the light switches or a neighbour changes, never on a timer; light-block count capped per lamp."],
+        ["Generators", "Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and tank drain."],
+        ["Machines", "Idle multiblocks stop re-scanning the recipe list every tick; the scan interval widens."],
+    ]
+    data = [[Paragraph(c, cellb if i == 0 else (cellb if j == 0 else cell))
+             for j, c in enumerate(r)] for i, r in enumerate(rows)]
+    S.append(tbl(data, [1.05 * inch, 5.5 * inch]))
+    S.append(Spacer(1, 10))
+
+    S.append(Paragraph(
+        "It is <b>off by default</b>, and off means byte-identical to stock. "
+        "<font face='Courier'>cityMode</font> is the master switch; "
+        "<font face='Courier'>cityModeWires</font>, "
+        "<font face='Courier'>cityModeFloodlights</font>, "
+        "<font face='Courier'>cityModeGenerators</font> and "
+        "<font face='Courier'>cityModeMachines</font> each default to on, so the master alone "
+        "enables everything while any one subsystem can be declined. Switching the master off is "
+        "always sufficient to restore stock behaviour, and nothing here touches saved data.", body))
+
+    S.append(Paragraph("Modelled performance — the wire subsystem", h2))
     S.append(Image(chart_a, width=6.3 * inch, height=2.17 * inch))
     S.append(Spacer(1, 10))
     S.append(Paragraph(
-        "<b>These are modelled figures, not measurements.</b> They apply the operation counts below "
-        "to the one measured baseline this fork has — a live spark profile of the production "
-        "server, where Immersive Engineering was the single most expensive individual mod at 16.65% "
-        "of active CPU, roughly 11.5 points of which was the wire traversal alone. City mode itself "
-        "has not yet been profiled under live load. Treat the shape as sound and the exact "
-        "percentages as an estimate.", note))
+        "<b>These are modelled figures, not measurements, and they cover the wire subsystem only.</b> "
+        "They apply the operation counts below to the one measured baseline this fork has — a live "
+        "spark profile of the production server, where Immersive Engineering was the single most "
+        "expensive individual mod at 16.65% of active CPU, roughly 11.5 points of which was the wire "
+        "traversal alone. City mode itself has not yet been profiled under live load. Treat the shape "
+        "as sound and the exact percentages as an estimate.", note))
+    S.append(Spacer(1, 4))
+    S.append(Paragraph(
+        "The floodlight, machine and generator work all lives inside the undifferentiated 5.15% "
+        "\"rest of IE\" slice and is deliberately <b>not</b> modelled here, because its value depends "
+        "entirely on what you built. Floodlights scale with how many lamps you have and how obstructed "
+        "their beams are — for a lit city that could plausibly exceed the wire saving, and it is the "
+        "one to measure first. Machines scale with how many multiblocks sit idle holding unusable "
+        "input. Generators are negligible by design; they are in for the gameplay semantics, not the "
+        "CPU. Toggle the sub-flags individually to separate their contributions.", note))
 
     S.append(KeepTogether([
         Paragraph("Where the saving comes from", h2),
@@ -263,14 +290,27 @@ def build_pdf(path, chart_a, chart_b):
         ["Wire shock damage", "sourced from the whole network", "sourced from the local connector"],
         ["Breaker switches", "cut the network", "unchanged"],
         ["Energy meters", "read loss-attenuated throughput", "read full throughput"],
-        ["Generator fuel", "consumed only under load", "unchanged"],
-        ["Machine power needs", "—", "unchanged"],
+        ["Floodlight beams", "re-traced every 512 ticks", "only on switch / neighbour change"],
+        ["Floodlight light count", "uncapped", "capped at 64 per lamp"],
+        ["Generator fuel burn", "per-tick rate from the fluid", "1 mB every 20 ticks, cosmetic"],
+        ["Generator load gate", "only runs under load", "<b>unchanged — deliberately kept</b>"],
+        ["Idle machine recipe scan", "every tick", "every 32 ticks"],
+        ["Machine speed / power needs", "—", "unchanged"],
     ]
     data = [[Paragraph(c, cellb if i == 0 else (cellb if j == 0 else cell))
              for j, c in enumerate(r)] for i, r in enumerate(rows)]
     S.append(tbl(data, [1.5 * inch, 2.75 * inch, 2.3 * inch]))
 
-    S.append(Paragraph("Two consequences worth knowing", h2))
+    S.append(Paragraph("Three consequences worth knowing", h2))
+    S.append(Paragraph("Floodlights stop noticing distant obstructions", h3))
+    S.append(Paragraph(
+        "A floodlight is usually the most expensive block in a city build. Every 512 ticks each one "
+        "re-traces thirteen beams, queues a light block roughly every third block along each, and "
+        "recalculates block lighting — and every light it places is an individually ticking tile "
+        "entity, uncapped, so one unobstructed lamp can own well over a hundred. City mode rebuilds "
+        "only when the light switches or a neighbouring block changes. The cost is that a wall built "
+        "across a beam further out is not noticed until something else triggers a rebuild, leaving "
+        "the lights beyond it floating until the lamp is toggled.", body))
     S.append(Paragraph("Wire burnout is disabled", h3))
     S.append(Paragraph(
         "Overload destruction works by the normal transfer path recording per-connection throughput "
@@ -289,23 +329,31 @@ def build_pdf(path, chart_a, chart_b):
 
     S.append(Paragraph("Does a diesel generator still need fuel?", h2))
     S.append(Paragraph(
-        "<b>Yes.</b> No generator reads the city-mode flag — the entire footprint is four reads "
-        "of one boolean inside the connector class. A diesel generator gates fuel consumption on two "
-        "conditions city mode never touches: something must actually accept power, and there must be "
-        "registered fuel in the tank. With no consumers, connector buffers saturate, the generator's "
-        "simulated insert returns zero, the fan spins down and no fuel burns — in both modes.", body))
+        "<b>Yes.</b> A diesel generator gates on two conditions: something must actually accept "
+        "power, and there must be fuel in the tank. With no consumers, connector buffers saturate, "
+        "the generator's simulated insert returns zero, the fan spins down and no fuel burns — in "
+        "both modes. What city mode makes cosmetic is the <i>rate</i>: instead of deriving a per-tick "
+        "burn rate from the fluid and draining every tick, it sips 1 mB every 20 ticks, so a full "
+        "tank lasts about six and a half hours of runtime.", body))
     S.append(Paragraph(
-        "What city mode changes is the yield per unit of fuel: the 4096 FE/t leaving the generator "
-        "arrives undiminished instead of being attenuated by every wire segment on the way. More "
-        "useful power per bucket of biodiesel, but never power from nothing — only what receivers "
-        "actually accepted is deducted from the connector.", body))
+        "The load gate is kept deliberately. Only running when something wants power is a "
+        "<i>performance</i> feature, not a realism one — it is what makes an idle generator free. "
+        "Removing it would make city mode slower, not faster, because generators would push energy "
+        "at saturated connectors every tick only for it to be discarded.", body))
+    S.append(Paragraph(
+        "City mode also raises the yield per unit of fuel, because the 4096 FE/t leaving the "
+        "generator arrives undiminished instead of being attenuated by every wire segment on the "
+        "way. More useful power per bucket of biodiesel, but never power from nothing — only what "
+        "receivers actually accepted is deducted from the connector.", body))
 
     S.append(Paragraph("Block-by-block summary", h2))
     rows = [
         ["Block", "Role", "Affected by city mode"],
-        ["Diesel Generator", "4096 FE/t, burns fuel only under load", "No — but its output now arrives lossless"],
-        ["Thermoelectric / Dynamo", "push to adjacent blocks only", "No"],
-        ["Windmill / Water Wheel", "drive the dynamo, produce no FE", "No"],
+        ["Diesel Generator", "4096 FE/t, burns fuel only under load", "<b>Yes</b> — fuel burn becomes a token sip; load gate kept"],
+        ["Thermoelectric / Dynamo", "push to adjacent blocks only", "No — already cached or event-driven"],
+        ["Windmill / Water Wheel", "drive the dynamo, produce no FE", "No — already cached and throttled"],
+        ["Floodlight", "13 beams of ticking light blocks", "<b>Yes</b> — no timed re-scan, 64-light cap"],
+        ["Multiblock machines", "Arc Furnace, Squeezer, Fermenter, Mixer, Refinery", "<b>Yes</b> — idle recipe scan throttled to 32 ticks"],
         ["Capacitor LV/MV/HV", "buffer; 256 / 1024 / 4096 FE/t", "No"],
         ["Creative Capacitor", "infinite source, all six sides", "No — works as an infinite source in both modes"],
         ["Lightning Rod", "16,000,000 FE on a strike", "No"],
@@ -314,7 +362,7 @@ def build_pdf(path, chart_a, chart_b):
         ["Transformer", "tier adapter; holds no energy", "<b>Yes</b> — tier throttling disappears"],
         ["Breaker Switch", "interrupts the network", "No — still cuts"],
         ["Energy Meter", "passive throughput accumulator", "Works, and reads the full unattenuated amount"],
-        ["Machines", "receive by push into their own buffer", "No — their own intake caps still apply"],
+        ["Machine power intake", "receive by push into their own buffer", "No — their own intake caps still apply"],
         ["Direct generator → machine", "no wires involved", "No — entirely unaffected"],
     ]
     data = [[Paragraph(c, cellb if i == 0 else (cellb if j == 0 else cell))

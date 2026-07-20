@@ -5,51 +5,84 @@ Technical documentation for the fork's config-gated "city mode" power simulation
 
 ## Overview
 
-City mode is an opt-in setting that keeps every visible part of Immersive Engineering's
-electrical system — connectors, relays, transformers, breaker switches, energy meters and the
-catenary wires strung between them — while replacing the *simulation* behind them with a single
-lossless push.
+City mode trades Immersive Engineering's simulation detail for server tick time. It is aimed at
+city/roleplay packs where the mod's machinery is set dressing rather than an engineering puzzle:
+you keep the entire look of the build, and give up the physics behind it.
 
-It exists for one reason: on a large build, the realistic grid is the most expensive thing
-Immersive Engineering does per tick. A live profile of a heavily-modded server measured IE at
-**16.65% of active server CPU — the single most expensive individual mod** — of which roughly
-**11.5 percentage points** were the wire energy traversal alone. City mode targets exactly that
-traversal and leaves the rest of the mod untouched.
+It covers four subsystems:
 
-The trade is deliberate: you give up wire loss, voltage-tier throughput limits, distance-weighted
-distribution and wire burnout. You keep fuel costs, generator output rates, machine power
-requirements, connector throughput caps, breaker switches, energy meters and the entire look of
-the build. It is aimed at city/roleplay packs where the wiring is set dressing rather than an
-engineering puzzle.
+| Subsystem | What is simplified |
+|---|---|
+| **Wires** | One lossless push per connector instead of loss, distance weighting, proportional split, a double simulate/real pass and a network-wide broadcast. |
+| **Floodlights** | Beams are re-traced only when the light switches or a neighbour changes, never on a timer, and the number of light blocks one lamp may place is capped. |
+| **Generators** | Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and a per-tick tank drain. |
+| **Machines** | Idle multiblocks stop re-scanning the recipe list every tick, and the scan interval widens. |
 
-**It is off by default.** With `cityMode = false` the code paths below are not entered and
-behaviour is byte-identical to stock Immersive Engineering.
+**It is off by default**, and off means byte-identical to stock.
 
 ```
-Config → Immersive Engineering → general → cityMode   (default: false)
+Config → Immersive Engineering → general
+    cityMode             (default: false)   ← master switch
+    cityModeWires        (default: true)
+    cityModeFloodlights  (default: true)
+    cityModeGenerators   (default: true)
+    cityModeMachines     (default: true)
 ```
 
-The flag is a plain `public static boolean` read live every tick
-(`common/Config.java:78`), so it takes effect on config reload without a world restart.
+`cityMode` is the master switch. The four sub-flags default to on, so enabling the master alone
+turns on everything; a subsystem is simplified only when the master is on **and** that sub-flag
+has not been turned off. Switching the master off is therefore always sufficient to restore stock
+behaviour. All five are plain booleans read live, so they take effect on config reload without a
+world restart, and none of them touch saved data in either direction.
+
+Every call site resolves the pairing through `common/util/CityMode.java`
+(`CityMode.wires()`, `.floodlights()`, `.generators()`, `.machines()`) rather than repeating the
+conjunction.
+
+### Why these four, in this order
+
+Cost is `instance count × per-tick cost`, and that ordering is not intuitive.
+
+A live profile of a heavily-modded server measured IE at **16.65% of active server CPU — the
+single most expensive individual mod** — of which roughly **11.5 points** were the wire traversal
+alone. Connectors number in the hundreds to thousands on a real build, which is exactly how they
+came to dominate. That is why wires came first.
+
+**Floodlights** are second because a city lights its streets. Each lamp re-traces 13 beams and
+recalculates block lighting on a timer, and every light block it places is an individually ticking
+tile entity with no cap on the count — so one lamp is really one block plus dozens of ticking
+children. Instance count in a city rivals connectors.
+
+**Machines** are third, and the win is narrower than it looks: the expensive case is an *idle*
+machine holding input it cannot use, not a busy one.
+
+**Generators are last and worth the least.** A diesel generator's entire tick is a handful of
+lookups and inserts; a city runs maybe ten to thirty of them. Making every generator in the world
+free would reclaim on the order of 0.05% of a tick. The generator changes here are about the
+*gameplay* semantics — fuel as set dressing — not about reclaiming CPU.
 
 ---
 
-## Code footprint
+## Wires
 
-City mode is remarkably small. It is **four runtime reads of one boolean**, all inside a single
+The wire subsystem is the original city mode and by far the largest saving.
+
+### Code footprint
+
+The wire changes are remarkably small — **four calls to `CityMode.wires()`**, all inside a single
 class:
 
 | Location | Purpose |
 |---|---|
-| `common/Config.java:78` | The flag itself, plus its `@Comment` documentation. |
 | `TileEntityConnectorLV.java:73-74` | Tick dispatch: `cityModeTransfer()` instead of the double `transferEnergy` pass. |
 | `TileEntityConnectorLV.java:91` | Skips the `notifyAvailableEnergy` network broadcast in the tick path. |
 | `TileEntityConnectorLV.java:321` | Skips the same broadcast in `receiveEnergy` (the input path). |
 | `TileEntityConnectorLV.java:510` | Forces the loss rate to zero in `getEnergyForConnection`. |
 
-Everything else — every generator, every machine, every capacitor, the path-finder, the cache,
-the save format — is completely unaware of the flag. That is the design: city mode changes *how
-much energy moves between connectors and how the amount is computed*, and nothing else.
+Nothing else in the energy system is aware of the flag — not the path-finder, not the route cache,
+not the save format, and **not a single generator, machine or capacitor**. City mode's wire
+subsystem changes *how much energy moves between connectors and how the amount is computed*, and
+nothing else. (The other three subsystems below are equally self-contained, in their own classes.)
 
 Because `TileEntityConnectorMV extends TileEntityConnectorLV` and
 `TileEntityConnectorHV extends TileEntityConnectorMV`, all three voltage tiers and all three
@@ -57,7 +90,7 @@ relays inherit the behaviour verbatim.
 
 ---
 
-## The per-tick path, side by side
+### The per-tick path, side by side
 
 Both modes share the same entry guard in `TileEntityConnectorLV.update()`
 (`TileEntityConnectorLV.java:62-96`): server side only, and the entire body is skipped when the
@@ -79,7 +112,7 @@ flowchart TD
     C2 --> Z
 ```
 
-### Normal mode — what the three passes actually do
+#### Normal mode — what the three passes actually do
 
 `transferEnergy` (`TileEntityConnectorLV.java:409`) runs **twice per tick**, once to simulate and
 once for real. Each invocation:
@@ -102,7 +135,7 @@ connector's energy to every reachable node.
 Note the loss model is counter-intuitive: `Connection.getBaseLoss` scales loss *up* when a wire is
 lightly loaded, so a barely-used long wire is proportionally worse than a saturated one.
 
-### City mode — one pass
+#### City mode — one pass
 
 `cityModeTransfer()` (`TileEntityConnectorLV.java:365`) in full:
 
@@ -148,9 +181,9 @@ Three properties worth stating plainly:
 
 ---
 
-## Block-by-block behaviour
+### Block-by-block behaviour
 
-### Power sources
+#### Power sources
 
 **No generator reads the city-mode flag.** Every one of them produces energy, consumes its
 resource, and pushes to adjacent blocks through `EnergyHelper.insertFlux` exactly as it always
@@ -167,7 +200,7 @@ and only then does city mode become relevant.
 | **Creative Capacitor** | yes | nothing | `Integer.MAX_VALUE` every tick to every neighbour | push to all 6 sides | no |
 | **Lightning Rod** | yes (master only) | weather + structure height | sets buffer to `lightning_output` = **16,000,000 FE** on a strike | push, 2 blocks out horizontally | no |
 
-#### Does a diesel generator still need fuel in city mode?
+##### Does a diesel generator still need fuel in city mode?
 
 **Yes.** This is worth spelling out because it is the most common misunderstanding of what city
 mode does.
@@ -195,7 +228,7 @@ One caveat inherited from stock IE, present in both modes: the demand check is c
 "did anyone accept *anything*?", so a connector willing to take 1 FE keeps the generator burning
 fuel at the full per-tick rate for that tick.
 
-### Transmission
+#### Transmission
 
 | Block | Role | City mode effect |
 |---|---|---|
@@ -205,7 +238,7 @@ fuel at the full per-tick rate for that tick.
 | **Breaker Switch** | `allowEnergyToPass()` returns its active flag. | **None — still cuts.** Honoured both in the path-finder and as an endpoint gate in `cityModeTransfer`. |
 | **Energy Meter** | Passive accumulator via `onEnergyPassthrough`. | Works, but only because `cityModeTransfer` explicitly replays the hook along each route. See below. |
 
-#### Transformers and voltage tiers
+##### Transformers and voltage tiers
 
 A transformer never loses or caps anything itself. Tier limiting is *emergent*: the path-finder
 records the **weakest wire on the whole path** as an `AbstractConnection`'s `cableType`. In normal
@@ -219,7 +252,7 @@ The *connection* rules are unchanged: you still cannot attach LV wire to an HV c
 transformer still requires exactly one higher-tier and one lower-tier coil. City mode is voltage
 agnostic in throughput, not in construction.
 
-#### Energy meters
+##### Energy meters
 
 Meters needed two fixes to work in city mode, both worth knowing about if you touch this code:
 
@@ -234,7 +267,7 @@ Meters needed two fixes to work in city mode, both worth knowing about if you to
 Because city mode is lossless, the meter sees the **full** amount at every hop, whereas normal
 mode reports the loss-attenuated figure that segment actually carried.
 
-#### Wire types
+##### Wire types
 
 | Wire | Transfer FE/t | Loss / 16 blocks | Max length | Tier | Conductive | Shocks |
 |---|---|---|---|---|---|---|
@@ -257,7 +290,7 @@ non-conductive segment is rejected whole, in both modes.
 **In city mode the transfer-rate and loss columns above stop applying.** Max length still does —
 it is enforced by the coil item when you place the wire, not during transfer.
 
-### Consumers
+#### Consumers
 
 Machines never pull from the network. Delivery is always a push, along one fixed chain that is
 **byte-identical in both modes**:
@@ -303,6 +336,93 @@ the net handler or the wire types.
 
 ---
 
+## Floodlights
+
+Gated behind `cityModeFloodlights`. Implemented in `TileEntityFloodlight`.
+
+A floodlight is usually the most expensive block in a city build, and until this change nothing
+about it had been optimised at all.
+
+**What a floodlight does every 512 ticks, in stock:** re-traces all **13 beams**, walking up to 32
+blocks per ray and queueing a light block roughly every third block, then calls
+`world.checkLightFor` to recalculate block lighting. Every light it places is a
+`TileEntityFakeLight` — **an individually ticking tile entity** — and nothing caps how many there
+are, so one unobstructed lamp can own well over a hundred. The queue is then drained at up to 32
+`world.setBlockState` calls every 8 ticks, each of which triggers its own lighting recalculation,
+chunk re-render and neighbour notification.
+
+So a single street lamp is not one ticking block. It is one block plus dozens of ticking children,
+plus a periodic burst of light propagation. Multiply by the number of lamps in a lit city.
+
+**City mode makes two changes:**
+
+1. **No periodic re-scan.** The 512-tick rebuild exists to notice the world changing around a beam
+   — someone builds a wall through it, or mines one away. City mode assumes static surroundings and
+   rebuilds only when the light actually switches or a neighbouring block changes (the latter
+   already sets `shouldUpdate`, so deliberate edits next to the lamp are still picked up).
+2. **A cap of 64 queued lights per floodlight.**
+
+**What you give up:** a change *further out along a beam* — not adjacent to the lamp — is not
+noticed until something else triggers a rebuild. In practice that means a wall built across a beam
+leaves the lights beyond it floating until the lamp is toggled. Reaching the 64-light cap stops the
+remaining rays before they ray-trace, which can leave a beam lit asymmetrically; only pathological
+setups get there.
+
+---
+
+## Generators
+
+Gated behind `cityModeGenerators`. Implemented in `TileEntityDieselGenerator`.
+
+Be clear about the motivation: **this is a gameplay change, not a meaningful performance win.** See
+"Why these four, in this order" above — generators are too few to matter. What it buys is the
+semantics: fuel as set dressing.
+
+**Stock:** derives a per-tick burn rate from the fluid (`1000/burnTime`) and drains the tank
+**every tick**, which also dirties the tank every tick.
+
+**City mode:** checks that fuel is present and drains **1 mB every 20 ticks**. A full 24-bucket
+tank lasts roughly six and a half hours of runtime — cosmetic, but visible enough that tanks still
+drain and refuelling is still part of running a generator. Output was already a flat config value
+and is unchanged.
+
+**The load gate is deliberately kept.** "Only run when something actually wants power" is a
+*performance* feature, not a realism one — it is what makes an idle generator free. Removing it
+would have made city mode **slower**, because generators would push energy at saturated connectors
+every tick only for it to be discarded. An idle generator still burns nothing in either mode.
+
+The tank only ever accepts fluids registered as valid fuel, so requiring 1 mB of it is a genuine
+"is there fuel" test rather than an invitation to run a city on water.
+
+Other generators are unchanged, because there is nothing worth changing: the thermoelectric
+generator already recomputes only every 1024 ticks, the dynamo is event-driven and does not tick at
+all, and the windmill and water wheel were already cached and throttled.
+
+---
+
+## Machines
+
+Gated behind `cityModeMachines`. Implemented in `TileEntityMultiblockMetal` and used by the Arc
+Furnace, Squeezer, Fermenter, Mixer and Refinery.
+
+The existing recipe-scan throttle deliberately **exempted idle machines**: the condition was
+"queue empty **or** the interval elapsed", so a machine with nothing queued re-scanned every single
+tick to pick up new input immediately.
+
+That exemption protects the wrong case. A busy machine topping up its queue was already cheap. The
+expensive one is a machine sitting with input it *cannot use*, re-scanning the entire recipe list
+forever — and for the Arc Furnace that list is inflated to hundreds of entries by the
+auto-generated recycling recipes. A decorative machine in a city build does exactly this,
+indefinitely.
+
+**City mode** applies the throttle to idle machines too, and widens the interval from **8 ticks to
+32**.
+
+**What you give up:** a machine can take up to 1.6 seconds to notice newly inserted items. Recipe
+outputs, processing rates and throughput once running are all untouched.
+
+---
+
 ## What changes, in gameplay terms
 
 | Behaviour | Normal | City mode |
@@ -314,8 +434,14 @@ the net handler or the wire types.
 | Wire shock damage | sourced from the whole network's advertised energy | sourced from the local connector's own buffer |
 | Breaker switches | cut the network | unchanged |
 | Energy meters | read loss-attenuated throughput | read full throughput |
-| Generator fuel | consumed only under load | unchanged |
-| Machine power requirements | unchanged | unchanged |
+| Floodlight beams | re-traced every 512 ticks | re-traced only on switch / neighbour change |
+| Floodlight light count | uncapped | capped at 64 per lamp |
+| Generator fuel burn | per-tick rate derived from the fluid | 1 mB every 20 ticks, cosmetic |
+| Generator load gate | only runs under load | **unchanged — deliberately kept** |
+| Generator output | flat config value | unchanged |
+| Idle machine recipe scan | every tick | every 32 ticks |
+| Machine recipe outputs / speed | — | unchanged |
+| Machine power requirements | — | unchanged |
 
 ### Wire burnout is disabled
 
@@ -396,11 +522,30 @@ by roughly the 6:1 operation ratio.
 
 That is on the order of **10 percentage points of active server CPU** reclaimed on a grid-heavy
 build — but only on a build where the grid is actually large. City mode does nothing for a base
-whose cost is machines, entities or chunk I/O, and the baseline profile showed larger non-IE costs
-elsewhere (chunk NBT handling and vehicle physics both exceeded IE's share).
+whose cost is entities or chunk I/O, and the baseline profile showed larger non-IE costs elsewhere
+(chunk NBT handling and vehicle physics both exceeded IE's share).
 
-To validate on your own server, capture a profile before and after per
-`docs/agent-plans/SPARK_MEASUREMENT_GUIDE.md`.
+#### The other three subsystems
+
+The figures above cover **wires only**, because that is the only part the baseline profile can
+speak to — the floodlight, machine and generator work all lives inside the "everything else in IE"
+5.15% slice, which was never broken down.
+
+They are not modelled here, deliberately. Their value depends entirely on *what you built*, in a
+way the wire figure does not:
+
+- **Floodlights** scale with how many lamps you have and how obstructed their beams are. A build
+  with no floodlights saves nothing; a lit city could plausibly save more than the wire change,
+  since the recurring cost is ray-tracing plus light propagation plus a crowd of ticking light
+  blocks. This is the one to measure first if you have street lighting.
+- **Machines** scale with how many multiblocks sit idle holding unusable input. Zero if your
+  machines are all either empty or busy.
+- **Generators** are negligible and are not expected to move the needle at all — they are in for
+  the gameplay semantics.
+
+Anyone quoting a number for these should measure it. To do that on your own server, capture a
+profile before and after per `docs/agent-plans/SPARK_MEASUREMENT_GUIDE.md`, and toggle the
+sub-flags individually so each subsystem's contribution is separable.
 
 ---
 
@@ -410,8 +555,12 @@ With `cityMode = false` — regression check, must be indistinguishable from sto
 
 - [ ] Power behaves exactly as before: loss over long wires, tier throttling, proportional split.
 - [ ] Overloading a copper wire still destroys it with flame particles.
+- [ ] A floodlight still re-scans its beams periodically: build a wall through a lit beam and
+      confirm the lights beyond it disappear within ~25 seconds without touching the lamp.
+- [ ] A diesel generator drains fuel at the stock rate.
+- [ ] A machine picks up hopper-fed input within a tick or two.
 
-With `cityMode = true`:
+With `cityMode = true` — wires:
 
 - [ ] A generator → connectors → machine chain still powers the machine.
 - [ ] Capacitors charge; relays and transformers still pass power.
@@ -419,9 +568,34 @@ With `cityMode = true`:
 - [ ] Redstone, structural rope and steel cable still carry **no** power.
 - [ ] A breaker switch still cuts its network.
 - [ ] An energy meter reads non-zero throughput.
-- [ ] A diesel generator with no consumers attached burns **no** fuel.
 - [ ] Entities touching a powered wire still take shock damage — reduced, and absent on spans
       between two relays. If unwanted, set `enableWireDamage = false`.
-- [ ] Toggling the config off again restores stock behaviour with no save damage.
 
-Saves are unaffected in both directions: city mode adds no NBT and changes no persisted state.
+With `cityMode = true` — floodlights:
+
+- [ ] A floodlight still lights its beams normally when switched on, and goes dark when switched
+      off or unpowered.
+- [ ] Rotating a floodlight with the hammer still moves the beams.
+- [ ] Placing a block directly beside the lamp still triggers a rebuild.
+- [ ] Expected difference: a wall built across a beam **further out** leaves the lights beyond it
+      until the lamp is toggled. Confirm that is acceptable.
+- [ ] No orphaned light blocks are left behind after breaking a floodlight.
+
+With `cityMode = true` — generators:
+
+- [ ] A diesel generator with no consumers attached burns **no** fuel and its fan spins down.
+- [ ] With consumers attached it runs, and the tank drains slowly but visibly.
+- [ ] An empty tank still stops the generator.
+
+With `cityMode = true` — machines:
+
+- [ ] Arc Furnace, Squeezer, Fermenter, Mixer and Refinery all still craft, at unchanged speed.
+- [ ] Hopper-fed input is picked up within ~1.6 s (the widened idle scan interval).
+- [ ] A machine holding non-matching input does not stall a machine beside it.
+
+Finally:
+
+- [ ] Toggling `cityMode` off again restores stock behaviour with no save damage.
+- [ ] Each sub-flag can be turned off individually while the master stays on.
+
+Saves are unaffected in every direction: city mode adds no NBT and changes no persisted state.
