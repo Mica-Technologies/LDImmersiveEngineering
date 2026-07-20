@@ -54,26 +54,28 @@ def _strip(ax, keep_left=True):
 # ---- Chart A: MEASURED cost per configuration ------------------------------
 def chart_cpu_share(path):
     """Measured IE server-thread cost across the profiled configurations."""
-    fig, ax = plt.subplots(figsize=(7.4, 2.5), dpi=220)
+    fig, ax = plt.subplots(figsize=(7.4, 2.75), dpi=220)
 
-    rows = ["Stock\n(wire damage on)", "City mode on", "Wire damage off\n(physics intact)"]
-    # measured IE server-thread CPU, seconds per 120s capture; load-normalised reduction
-    cost = [6.53, 2.72, 2.49]
-    delta = [None, -49, -60]
+    rows = ["Stock baseline", "City mode on", "Wire damage off",
+            "Both", "On-demand damage"]
+    cost = [6.53, 2.72, 2.49, 1.94, None]
+    ypos = [4, 3, 2, 1, 0]
 
-    ypos = [2, 1, 0]
     for i, yy in enumerate(ypos):
-        colour = SERIES_2 if i == 2 else SERIES_1
-        ax.barh(yy, cost[i], height=0.48, color=colour, zorder=3)
-        lbl = f"{cost[i]:.2f}s"
-        if delta[i] is not None:
-            lbl += f"    {delta[i]}%"
-        ax.text(cost[i] + 0.16, yy, lbl, va="center", ha="left", fontsize=10.5,
-                color=INK_PRIMARY, fontweight="bold")
+        if cost[i] is None:
+            # the shipped fix: measured runs all predate it
+            ax.barh(yy, 2.4, height=0.48, color="none", zorder=3,
+                    edgecolor=SERIES_2, linewidth=1.4, linestyle=(0, (3, 2)))
+            ax.text(2.55, yy, "not yet measured", va="center", ha="left",
+                    fontsize=9.5, color=INK_SECOND, style="italic")
+            continue
+        ax.barh(yy, cost[i], height=0.48, color=SERIES_1, zorder=3)
+        ax.text(cost[i] + 0.16, yy, f"{cost[i]:.2f}s", va="center", ha="left",
+                fontsize=10.5, color=INK_PRIMARY, fontweight="bold")
 
     ax.set_yticks(ypos)
     ax.set_yticklabels(rows, fontsize=9.5, color=INK_PRIMARY)
-    ax.set_xlim(0, 8.4)
+    ax.set_xlim(0, 8.0)
     ax.set_xticks([0, 2, 4, 6, 8])
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}s"))
     ax.tick_params(axis="x", labelsize=9)
@@ -84,9 +86,10 @@ def chart_cpu_share(path):
     ax.set_title("Measured: Immersive Engineering server CPU per 120s capture",
                  fontsize=12.5, color=INK_PRIMARY, pad=12, loc="left",
                  fontweight="bold")
-    fig.text(0.012, -0.04,
-             "Percentages are the load-normalised reduction against the stock baseline. "
-             "Turning wire damage off beats city mode and keeps every power mechanic.",
+    fig.text(0.012, -0.05,
+             "The three optimised runs are within the baseline's own run-to-run noise, so they are "
+             "not distinguishable\nfrom each other. All remove the same broadcast, which is why "
+             "applying two of them together is not additive.",
              fontsize=8.5, color=INK_MUTED)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
@@ -203,25 +206,31 @@ def build_pdf(path, chart_a, chart_b):
 
     S.append(Paragraph("The headline", h2))
     S.append(Paragraph(
-        "<b>Set <font face='Courier'>enableWireDamage = false</font>.</b> On a profiled world it cut "
-        "Immersive Engineering's server CPU by <b>60%</b> while changing nothing else about how the "
-        "mod plays — wire loss, voltage tiers, proportional power distribution and wire burnout all "
-        "stay exactly as they are. It is a bigger win than city mode, and it costs you one feature: "
-        "entities no longer take shock damage from touching a live wire.", body))
+        "<b>You do not need to configure anything.</b> The expensive part of the wire network has "
+        "been removed in code. On a profiled world, roughly <b>half</b> of everything Immersive "
+        "Engineering did was a single per-tick broadcast that existed only to feed wire-shock "
+        "damage — running whether or not anything was near a wire, and running even when wire "
+        "damage was switched off. That figure is now computed on demand, when an entity actually "
+        "touches a wire. Nothing about gameplay changes, and no setting is involved.", body))
     S.append(Paragraph(
-        "That is not what anyone expected, including the author of city mode. The wire network's cost "
-        "turned out not to be its physics but a per-tick, whole-network broadcast that exists only to "
-        "feed that damage feature.", body))
+        "Getting there took a wrong turn worth recording. The first fix was to skip the broadcast "
+        "when <font face='Courier'>enableWireDamage=false</font>, which measured a ~60% cut — better "
+        "than city mode, the feature built specifically to make the wire network cheap. That made it "
+        "obvious the cost was never the physics, and the right move was to stop broadcasting "
+        "entirely rather than make anyone choose.", body))
 
     S.append(Paragraph("Recommended configurations", h2))
     rows = [
         ["Goal", "Set", "Result"],
-        ["<b>Recommended</b> — fastest, keeps the gameplay",
-         "enableWireDamage = false<br/>cityMode = false",
-         "~60% less IE server CPU. Loss, voltage tiers, proportional distribution and wire burnout all intact. Only wire shock damage is lost."],
+        ["<b>Recommended</b> — the defaults",
+         "enableWireDamage = true<br/>cityMode = false",
+         "Full realistic grid, wire damage working, and the cost that used to make people turn it off is gone for everyone."],
+        ["No wire shock damage",
+         "enableWireDamage = false",
+         "A gameplay choice now, not a performance one. It used to be the biggest performance setting in the mod; it no longer is."],
         ["City / roleplay pack",
-         "cityMode = true<br/>enableWireDamage = false",
-         "~49% from city mode alone. Choose it for the gameplay — lossless voltage-agnostic wires, no burnout — not for speed; the row above is faster."],
+         "cityMode = true",
+         "For the gameplay — lossless voltage-agnostic wires, no burnout — not for speed. What is left of its performance case is ~1.6% of active CPU."],
         ["Leave alone",
          "validateConnections = false<br/>pump_placeCobble = true",
          "Both already default. The first slows world load; the second stops flowing-fluid updates propagating."],
@@ -266,13 +275,18 @@ def build_pdf(path, chart_a, chart_b):
     S.append(Image(chart_a, width=6.3 * inch, height=2.13 * inch))
     S.append(Spacer(1, 10))
     S.append(Paragraph(
-        "<b>Measured, not modelled.</b> Four 120-second spark captures of the Server thread on a "
+        "<b>Measured, not modelled.</b> Five 120-second spark captures of the Server thread on a "
         "local world, flying along power lines — the worst case for the route cache, since chunk "
         "streaming keeps invalidating it. Library time is attributed to the calling mod and idle "
-        "(the server thread sleeps 84–90% of the time on an unsaturated world) is excluded. The runs "
-        "were not perfectly load-matched — non-IE time varied between them, which no IE setting can "
-        "cause — so the quoted percentages normalise IE cost against non-IE server work, which "
-        "cancels overall load out. Raw absolutes tell the same story.", note))
+        "(the server thread sleeps 84–92% of the time on an unsaturated world) is excluded.", note))
+    S.append(Spacer(1, 4))
+    S.append(Paragraph(
+        "<b>Read the chart carefully.</b> The two baseline runs differ by 30% from each other, which "
+        "puts this methodology's noise floor around ±13%. The three optimised runs span a smaller "
+        "range than that, so they are <i>not</i> distinguishable from one another — an earlier "
+        "version of this document claimed wire-damage-off beat city mode on the strength of that "
+        "gap, and that claim was wrong. What the runs do show is that combining two of them is not "
+        "additive, which is exactly what you would see if a single shared bottleneck dominated.", note))
     S.append(Spacer(1, 4))
     S.append(Paragraph(
         "<b>The physics is nearly free.</b> The wire-damage-off run keeps the entire realistic "
