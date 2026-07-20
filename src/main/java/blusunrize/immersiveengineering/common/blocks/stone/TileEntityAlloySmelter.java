@@ -19,6 +19,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IProcessTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IUsesBooleanProperty;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
+import blusunrize.immersiveengineering.common.util.RecipeScanCache;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.inventory.IIEInventory;
 import net.minecraft.item.Item;
@@ -208,12 +209,18 @@ public class TileEntityAlloySmelter extends TileEntityMultiblockPart<TileEntityA
 		}
 	}
 
+	private final RecipeScanCache<AlloyRecipe> recipeScanCache = new RecipeScanCache<>();
+
 	@Nullable
 	public AlloyRecipe getRecipe()
 	{
 		if(inventory.get(0).isEmpty()||inventory.get(1).isEmpty())
 			return null;
-		AlloyRecipe recipe = AlloyRecipe.findRecipe(inventory.get(0), inventory.get(1));
+		//update() reaches getRecipe() up to four times per tick and each call re-scanned the whole
+		//recipe list. The scan is memoized for the current tick; the check below stays live.
+		AlloyRecipe recipe = world==null
+				?AlloyRecipe.findRecipe(inventory.get(0), inventory.get(1))
+				: recipeScanCache.get(world.getTotalWorldTime(), inventory.get(0), inventory.get(1), AlloyRecipe::findRecipe);
 		if(recipe==null)
 			return null;
 		if(inventory.get(3).isEmpty()||(OreDictionary.itemMatches(inventory.get(3), recipe.output, true)&&inventory.get(3).getCount()+recipe.output.getCount() <= getSlotLimit(3)))

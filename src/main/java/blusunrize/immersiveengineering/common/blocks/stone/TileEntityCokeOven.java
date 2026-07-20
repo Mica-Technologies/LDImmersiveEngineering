@@ -19,6 +19,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IProcessTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IUsesBooleanProperty;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
+import blusunrize.immersiveengineering.common.util.RecipeScanCache;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.inventory.IEInventoryHandler;
 import blusunrize.immersiveengineering.common.util.inventory.IIEInventory;
@@ -193,9 +194,15 @@ public class TileEntityCokeOven extends TileEntityMultiblockPart<TileEntityCokeO
 		}
 	}
 
+	private final RecipeScanCache<CokeOvenRecipe> recipeScanCache = new RecipeScanCache<>();
+
 	public CokeOvenRecipe getRecipe()
 	{
-		CokeOvenRecipe recipe = CokeOvenRecipe.findRecipe(inventory.get(0));
+		//update() reaches getRecipe() up to three times per tick and each call re-scanned the whole
+		//recipe list. The scan is memoized for the current tick; the checks below stay live.
+		CokeOvenRecipe recipe = world==null
+				?CokeOvenRecipe.findRecipe(inventory.get(0))
+				: recipeScanCache.get(world.getTotalWorldTime(), inventory.get(0), CokeOvenRecipe::findRecipe);
 		if(recipe==null)
 			return null;
 
