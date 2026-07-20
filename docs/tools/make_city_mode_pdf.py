@@ -51,39 +51,39 @@ def _strip(ax, keep_left=True):
     ax.tick_params(length=0)
 
 
-# ---- Chart A: modelled active-server-CPU share ------------------------------
+# ---- Chart A: MEASURED Immersive Engineering cost ---------------------------
 def chart_cpu_share(path):
+    """Measured IE server-thread cost, city mode off (avg of 2 runs) vs on."""
     fig, ax = plt.subplots(figsize=(7.4, 2.55), dpi=220)
 
-    rows = ["Normal", "City mode"]
+    rows = ["City mode off", "City mode on"]
     y = [1, 0]
-    traversal = [11.5, 1.5]
-    rest_of_ie = [5.15, 5.15]
+    # measured ms of Server-thread CPU over a 120s capture, library time attributed
+    traversal = [6.29, 2.52]      # wire traversal, seconds
+    rest_of_ie = [0.24, 0.20]     # everything else in IE, seconds
 
     H = 0.42
     # 2px-equivalent surface gap between stacked segments
-    gap = 0.09
+    gap = 0.035
     for i, yy in enumerate(y):
         ax.barh(yy, traversal[i], height=H, color=SERIES_1, zorder=3)
         ax.barh(yy, rest_of_ie[i], height=H, left=traversal[i] + gap,
                 color=SERIES_2, zorder=3)
 
         total = traversal[i] + rest_of_ie[i]
-        ax.text(total + 0.75, yy, f"{total:.2f}%".rstrip("0").rstrip("."),
+        ax.text(total + 0.28, yy, f"{total:.2f}s",
                 va="center", ha="left", fontsize=11.5, color=INK_PRIMARY,
                 fontweight="bold")
         # direct labels inside segments where they fit
-        ax.text(traversal[i] / 2, yy, f"{traversal[i]}", va="center", ha="center",
+        ax.text(traversal[i] / 2, yy, f"{traversal[i]:.2f}", va="center", ha="center",
                 fontsize=9.5, color="white", fontweight="bold", zorder=4)
-        ax.text(traversal[i] + gap + rest_of_ie[i] / 2, yy, f"{rest_of_ie[i]}",
-                va="center", ha="center", fontsize=9.5, color="white",
-                fontweight="bold", zorder=4)
+        # rest-of-IE slice is too thin to label inside; left to the legend
 
     ax.set_yticks(y)
     ax.set_yticklabels(rows, fontsize=11, color=INK_PRIMARY)
-    ax.set_xlim(0, 20)
-    ax.set_xticks([0, 5, 10, 15, 20])
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}%"))
+    ax.set_xlim(0, 7.6)
+    ax.set_xticks([0, 2, 4, 6])
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}s"))
     ax.tick_params(axis="x", labelsize=9)
     ax.xaxis.grid(True, color=GRIDLINE, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
@@ -91,13 +91,13 @@ def chart_cpu_share(path):
 
     handles = [plt.Rectangle((0, 0), 1, 1, color=SERIES_1),
                plt.Rectangle((0, 0), 1, 1, color=SERIES_2)]
-    ax.legend(handles, ["Wire energy traversal", "Rest of Immersive Engineering"],
+    ax.legend(handles, ["Wire energy traversal", "Rest of IE"],
               loc="lower right", bbox_to_anchor=(1.0, -0.42), ncol=2,
               frameon=False, fontsize=9.5, handlelength=1.1, handleheight=1.1,
               borderpad=0, columnspacing=1.4,
               labelcolor=INK_SECOND)
 
-    ax.set_title("Immersive Engineering's share of active server CPU",
+    ax.set_title("Measured: Immersive Engineering server-thread CPU per 120s",
                  fontsize=12.5, color=INK_PRIMARY, pad=12, loc="left",
                  fontweight="bold")
     fig.tight_layout()
@@ -105,50 +105,40 @@ def chart_cpu_share(path):
     plt.close(fig)
 
 
-# ---- Chart B: work per powered connector per tick ---------------------------
+# ---- Chart B: MEASURED source of the saving ---------------------------------
 def chart_work(path):
-    fig, ax = plt.subplots(figsize=(7.4, 3.05), dpi=220)
+    """Where city mode's measured saving actually came from."""
+    fig, ax = plt.subplots(figsize=(7.4, 2.75), dpi=220)
 
-    labels = ["Route-set lookups\n(per tick)",
-              "outputEnergy calls\n(per reachable output)",
-              "Per-segment loss maths\n(per output)",
-              "Burnout ledger writes\n(per output)"]
-    normal = [3, 6, 8, 4]
-    city = [1, 1, 0, 0]
+    labels = ["Removing the whole-network\nbroadcast (notifyAvailableEnergy)",
+              "toIIC — overwhelmingly called\nby that broadcast",
+              "Simpler distribution maths\n(loss, sort, proportional split)"]
+    saved = [2444, 1126, 240]
+    total = sum(saved)
 
     ypos = list(range(len(labels)))[::-1]
-    H = 0.34
-    off = 0.19
-
     for i, yy in enumerate(ypos):
-        ax.barh(yy + off, normal[i], height=H, color=SERIES_1, zorder=3)
-        ax.barh(yy - off, city[i], height=H, color=SERIES_2, zorder=3)
-        ax.text(normal[i] + 0.18, yy + off, str(normal[i]), va="center",
-                ha="left", fontsize=10, color=INK_PRIMARY, fontweight="bold")
-        ax.text(city[i] + 0.18, yy - off, str(city[i]), va="center",
-                ha="left", fontsize=10, color=INK_PRIMARY, fontweight="bold")
+        ax.barh(yy, saved[i], height=0.5, color=SERIES_1, zorder=3)
+        ax.text(saved[i] + 45, yy, f"{saved[i]} ms   ({100*saved[i]/total:.0f}%)",
+                va="center", ha="left", fontsize=10, color=INK_PRIMARY,
+                fontweight="bold")
 
     ax.set_yticks(ypos)
     ax.set_yticklabels(labels, fontsize=9.5, color=INK_PRIMARY)
-    ax.set_xlim(0, 9)
-    ax.set_xticks(range(0, 10, 2))
+    ax.set_xlim(0, 3350)
+    ax.set_xticks([0, 1000, 2000, 3000])
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}ms"))
     ax.tick_params(axis="x", labelsize=9)
     ax.xaxis.grid(True, color=GRIDLINE, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
     _strip(ax, keep_left=False)
 
-    handles = [plt.Rectangle((0, 0), 1, 1, color=SERIES_1),
-               plt.Rectangle((0, 0), 1, 1, color=SERIES_2)]
-    ax.legend(handles, ["Normal", "City mode"], loc="lower right",
-              bbox_to_anchor=(1.0, -0.30), ncol=2, frameon=False, fontsize=9.5,
-              handlelength=1.1, handleheight=1.1, borderpad=0, columnspacing=1.4,
-              labelcolor=INK_SECOND)
-
-    ax.set_title("Work per powered connector, per tick",
+    ax.set_title("Measured: where city mode's saving comes from",
                  fontsize=12.5, color=INK_PRIMARY, pad=12, loc="left",
                  fontweight="bold")
-    fig.text(0.012, -0.055,
-             "Segment counts assume an illustrative 4 wire segments per route.",
+    fig.text(0.012, -0.02,
+             "Server-thread CPU saved per 120s capture. The distribution rewrite — the "
+             "conceptual heart of city mode — accounts for 6%.",
              fontsize=8.5, color=INK_MUTED)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
@@ -250,38 +240,48 @@ def build_pdf(path, chart_a, chart_b):
         "enables everything while any one subsystem can be declined. Switching the master off is "
         "always sufficient to restore stock behaviour, and nothing here touches saved data.", body))
 
-    S.append(Paragraph("Modelled performance — the wire subsystem", h2))
+    S.append(Paragraph("Measured performance — the wire subsystem", h2))
     S.append(Image(chart_a, width=6.3 * inch, height=2.17 * inch))
     S.append(Spacer(1, 10))
     S.append(Paragraph(
-        "<b>These are modelled figures, not measurements, and they cover the wire subsystem only.</b> "
-        "They apply the operation counts below to the one measured baseline this fork has — a live "
-        "spark profile of the production server, where Immersive Engineering was the single most "
-        "expensive individual mod at 16.65% of active CPU, roughly 11.5 points of which was the wire "
-        "traversal alone. City mode itself has not yet been profiled under live load. Treat the shape "
-        "as sound and the exact percentages as an estimate.", note))
+        "<b>Measured, not modelled.</b> Three 120-second spark captures of the Server thread on a "
+        "local world, flying along power lines — the worst case for the route cache, since chunk "
+        "streaming keeps invalidating it. Library time is attributed to the calling mod and idle "
+        "(the server thread sleeps ~85% of the time on an unsaturated world) is excluded. Immersive "
+        "Engineering's cost fell from 6.53 s to 2.72 s per capture. The raw drop is 58%, but the runs "
+        "were not perfectly load-matched — non-IE time fell too, which city mode cannot cause — so "
+        "normalising against non-IE work gives <b>~49%</b>, and that is the number to quote. These "
+        "figures cover the wire subsystem only.", note))
     S.append(Spacer(1, 4))
     S.append(Paragraph(
-        "The floodlight, machine and generator work all lives inside the undifferentiated 5.15% "
-        "\"rest of IE\" slice and is deliberately <b>not</b> modelled here, because its value depends "
-        "entirely on what you built. Floodlights scale with how many lamps you have and how obstructed "
-        "their beams are — for a lit city that could plausibly exceed the wire saving, and it is the "
-        "one to measure first. Machines scale with how many multiblocks sit idle holding unusable "
-        "input. Generators are negligible by design; they are in for the gameplay semantics, not the "
-        "CPU. Toggle the sub-flags individually to separate their contributions.", note))
+        "The floodlight, machine and generator subsystems did not register in these captures — "
+        "TileEntityFloodlight.update came in at 0.04%, effectively absent. That neither vindicates "
+        "nor refutes them: the profiled area simply had no lit floodlights and no idle machines "
+        "holding unusable input. Their value depends entirely on what is built and loaded, so measure "
+        "them where they exist, toggling the sub-flags individually. The floodlight work was predicted "
+        "to rival the wire saving in a lit city; that prediction remains unmeasured.", note))
 
     S.append(KeepTogether([
-        Paragraph("Where the saving comes from", h2),
+        Paragraph("Where the saving actually comes from", h2),
         Image(chart_b, width=6.3 * inch, height=2.44 * inch),
     ]))
     S.append(Spacer(1, 10))
     S.append(Paragraph(
-        "The reduction is structural rather than incremental. Normal mode fetches the route set three "
-        "times per tick and runs the distribution twice — a simulate pass to discover demand, then "
-        "a real pass that sorts every output into a TreeMap by loss rate, gives each a proportional "
-        "share, applies per-segment attenuation and records throughput for wire burnout — followed "
-        "by a third full walk of the network to advertise available energy. City mode does one lookup, "
-        "one real push per output, and stops.", body))
+        "This was a surprise, and it overturned the estimate this document previously carried. City "
+        "mode's conceptual heart — replacing the loss maths, the TreeMap sort by loss rate, the "
+        "proportional split and the double simulate/real pass with a single lossless push — accounts "
+        "for about 6% of the saving. Essentially all of it is the removal of one whole-network "
+        "broadcast per connector per tick.", body))
+    S.append(Paragraph(
+        "That has a consequence worth acting on. The broadcast exists solely to feed wire-shock "
+        "damage, so most of this performance is available <i>without</i> giving up loss, voltage tiers "
+        "or wire burnout. The broadcast now respects enableWireDamage — it previously ran every tick "
+        "even with the feature switched off — and computing damage lazily on entity-wire collision "
+        "would give the realistic grid most of city mode's speedup.", body))
+    S.append(Paragraph(
+        "One thing did <i>not</i> improve: getIndirectEnergyConnections was unchanged despite being "
+        "called once per tick instead of three times, so its cost is cache misses being re-flooded "
+        "rather than call count. It is now the largest remaining Immersive Engineering cost.", body))
 
     S.append(Paragraph("What changes, in gameplay terms", h2))
     rows = [

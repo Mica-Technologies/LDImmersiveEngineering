@@ -505,59 +505,79 @@ The reduction is structural rather than incremental: two of the three network wa
 entirely, and the surviving one does a sixth of the per-output work with no sorting and no
 floating-point loss accumulation.
 
-### Estimated tick usage
+**Do not read that table as a cost model.** It counts operations, and operation counts turned out
+to be a poor predictor here — the measurements below show that eliminating the *broadcast* is worth
+roughly ten times the entire reduction in per-output work. It is included to describe what changes,
+not to predict what it saves.
 
-> **These are modelled figures, not measurements.** They are derived by applying the operation
-> counts above to the one *measured* baseline this fork has — a live spark profile of the
-> production server. City mode itself has not yet been profiled under live load. Treat the shape
-> as sound and the exact percentages as an estimate.
+### Measured results
 
-Measured baseline (whole server, active CPU excluding idle):
+These are **measurements**, not a model. Three 120-second `spark` captures of the Server thread on
+a local single-player world, flying along power lines and past transformers and machines — the
+worst case for the route cache, since chunk streaming keeps invalidating it. Library time is
+attributed to the calling mod, and idle (the server thread sleeps ~85% of the time on an
+unsaturated world) is excluded.
 
-| Metric | Value |
-|---|---|
-| Immersive Engineering, total | **16.65%** — the #1 individual mod |
-| ├ wire energy traversal | ~11.5% |
-| │  ├ `notifyAvailableEnergy` | 5.25% |
-| │  ├ `transferEnergy` + `getIndirectEnergyConnections` | ~6.25% |
-| │  └ of which `ApiUtils.toIIC` | 2.23% |
-| └ everything else in IE | ~5.15% |
+| Immersive Engineering, self+library | city OFF (run A) | city OFF (run B) | **city ON** |
+|---|---|---|---|
+| `notifyAvailableEnergy` | 2356 ms | 2532 ms | **0** |
+| `ApiUtils.toIIC` | 1176 ms | 1452 ms | **188 ms** |
+| `transferEnergy` | 1108 ms | 1364 ms | — |
+| `cityModeTransfer` | — | — | 996 ms |
+| `getIndirectEnergyConnections` | 1016 ms | 792 ms | 980 ms |
+| **IE total** | **6364 ms** | **6692 ms** | **2720 ms** |
+| IE share of active CPU | 32.7% | 38.7% | **22.2%** |
 
-Applying the model: city mode removes the `notifyAvailableEnergy` broadcast outright (both the
-tick path and, since this fork's input-path fix, the `receiveEnergy` path), and cuts the push work
-by roughly the 6:1 operation ratio.
+**Immersive Engineering's cost fell by roughly half.** The raw drop is 58%, but the three runs were
+not perfectly load-matched — non-IE time also fell between them, which city mode cannot cause.
+Normalising IE against non-IE work to cancel that out gives a **~49% reduction**, and that is the
+number to quote.
 
-| Share of active CPU | Normal | City mode (modelled) |
+#### Where the saving actually comes from
+
+This was a surprise, and it corrects an earlier estimate in this document that attributed the win
+to the simpler distribution maths:
+
+| Source | Saved | Share |
 |---|---|---|
-| Wire traversal | ~11.5% | **~1.5%** |
-| IE total | ~16.65% | **~6.65%** |
+| Removing the `notifyAvailableEnergy` broadcast | 2444 ms | 64% |
+| `toIIC` — overwhelmingly called *by* that broadcast | 1126 ms | 30% |
+| Simpler distribution (`transferEnergy` → `cityModeTransfer`) | 240 ms | **6%** |
 
-That is on the order of **10 percentage points of active server CPU** reclaimed on a grid-heavy
-build — but only on a build where the grid is actually large. City mode does nothing for a base
-whose cost is entities or chunk I/O, and the baseline profile showed larger non-IE costs elsewhere
-(chunk NBT handling and vehicle physics both exceeded IE's share).
+`cityModeTransfer` measured 996 ms against `transferEnergy`'s ~1236 ms. Dropping the loss maths,
+the `TreeMap` sort, the proportional split and the double simulate/real pass together bought about
+6% of the total. **Essentially all of city mode's benefit is the removal of one whole-network
+broadcast per connector per tick.**
+
+That has a significant consequence: since the broadcast exists solely to feed wire-shock damage,
+most of this performance is available *without* giving up loss, voltage tiers or wire burnout. Two
+changes follow from it, both of which help the realistic grid too:
+
+- The broadcast now respects `enableWireDamage`. It previously ran every tick even with wire damage
+  switched off, feeding a disabled feature.
+- Computing damage lazily on entity-wire collision, rather than broadcasting continuously against
+  the chance of one, would give the realistic grid most of city mode's speedup.
+
+#### What did not improve
+
+`getIndirectEnergyConnections` was essentially unchanged (~904 ms → 980 ms) even though city mode
+calls it once per tick instead of three times. Its cost is therefore not call count — it is cache
+misses being re-flooded (the capture involved constant chunk loading) plus the lookup itself. It is
+now the single largest remaining Immersive Engineering cost, at about 8% of active CPU and over a
+third of what the mod does. The path-finder is still effectively O(V²) on a miss, and that, with
+the cache-invalidation strategy, is the next target.
 
 #### The other three subsystems
 
-The figures above cover **wires only**, because that is the only part the baseline profile can
-speak to — the floodlight, machine and generator work all lives inside the "everything else in IE"
-5.15% slice, which was never broken down.
+The figures above cover **wires only**. The floodlight, machine and generator subsystems did not
+register meaningfully in these captures — `TileEntityFloodlight.update` came in at 0.04%, i.e.
+absent. That does not vindicate or refute them; it means the profiled area had no lit floodlights
+and no idle machines holding unusable input. Their value depends entirely on what is built and
+loaded, so measure them where they actually exist, toggling the sub-flags individually to separate
+each one's contribution.
 
-They are not modelled here, deliberately. Their value depends entirely on *what you built*, in a
-way the wire figure does not:
-
-- **Floodlights** scale with how many lamps you have and how obstructed their beams are. A build
-  with no floodlights saves nothing; a lit city could plausibly save more than the wire change,
-  since the recurring cost is ray-tracing plus light propagation plus a crowd of ticking light
-  blocks. This is the one to measure first if you have street lighting.
-- **Machines** scale with how many multiblocks sit idle holding unusable input. Zero if your
-  machines are all either empty or busy.
-- **Generators** are negligible and are not expected to move the needle at all — they are in for
-  the gameplay semantics.
-
-Anyone quoting a number for these should measure it. To do that on your own server, capture a
-profile before and after per `docs/agent-plans/SPARK_MEASUREMENT_GUIDE.md`, and toggle the
-sub-flags individually so each subsystem's contribution is separable.
+An honest note on the floodlight work: it was predicted to rival the wire saving in a lit city.
+That prediction is so far unmeasured, not confirmed.
 
 ---
 
