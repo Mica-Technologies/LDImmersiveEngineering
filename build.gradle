@@ -1,5 +1,32 @@
 import groovy.json.JsonOutput
 
+// ---------------------------------------------------------------------------
+// Environment guard.
+//
+// ForgeGradle 2.3 only works on Gradle 4.x running on a Java 8 JVM. Every other
+// combination fails deep inside the plugin with an error that says nothing about
+// the actual cause (typically a NoSuchMethodError or a "plugin not found"), which
+// has repeatedly cost time here — IntelliJ has silently rewritten
+// gradle/wrapper/gradle-wrapper.properties to a modern Gradle more than once.
+// Fail immediately instead, with a message that names the fix.
+// ---------------------------------------------------------------------------
+def gradleMajor = gradle.gradleVersion.tokenize('.')[0] as int
+if (gradleMajor != 4) {
+    throw new GradleException(
+            "This project requires Gradle 4.x (pinned to 4.10.3 in gradle/wrapper/gradle-wrapper.properties)," +
+                    " but is running on Gradle ${gradle.gradleVersion}.\n" +
+                    "ForgeGradle 2.3 cannot load on Gradle 5+. If your IDE offered to upgrade the Gradle wrapper," +
+                    " decline it and restore the committed gradle-wrapper.properties:\n" +
+                    "    git checkout -- gradle/wrapper/gradle-wrapper.properties")
+}
+if (!JavaVersion.current().isJava8()) {
+    throw new GradleException(
+            "This project must be built with JDK 8, but Gradle is running on Java ${JavaVersion.current()}.\n" +
+                    "Set the Gradle JVM to a Java 8 JDK (see README.md):\n" +
+                    "    - IntelliJ: Settings > Build Tools > Gradle > Gradle JVM (pinned in .idea/gradle.xml)\n" +
+                    "    - CLI:      use ./build.sh / build.bat, which select the JDK 8 for you")
+}
+
 def mainVersion = "0.12"
 def buildNumber = "98"
 
@@ -30,6 +57,40 @@ archivesBaseName = "ImmersiveEngineering"
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+// Pin the charset for every compile and resource task. Without this, javac and the
+// resource copies use the JVM's platform default — windows-1252 on this machine,
+// UTF-8 on the CI runners — so the same commit produced different class files and
+// different resource bytes depending on where it was built.
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+tasks.withType(AbstractCopyTask) {
+    filteringCharset = 'UTF-8'
+}
+
+// Dependency locking (Gradle 4.8+). The pinned versions above cover direct
+// dependencies; the lockfile in gradle/dependency-locks/ additionally pins the
+// full transitive graph, so a fresh checkout and CI resolve byte-identical
+// classpaths. Only the compile classpath is locked — ForgeGradle 2.3 rebuilds its
+// own internal configurations per run and cannot be locked.
+//
+// After changing any dependency: ./gradlew resolveAndLockAll
+configurations.compileClasspath {
+    resolutionStrategy.activateDependencyLocking()
+}
+
+task resolveAndLockAll {
+    description = 'Regenerates gradle/dependency-locks/ after a dependency change. Run with --write-locks.'
+    group = 'help'
+    doFirst {
+        assert gradle.startParameter.writeDependencyLocks:
+                "Run this task with --write-locks:\n    ./gradlew resolveAndLockAll --write-locks"
+    }
+    doLast {
+        configurations.compileClasspath.resolve()
+    }
+}
+
 minecraft {
     version = "1.12.2-14.23.5.2838"
     runDir = "run"
@@ -44,67 +105,69 @@ minecraft {
     // makeObfSourceJar = false // an Srg named sources jar is made by default. uncomment this to disable.
 }
 
+// All repositories are https. Several of these used to be declared as plain http;
+// every one of them serves https today, and http adds a redirect round-trip (or a
+// silent failure) to every single artifact lookup.
+//
+// Removed as dead, do not re-add without checking first:
+//   - http://tehnut.info/maven  (DNS no longer resolves at all; Hwyla comes from
+//     the CurseForge maven below)
 repositories {
     maven { // JEI & Tinkers
         name 'DVS1 Maven FS'
         url 'https://dvs1.progwml6.com/files/maven'
     }
-    maven { // HWYLA
-        name "TehNuts WAILA fork"
-        url "http://tehnut.info/maven"
-    }
     maven { // OpenComputers
         name "OpenComputers"
-        url "http://maven.cil.li/"
+        url "https://maven.cil.li/"
     }
     maven { // TOP
         name 'tterrag maven'
-        url "http://maven.tterrag.com/"
+        url "https://maven.tterrag.com/"
     }
-//    maven { // McJty's CompatLayer
-//        name 'K4 maven'
-//        url "http://maven.k-4u.nl/"
-//    }
     maven { // CraftTweaker (aka MineTweaker3)
         name 'jared maven'
-        url "http://maven.blamejared.com/"
+        url "https://maven.blamejared.com/"
     }
     maven { // ModMaven, there is a bunch of stuff on there
         name 'ModMaven'
-        url "http://modmaven.k-4u.nl/"
+        url "https://modmaven.k-4u.nl/"
     }
-    repositories {//Curseforge maven, in case some other maven goes offline
-        maven {
-            name = "CurseForge"
-            url = "https://minecraft.curseforge.com/api/maven/"
-        }
+    // Do NOT remove this one. Browsing its root returns HTTP 401, which makes it look
+    // retired, but artifact paths under it serve fine — and it is the only remaining
+    // source for `albedo` (and the fallback for several other compat deps). Verify a
+    // concrete artifact URL, not the root, before concluding this repo is dead.
+    maven { // CurseForge, in case some other maven goes offline
+        name = "CurseForge"
+        url = "https://minecraft.curseforge.com/api/maven/"
     }
-    /*maven { //IC2
-        name = "ic2"
-        url = "http://maven.ic2.player.to/"
-    }*/
     maven { // Redstone Flux
         name 'CoFH Maven'
-        url "http://maven.covers1624.net/"
+        url "https://maven.covers1624.net/"
     }
-    
     maven { // Albedo Lights
+        name 'elytradev'
         url 'https://repo.elytradev.com/'
     }
 }
 
+// Every version is pinned exactly. These were previously dynamic ranges ("4.15.+",
+// "1.12.2+", ...), which meant Gradle re-resolved them every 24 hours and the build
+// could change underneath us with no commit — the classic "it built yesterday" bug.
+// The pinned values below are what the ranges actually resolved to; bump them
+// deliberately and re-run `./gradlew resolveAndLockAll` to refresh the lockfile.
 dependencies {
     compileOnly "team.chisel.ctm:CTM:MC1.12.2-0.3.2.18"
-    compileOnly "mezz.jei:jei_1.12.2:4.15.+"
-    compileOnly "cofh:RedstoneFlux:1.12-2.+:deobf"
-    compileOnly "slimeknights.mantle:Mantle:1.12-1.3.+"
-    compileOnly "slimeknights:TConstruct:1.12.2-2.12.+"
-    compileOnly "mcjty.theoneprobe:TheOneProbe-1.12:1.12-1.+"//1.1x-1.4.4-55
+    compileOnly "mezz.jei:jei_1.12.2:4.15.0.297"                        // was 4.15.+
+    compileOnly "cofh:RedstoneFlux:1.12-2.1.0.7:deobf"                  // was 1.12-2.+
+    compileOnly "slimeknights.mantle:Mantle:1.12-1.3.3.56"              // was 1.12-1.3.+
+    compileOnly "slimeknights:TConstruct:1.12.2-2.12.0.170"             // was 1.12.2-2.12.+
+    compileOnly "mcjty.theoneprobe:TheOneProbe-1.12:1.12-1.4.28-17"     // was 1.12-1.+
     compileOnly "CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.8.468"
-    compileOnly "opencomputers:OpenComputers:MC1.12.2:1.7.2.67"//li.cil.oc:OpenComputers:MC1.12.1-1.7.0.+"
-    compileOnly "hwyla:Hwyla:1.8.20:B35_1.12" //compileOnly "mcp.mobius.waila:Hwyla:1.8.20-B35_1.12"
-    compileOnly 'industrial-craft:industrialcraft-2:release:ex112'//'net.industrial-craft:industrialcraft-2:2.8.+'
-    compileOnly "de.ellpeck.actuallyadditions:ActuallyAdditions:1.12.2+"
+    compileOnly "opencomputers:OpenComputers:MC1.12.2:1.7.2.67"
+    compileOnly "hwyla:Hwyla:1.8.20:B35_1.12"
+    compileOnly 'industrial-craft:industrialcraft-2:release:ex112'
+    compileOnly "de.ellpeck.actuallyadditions:ActuallyAdditions:1.12.2-r152.16"  // was 1.12.2+
     compileOnly 'baubles:Baubles:1.12:1.5.2'
     deobfCompile "albedo:albedo:0.1.3"
 }
@@ -234,10 +297,17 @@ artifacts {
 }
 
 apply plugin: 'maven'
+// Upstream's Bamboo-era publishing. Neither env var is set anywhere in this fork, so
+// the repository URL used to evaluate to the literal string "file://null" on every
+// build. Kept (rather than deleted) to stay close to upstream for future merges, but
+// now only wired up when a target directory is actually configured.
+// Note: this fork does not publish — Blu's license forbids redistributing builds.
+def localMavenDir = System.getenv("local_maven") ?: System.getenv("bamboo_local_maven")
 uploadArchives {
+    onlyIf { localMavenDir != null }
     repositories {
         mavenDeployer {
-            repository(url: "file://" + (System.getenv("local_maven") != null ? System.getenv("local_maven") : System.getenv("bamboo_local_maven")))
+            repository(url: "file://" + (localMavenDir ?: project.file("build/local-maven")))
             pom {
                 groupId = project.group
                 version = project.version
@@ -298,6 +368,29 @@ class GenerateUpdateJSON extends DefaultTask {
     static def LATEST = "-latest"
     static def CF_URL = "https://minecraft.curseforge.com/projects/immersive-engineering"
 
+    // Declared inputs/outputs. Previously this task had none, so it ran on every
+    // single build and dragged processResources (and everything downstream) with it.
+    @InputFile
+    File getSourceChangelog() { project.file("changelog.md") }
+
+    @OutputFile
+    File getUpdateJson() { project.file("changelog.json") }
+
+    @OutputFile
+    File getManualJson() { project.file(CHANGELOG_FOR_MANUAL) }
+
+    /**
+     * Writes {@code text} with LF line endings and UTF-8, regardless of platform.
+     *
+     * Groovy's JsonOutput.prettyPrint uses the platform line separator, so on Windows
+     * this task rewrote both changelog JSONs with CRLF on every build. .gitattributes
+     * stores them as LF, so `git status` came back dirty after every single build
+     * while CI (Linux) never saw it.
+     */
+    private static void writeNormalized(File target, String text) {
+        target.setText(text.replaceAll("\r\n|\r", "\n") + "\n", "UTF-8")
+    }
+
     static int compareVersions(String vA, String vB) {
         String[] vPartsA = vA.split("[\\D]")
         String[] vPartsB = vB.split("[\\D]")
@@ -325,9 +418,14 @@ class GenerateUpdateJSON extends DefaultTask {
     def generate() {
         Map<String, String> mcFromIEVersion = new HashMap<>()
         initVersions(mcFromIEVersion)
-        File changelog = new File("changelog.md")
+        // project.file(), not new File(): the old code was relative to the Gradle
+        // process's working directory rather than the project directory, so any
+        // invocation from outside the project root silently skipped generation.
+        File changelog = getSourceChangelog()
+        // Previously this printed "Aborting!" and let the build SUCCEED, which shipped
+        // a stale changelog.json without any signal. A missing changelog is a bug.
         if (!changelog.exists())
-            println "Changelog does not exist! Aborting!"
+            throw new GradleException("Changelog not found at ${changelog.absolutePath} — cannot generate update JSON.")
         else {
             Map<String, Map<String, String>> changelogForVersions = new HashMap<>()
             Map<String, String> promos = new TreeMap<>({ String s1, String s2 ->
@@ -372,15 +470,11 @@ class GenerateUpdateJSON extends DefaultTask {
             //JSON for the Forge update checker
             def updateJson = JsonOutput.toJson(mainMap)
             updateJson = JsonOutput.prettyPrint(updateJson)
-            File outF = new File("changelog.json")
-            outF.delete()
-            outF << updateJson
+            writeNormalized(getUpdateJson(), updateJson)
             //JSON for the manual
             def manualJson = JsonOutput.toJson(changelogForVersions[CURRENT_MC_VERSION])
             manualJson = JsonOutput.prettyPrint(manualJson)
-            outF = new File(CHANGELOG_FOR_MANUAL)
-            outF.delete()
-            outF << manualJson
+            writeNormalized(getManualJson(), manualJson)
         }
     }
 }

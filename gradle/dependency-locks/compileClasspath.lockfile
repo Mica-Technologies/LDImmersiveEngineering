@@ -1,0 +1,19 @@
+# This is a Gradle generated file for dependency locking.
+# Manual edits can break the build and are not advised.
+# This file is expected to be part of source control.
+CraftTweaker2:CraftTweaker2-API:4.1.8.468
+CraftTweaker2:CraftTweaker2-MC1120-Main:1.12-4.1.8.468
+CraftTweaker2:ZenScript:4.1.8.468
+baubles:Baubles:1.12
+cofh:RedstoneFlux:1.12-2.1.0.7
+de.ellpeck.actuallyadditions:ActuallyAdditions:1.12.2-r152.16
+deobf.albedo:albedo:0.1.3
+hwyla:Hwyla:1.8.20
+industrial-craft:industrialcraft-2:release
+mcjty.theoneprobe:TheOneProbe-1.12:1.12-1.4.28-17
+mezz.jei:jei_1.12.2:4.15.0.297
+opencomputers:OpenComputers:MC1.12.2
+org.ow2.asm:asm-debug-all:6.0_BETA
+slimeknights.mantle:Mantle:1.12-1.3.3.56
+slimeknights:TConstruct:1.12.2-2.12.0.170
+team.chisel.ctm:CTM:MC1.12.2-0.3.2.18

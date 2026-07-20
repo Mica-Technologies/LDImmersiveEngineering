@@ -11,8 +11,14 @@ out
 *.ipr
 *.iws
 *.iml
-.idea
+# Note: ".idea/*" not ".idea" — git cannot re-include a file inside an ignored
+# *directory*, so the negation below only works if the directory itself is walked.
+.idea/*
 classes
+# The Gradle wiring must be shared. IntelliJ has silently rewritten the Gradle
+# wrapper to an incompatible version more than once; pinning the Gradle JVM and the
+# "use the wrapper" setting in a tracked file is what prevents that.
+!.idea/gradle.xml
 
 # gradle
 build
@@ -23,7 +29,6 @@ eclipse
 run
 libs
 
-gradle.properties
 *.jks
 
 # minecraft runtime / dev environment

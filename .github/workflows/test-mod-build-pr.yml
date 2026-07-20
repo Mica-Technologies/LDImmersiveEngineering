@@ -2,25 +2,116 @@ name: Test Mod Build (Pull Request)
 
 on: pull_request
 
+# Superseded runs on the same PR are pointless — the server smoke test is slow.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  test_assemble_mod:
-    name: Test Assemble Mod
+  compile:
+    name: Compile
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      # Legacy Forge 1.12.2 (ForgeGradle 2.3 / Gradle 4.1) must build on JDK 8.
+      # Legacy Forge 1.12.2 (ForgeGradle 2.3 / Gradle 4.10.3) must build on JDK 8.
+      # build.gradle fails fast with an explanatory message if this is ever wrong.
       - name: Set Up JDK 8
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '8'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
+      # The -D timeouts are also in gradle.properties; they are repeated here so the
+      # command stays correct if it is ever run outside the project directory.
       - name: Assemble mod with Gradle
-        run: ./gradlew setupCiWorkspace build -Dhttp.socketTimeout=60000 -Dhttp.connectionTimeout=60000 -Dorg.gradle.internal.http.socketTimeout=60000 -Dorg.gradle.internal.http.connectionTimeout=60000
+        run: >-
+          ./gradlew setupCiWorkspace build
+          -Dhttp.socketTimeout=60000 -Dhttp.connectionTimeout=60000
+          -Dorg.gradle.internal.http.socketTimeout=60000
+          -Dorg.gradle.internal.http.connectionTimeout=60000
+
+      # Dependency locking only helps if drift actually fails the build.
+      - name: Verify dependency lock is up to date
+        run: |
+          ./gradlew resolveAndLockAll --write-locks
+          if ! git diff --exit-code --quiet gradle/dependency-locks/; then
+            echo "::error::Dependency lock is out of date. Run './gradlew resolveAndLockAll --write-locks' and commit gradle/dependency-locks/."
+            git diff gradle/dependency-locks/
+            exit 1
+          fi
+
+      # updateJson regenerates changelog.json from changelog.md. A diff here means the
+      # committed JSON and the changelog have drifted apart.
+      - name: Verify generated changelog is committed
+        run: |
+          if ! git diff --exit-code --quiet changelog.json src/main/resources/assets/immersiveengineering/changelog.json; then
+            echo "::error::Generated changelog JSON differs from the committed copy. Run a build and commit the result."
+            git diff --stat changelog.json src/main/resources/assets/immersiveengineering/changelog.json
+            exit 1
+          fi
+
+      - name: Upload build reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: build/reports/
+          retention-days: 7
+
+  server_smoke_test:
+    name: Dedicated Server Smoke Test
+    needs: compile
+    runs-on: ubuntu-latest
+    # Cold-cache Forge setup is the slow part; the script has its own inner budget.
+    timeout-minutes: 40
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set Up JDK 8
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # `./gradlew build` proves the mod COMPILES, not that it can LOAD. This mod ships
+      # a coremod (IELoadingPlugin) and an access transformer, and neither is exercised
+      # by a plain compile — a stale AT entry or a bad ASM patch builds perfectly and
+      # fails only when FML applies it at runtime.
+      - name: Set up dev workspace
+        run: >-
+          ./gradlew setupDevWorkspace
+          -Dorg.gradle.internal.http.socketTimeout=60000
+          -Dorg.gradle.internal.http.connectionTimeout=60000
+
+      - name: Boot dedicated server and assert startup
+        run: bash .github/scripts/server-smoke-test.sh
+        env:
+          SMOKE_TIMEOUT: '900'
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-smoke-log
+          # Both streams: the server's own log is where startup actually gets
+          # reported (see the script for why), the Gradle log catches build failures.
+          path: |
+            server-smoke.log
+            run/logs/latest.log
+            run/crash-reports/
+          retention-days: 7
+          if-no-files-found: warn

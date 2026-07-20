@@ -1,0 +1,4 @@
+// Pinned explicitly rather than derived from the checkout directory name. Without
+// this, cloning into a differently-named folder changes the project name, which in
+// turn changes the produced artifact names and the IDE module names.
+rootProject.name = 'ImmersiveEngineering'

@@ -41,13 +41,61 @@ If you are looking for Immersive Engineering to play with, please get it from th
 
 ## Building
 
-This is a legacy Forge 1.12.2 project and must be built with **JDK 8** (ForgeGradle 2.3 / Gradle 4.1).
+This is a legacy Forge 1.12.2 project: **ForgeGradle 2.3 on Gradle 4.10.3, running on JDK 8.**
+That combination is not negotiable — ForgeGradle 2.3 cannot load on Gradle 5+ or on a JVM
+newer than 8. `build.gradle` checks both up front and fails with an explanatory message
+rather than a cryptic plugin error.
+
+Use the `build.sh` / `build.bat` wrappers. They find a JDK 8 (`~/.jdks/*1.8*`, or
+`JAVA8_HOME` if set) and hand off to `./gradlew`, which matters because this machine setup
+keeps no `java` on `PATH` and no global `JAVA_HOME`:
 
 ```sh
-# JDK 8 must be the JVM used by the Gradle wrapper.
-# Either set JAVA_HOME for the session, or pin org.gradle.java.home in a local gradle.properties.
-./gradlew setupCiWorkspace build      # CI / headless build
-./gradlew setupDecompWorkspace        # full decompiled sources for IDE work
+./build.sh setupCiWorkspace build      # headless build (what CI runs)
+./build.sh setupDecompWorkspace        # full decompiled sources for IDE work
+./build.sh setupDevWorkspace           # assets + natives, needed for runClient/runServer
 ```
 
+```powershell
+build.bat setupCiWorkspace build       # same, on Windows without a bash shell
+```
+
+`./gradlew` directly also works if `JAVA_HOME` already points at a JDK 8.
+
 Build output lands in `build/libs/` (`ImmersiveEngineering-<version>.jar`).
+
+### Before pushing
+
+```sh
+bash .github/scripts/server-smoke-test.sh   # boots a dedicated server, asserts "Done ("
+```
+
+A successful compile does not prove the mod can *load*: this fork ships a coremod
+(`IELoadingPlugin`) and an access transformer, and neither is exercised by `build`.
+CI runs this same script on every PR.
+
+### Dependency changes
+
+Every dependency version is pinned exactly, and the resolved graph is locked in
+`gradle/dependency-locks/`. After changing a version in `build.gradle`:
+
+```sh
+./build.sh resolveAndLockAll --write-locks   # then commit gradle/dependency-locks/
+```
+
+CI fails the build if the lockfile is out of date.
+
+### IDE setup
+
+`.idea/gradle.xml` is committed and pins the Gradle JVM to JDK 8 and the distribution to
+the project wrapper. **If IntelliJ offers to upgrade the Gradle wrapper, decline.** It has
+silently rewritten `gradle/wrapper/gradle-wrapper.properties` to a modern Gradle more than
+once, which breaks the build entirely. To recover:
+
+```sh
+git checkout -- gradle/wrapper/gradle-wrapper.properties
+```
+
+If `clean` fails with "Unable to delete file" under `build/`, a Gradle daemon from a
+different Gradle version is still holding the file — `./gradlew --stop` only stops daemons
+matching the current wrapper, so check for leftover `java` processes.
