@@ -62,14 +62,20 @@ public class ImmersiveNetHandler
 
 	public IntHashMap<Map<BlockPos, BlockWireInfo>> blockWireMap = new IntHashMap<>();
 
+	/**
+	 * Returns the connection map for a dimension, creating it if absent.
+	 * <p>
+	 * computeIfAbsent rather than a check followed by a put: the old form was a non-atomic
+	 * check-then-act with a genuine lost update behind it. Two callers that both saw no map would
+	 * both construct one and both put, and the second put replaced the first -- discarding every
+	 * connection any other thread had added to it in between. That is every wire in a dimension
+	 * vanishing, and it needed only a client chunk-render thread to call in at the wrong moment,
+	 * which singleplayer does through genConnBlockstate.
+	 */
 	private ConcurrentHashMap<BlockPos, Set<Connection>> getMultimap(int dimension)
 	{
-		if(directConnections.get(dimension)==null)
-		{
-			ConcurrentHashMap<BlockPos, Set<Connection>> mm = new ConcurrentHashMap<BlockPos, Set<Connection>>();
-			directConnections.put(dimension, mm);
-		}
-		return directConnections.get(dimension);
+		return (ConcurrentHashMap<BlockPos, Set<Connection>>)directConnections.computeIfAbsent(
+				dimension, d -> new ConcurrentHashMap<BlockPos, Set<Connection>>());
 	}
 
 	public HashMap<Connection, Integer> getTransferedRates(int dimension)
@@ -228,7 +234,7 @@ public class ImmersiveNetHandler
 	}
 
 	@Nullable
-	public synchronized Set<Connection> getConnections(World world, BlockPos node)
+	public Set<Connection> getConnections(World world, BlockPos node)
 	{
 		if(world!=null&&world.provider!=null)
 		{
@@ -237,11 +243,26 @@ public class ImmersiveNetHandler
 		return null;
 	}
 
+	/**
+	 * Looks up the connections at a node. Returns null when the dimension or the node has none.
+	 * <p>
+	 * This is a pure read. It used to route through getMultimap and so created a dimension's map as
+	 * a side effect of asking whether anything was there -- a write on the read path, on a method
+	 * called several times per connector per tick and from client chunk-render threads.
+	 * <p>
+	 * It also used to be synchronized on the singleton, which serialised every connector tick in
+	 * the game against every other. That lock protected nothing: every method that actually mutates
+	 * the connection map -- addConnection, removeConnection, clearAllConnectionsFor,
+	 * floodConnectivityUpdate and the rest -- is unsynchronized, so a reader was never excluded
+	 * from a concurrent writer. What safety exists comes from the maps themselves being
+	 * ConcurrentHashMap at every level, and from the connection sets being CHM-backed, which makes
+	 * their iterators weakly consistent rather than fail-fast.
+	 */
 	@Nullable
-	public synchronized Set<Connection> getConnections(int world, BlockPos node)
+	public Set<Connection> getConnections(int world, BlockPos node)
 	{
-		ConcurrentHashMap<BlockPos, Set<Connection>> map = getMultimap(world);
-		return map.get(node);
+		Map<BlockPos, Set<Connection>> map = directConnections.get(world);
+		return map==null?null: map.get(node);
 	}
 
 	public void clearAllConnections(World world)
@@ -734,7 +755,12 @@ public class ImmersiveNetHandler
 
 	public Connection getReverseConnection(int world, Connection ret)
 	{
-		return getConnections(world, ret.end).stream().filter(ret::hasSameConnectors).findAny().orElse(null);
+		//Null-guarded: getConnections has always been able to return null for a node with no
+		//connections, and this dereferenced it directly.
+		Set<Connection> conns = getConnections(world, ret.end);
+		if(conns==null)
+			return null;
+		return conns.stream().filter(ret::hasSameConnectors).findAny().orElse(null);
 	}
 
 	/**
