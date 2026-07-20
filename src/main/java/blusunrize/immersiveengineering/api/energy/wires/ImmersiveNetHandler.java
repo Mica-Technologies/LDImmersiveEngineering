@@ -544,13 +544,27 @@ public class ImmersiveNetHandler
 				indirectConnectionsIgnoreOut.get(dimension).containsKey(node))
 			return indirectConnectionsIgnoreOut.get(dimension).get(node);
 
-		PriorityQueue<Pair<IImmersiveConnectable, Float>> queue = new PriorityQueue<>(Comparator.comparingDouble(Pair::getRight));
+		//Dijkstra with lazy deletion. The previous implementation kept at most one queue entry per node
+		//by scanning the queue on every poll (stream().noneMatch) and again on every edge relaxation
+		//(stream().filter + removeIf). Each of those is O(V) inside a loop that runs once per node or
+		//per edge, which made a cache miss O(V^2)/O(E*V) -- and cache misses are frequent, because
+		//chunk streaming invalidates the route cache constantly. Profiling put this method at the
+		//largest remaining cost in the mod.
+		//
+		//Instead the queue may now hold several entries for the same node, and bestLoss records the
+		//cheapest route found to each so far. A polled entry whose loss is worse than the recorded
+		//best is a superseded duplicate and is skipped. Same shortest paths, O(E log V).
+		PriorityQueue<PathNode> queue = new PriorityQueue<>(Comparator.comparingDouble(n -> n.loss));
 		Set<AbstractConnection> closedList = newSetFromMap(new ConcurrentHashMap<AbstractConnection, Boolean>());
 		// HashSet (not ArrayList): this set is only ever used for add/contains membership tests, never
-		// iterated or indexed, so the result is identical while contains() drops from O(n) to O(1) -- the
-		// previous ArrayList.contains made the path-find O(V^2) on every cache miss.
+		// iterated or indexed, so the result is identical while contains() drops from O(n) to O(1).
 		Set<BlockPos> checked = new HashSet<>();
 		HashMap<BlockPos, BlockPos> backtracker = new HashMap<>();
+		//The connection each node was reached through. Recording it during relaxation lets the
+		//route be reconstructed by following parents, instead of re-querying getConnections at every
+		//step of every backtrack and re-scanning it for the matching endpoint.
+		HashMap<BlockPos, Connection> viaConnection = new HashMap<>();
+		HashMap<BlockPos, Float> bestLoss = new HashMap<>();
 
 		checked.add(node);
 		Set<Connection> conL = getConnections(world, node);
@@ -560,71 +574,76 @@ public class ImmersiveNetHandler
 				IImmersiveConnectable end = toIIC(con.end, world);
 				if(end!=null)
 				{
-					queue.add(new ImmutablePair<>(end, con.getBaseLoss()));
-					backtracker.put(con.end, node);
+					float loss = con.getBaseLoss();
+					Float known = bestLoss.get(con.end);
+					if(known==null||loss < known)
+					{
+						bestLoss.put(con.end, loss);
+						queue.add(new PathNode(end, con.end, loss));
+						backtracker.put(con.end, node);
+						viaConnection.put(con.end, con);
+					}
 				}
 			}
 
-		IImmersiveConnectable next;
 		final int closedListMax = 1200;
 
 		while(closedList.size() < closedListMax&&!queue.isEmpty())
 		{
-			Pair<IImmersiveConnectable, Float> pair = queue.poll();
-			next = pair.getLeft();
-			float loss = pair.getRight();
-			BlockPos nextPos = toBlockPos(next);
-			if(!checked.contains(nextPos)&&queue.stream().noneMatch((p) -> p.getLeft().equals(nextPos)))
+			PathNode current = queue.poll();
+			BlockPos nextPos = current.pos;
+			Float best = bestLoss.get(nextPos);
+			//Superseded duplicate: a cheaper route to this node was queued after this entry was.
+			if(best!=null&&current.loss > best)
+				continue;
+			if(checked.contains(nextPos))
+				continue;
+			IImmersiveConnectable next = current.iic;
+			float loss = current.loss;
+
+			boolean isOutput = next.isEnergyOutput();
+			if(ignoreIsEnergyOutput||isOutput)
 			{
-				boolean isOutput = next.isEnergyOutput();
-				if(ignoreIsEnergyOutput||isOutput)
+				BlockPos cursor = nextPos;
+				WireType minimumType = null;
+				int distance = 0;
+				List<Connection> connectionParts = new ArrayList<>();
+				while(cursor!=null)
 				{
-					BlockPos last = nextPos;
-					WireType minimumType = null;
-					int distance = 0;
-					List<Connection> connectionParts = new ArrayList<>();
-					while(last!=null)
+					Connection via = viaConnection.get(cursor);
+					BlockPos parent = backtracker.get(cursor);
+					if(parent!=null&&via!=null)
 					{
-						BlockPos prev = last;
-						last = backtracker.get(last);
-						if(last!=null)
-						{
-
-							Set<Connection> conLB = getConnections(world, last);
-							if(conLB!=null)
-								for(Connection conB : conLB)
-									if(conB.end.equals(prev))
-									{
-										connectionParts.add(0, conB);
-										distance += conB.length;
-										if(minimumType==null||conB.cableType.getTransferRate() < minimumType.getTransferRate())
-											minimumType = conB.cableType;
-										break;
-									}
-						}
+						connectionParts.add(0, via);
+						distance += via.length;
+						if(minimumType==null||via.cableType.getTransferRate() < minimumType.getTransferRate())
+							minimumType = via.cableType;
 					}
-					closedList.add(new AbstractConnection(toBlockPos(node), nextPos, minimumType, distance, isOutput, connectionParts.toArray(new Connection[connectionParts.size()])));
+					cursor = parent;
 				}
+				closedList.add(new AbstractConnection(toBlockPos(node), nextPos, minimumType, distance, isOutput, connectionParts.toArray(new Connection[connectionParts.size()])));
+			}
 
-				Set<Connection> conLN = getConnections(world, nextPos);
-				if(conLN!=null)
-					for(Connection con : conLN)
-						if(next.allowEnergyToPass(con))
+			Set<Connection> conLN = getConnections(world, nextPos);
+			if(conLN!=null)
+				for(Connection con : conLN)
+					if(next.allowEnergyToPass(con))
+					{
+						IImmersiveConnectable end = toIIC(con.end, world);
+						float newLoss = con.getBaseLoss()+loss;
+						if(end!=null&&!checked.contains(con.end))
 						{
-							IImmersiveConnectable end = toIIC(con.end, world);
-
-							Optional<Pair<IImmersiveConnectable, Float>> existing =
-									queue.stream().filter((p) -> p.getLeft()==end).findAny();
-							float newLoss = con.getBaseLoss()+loss;
-							if(end!=null&&!checked.contains(con.end)&&existing.map(Pair::getRight).orElse(Float.MAX_VALUE) > newLoss)
+							Float known = bestLoss.get(con.end);
+							if(known==null||newLoss < known)
 							{
-								existing.ifPresent(p1 -> queue.removeIf((p2) -> p1.getLeft()==p2.getLeft()));
-								queue.add(new ImmutablePair<>(end, newLoss));
+								bestLoss.put(con.end, newLoss);
+								queue.add(new PathNode(end, con.end, newLoss));
 								backtracker.put(con.end, nextPos);
+								viaConnection.put(con.end, con);
 							}
 						}
-				checked.add(nextPos);
-			}
+					}
+			checked.add(nextPos);
 		}
 		if(FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
 		{
@@ -716,6 +735,28 @@ public class ImmersiveNetHandler
 	public Connection getReverseConnection(int world, Connection ret)
 	{
 		return getConnections(world, ret.end).stream().filter(ret::hasSameConnectors).findAny().orElse(null);
+	}
+
+	/**
+	 * One entry in the path-finder's priority queue.
+	 * <p>
+	 * Carries the resolved connectable alongside its position so the search does not have to
+	 * re-derive either while relaxing edges, and so the loss can be compared against
+	 * {@code bestLoss} without unboxing a {@code Pair}. Several entries may exist for the same
+	 * node; the search discards any whose loss has since been beaten.
+	 */
+	private static final class PathNode
+	{
+		final IImmersiveConnectable iic;
+		final BlockPos pos;
+		final float loss;
+
+		PathNode(IImmersiveConnectable iic, BlockPos pos, float loss)
+		{
+			this.iic = iic;
+			this.pos = pos;
+			this.loss = loss;
+		}
 	}
 
 	public static class Connection implements Comparable<Connection>
