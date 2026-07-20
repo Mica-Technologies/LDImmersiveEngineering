@@ -21,6 +21,7 @@ import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.blocks.BlockFakeLight.TileEntityFakeLight;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
 import net.minecraft.block.state.IBlockState;
@@ -103,7 +104,14 @@ public class TileEntityFloodlight extends TileEntityImmersiveConnectable impleme
 		}
 
 		switchCooldown--;
-		if(active!=b||world.getTotalWorldTime()%512==((getPos().getX()^getPos().getZ())&511))
+		//The periodic re-scan exists to notice the world changing around a beam -- someone builds a wall
+		//through it, or mines one away. It re-traces all 13 rays and recalculates block lighting whether
+		//or not anything actually moved. In city mode the surroundings are assumed static, so the beams
+		//are recomputed only when the light switches or a neighbouring block changes (which still sets
+		//shouldUpdate above). This is the single biggest saving available on a street-lit build.
+		boolean periodicRescan = !CityMode.floodlights()
+				&&world.getTotalWorldTime()%512==((getPos().getX()^getPos().getZ())&511);
+		if(active!=b||periodicRescan)
 		{
 			this.markContainingBlockForUpdate(null);
 			updateFakeLights(true, active);
@@ -231,8 +239,20 @@ public class TileEntityFloodlight extends TileEntityImmersiveConnectable impleme
 		this.lightsToBeRemoved.addAll(tempRemove);
 	}
 
+	/**
+	 * Ceiling on how many light blocks one floodlight may queue in a single regeneration while city
+	 * mode is active. Each placed light is an individually ticking tile entity and the beam geometry
+	 * places one roughly every three blocks across thirteen rays, so an unobstructed floodlight can
+	 * reach well over a hundred. Hitting the cap stops the remaining rays before they ray-trace, which
+	 * can leave the beam lit asymmetrically -- a deliberate trade, and one only pathological setups
+	 * reach.
+	 */
+	private static final int MAX_CITY_FAKE_LIGHTS = 64;
+
 	public void placeLightAlongVector(Vec3d vec, int offset, ArrayList<BlockPos> checklist)
 	{
+		if(CityMode.floodlights()&&lightsToBePlaced.size() >= MAX_CITY_FAKE_LIGHTS)
+			return;
 		Vec3d light = new Vec3d(getPos()).add(.5, .75, .5);
 		int range = 32;
 		HashSet<BlockPos> ignore = new HashSet<BlockPos>();
@@ -253,6 +273,8 @@ public class TileEntityFloodlight extends TileEntityImmersiveConnectable impleme
 			{
 				if(!checklist.remove(target))
 					lightsToBePlaced.add(target);
+				if(CityMode.floodlights()&&lightsToBePlaced.size() >= MAX_CITY_FAKE_LIGHTS)
+					return;
 				i += 2;
 			}
 		}
