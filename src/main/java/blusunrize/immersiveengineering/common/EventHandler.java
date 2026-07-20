@@ -298,6 +298,11 @@ public class EventHandler
 	@SubscribeEvent
 	public void onMinecartUpdate(MinecartUpdateEvent event)
 	{
+		//The shader effect function is purely cosmetic (it only spawns particles via the client proxy;
+		//the default implementation is a no-op). Running it server-side did nothing but burn tick time
+		//on every shaded minecart, so skip it there entirely.
+		if(!event.getMinecart().world.isRemote)
+			return;
 		if(event.getMinecart().ticksExisted%3==0&&event.getMinecart().hasCapability(CapabilityShader.SHADER_CAPABILITY, null))
 		{
 			ShaderWrapper wrapper = event.getMinecart().getCapability(CapabilityShader.SHADER_CAPABILITY, null);
@@ -397,8 +402,12 @@ public class EventHandler
 						invalidConnectionsDropped++;
 					}
 				}
-				IELogger.info("removed "+invalidConnectionsDropped+" invalid connections from world");
 			}
+			//Logged once after the loop rather than once per dimension: the counter is cumulative across
+			//dimensions, so the in-loop call printed a running total repeatedly, and printed "removed 0"
+			//on every validation pass of a healthy world.
+			if(invalidConnectionsDropped > 0)
+				IELogger.info("removed "+invalidConnectionsDropped+" invalid connections from world");
 			int invalidProxies = 0;
 			Set<DimensionBlockPos> toRemove = new HashSet<>();
 			for(Entry<DimensionBlockPos, IICProxy> e : ImmersiveNetHandler.INSTANCE.proxies.entrySet())
@@ -464,14 +473,24 @@ public class EventHandler
 						itExplosion.remove();
 				}
 			}
-			while(!requestedBlockUpdates.isEmpty())
+			if(!requestedBlockUpdates.isEmpty())
 			{
-				Pair<Integer, BlockPos> curr = requestedBlockUpdates.poll();
-				World w = DimensionManager.getWorld(curr.getLeft());
-				if(w!=null)
+				//Clients each request an update for the same position, so a single chunk load can queue the
+				//same pos dozens of times. notifyBlockUpdate is called with identical old/new state, so
+				//repeats within one tick are pure duplicates - de-dupe them. The queue is still drained
+				//fully: capping it would let the backlog grow without bound under sustained load.
+				Set<Pair<Integer, BlockPos>> updatedThisTick = new HashSet<>();
+				while(!requestedBlockUpdates.isEmpty())
 				{
-					IBlockState state = w.getBlockState(curr.getRight());
-					w.notifyBlockUpdate(curr.getRight(), state, state, 3);
+					Pair<Integer, BlockPos> curr = requestedBlockUpdates.poll();
+					if(!updatedThisTick.add(curr))
+						continue;
+					World w = DimensionManager.getWorld(curr.getLeft());
+					if(w!=null)
+					{
+						IBlockState state = w.getBlockState(curr.getRight());
+						w.notifyBlockUpdate(curr.getRight(), state, state, 3);
+					}
 				}
 			}
 		}
