@@ -21,6 +21,7 @@ import blusunrize.immersiveengineering.api.energy.immersiveflux.FluxStorageAdvan
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
 import blusunrize.immersiveengineering.common.util.Utils;
@@ -361,10 +362,38 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 	 * same tick.
 	 */
 	protected static final int RECIPE_SCAN_INTERVAL = 8;
+	/**
+	 * City mode widens the interval and, unlike the stock path, applies it to idle machines too.
+	 * Must stay a power of two for the masking in {@link #shouldThrottledRecipeScan()}.
+	 */
+	protected static final int CITY_RECIPE_SCAN_INTERVAL = 32;
 
 	protected boolean shouldThrottledRecipeScan()
 	{
-		return world.getTotalWorldTime()%RECIPE_SCAN_INTERVAL==((getPos().getX()^getPos().getZ())&(RECIPE_SCAN_INTERVAL-1));
+		int interval = CityMode.machines()?CITY_RECIPE_SCAN_INTERVAL: RECIPE_SCAN_INTERVAL;
+		return world.getTotalWorldTime()%interval==((getPos().getX()^getPos().getZ())&(interval-1));
+	}
+
+	/**
+	 * Whether a machine should look for a new recipe to start this tick.
+	 * <p>
+	 * Normally an idle machine -- one with nothing queued -- scans every single tick so that newly
+	 * inserted items are picked up immediately. That is the expensive case, not the cheap one: a
+	 * machine sitting with input it cannot use re-scans the whole recipe list forever, and for the arc
+	 * furnace that list is inflated to hundreds of entries by the auto-generated recycling recipes. A
+	 * decorative machine in a city build does exactly this indefinitely.
+	 * <p>
+	 * City mode therefore throttles the idle scan as well, at the cost of a machine taking up to
+	 * {@link #CITY_RECIPE_SCAN_INTERVAL} ticks to notice new input. Recipe outputs and processing
+	 * rates are unaffected either way.
+	 *
+	 * @param queueEmpty whether the machine currently has nothing queued
+	 */
+	protected boolean shouldScanForRecipe(boolean queueEmpty)
+	{
+		if(queueEmpty&&!CityMode.machines())
+			return true;
+		return shouldThrottledRecipeScan();
 	}
 
 	public abstract R findRecipeForInsertion(ItemStack inserting);

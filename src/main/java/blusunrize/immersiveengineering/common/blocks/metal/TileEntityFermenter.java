@@ -81,7 +81,7 @@ public class TileEntityFermenter extends TileEntityMultiblockMetal<TileEntityFer
 		if(!world.isRemote)
 		{
 			boolean update = false;
-			if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&(processQueue.isEmpty()||shouldThrottledRecipeScan()))
+			if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&shouldScanForRecipe(processQueue.isEmpty()))
 			{
 				final int[] usedInvSlots = new int[8];
 				for(MultiblockProcess process : processQueue)

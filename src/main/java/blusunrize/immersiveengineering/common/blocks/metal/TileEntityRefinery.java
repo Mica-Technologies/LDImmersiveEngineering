@@ -76,7 +76,7 @@ public class TileEntityRefinery extends TileEntityMultiblockMetal<TileEntityRefi
 			return;
 
 		boolean update = false;
-		if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&(processQueue.isEmpty()||shouldThrottledRecipeScan()))
+		if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&shouldScanForRecipe(processQueue.isEmpty()))
 		{
 			if(tanks[0].getFluidAmount() > 0||tanks[1].getFluidAmount() > 0)
 			{

@@ -116,7 +116,7 @@ public class TileEntityMixer extends TileEntityMultiblockMetal<TileEntityMixer, 
 		{
 			boolean update = false;
 			boolean foundRecipe = false;
-			if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&(processQueue.isEmpty()||shouldThrottledRecipeScan()))
+			if(energyStorage.getEnergyStored() > 0&&processQueue.size() < this.getProcessQueueMaxLength()&&shouldScanForRecipe(processQueue.isEmpty()))
 			{
 				int tankAmount = tank.getFluidAmount();
 				if(tankAmount > 0)
