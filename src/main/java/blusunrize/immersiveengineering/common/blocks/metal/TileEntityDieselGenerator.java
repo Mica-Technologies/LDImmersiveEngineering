@@ -14,6 +14,7 @@ import blusunrize.immersiveengineering.api.energy.DieselHandler;
 import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.multiblocks.MultiblockDieselGenerator;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper;
 import blusunrize.immersiveengineering.common.util.IESounds;
 import blusunrize.immersiveengineering.common.util.Utils;
@@ -48,6 +49,14 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 
 	public FluidTank[] tanks = new FluidTank[]{new FluidTank(24000)};
 	public boolean active = false;
+
+	/**
+	 * City mode fuel sip: how much fuel is drained, and how often. One millibucket every second empties
+	 * a full 24-bucket tank over roughly six and a half hours of runtime -- slow enough to be cosmetic,
+	 * visible enough that a tank still drains and refuelling is still part of running a generator.
+	 */
+	private static final int CITY_FUEL_SIP_AMOUNT = 1;
+	private static final int CITY_FUEL_SIP_INTERVAL = 20;
 
 	public float animation_fanRotationStep = 0;
 	public float animation_fanRotation = 0;
@@ -124,7 +133,13 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 				int burnTime = DieselHandler.getBurnTime(tanks[0].getFluid().getFluid());
 				if(burnTime > 0)
 				{
-					int fluidConsumed = 1000/burnTime;
+					//City mode: fuel is cosmetic. Instead of deriving a per-tick burn rate from the fluid
+					//and draining the tank every single tick -- which also dirties the tank every tick --
+					//the generator only checks that fuel is present and takes a token sip on an interval,
+					//so tanks still visibly empty and refuelling still matters. Output is already a flat
+					//config value, so nothing else needs to change.
+					boolean cosmeticFuel = CityMode.generators();
+					int fluidConsumed = cosmeticFuel?CITY_FUEL_SIP_AMOUNT: 1000/burnTime;
 					int output = IEConfig.Machines.dieselGen_output;
 					int connected = 0;
 					TileEntity[] receivers = new TileEntity[3];
@@ -144,7 +159,10 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 							active = true;
 							animation_fanFadeIn = 80;
 						}
-						tanks[0].drain(fluidConsumed, true);
+						if(!cosmeticFuel)
+							tanks[0].drain(fluidConsumed, true);
+						else if(world.getTotalWorldTime()%CITY_FUEL_SIP_INTERVAL==0)
+							tanks[0].drain(CITY_FUEL_SIP_AMOUNT, true);
 						int splitOutput = output/connected;
 						int leftover = output%connected;
 						for(int i = 0; i < 3; i++)
