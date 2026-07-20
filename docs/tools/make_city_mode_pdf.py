@@ -177,10 +177,13 @@ def build_pdf(path, chart_a, chart_b):
                           spaceAfter=0)
     cellb = ParagraphStyle("cellb", parent=cell, fontName=SANS + "-Bold")
 
+    # invariant=1 pins the embedded creation timestamp and document id, so regenerating an
+    # unchanged document produces a byte-identical file instead of a phantom diff on every run.
     doc = BaseDocTemplate(path, pagesize=LETTER,
                           leftMargin=0.85 * inch, rightMargin=0.85 * inch,
                           topMargin=0.8 * inch, bottomMargin=0.8 * inch,
-                          title="City Mode", author="LDImmersiveEngineering")
+                          title="City Mode", author="LDImmersiveEngineering",
+                          invariant=1)
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="f")
 
     def decorate(canvas, d):
