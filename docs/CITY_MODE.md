@@ -1,6 +1,7 @@
 # City Mode
 
-Technical documentation for the fork's config-gated "city mode" power simulation
+Technical documentation for the fork's config-gated "city mode" — a mod-wide simplification of
+Immersive Engineering's simulation, covering wires, floodlights, generators and machines
 (Forge 1.12.2).
 
 ## Overview
@@ -79,10 +80,10 @@ class:
 | `TileEntityConnectorLV.java:321` | Skips the same broadcast in `receiveEnergy` (the input path). |
 | `TileEntityConnectorLV.java:510` | Forces the loss rate to zero in `getEnergyForConnection`. |
 
-Nothing else in the energy system is aware of the flag — not the path-finder, not the route cache,
-not the save format, and **not a single generator, machine or capacitor**. City mode's wire
-subsystem changes *how much energy moves between connectors and how the amount is computed*, and
-nothing else. (The other three subsystems below are equally self-contained, in their own classes.)
+Nothing else in the energy system is aware of `cityModeWires` — not the path-finder, not the route
+cache, not the save format, and no generator, machine or capacitor. This subsystem changes *how
+much energy moves between connectors and how the amount is computed*, and nothing else. (The other
+three subsystems are equally self-contained, each in its own class, behind its own flag.)
 
 Because `TileEntityConnectorMV extends TileEntityConnectorLV` and
 `TileEntityConnectorHV extends TileEntityConnectorMV`, all three voltage tiers and all three
@@ -185,14 +186,18 @@ Three properties worth stating plainly:
 
 #### Power sources
 
-**No generator reads the city-mode flag.** Every one of them produces energy, consumes its
-resource, and pushes to adjacent blocks through `EnergyHelper.insertFlux` exactly as it always
+**No generator is affected by the *wire* subsystem.** Every one of them produces energy, consumes
+its resource, and pushes to adjacent blocks through `EnergyHelper.insertFlux` exactly as it always
 has. Generators do not talk to the wire network at all — they push into an adjacent *connector*,
-and only then does city mode become relevant.
+and only then does `cityModeWires` become relevant.
 
-| Block | Ticks | Consumes | Output | Reaches wires via | Changed by city mode |
+The one generator that city mode *does* touch is the diesel generator, and only via the separate
+`cityModeGenerators` flag — see [Generators](#generators). The table's last column below is about
+the wire subsystem; the fuel column notes where the generator flag changes things.
+
+| Block | Ticks | Consumes | Output | Reaches wires via | Changed by the wire subsystem |
 |---|---|---|---|---|---|
-| **Diesel Generator** | yes (master only) | fuel, `1000/burnTime` mB per tick | `dieselGen_output`, **4096 FE/t** | adjacent blocks above multiblock positions 15/16/17 | no |
+| **Diesel Generator** | yes (master only) | fuel — `1000/burnTime` mB per tick, or 1 mB per 20 ticks under `cityModeGenerators` | `dieselGen_output`, **4096 FE/t** | adjacent blocks above multiblock positions 15/16/17 | no |
 | **Thermoelectric Generator** | yes | nothing — source blocks are never consumed | `sqrt(tempDiff)/2 × thermoelectric_output` per axis, recomputed every 1024 ticks | push to all 6 sides | no |
 | **Dynamo** | **no** — event-driven | rotation from a wheel | `dynamo_output × rotation` (`dynamo_output = 3`) | push to all 6 sides | no |
 | **Windmill / Water Wheel** | yes | weather / water flow | no FE — they drive the dynamo | n/a | no |
@@ -203,30 +208,34 @@ and only then does city mode become relevant.
 ##### Does a diesel generator still need fuel in city mode?
 
 **Yes.** This is worth spelling out because it is the most common misunderstanding of what city
-mode does.
+mode does. Fuel becomes *cosmetic*; it does not become *optional*.
 
-`TileEntityDieselGenerator.update()` gates fuel consumption on two independent conditions, neither
-of which city mode touches:
+`TileEntityDieselGenerator.update()` gates on two independent conditions, and **city mode changes
+neither of them**:
 
 1. **There must be demand.** It simulate-inserts 4096 FE into each of its up-to-three receivers
    and counts how many accept anything at all. If `connected == 0` the generator goes inactive,
    the fan spins down, and **no fuel is burned**.
 2. **There must be fuel**, and the fluid must be registered in `DieselHandler` with a burn time.
+   The tank only ever accepts registered fuels, so this is a real test — you cannot run a city on
+   water.
 
-Only then does it drain `1000/burnTime` mB and push out its 4096 FE/t.
+What `cityModeGenerators` changes is only the *rate* of the drain that follows: 1 mB every 20
+ticks instead of `1000/burnTime` mB every tick. A full 24-bucket tank then lasts roughly six and a
+half hours of runtime rather than minutes. See [Generators](#generators).
 
-The back-pressure that makes this work is the connector's buffer. A connector's `FluxStorage`
-holds exactly one tick of input (256/1024/4096 FE) and its `receiveEnergy` returns 0 when full. So
-with no consumers, connectors saturate, the generator's simulate-insert returns 0, and it idles
-with its fuel intact — in **both** modes.
+The back-pressure that makes the demand gate work is the connector's buffer. A connector's
+`FluxStorage` holds exactly one tick of input (256/1024/4096 FE) and its `receiveEnergy` returns 0
+when full. So with no consumers, connectors saturate, the generator's simulate-insert returns 0,
+and it idles with its fuel intact — in **every** mode.
 
-What city mode does change is the *yield* per unit of fuel: the 4096 FE/t leaving the generator
-arrives at the machines undiminished instead of being attenuated by every wire segment on the way.
-More useful power per bucket of biodiesel, but not power from nothing.
+Separately, `cityModeWires` raises the *yield* per unit of fuel: the 4096 FE/t leaving the
+generator arrives at the machines undiminished instead of being attenuated by every wire segment
+on the way. More useful power per bucket of biodiesel, but not power from nothing.
 
-One caveat inherited from stock IE, present in both modes: the demand check is coarse. It asks
-"did anyone accept *anything*?", so a connector willing to take 1 FE keeps the generator burning
-fuel at the full per-tick rate for that tick.
+One caveat inherited from stock IE, present in all modes: the demand check is coarse. It asks "did
+anyone accept *anything*?", so a connector willing to take 1 FE keeps the generator running — and
+consuming fuel at whichever rate applies — for that tick.
 
 #### Transmission
 
@@ -293,7 +302,7 @@ it is enforced by the coil item when you place the wire, not during transfer.
 #### Consumers
 
 Machines never pull from the network. Delivery is always a push, along one fixed chain that is
-**byte-identical in both modes**:
+**byte-identical whether or not `cityModeWires` is on**:
 
 ```
 cityModeTransfer / transferEnergy
@@ -303,7 +312,8 @@ cityModeTransfer / transferEnergy
   → FluxStorage.receiveEnergy               (honours the machine's own limitReceive)
 ```
 
-City mode changes only *who calls this and with what number*.
+The wire subsystem changes only *who calls this and with what number*. (`cityModeMachines`, covered
+separately below, changes how often a machine looks for a *recipe* — never how it receives power.)
 
 Device-side caps survive city mode; network-side caps do not:
 
@@ -330,9 +340,11 @@ Examples:
   connectors in city mode, it will run its multi-tick acceleration path freely.
 - **Crusher** — 32,000 FE buffer, same story.
 
-**A machine bolted directly to a generator with no wires at all is completely unaffected by city
-mode.** Generators call `insertFlux` on their neighbours directly, never touching the connector,
-the net handler or the wire types.
+**A machine bolted directly to a generator with no wires at all is completely unaffected by the
+wire subsystem.** Generators call `insertFlux` on their neighbours directly, never touching the
+connector, the net handler or the wire types. Note that such a setup is still subject to
+`cityModeGenerators` (the generator's fuel drain) and `cityModeMachines` (the machine's recipe
+scan interval) — those are independent of how the power arrives.
 
 ---
 
