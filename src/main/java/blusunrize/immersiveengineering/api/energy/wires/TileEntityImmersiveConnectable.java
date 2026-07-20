@@ -144,22 +144,73 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 	}
 
 	private List<Pair<Float, Consumer<Float>>> sources = new ArrayList<>();
-	private long lastSourceUpdate = 0;
+	private long lastSourceUpdate = Long.MIN_VALUE;
 
 	@Override
 	public void addAvailableEnergy(float amount, Consumer<Float> consume)
 	{
-		long currentTime = world.getTotalWorldTime();
-		if(lastSourceUpdate!=currentTime)
-		{
-			sources.clear();
-			Pair<Float, Consumer<Float>> own = getOwnEnergy();
-			if(own!=null)
-				sources.add(own);
-			lastSourceUpdate = currentTime;
-		}
+		refreshSources();
 		if(amount > 0&&consume!=null)
 			sources.add(new ImmutablePair<>(amount, consume));
+	}
+
+	/**
+	 * Rebuilds the list of energy this node could draw on for wire-shock damage, at most once per
+	 * tick.
+	 * <p>
+	 * The list used to be filled by every powered connector on the network broadcasting to every
+	 * node it could reach, every tick, whether or not anything was touching a wire. Profiling
+	 * measured that broadcast as the single most expensive method in the mod. It is now built on
+	 * demand: nothing happens until {@link #getDamageAmount} or {@link #processDamage} actually
+	 * asks, which only occurs when an entity is genuinely in contact with a live wire.
+	 * <p>
+	 * The per-tick stamp keeps repeat calls within one tick free -- several entities touching the
+	 * same wire, or the paired getDamageAmount/processDamage calls, walk the network once between
+	 * them.
+	 */
+	private void refreshSources()
+	{
+		long currentTime = world.getTotalWorldTime();
+		if(lastSourceUpdate==currentTime)
+			return;
+		sources.clear();
+		Pair<Float, Consumer<Float>> own = getOwnEnergy();
+		if(own!=null)
+			sources.add(own);
+		//Stamped before gathering: gatherAvailableEnergy walks the network and may re-enter this
+		//node, and the stamp is what stops that recursing.
+		lastSourceUpdate = currentTime;
+		gatherAvailableEnergy();
+	}
+
+	/**
+	 * Collects the energy available from the rest of the network into {@link #sources}.
+	 * <p>
+	 * This lives on the base node rather than on connectors because damage is asked of whatever a
+	 * wire is attached to, which includes transformers, breaker switches, feedthroughs, energy
+	 * meters and razor wire -- none of which store energy themselves but all of which previously
+	 * had this list filled for them by the network-wide broadcast. The walk needs nothing
+	 * connector-specific: it asks each reachable node what it could supply, and only nodes that
+	 * actually hold energy answer.
+	 */
+	protected void gatherAvailableEnergy()
+	{
+		if(world==null||world.isRemote)
+			return;
+		for(ImmersiveNetHandler.AbstractConnection con :
+				ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(pos, world, true))
+		{
+			if(con.cableType==null)
+				continue;
+			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
+			//Checked on the far node exactly as the old broadcast did, so an open breaker switch
+			//still isolates the two halves of a network for damage purposes.
+			if(end==null||!end.allowEnergyToPass(null))
+				continue;
+			Pair<Float, Consumer<Float>> e = end.getAvailableEnergy(con);
+			if(e!=null&&e.getKey() > 0)
+				addAvailableEnergy(e.getKey(), e.getValue());
+		}
 	}
 
 	@Nullable
@@ -173,8 +224,13 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 	{
 		float baseDmg = getBaseDamage(c);
 		float max = getMaxDamage(c);
-		if(baseDmg==0||world.getTotalWorldTime()-lastSourceUpdate > 1)
+		if(baseDmg==0)
 			return 0;
+		//The old staleness check (more than a tick since the last broadcast) is gone because the
+		//list is now built on demand and so is never stale. It was standing in for "is anything on
+		//this network actually powered": an unpowered network simply reports zero available energy
+		//and the loop below still yields no damage.
+		refreshSources();
 		float damage = 0;
 		for(int i = 0; i < sources.size()&&damage < max; i++)
 		{
@@ -188,6 +244,9 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 	public void processDamage(Entity e, float amount, Connection c)
 	{
 		float baseDmg = getBaseDamage(c);
+		//Always follows a getDamageAmount in the same tick, so this is a cheap stamp check that
+		//reuses the list that call built rather than walking the network a second time.
+		refreshSources();
 		float damage = 0;
 		for(int i = 0; i < sources.size()&&damage < amount; i++)
 		{

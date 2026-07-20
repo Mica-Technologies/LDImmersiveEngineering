@@ -12,6 +12,7 @@ import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.TargetingInfo;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Connection;
 import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.tuple.Pair;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -121,6 +122,31 @@ public interface IImmersiveConnectable
 	 */
 	default void addAvailableEnergy(float amount, Consumer<Float> consume)
 	{
+	}
+
+	/**
+	 * Reports how much energy this node can supply across the given connection, and how to debit it.
+	 * <p>
+	 * This is the pull-side counterpart to {@link #addAvailableEnergy(float, Consumer)}. Wire-shock
+	 * damage used to be fed by every powered connector pushing this figure to every node it could
+	 * reach, every tick, on the chance that something was touching a wire; profiling found that
+	 * broadcast to be the most expensive thing the mod did. A node that actually needs the
+	 * information now asks for it instead, which happens only when an entity is genuinely in
+	 * contact with a wire.
+	 * <p>
+	 * The returned amount must already account for the loss along {@code c}, and the consumer must
+	 * debit the <em>pre-loss</em> amount from this node's storage, so that a node answering a pull
+	 * reports exactly what it would have pushed. Loss is a property of the path, not of a
+	 * direction, so the same figure is correct whichever end asks.
+	 *
+	 * @param c the connection the energy would travel over, or null for this node's own energy
+	 * @return the available amount and a consumer that debits it, or null if this node is not a
+	 * source of energy
+	 */
+	@Nullable
+	default Pair<Float, Consumer<Float>> getAvailableEnergy(@Nullable ImmersiveNetHandler.AbstractConnection c)
+	{
+		return null;
 	}
 
 	/**

@@ -18,7 +18,6 @@ import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Conn
 import blusunrize.immersiveengineering.api.energy.wires.TileEntityImmersiveConnectable;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.common.Config;
-import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockBounds;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectionalTile;
 import blusunrize.immersiveengineering.common.util.CityMode;
@@ -83,19 +82,9 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 						markDirty();
 					}
 				}
-				//The "sources" list these two calls maintain exists for exactly one feature: wire-shock
-				//damage. It is read only by getDamageAmount/processDamage -- machine power delivery is
-				//the push above and never consults it. So the whole mechanism is dead weight whenever
-				//wire damage is switched off, and profiling says it is not cheap dead weight: the
-				//broadcast was the single most expensive method in the mod, at two thirds of the wire
-				//network's entire cost. City mode skips it and relies on the lossless push instead,
-				//keeping local wire damage from each connector's own energy.
-				if(IEConfig.enableWireDamage)
-				{
-					addAvailableEnergy(-1F, null);
-					if(!CityMode.wires())
-						notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
-				}
+				//No wire-damage bookkeeping happens here any more. The source list that feeds it is
+				//built on demand by gatherAvailableEnergy when something actually touches a wire,
+				//rather than being broadcast across the network by every connector every tick.
 			}
 			currentTickToMachine = 0;
 			currentTickToNet = 0;
@@ -319,13 +308,10 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 		if(!simulate)
 		{
 			energyStorage.modifyEnergyStored(accepted);
-			//Same reasoning as the broadcast in update(): this only advertises energy to the rest of the
-			//network for the wire-damage feature, so it is skipped both when that feature is off and in
-			//city mode. Without these guards every connector fed by an adjacent source -- a generator, a
-			//capacitor, an external mod's block -- walked its whole network once per tick, which is the
-			//exact cost city mode exists to remove. Local wire damage reads this connector's own energy.
-			if(IEConfig.enableWireDamage&&!CityMode.wires())
-				notifyAvailableEnergy(accepted, null);
+			//This used to broadcast the accepted energy across the whole network for wire-damage
+			//bookkeeping, so every connector fed by an adjacent source -- a generator, a capacitor,
+			//another mod's block -- walked its network once per tick. That figure is now pulled on
+			//demand instead; see gatherAvailableEnergy.
 			currentTickToNet += accepted;
 			markDirty();
 		}
@@ -496,19 +482,18 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 		return received;
 	}
 
-	private void notifyAvailableEnergy(int energyStored, @Nullable Set<AbstractConnection> outputs)
+	/**
+	 * Answers the pull that replaced the old {@code notifyAvailableEnergy} broadcast: reports what
+	 * this connector could supply across {@code c}, loss included, exactly as it used to push.
+	 * Relays never hold energy, so they contribute nothing.
+	 */
+	@Nullable
+	@Override
+	public Pair<Float, Consumer<Float>> getAvailableEnergy(@Nullable AbstractConnection c)
 	{
-		if(outputs==null)
-			outputs = ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(pos, world, true);
-		for(AbstractConnection con : outputs)
-		{
-			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
-			if(con.cableType!=null&&end!=null&&end.allowEnergyToPass(null))
-			{
-				Pair<Float, Consumer<Float>> e = getEnergyForConnection(con);
-				end.addAvailableEnergy(e.getKey(), e.getValue());
-			}
-		}
+		if(isRelay())
+			return null;
+		return getEnergyForConnection(c);
 	}
 
 	private Pair<Float, Consumer<Float>> getEnergyForConnection(@Nullable AbstractConnection c)
