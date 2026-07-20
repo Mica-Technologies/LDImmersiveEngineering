@@ -19,6 +19,10 @@ implements which system and how those systems behave. All entries cite real sour
 - **[WIRE_AND_ENERGY_NETWORK.md](WIRE_AND_ENERGY_NETWORK.md)** — the connection/wire graph,
   `ImmersiveNetHandler`, per-tick energy distribution, path-finding, Immersive Flux (IF)
   energy, and connection persistence across chunk load/unload.
+- **[CITY_MODE.md](CITY_MODE.md)** — this fork's config-gated "city mode": a lossless,
+  simulation-free power path that keeps the wiring but drops loss, voltage throttling and
+  wire burnout. Block-by-block behaviour and the performance model.
+  ([PDF summary](CITY_MODE.pdf))
 - **[MULTIBLOCK_SYSTEM.md](MULTIBLOCK_SYSTEM.md)** — the multiblock structure framework
   (master/slave/mirror), formation/disassembly, and the machine catalog (crusher, blast
   furnace, arc furnace, assembler, refinery, etc.).
