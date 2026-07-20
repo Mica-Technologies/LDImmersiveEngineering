@@ -135,7 +135,8 @@ public class TileEntityAlloySmelter extends TileEntityMultiblockPart<TileEntityA
 								active = true;
 						}
 					}
-					markContainingBlockForUpdate(null);
+					if(shouldSyncProgress())
+						markContainingBlockForUpdate(null);
 				}
 				if(--burnTime%10==0)
 					markContainingBlockForUpdate(null);

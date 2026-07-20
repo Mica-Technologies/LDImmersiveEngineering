@@ -141,7 +141,8 @@ public class TileEntityBlastFurnace extends TileEntityMultiblockPart<TileEntityB
 								active = true;
 						}
 					}
-					markContainingBlockForUpdate(null);
+					if(shouldSyncProgress())
+						markContainingBlockForUpdate(null);
 				}
 
 				if(process <= 0)

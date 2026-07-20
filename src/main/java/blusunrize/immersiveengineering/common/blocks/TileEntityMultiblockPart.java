@@ -359,4 +359,23 @@ public abstract class TileEntityMultiblockPart<T extends TileEntityMultiblockPar
 		if(tile instanceof ITileDrop)
 			((ITileDrop)tile).readOnPlacement(null, stack);
 	}
+
+	private static final int PROGRESS_SYNC_INTERVAL = 10;
+
+	/**
+	 * Rate-limits the description packet that feeds a running machine's client-side progress bar.
+	 * <p>
+	 * The stone multiblocks have no container int-sync -- their GUIs read process/burn fields straight
+	 * off the client tile entity -- so a description packet is the only way to animate the bar. Sending
+	 * one every tick meant a full tile entity NBT payload per machine per tick to every player tracking
+	 * the chunk, plus a neighbour state-change notification each time.
+	 * <p>
+	 * Ten ticks matches the burn-bar throttle {@link blusunrize.immersiveengineering.common.blocks.stone.TileEntityAlloySmelter}
+	 * already applies to its own fuel display. Staggering by position keeps a room full of machines from
+	 * syncing on the same tick. State transitions are unaffected: those fire their own block update.
+	 */
+	protected boolean shouldSyncProgress()
+	{
+		return (world.getTotalWorldTime()+((getPos().getX()^getPos().getZ())&7))%PROGRESS_SYNC_INTERVAL==0;
+	}
 }

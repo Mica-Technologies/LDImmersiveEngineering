@@ -126,7 +126,8 @@ public class TileEntityCokeOven extends TileEntityMultiblockPart<TileEntityCokeO
 					else
 						process--;
 				}
-				this.markContainingBlockForUpdate(null);
+				if(shouldSyncProgress())
+					this.markContainingBlockForUpdate(null);
 			}
 			else
 			{
