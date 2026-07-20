@@ -313,7 +313,13 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 		if(!simulate)
 		{
 			energyStorage.modifyEnergyStored(accepted);
-			notifyAvailableEnergy(accepted, null);
+			//Same reasoning as the broadcast in update(): this only advertises energy to the rest of the
+			//network for the wire-damage feature, so city mode skips it. Without this guard every
+			//connector fed by an adjacent source -- a generator, a capacitor, an external mod's block --
+			//still walked its whole network once per tick, which is the exact cost city mode exists to
+			//remove. Local wire damage is unaffected; it reads this connector's own energy.
+			if(!Config.IEConfig.cityMode)
+				notifyAvailableEnergy(accepted, null);
 			currentTickToNet += accepted;
 			markDirty();
 		}
