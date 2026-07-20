@@ -934,10 +934,34 @@ public class ImmersiveNetHandler
 			return compareTo((Connection)obj)==0;
 		}
 
+		/**
+		 * Lazily cached. start, end and cableType are assigned only by the constructors -- the
+		 * moveConnectionTo implementations update the connectable's own bookkeeping, never a
+		 * Connection's fields -- so the hash cannot go stale.
+		 * <p>
+		 * Worth caching because connections live in hash-based sets and maps that are consulted
+		 * constantly on the wire hot path, and because {@code Objects.hash} allocates a varargs
+		 * array on every single call. The arithmetic below reproduces its value exactly, without
+		 * the array. Zero doubles as "not yet computed", so a hash that genuinely lands on zero is
+		 * stored as one; equal objects still agree, which is all hashCode owes equals.
+		 */
+		private int hashCache;
+
 		@Override
 		public int hashCode()
 		{
-			return Objects.hash(start, end, cableType);
+			int h = hashCache;
+			if(h==0)
+			{
+				h = 1;
+				h = 31*h+(start==null?0: start.hashCode());
+				h = 31*h+(end==null?0: end.hashCode());
+				h = 31*h+(cableType==null?0: cableType.hashCode());
+				if(h==0)
+					h = 1;
+				hashCache = h;
+			}
+			return h;
 		}
 
 		public float getBaseLoss()
@@ -1005,12 +1029,27 @@ public class ImmersiveNetHandler
 			return Arrays.equals(subConnections, that.subConnections);
 		}
 
+		/**
+		 * Cached separately from {@link Connection#hashCache} so the two do not fight over one
+		 * field. This is the more valuable of the pair: it hashes every sub-connection of the
+		 * route, so an uncached call cost one hash per wire segment, and abstract connections are
+		 * added to and looked up in hash sets throughout the path-finder and the route cache.
+		 * subConnections is assigned only by the constructor.
+		 */
+		private int abstractHashCache;
+
 		@Override
 		public int hashCode()
 		{
-			int result = super.hashCode();
-			result = 31*result+Arrays.hashCode(subConnections);
-			return result;
+			int h = abstractHashCache;
+			if(h==0)
+			{
+				h = 31*super.hashCode()+Arrays.hashCode(subConnections);
+				if(h==0)
+					h = 1;
+				abstractHashCache = h;
+			}
+			return h;
 		}
 
 		@Override

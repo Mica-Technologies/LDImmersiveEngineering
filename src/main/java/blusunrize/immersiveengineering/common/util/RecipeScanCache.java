@@ -23,13 +23,17 @@ import java.util.function.Function;
  * is not cheap: recipe inputs are frequently ore dictionary entries, so each candidate walks
  * {@code OreDictionary.getOres()} to compare.
  * <p>
- * The cache key is the identity of the input stacks -- item, damage and count. Every matcher these
- * scans reach bottoms out in {@code OreDictionary.itemMatches(..., false)} (item and damage) and,
- * for {@link blusunrize.immersiveengineering.api.crafting.IngredientStack}, an
- * {@code inputSize <= input.getCount()} test. Nothing else about the stack participates, so two
- * inputs agreeing on those three values always produce the same result. Count is part of the key
- * even where it cannot matter, so this stays correct without depending on which matcher a given
- * recipe type happens to use.
+ * The cache key is the identity of the input stacks: item, damage, count, and the hash of the NBT
+ * tag. Item and damage cover {@code OreDictionary.itemMatches(..., false)}, which every one of
+ * these scans bottoms out in. Count covers the {@code inputSize <= input.getCount()} test in
+ * {@link blusunrize.immersiveengineering.api.crafting.IngredientStack}, and matters in practice
+ * because the caller mutates the input stack's size between calls when it consumes an ingredient.
+ * NBT covers that same class's two remaining branches -- a fluid-container ingredient, which reads
+ * the contained fluid out of the tag, and an ingredient with {@code useNBT} set, which compares
+ * tags directly. Both are reachable from CraftTweaker-defined recipes.
+ * <p>
+ * Keying on more than a given recipe type can actually consult costs nothing but an occasional
+ * extra miss, and means correctness does not depend on which matcher that type happens to use.
  * <p>
  * Only the scan is cached. The output-space and tank-capacity checks that surround it in each
  * {@code getRecipe()} stay live, so machine behaviour is unchanged.
@@ -44,11 +48,18 @@ public class RecipeScanCache<T>
 	private Item itemA;
 	private int metaA;
 	private int countA;
+	private int nbtA;
 	private Item itemB;
 	private int metaB;
 	private int countB;
+	private int nbtB;
 	private long cachedTick = Long.MIN_VALUE;
 	private T cachedRecipe;
+
+	private static int nbtHash(ItemStack stack)
+	{
+		return stack.hasTagCompound()?stack.getTagCompound().hashCode(): 0;
+	}
 
 	/**
 	 * Single-input lookup.
@@ -79,22 +90,26 @@ public class RecipeScanCache<T>
 		Item newItemA = inputA.isEmpty()?null: inputA.getItem();
 		int newMetaA = inputA.isEmpty()?0: inputA.getItemDamage();
 		int newCountA = inputA.getCount();
+		int newNbtA = nbtHash(inputA);
 		Item newItemB = inputB.isEmpty()?null: inputB.getItem();
 		int newMetaB = inputB.isEmpty()?0: inputB.getItemDamage();
 		int newCountB = inputB.getCount();
+		int newNbtB = nbtHash(inputB);
 
 		if(cachedTick==worldTime
-				&&itemA==newItemA&&metaA==newMetaA&&countA==newCountA
-				&&itemB==newItemB&&metaB==newMetaB&&countB==newCountB)
+				&&itemA==newItemA&&metaA==newMetaA&&countA==newCountA&&nbtA==newNbtA
+				&&itemB==newItemB&&metaB==newMetaB&&countB==newCountB&&nbtB==newNbtB)
 			return cachedRecipe;
 
 		cachedRecipe = scan.apply(inputA, inputB);
 		itemA = newItemA;
 		metaA = newMetaA;
 		countA = newCountA;
+		nbtA = newNbtA;
 		itemB = newItemB;
 		metaB = newMetaB;
 		countB = newCountB;
+		nbtB = newNbtB;
 		cachedTick = worldTime;
 		return cachedRecipe;
 	}

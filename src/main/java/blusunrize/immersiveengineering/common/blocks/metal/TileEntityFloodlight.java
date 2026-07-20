@@ -240,18 +240,31 @@ public class TileEntityFloodlight extends TileEntityImmersiveConnectable impleme
 	}
 
 	/**
-	 * Ceiling on how many light blocks one floodlight may queue in a single regeneration while city
-	 * mode is active. Each placed light is an individually ticking tile entity and the beam geometry
-	 * places one roughly every three blocks across thirteen rays, so an unobstructed floodlight can
-	 * reach well over a hundred. Hitting the cap stops the remaining rays before they ray-trace, which
-	 * can leave the beam lit asymmetrically -- a deliberate trade, and one only pathological setups
-	 * reach.
+	 * Ceiling on how many light blocks one floodlight may own while city mode is active. Each placed
+	 * light is an individually ticking tile entity and the beam geometry places one roughly every
+	 * three blocks across thirteen rays, so an unobstructed floodlight can reach well over a hundred.
+	 * Hitting the cap stops the remaining rays before they ray-trace, which can leave the beam lit
+	 * asymmetrically -- a deliberate trade, and one only pathological setups reach.
 	 */
 	private static final int MAX_CITY_FAKE_LIGHTS = 64;
 
+	/**
+	 * How many lights this floodlight will own once the regeneration in progress finishes: the ones
+	 * it is keeping, plus the ones it has queued.
+	 * <p>
+	 * Counting only the queue would bound the *delta* rather than the total. A regeneration matches
+	 * existing lights out of {@code checklist} without queueing them, so a lamp that hit the cap,
+	 * then had a neighbour change, would keep its 64 and queue 64 more -- and climb by 64 on every
+	 * rebuild until it reached the uncapped count the cap exists to prevent.
+	 */
+	private int projectedLightCount(ArrayList<BlockPos> checklist)
+	{
+		return (fakeLights.size()-checklist.size())+lightsToBePlaced.size();
+	}
+
 	public void placeLightAlongVector(Vec3d vec, int offset, ArrayList<BlockPos> checklist)
 	{
-		if(CityMode.floodlights()&&lightsToBePlaced.size() >= MAX_CITY_FAKE_LIGHTS)
+		if(CityMode.floodlights()&&projectedLightCount(checklist) >= MAX_CITY_FAKE_LIGHTS)
 			return;
 		Vec3d light = new Vec3d(getPos()).add(.5, .75, .5);
 		int range = 32;
@@ -273,7 +286,7 @@ public class TileEntityFloodlight extends TileEntityImmersiveConnectable impleme
 			{
 				if(!checklist.remove(target))
 					lightsToBePlaced.add(target);
-				if(CityMode.floodlights()&&lightsToBePlaced.size() >= MAX_CITY_FAKE_LIGHTS)
+				if(CityMode.floodlights()&&projectedLightCount(checklist) >= MAX_CITY_FAKE_LIGHTS)
 					return;
 				i += 2;
 			}

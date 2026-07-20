@@ -170,6 +170,11 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 	 */
 	private void refreshSources()
 	{
+		//addAvailableEnergy is public API, so this can be reached from an addon outside a tick body
+		//where the tile has no world yet. Guarded here rather than one frame deeper, where it used
+		//to sit uselessly behind this dereference.
+		if(world==null)
+			return;
 		long currentTime = world.getTotalWorldTime();
 		if(lastSourceUpdate==currentTime)
 			return;
@@ -195,7 +200,18 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 	 */
 	protected void gatherAvailableEnergy()
 	{
-		if(world==null||world.isRemote)
+		if(world.isRemote)
+			return;
+		//This node must be willing to pass energy before it may draw on the network, because the
+		//push it replaces applied exactly that test to the receiver: a source only ever advertised
+		//to a node whose allowEnergyToPass was true, so an open breaker switch never accumulated
+		//any energy and the spans attached to it never shocked.
+		//
+		//It has to be checked here rather than relying on the search. getIndirectEnergyConnections
+		//refuses to expand *through* a node that blocks energy, but it seeds from the starting
+		//node's own connections without ever asking whether that node blocks -- so a breaker switch
+		//asked for a damage figure can see straight across itself to the live side.
+		if(!allowEnergyToPass(null))
 			return;
 		for(ImmersiveNetHandler.AbstractConnection con :
 				ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(pos, world, true))
@@ -203,8 +219,6 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 			if(con.cableType==null)
 				continue;
 			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
-			//Checked on the far node exactly as the old broadcast did, so an open breaker switch
-			//still isolates the two halves of a network for damage purposes.
 			if(end==null||!end.allowEnergyToPass(null))
 				continue;
 			Pair<Float, Consumer<Float>> e = end.getAvailableEnergy(con);
