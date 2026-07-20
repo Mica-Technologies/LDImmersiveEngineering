@@ -73,9 +73,30 @@ public class Config
 		@RequiresWorldRestart
 		public static boolean blocksBreakWires = true;
 
-		@Comment({"\"City mode\": treats the IE wire network as simple, lossless power. When enabled, a powered connector pushes energy straight to the devices on its network with no per-wire loss and no distance/path weighting -- the realistic-grid simulation (loss, proportional distribution, the double simulate/transfer pass) is skipped.",
-				"This keeps the look and feel of connectors, relays, transformers and catenary wires while greatly reducing the wire network's server-tick cost. Intended for decorative / city packs that don't want power management. Existing worlds are unaffected; toggling this only changes how power is distributed at runtime."})
+		@Comment({"\"City mode\": trades Immersive Engineering's simulation detail for server tick time. Intended for decorative / city packs that want the look of the mod without paying for its physics.",
+				"This is the master switch. When it is off, nothing below applies and behaviour is identical to stock. When it is on, each subsystem listed below is simplified unless you turn that subsystem back off individually.",
+				"Existing worlds are unaffected either way -- city mode adds no saved data and changes no persisted state."})
 		public static boolean cityMode = false;
+
+		@Comment({"City mode: wires. A powered connector pushes energy straight to the devices on its network with no per-wire loss and no distance/path weighting -- the realistic-grid simulation (loss, proportional distribution, the double simulate/transfer pass, the network-wide energy broadcast) is skipped.",
+				"Side effects worth knowing: wires can no longer burn out from overload, voltage tiers stop limiting throughput, and wire shock damage is sourced from the local connector rather than the whole network.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeWires = true;
+
+		@Comment({"City mode: floodlights. Skips the periodic re-scan of the light beams, recomputing only when the light actually switches or a neighbouring block changes, and caps how many light blocks a single floodlight may place.",
+				"Floodlights are usually the most expensive block in a city build because each one places a number of individually ticking light blocks and periodically re-traces 13 beams and recalculates lighting.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeFloodlights = true;
+
+		@Comment({"City mode: generators. Fuel becomes cosmetic -- a diesel generator checks that fuel is present and sips a token amount rather than computing and draining a per-tick burn rate, and produces a flat output.",
+				"Generators still only run when something actually wants power, so an idle generator still costs nothing and still burns nothing.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeGenerators = true;
+
+		@Comment({"City mode: machines. Multiblocks scan for a new recipe far less often when they are already busy, and the stone furnaces stop broadcasting a block update to all 26 neighbours on every state change.",
+				"Machines still craft the same recipes at the same speed; they may take slightly longer to notice newly inserted items.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeMachines = true;
 
 		@Comment({"By default all devices that accept cables have increased renderbounds to show cables even if the block itself is not in view.", "Disabling this reduces them to their minimum sizes, which might improve FPS on low-power PCs"})
 		//TODO this is for TESR wires. Remove?

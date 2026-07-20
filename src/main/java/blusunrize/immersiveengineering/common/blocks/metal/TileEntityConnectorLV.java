@@ -20,6 +20,7 @@ import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.common.Config;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockBounds;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectionalTile;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
@@ -70,7 +71,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			//				}
 			if(energyStorage.getEnergyStored() > 0)
 			{
-				if(Config.IEConfig.cityMode)
+				if(CityMode.wires())
 					cityModeTransfer();
 				else
 				{
@@ -88,7 +89,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 				//mode we skip this whole-network broadcast -- the single biggest connector hot spot --
 				//and rely on the lossless push. Local wire damage still works from each connector's own
 				//energy (added by addAvailableEnergy above).
-				if(!Config.IEConfig.cityMode)
+				if(!CityMode.wires())
 					notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
 			}
 			currentTickToMachine = 0;
@@ -318,7 +319,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			//connector fed by an adjacent source -- a generator, a capacitor, an external mod's block --
 			//still walked its whole network once per tick, which is the exact cost city mode exists to
 			//remove. Local wire damage is unaffected; it reads this connector's own energy.
-			if(!Config.IEConfig.cityMode)
+			if(!CityMode.wires())
 				notifyAvailableEnergy(accepted, null);
 			currentTickToNet += accepted;
 			markDirty();
@@ -355,7 +356,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 	private final Map<AbstractConnection, IImmersiveConnectable> transferEndCache = new HashMap<>();
 
 	/**
-	 * "City mode" power push (see {@link Config.IEConfig#cityMode}). A single, lossless pass that sends
+	 * "City mode" power push (see {@link CityMode#wires()}). A single, lossless pass that sends
 	 * this connector's stored energy straight to the devices reachable on its wire network, skipping the
 	 * realistic grid's per-wire loss, distance weighting, proportional split and double simulate/transfer
 	 * pass. Conductive wires (transfer rate &gt; 0) carry power with no per-wire cap beyond this
@@ -507,7 +508,7 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 
 	private Pair<Float, Consumer<Float>> getEnergyForConnection(@Nullable AbstractConnection c)
 	{
-		float loss = (c!=null&&!Config.IEConfig.cityMode)?c.getAverageLossRate(): 0;
+		float loss = (c!=null&&!CityMode.wires())?c.getAverageLossRate(): 0;
 		float max = (1-loss)*energyStorage.getEnergyStored();
 		Consumer<Float> extract = (energy) -> {
 			energyStorage.modifyEnergyStored((int)(-energy/(1-loss)));
