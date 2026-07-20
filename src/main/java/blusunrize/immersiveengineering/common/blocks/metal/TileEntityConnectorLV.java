@@ -18,6 +18,7 @@ import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Conn
 import blusunrize.immersiveengineering.api.energy.wires.TileEntityImmersiveConnectable;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.common.Config;
+import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockBounds;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectionalTile;
 import blusunrize.immersiveengineering.common.util.CityMode;
@@ -82,15 +83,19 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 						markDirty();
 					}
 				}
-				addAvailableEnergy(-1F, null);
-				//notifyAvailableEnergy only advertises this connector's energy to the rest of the
-				//network for the wire-damage feature (the pull-side "sources" list is consumed solely
-				//by getDamageAmount/applyDamage); machine power delivery is the push above. In city
-				//mode we skip this whole-network broadcast -- the single biggest connector hot spot --
-				//and rely on the lossless push. Local wire damage still works from each connector's own
-				//energy (added by addAvailableEnergy above).
-				if(!CityMode.wires())
-					notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
+				//The "sources" list these two calls maintain exists for exactly one feature: wire-shock
+				//damage. It is read only by getDamageAmount/processDamage -- machine power delivery is
+				//the push above and never consults it. So the whole mechanism is dead weight whenever
+				//wire damage is switched off, and profiling says it is not cheap dead weight: the
+				//broadcast was the single most expensive method in the mod, at two thirds of the wire
+				//network's entire cost. City mode skips it and relies on the lossless push instead,
+				//keeping local wire damage from each connector's own energy.
+				if(IEConfig.enableWireDamage)
+				{
+					addAvailableEnergy(-1F, null);
+					if(!CityMode.wires())
+						notifyAvailableEnergy(energyStorage.getEnergyStored(), null);
+				}
 			}
 			currentTickToMachine = 0;
 			currentTickToNet = 0;
@@ -315,11 +320,11 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 		{
 			energyStorage.modifyEnergyStored(accepted);
 			//Same reasoning as the broadcast in update(): this only advertises energy to the rest of the
-			//network for the wire-damage feature, so city mode skips it. Without this guard every
-			//connector fed by an adjacent source -- a generator, a capacitor, an external mod's block --
-			//still walked its whole network once per tick, which is the exact cost city mode exists to
-			//remove. Local wire damage is unaffected; it reads this connector's own energy.
-			if(!CityMode.wires())
+			//network for the wire-damage feature, so it is skipped both when that feature is off and in
+			//city mode. Without these guards every connector fed by an adjacent source -- a generator, a
+			//capacitor, an external mod's block -- walked its whole network once per tick, which is the
+			//exact cost city mode exists to remove. Local wire damage reads this connector's own energy.
+			if(IEConfig.enableWireDamage&&!CityMode.wires())
 				notifyAvailableEnergy(accepted, null);
 			currentTickToNet += accepted;
 			markDirty();
