@@ -19,6 +19,9 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
+permissions:
+  contents: write   # needed to push the build tag
+
 jobs:
   build_mod:
     name: Build Mod
@@ -58,11 +61,85 @@ jobs:
           path: build/reports/
           retention-days: 7
 
+      # The version is derived in build.gradle from the commit (date + short sha), so it
+      # is asked for rather than recomputed here — one source of truth.
+      - name: Read version from Gradle
+        run: |
+          echo "MOD_VERSION=$(./gradlew -q printModVersion | tail -1 | xargs)" >> $GITHUB_ENV
+          echo "MOD_ARCHIVE_BASE_NAME=$(./gradlew -q printArchivesBaseName | tail -1 | xargs)" >> $GITHUB_ENV
+          echo "MINECRAFT_VERSION=$(./gradlew -q printMinecraftVersion | tail -1 | xargs)" >> $GITHUB_ENV
+          echo "COMMIT_DATE=$(./gradlew -q printCommitDate | tail -1 | xargs)" >> $GITHUB_ENV
+
+      # A CI build must never be ".dirty" — that suffix means the jar doesn't correspond
+      # to any commit, which would make the tag we push a lie.
+      - name: Reject a dirty build
+        run: |
+          if [[ "${{ env.MOD_VERSION }}" == *".dirty" ]]; then
+            echo "::error::Version is marked dirty (${{ env.MOD_VERSION }}) — the checkout has uncommitted tracked changes."
+            exit 1
+          fi
+          echo "Building ${{ env.MOD_ARCHIVE_BASE_NAME }} ${{ env.MOD_VERSION }} for MC ${{ env.MINECRAFT_VERSION }}"
+
+      # Tag every successful main build, so a jar can always be traced back to a commit.
+      #
+      # Prefixed "ld-" to keep fork tags distinguishable from the ~150 inherited upstream
+      # IE tags (0.10-38 ... 0.12-89). Same-day builds get SemVer build metadata (+N)
+      # rather than a non-SemVer 4th segment, matching the other mods' scheme.
+      - name: Create build tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          baseTag="ld-${{ env.COMMIT_DATE }}"
+          git fetch --tags --quiet origin || true
+          maxN=-1
+          if git rev-parse -q --verify "refs/tags/${baseTag}" >/dev/null 2>&1; then
+            maxN=0
+          fi
+          for existingTag in $(git tag -l "${baseTag}+*"); do
+            suffix="${existingTag#${baseTag}+}"
+            if [[ "$suffix" =~ ^[0-9]+$ ]] && [ "$suffix" -gt "$maxN" ]; then
+              maxN="$suffix"
+            fi
+          done
+          if [ "$maxN" -ge 0 ]; then
+            buildTag="${baseTag}+$((maxN + 1))"
+          else
+            buildTag="${baseTag}"
+          fi
+
+          # A re-run of the same commit should not create a second tag.
+          existing=$(git tag --points-at "${{ github.sha }}" -l 'ld-*' | head -1)
+          if [ -n "$existing" ]; then
+            echo "Commit already tagged as ${existing}; not creating another."
+            echo "BUILD_TAG=${existing}" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          git tag -a "$buildTag" "${{ github.sha }}" -m "${{ env.MOD_ARCHIVE_BASE_NAME }} ${{ env.MOD_VERSION }} (MC ${{ env.MINECRAFT_VERSION }})"
+          git push origin "$buildTag"
+          echo "BUILD_TAG=$buildTag" >> $GITHUB_ENV
+
+      - name: Report build identity
+        run: |
+          jar="build/libs/${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}.jar"
+          {
+            echo "### ${{ env.MOD_ARCHIVE_BASE_NAME }} ${{ env.MOD_VERSION }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Tag | \`${{ env.BUILD_TAG }}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Minecraft | ${{ env.MINECRAFT_VERSION }} |"
+            echo "| SHA-256 | \`$(sha256sum "$jar" | awk '{print $1}')\` |"
+            echo "| SHA-1 | \`$(sha1sum "$jar" | awk '{print $1}')\` |"
+          } >> $GITHUB_STEP_SUMMARY
+
       # Private artifact only — NOT a public release. See the note at the top of this file.
       - name: Upload mod jar (private artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: immersiveengineering-jar
+          name: ${{ env.MOD_ARCHIVE_BASE_NAME }}-${{ env.MOD_VERSION }}
           path: build/libs/*.jar
           retention-days: 90
           if-no-files-found: error

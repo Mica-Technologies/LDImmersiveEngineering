@@ -64,6 +64,30 @@ build.bat setupCiWorkspace build       # same, on Windows without a bash shell
 
 Build output lands in `build/libs/` (`ImmersiveEngineering-<version>.jar`).
 
+### Versioning
+
+Builds are versioned as the upstream IE version plus this fork's build metadata:
+
+```
+0.12-98+LD.2026.07.19.586a9f5
+└─────┘ └──────────┘ └─────┘
+  │           │         └── commit short sha
+  │           └── commit date (YYYY.MM.DD)
+  └── upstream Immersive Engineering version this fork is built from
+```
+
+The date comes from the **commit**, not the build, so rebuilding a commit reproduces its
+version exactly. A `.dirty` suffix is appended when the working tree has uncommitted
+tracked changes — CI rejects any build carrying it.
+
+Nothing is set by hand; `./build.sh -q printModVersion` reports the current value. Every
+successful build of `main` is tagged `ld-YYYY.MM.DD` (with `+N` for repeat builds on the
+same day) — prefixed to keep fork tags apart from the ~150 inherited upstream IE tags.
+
+Note that the in-game update checker is deliberately disabled: it used to point at
+upstream's `changelog.json`, and the `+LD...` suffix makes Maven version ordering rank
+these builds below the bare upstream version, so every build reported itself as outdated.
+
 ### Before pushing
 
 ```sh

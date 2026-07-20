@@ -49,7 +49,17 @@ buildscript {
 }
 apply plugin: 'net.minecraftforge.gradle.forge'
 
-version = "${mainVersion}-${buildNumber}" + getBuildNumber()
+// Version = upstream IE version + this fork's build identity, e.g.
+//     0.12-98+LD.2026.07.19.586a9f5
+//
+// The base ("0.12-98") is Immersive Engineering's own version and says which upstream
+// release this fork is built from. Everything after "+" is SemVer build metadata
+// identifying the LD build, matching the YYYY.MM.DD scheme used by the other mods.
+//
+// The date is the COMMIT date, not the build date, so rebuilding a given commit always
+// produces the same version — the same reason everything else here is pinned. Falls
+// back to a bare upstream version if git is unavailable (e.g. a source zip).
+version = "${mainVersion}-${buildNumber}" + forkBuildMetadata()
 group = "blusunrize"
 def archiveGroup = group
 archivesBaseName = "ImmersiveEngineering"
@@ -340,16 +350,57 @@ uploadArchives {
     }
 }
 
-String getBuildNumber() {
-    String buildNumber = System.getenv("BUILD_NUMBER") != null ? System.getenv("BUILD_NUMBER") : ""
-    if (buildNumber.equals("")) {
-        buildNumber = System.getenv("bamboo_buildNumber") != null ? "." + System.getenv("bamboo_buildNumber") : ""
+/**
+ * Runs a git command, returning trimmed stdout, or null if git is unavailable or the
+ * command fails. Never throws — a source-only checkout must still be buildable.
+ */
+String git(List<String> args) {
+    try {
+        def stdout = new ByteArrayOutputStream()
+        def result = exec {
+            commandLine(['git'] + args)
+            standardOutput = stdout
+            errorOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+            workingDir = project.projectDir
+        }
+        return result.exitValue == 0 ? stdout.toString('UTF-8').trim() : null
+    } catch (Exception ignored) {
+        return null
     }
-    if (!buildNumber.equals("")) {
-        buildNumber = "-" + buildNumber
-    }
-    return buildNumber
 }
+
+/**
+ * SemVer build metadata identifying this fork's build: "+LD.<commit date>.<short sha>".
+ *
+ * Deliberately NOT derived from `git describe`: this repo carries ~150 inherited
+ * upstream IE tags (0.10-38 ... 0.12-89), so describe returns things like
+ * "0.12-89-121-g586a9f5" — anchored to an unrelated upstream release.
+ *
+ * Returns "" when git isn't usable, so the build still works from a source archive.
+ */
+String forkBuildMetadata() {
+    def sha = git(['rev-parse', '--short=7', 'HEAD'])
+    def date = git(['log', '-1', '--format=%cd', '--date=format:%Y.%m.%d'])
+    if (!sha || !date) {
+        logger.warn("WARNING: could not read git metadata; building without a fork version suffix.")
+        return ""
+    }
+    def suffix = "+LD.${date}.${sha}"
+    // Uncommitted tracked changes mean the jar does not correspond to any commit.
+    // Untracked files are ignored — they don't end up in the jar.
+    if (git(['status', '--porcelain', '--untracked-files=no'])) {
+        suffix += ".dirty"
+    }
+    return suffix
+}
+
+// Queried by CI to name artifacts and derive the build tag. `-q` suppresses everything
+// else so the output is directly consumable: `./gradlew -q printModVersion`
+task printModVersion { doLast { println project.version } }
+task printArchivesBaseName { doLast { println project.archivesBaseName } }
+task printMinecraftVersion { doLast { println project.minecraft.version } }
+task printCommitDate { doLast { println git(['log', '-1', '--format=%cd', '--date=format:%Y.%m.%d']) } }
 
 //Code for automatic update JSON generation
 class GenerateUpdateJSON extends DefaultTask {

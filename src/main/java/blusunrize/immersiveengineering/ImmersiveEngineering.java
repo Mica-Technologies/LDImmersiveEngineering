@@ -44,10 +44,15 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.Arrays;
 
+// updateJSON is deliberately not set. It used to point at upstream's changelog.json,
+// which made Forge compare this fork's version against BluSunrize's release promos.
+// Fork builds carry a "+LD.<date>.<sha>" build-metadata suffix, and Maven version
+// ordering ranks a qualified version below the bare one, so every build reported
+// itself as permanently out of date in the mod list. This fork tracks upstream by
+// merging, not by the in-game update checker.
 @Mod(modid = ImmersiveEngineering.MODID, name = ImmersiveEngineering.MODNAME, version = ImmersiveEngineering.VERSION,
 		dependencies = "required-after:forge@[14.23.5.2820,);after:jei@[4.8,);after:railcraft;after:tconstruct@[1.12-2.7.1,);after:theoneprobe@[1.4.4,)",
-		certificateFingerprint = "4cb49fcde3b43048c9889e0a3d083225da926334", acceptedMinecraftVersions = "[1.12,1.12.2]",
-		updateJSON = "https://raw.githubusercontent.com/BluSunrize/ImmersiveEngineering/master/changelog.json")
+		certificateFingerprint = "4cb49fcde3b43048c9889e0a3d083225da926334", acceptedMinecraftVersions = "[1.12,1.12.2]")
 public class ImmersiveEngineering
 {
 	public static final String MODID = "immersiveengineering";

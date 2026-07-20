@@ -49,5 +49,6 @@ EOF
 fi
 
 export JAVA_HOME
-echo "Using JDK: ${JAVA_HOME}"
+# stderr, not stdout: `./build.sh -q printModVersion` must emit only the value.
+echo "Using JDK: ${JAVA_HOME}" >&2
 exec "$(dirname "$0")/gradlew" "$@"
