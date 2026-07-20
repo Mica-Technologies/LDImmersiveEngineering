@@ -1,10 +1,97 @@
-# City Mode
+# Performance Tuning and City Mode
 
-Technical documentation for the fork's config-gated "city mode" — a mod-wide simplification of
-Immersive Engineering's simulation, covering wires, floodlights, generators and machines
+How to make Immersive Engineering cheap on the server tick, and what each option costs you
 (Forge 1.12.2).
 
-## Overview
+Two things live here: **recommended configurations**, backed by measurements from this fork, and a
+**reference for city mode**, the config-gated simplification of the mod's simulation.
+
+## The headline
+
+If you read nothing else:
+
+> **Set `enableWireDamage = false`.** On a profiled world it cut Immersive Engineering's server
+> CPU by **60%** while changing nothing else about how the mod plays — wire loss, voltage tiers,
+> proportional power distribution and wire burnout all stay exactly as they are. It is a bigger win
+> than city mode, and it costs you one feature: entities no longer take shock damage from touching
+> a live wire.
+
+That is not what anyone expected, including the author of city mode. The wire network's cost turned
+out not to be its physics but a per-tick, whole-network broadcast that exists only to feed that
+damage feature. Details in [Measured results](#measured-results).
+
+---
+
+## Recommended configurations
+
+Pick the row that matches your pack. Everything not listed stays at its default.
+
+### Recommended — fastest, keeps the gameplay
+
+```
+enableWireDamage = false
+cityMode         = false
+```
+
+**~60% less IE server CPU.** The whole realistic grid is intact: loss over distance, voltage-tier
+throughput limits, nearest-first proportional distribution when supply is short, and wires burning
+out when overloaded. The only loss is wire shock damage.
+
+This is the right default for almost every pack. Wire damage is a niche hazard that many packs
+disable anyway, and until this fork it was costing you the single most expensive method in the mod
+whether it was switched on or not.
+
+### City / roleplay pack
+
+```
+cityMode = true          (plus the four cityMode* sub-flags, all default true)
+enableWireDamage = false
+```
+
+**~49% less IE server CPU from city mode alone**, and city mode already skips the same broadcast, so
+the two do not stack much on the wire side. Choose this for what it does to *gameplay*, not for
+speed: wires become lossless and voltage-agnostic, power distribution becomes greedy rather than
+proportional, and **wires can no longer burn out**. Floodlights, generators and machines are
+simplified too — see the subsystem sections below.
+
+If you want the look of a wired city without anyone having to think about voltage, this is the mode.
+If you want speed, the row above is faster and costs less.
+
+### Maximum server performance
+
+```
+enableWireDamage       = false
+cityMode               = true
+validateConnections    = false     (already the default)
+pump_placeCobble       = true      (already the default)
+```
+
+Everything above, plus the two defaults worth *not* changing — see
+[Other configuration knobs](#other-configuration-knobs).
+
+### Client FPS, not server tick
+
+```
+increasedRenderboxes       = false
+disableFancyTESR           = true
+disableFancyBlueprints     = true    (already the default)
+increasedTileRenderdistance = 1.0
+```
+
+These do nothing for TPS. They are for low-end GPUs — see the client section below.
+
+### Stock
+
+```
+enableWireDamage = true
+cityMode         = false
+```
+
+Everything on. Behaviour identical to upstream Immersive Engineering.
+
+---
+
+## Overview of city mode
 
 City mode trades Immersive Engineering's simulation detail for server tick time. It is aimed at
 city/roleplay packs where the mod's machinery is set dressing rather than an engineering puzzle:
@@ -486,104 +573,175 @@ pack, `enableWireDamage = false` turns it off properly.
 
 ---
 
-## Performance
+## Measured results
 
-### Where the cost goes
+Four 120-second `spark` captures of the Server thread on a local single-player world, flying along
+power lines and past transformers and machines — the worst case for the route cache, since chunk
+streaming keeps invalidating it. Library time is attributed to the calling mod, and idle (the
+server thread sleeps 84–90% of the time on an unsaturated world) is excluded.
 
-Per powered connector per tick, with `N` reachable outputs and `S` wire segments per route:
+The runs are not perfectly load-matched — non-IE time varied between them, which no IE setting can
+cause — so the honest comparison is the **ratio of IE cost to non-IE server work**, which cancels
+overall load out. Raw absolute figures are given too, and they tell the same story.
 
-| Work | Normal | City |
-|---|---|---|
-| Route-set lookups (cached) | **3** | **1** |
-| `outputEnergy` calls | **~6N** (2 passes × 3 calls per output) | **N** |
-| `TreeMap` sort by loss rate | N log N | none |
-| Per-segment float loss math | 2 × N × S | none |
-| Burnout ledger map writes | N × S | none |
-| Whole-network broadcast | 1 full walk | none |
+| Run | Config | IE cost | IE / non-IE | vs baseline |
+|---|---|---|---|---|
+| A | city off, damage **on** | 6364 ms | 0.487 | — |
+| B | city off, damage **on** | 6692 ms | 0.633 | — |
+| | *baseline average* | *6528 ms* | *0.560* | — |
+| C | **city mode on** | 2720 ms | 0.285 | **−49%** |
+| D | city off, **damage off** | **2492 ms** | **0.226** | **−60%** |
 
-The reduction is structural rather than incremental: two of the three network walks disappear
-entirely, and the surviving one does a sixth of the per-output work with no sorting and no
-floating-point loss accumulation.
+### Where the cost actually was
 
-**Do not read that table as a cost model.** It counts operations, and operation counts turned out
-to be a poor predictor here — the measurements below show that eliminating the *broadcast* is worth
-roughly ten times the entire reduction in per-output work. It is included to describe what changes,
-not to predict what it saves.
+Per-method, city mode off with damage on, versus each optimisation:
 
-### Measured results
+| Method | A | B | C (city) | D (no damage) |
+|---|---|---|---|---|
+| `notifyAvailableEnergy` | 2356 ms | 2532 ms | **0** | **0** |
+| `ApiUtils.toIIC` | 1176 ms | 1452 ms | 188 ms | 80 ms |
+| `transferEnergy` | 1108 ms | 1364 ms | — | 1212 ms |
+| `cityModeTransfer` | — | — | 996 ms | — |
+| `getIndirectEnergyConnections` | 1016 ms | 792 ms | 980 ms | 616 ms |
 
-These are **measurements**, not a model. Three 120-second `spark` captures of the Server thread on
-a local single-player world, flying along power lines and past transformers and machines — the
-worst case for the route cache, since chunk streaming keeps invalidating it. Library time is
-attributed to the calling mod, and idle (the server thread sleeps ~85% of the time on an
-unsaturated world) is excluded.
+Two conclusions fall out of that table.
 
-| Immersive Engineering, self+library | city OFF (run A) | city OFF (run B) | **city ON** |
-|---|---|---|---|
-| `notifyAvailableEnergy` | 2356 ms | 2532 ms | **0** |
-| `ApiUtils.toIIC` | 1176 ms | 1452 ms | **188 ms** |
-| `transferEnergy` | 1108 ms | 1364 ms | — |
-| `cityModeTransfer` | — | — | 996 ms |
-| `getIndirectEnergyConnections` | 1016 ms | 792 ms | 980 ms |
-| **IE total** | **6364 ms** | **6692 ms** | **2720 ms** |
-| IE share of active CPU | 32.7% | 38.7% | **22.2%** |
+**The physics is nearly free.** Run D keeps the entire realistic distribution — per-wire loss, the
+`TreeMap` sort by loss rate, proportional splitting, the double simulate/real pass, the burnout
+ledger — and `transferEnergy` costs 1212 ms against city mode's stripped-down `cityModeTransfer` at
+996 ms. **216 ms.** That is the price of everything city mode removes from power behaviour, about
+1.6% of active CPU.
 
-**Immersive Engineering's cost fell by roughly half.** The raw drop is 58%, but the three runs were
-not perfectly load-matched — non-IE time also fell between them, which city mode cannot cause.
-Normalising IE against non-IE work to cancel that out gives a **~49% reduction**, and that is the
-number to quote.
+**The cost was one broadcast.** `notifyAvailableEnergy` alone was 2356–2532 ms, and it drove most of
+the `toIIC` time on top of that. Both city mode and `enableWireDamage=false` eliminate it, which is
+why both land in the same place — and why the option that keeps the physics wins.
 
-#### Where the saving actually comes from
+This corrects an earlier estimate in this document, which used an operation-count model to
+attribute city mode's saving to the simpler distribution maths. Operation counts were a poor
+predictor: the distribution rewrite accounts for roughly 6% of the saving, and removing the
+broadcast for the rest.
 
-This was a surprise, and it corrects an earlier estimate in this document that attributed the win
-to the simpler distribution maths:
+### Why the broadcast was so expensive
 
-| Source | Saved | Share |
-|---|---|---|
-| Removing the `notifyAvailableEnergy` broadcast | 2444 ms | 64% |
-| `toIIC` — overwhelmingly called *by* that broadcast | 1126 ms | 30% |
-| Simpler distribution (`transferEnergy` → `cityModeTransfer`) | 240 ms | **6%** |
+`notifyAvailableEnergy` walks the entire reachable network from **every powered connector, every
+tick**, so its cost scales with (connectors × network size) rather than with anything the player
+did. It exists to populate a per-tick list of available energy on each connectable, read by exactly
+two methods — `getDamageAmount` and `processDamage` — both of which serve wire shock damage.
+Machine power delivery is a push and never consults it.
 
-`cityModeTransfer` measured 996 ms against `transferEnergy`'s ~1236 ms. Dropping the loss maths,
-the `TreeMap` sort, the proportional split and the double simulate/real pass together bought about
-6% of the total. **Essentially all of city mode's benefit is the removal of one whole-network
-broadcast per connector per tick.**
+Until this fork, that broadcast ran **even with `enableWireDamage` set to false**, because the flag
+was only ever checked at the point of impact. Turning wire damage off now actually stops paying for
+it. This is independent of city mode and applies to the realistic grid.
 
-That has a significant consequence: since the broadcast exists solely to feed wire-shock damage,
-most of this performance is available *without* giving up loss, voltage tiers or wire burnout. Two
-changes follow from it, both of which help the realistic grid too:
+The remaining opportunity is to compute damage lazily, when an entity actually touches a wire,
+rather than broadcasting continuously against the chance of one. That would deliver run D's numbers
+with wire damage still working.
 
-- The broadcast now respects `enableWireDamage`. It previously ran every tick even with wire damage
-  switched off, feeding a disabled feature.
-- Computing damage lazily on entity-wire collision, rather than broadcasting continuously against
-  the chance of one, would give the realistic grid most of city mode's speedup.
+### What did not improve
 
-#### What did not improve
+`getIndirectEnergyConnections` was essentially unchanged by city mode (~904 ms → 980 ms) even
+though city mode calls it once per tick instead of three times. Its cost is therefore not call
+count — it is cache misses being re-flooded, which the profiled flight path maximised, plus the
+lookup itself. It is now the largest remaining Immersive Engineering cost. The path-finder is still
+effectively O(V²) on a miss, and that, with the cache-invalidation strategy, is the next target.
 
-`getIndirectEnergyConnections` was essentially unchanged (~904 ms → 980 ms) even though city mode
-calls it once per tick instead of three times. Its cost is therefore not call count — it is cache
-misses being re-flooded (the capture involved constant chunk loading) plus the lookup itself. It is
-now the single largest remaining Immersive Engineering cost, at about 8% of active CPU and over a
-third of what the mod does. The path-finder is still effectively O(V²) on a miss, and that, with
-the cache-invalidation strategy, is the next target.
-
-#### The other three subsystems
+### The other three subsystems
 
 The figures above cover **wires only**. The floodlight, machine and generator subsystems did not
-register meaningfully in these captures — `TileEntityFloodlight.update` came in at 0.04%, i.e.
-absent. That does not vindicate or refute them; it means the profiled area had no lit floodlights
-and no idle machines holding unusable input. Their value depends entirely on what is built and
-loaded, so measure them where they actually exist, toggling the sub-flags individually to separate
-each one's contribution.
+register in these captures — `TileEntityFloodlight.update` came in at 0.04%, i.e. absent. That does
+not vindicate or refute them; it means the profiled area had no lit floodlights and no idle machines
+holding unusable input. Their value depends entirely on what is built and loaded, so measure them
+where they actually exist, toggling the sub-flags individually to separate each one's contribution.
 
 An honest note on the floodlight work: it was predicted to rival the wire saving in a lit city.
 That prediction is so far unmeasured, not confirmed.
 
 ---
 
+## Other configuration knobs
+
+### Server tick
+
+| Option | Default | Recommendation |
+|---|---|---|
+| `enableWireDamage` | `true` | **`false`** — the single biggest win. See above. |
+| `cityMode` | `false` | `true` only for a city/roleplay pack; it is not the fastest option. |
+| `validateConnections` | `false` | **Leave `false`.** It loads and checks every connection endpoint at world load and slows startup. Turn it on temporarily only when you suspect corrupted connection data, with a backup. |
+| `pump_placeCobble` | `true` | **Leave `true`.** The fluid pump replaces the fluid it drains with cobblestone, which stops flowing-water updates propagating — a genuine tick saving that is on by default. |
+| `retrogen_*` | all `false` | Leave off unless you deliberately want ore retrogen. Retrogen is throttled to 2 chunks/tick, but it is still work you do not need. |
+| `retrogen_log_flagChunk`, `retrogen_log_remaining` | `true` | Set `false` if you ever enable retrogen — otherwise they log per chunk. |
+
+### Client FPS only
+
+None of these affect TPS.
+
+| Option | Default | Effect |
+|---|---|---|
+| `increasedRenderboxes` | `true` | Set `false` to shrink render bounds on cable-accepting blocks. Wires may vanish when the block itself is off-screen; helps weak GPUs. |
+| `disableFancyTESR` | `false` | Set `true` to drop most dynamic lighting on turrets and garden cloches. |
+| `disableFancyBlueprints` | `true` | Already on by default; keeps the Workbench from rendering blueprints. |
+| `increasedTileRenderdistance` | `1.5` | Lower to `1.0` for default vanilla distance on windmills and similar. |
+| `stencilBufferEnabled` | `true` | Set `false` only if an old GPU misbehaves. |
+
+---
+
+## What this fork optimises with no configuration
+
+These are always on and need no setting. They are listed so you know what has already been done
+before reaching for a config change.
+
+- **Wire path-finder** visited-set is a `HashSet` rather than a list, removing an O(V²) term per
+  cache miss.
+- **Chunk-load cache invalidation** is deferred and coalesced to one flood per tick instead of one
+  per loaded connector — this was the original "TPS drops while flying around" symptom.
+- **Fluid-pipe endpoint cache** clearing is likewise deferred and coalesced.
+- **Connector endpoint resolution** is cached within a transfer call rather than re-resolved per hop.
+- **Multiblock insertion recipe lookup** is memoised per tick, so a hopper's simulate-then-insert
+  probe scans the recipe list once instead of twice.
+- **Idle multiblock recipe scans** are throttled and position-staggered.
+- **Stone furnace recipe scans** are memoised within a tick; those machines previously re-scanned
+  the whole recipe list two to four times per tick.
+- **Stone furnace progress packets** are rate-limited to every 10th tick instead of every tick.
+- **Water wheel / dynamo** neighbour lookups are cached and their blocked-check throttled.
+- **Minecart shader effects** are skipped server-side, where they only ever produced nothing.
+- **Queued block updates** are de-duplicated within a tick.
+
+---
+
+## Measuring your own server
+
+Full command recipe and gotchas in
+[`agent-plans/SPARK_MEASUREMENT_GUIDE.md`](agent-plans/SPARK_MEASUREMENT_GUIDE.md). The short
+version:
+
+```
+/spark profiler --timeout 120
+```
+
+- Do **not** add `--thread "Server thread"` — a quoted name with a space mis-parses in chat and
+  filters out everything, producing an empty report. Spark already focuses the server tick.
+- Do **not** use `--only-ticks-over` unless you are actively watching a spike.
+- In single player, enable commands first: **Esc → Open to LAN → Allow Cheats: ON**. Session-only;
+  it does not modify your save.
+- None of the options in this document carry a restart annotation, so **toggle them in Mod Options
+  between captures** rather than restarting. Staying in one session with the same chunks loaded is
+  what makes a before/after comparison trustworthy.
+- Read the results with idle **excluded**. On an unsaturated world the server thread sleeps ~85% of
+  the time, and spark's default view shows shares of total wall time — which makes a mod costing a
+  third of your actual CPU look like 5% and hides everything.
+
 ## Testing checklist
 
-With `cityMode = false` — regression check, must be indistinguishable from stock:
+With `enableWireDamage = false` and `cityMode = false` — the recommended configuration:
+
+- [ ] Power still behaves exactly as stock: loss over long wires, tier throttling, proportional
+      split when supply is short.
+- [ ] Overloading a copper wire still destroys it with flame particles.
+- [ ] Standing in a live wire does **not** hurt — that is the one intended difference.
+- [ ] Setting `enableWireDamage` back to `true` restores shock damage within a tick, no restart.
+
+With `cityMode = false` and `enableWireDamage = true` — regression check, must be
+indistinguishable from stock:
 
 - [ ] Power behaves exactly as before: loss over long wires, tier throttling, proportional split.
 - [ ] Overloading a copper wire still destroys it with flame particles.

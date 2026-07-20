@@ -1,4 +1,4 @@
-"""Generate CITY_MODE.pdf: charts via matplotlib, document via reportlab."""
+"""Generate CITY_MODE_AND_PERF.pdf: charts via matplotlib, document via reportlab."""
 import os
 import matplotlib
 matplotlib.use("Agg")
@@ -51,55 +51,43 @@ def _strip(ax, keep_left=True):
     ax.tick_params(length=0)
 
 
-# ---- Chart A: MEASURED Immersive Engineering cost ---------------------------
+# ---- Chart A: MEASURED cost per configuration ------------------------------
 def chart_cpu_share(path):
-    """Measured IE server-thread cost, city mode off (avg of 2 runs) vs on."""
-    fig, ax = plt.subplots(figsize=(7.4, 2.55), dpi=220)
+    """Measured IE server-thread cost across the profiled configurations."""
+    fig, ax = plt.subplots(figsize=(7.4, 2.5), dpi=220)
 
-    rows = ["City mode off", "City mode on"]
-    y = [1, 0]
-    # measured ms of Server-thread CPU over a 120s capture, library time attributed
-    traversal = [6.29, 2.52]      # wire traversal, seconds
-    rest_of_ie = [0.24, 0.20]     # everything else in IE, seconds
+    rows = ["Stock\n(wire damage on)", "City mode on", "Wire damage off\n(physics intact)"]
+    # measured IE server-thread CPU, seconds per 120s capture; load-normalised reduction
+    cost = [6.53, 2.72, 2.49]
+    delta = [None, -49, -60]
 
-    H = 0.42
-    # 2px-equivalent surface gap between stacked segments
-    gap = 0.035
-    for i, yy in enumerate(y):
-        ax.barh(yy, traversal[i], height=H, color=SERIES_1, zorder=3)
-        ax.barh(yy, rest_of_ie[i], height=H, left=traversal[i] + gap,
-                color=SERIES_2, zorder=3)
+    ypos = [2, 1, 0]
+    for i, yy in enumerate(ypos):
+        colour = SERIES_2 if i == 2 else SERIES_1
+        ax.barh(yy, cost[i], height=0.48, color=colour, zorder=3)
+        lbl = f"{cost[i]:.2f}s"
+        if delta[i] is not None:
+            lbl += f"    {delta[i]}%"
+        ax.text(cost[i] + 0.16, yy, lbl, va="center", ha="left", fontsize=10.5,
+                color=INK_PRIMARY, fontweight="bold")
 
-        total = traversal[i] + rest_of_ie[i]
-        ax.text(total + 0.28, yy, f"{total:.2f}s",
-                va="center", ha="left", fontsize=11.5, color=INK_PRIMARY,
-                fontweight="bold")
-        # direct labels inside segments where they fit
-        ax.text(traversal[i] / 2, yy, f"{traversal[i]:.2f}", va="center", ha="center",
-                fontsize=9.5, color="white", fontweight="bold", zorder=4)
-        # rest-of-IE slice is too thin to label inside; left to the legend
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(rows, fontsize=11, color=INK_PRIMARY)
-    ax.set_xlim(0, 7.6)
-    ax.set_xticks([0, 2, 4, 6])
+    ax.set_yticks(ypos)
+    ax.set_yticklabels(rows, fontsize=9.5, color=INK_PRIMARY)
+    ax.set_xlim(0, 8.4)
+    ax.set_xticks([0, 2, 4, 6, 8])
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}s"))
     ax.tick_params(axis="x", labelsize=9)
     ax.xaxis.grid(True, color=GRIDLINE, linewidth=0.8, zorder=0)
     ax.set_axisbelow(True)
     _strip(ax, keep_left=False)
 
-    handles = [plt.Rectangle((0, 0), 1, 1, color=SERIES_1),
-               plt.Rectangle((0, 0), 1, 1, color=SERIES_2)]
-    ax.legend(handles, ["Wire energy traversal", "Rest of IE"],
-              loc="lower right", bbox_to_anchor=(1.0, -0.42), ncol=2,
-              frameon=False, fontsize=9.5, handlelength=1.1, handleheight=1.1,
-              borderpad=0, columnspacing=1.4,
-              labelcolor=INK_SECOND)
-
-    ax.set_title("Measured: Immersive Engineering server-thread CPU per 120s",
+    ax.set_title("Measured: Immersive Engineering server CPU per 120s capture",
                  fontsize=12.5, color=INK_PRIMARY, pad=12, loc="left",
                  fontweight="bold")
+    fig.text(0.012, -0.04,
+             "Percentages are the load-normalised reduction against the stock baseline. "
+             "Turning wire damage off beats city mode and keeps every power mechanic.",
+             fontsize=8.5, color=INK_MUTED)
     fig.tight_layout()
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -172,7 +160,7 @@ def build_pdf(path, chart_a, chart_b):
     doc = BaseDocTemplate(path, pagesize=LETTER,
                           leftMargin=0.85 * inch, rightMargin=0.85 * inch,
                           topMargin=0.8 * inch, bottomMargin=0.8 * inch,
-                          title="City Mode", author="LDImmersiveEngineering",
+                          title="Performance Tuning and City Mode", author="LDImmersiveEngineering",
                           invariant=1)
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="f")
 
@@ -181,7 +169,7 @@ def build_pdf(path, chart_a, chart_b):
         canvas.setFillColor(colors.HexColor(INK_MUTED))
         canvas.setFont(SANS, 8)
         canvas.drawString(doc.leftMargin, 0.52 * inch,
-                          "LDImmersiveEngineering — City Mode")
+                          "LDImmersiveEngineering — Performance Tuning and City Mode")
         canvas.drawRightString(LETTER[0] - doc.rightMargin, 0.52 * inch,
                                "%d" % d.page)
         canvas.setStrokeColor(colors.HexColor(GRIDLINE))
@@ -208,11 +196,45 @@ def build_pdf(path, chart_a, chart_b):
         return t
 
     S = []
-    S.append(Paragraph("City Mode", h1))
+    S.append(Paragraph("Performance Tuning and City Mode", h1))
     S.append(Paragraph(
-        "A config-gated mode for Immersive Engineering 1.12.2 that keeps the look of the mod and "
-        "removes the simulation behind it.", sub))
+        "How to make Immersive Engineering 1.12.2 cheap on the server tick, and what each option "
+        "costs you.", sub))
 
+    S.append(Paragraph("The headline", h2))
+    S.append(Paragraph(
+        "<b>Set <font face='Courier'>enableWireDamage = false</font>.</b> On a profiled world it cut "
+        "Immersive Engineering's server CPU by <b>60%</b> while changing nothing else about how the "
+        "mod plays — wire loss, voltage tiers, proportional power distribution and wire burnout all "
+        "stay exactly as they are. It is a bigger win than city mode, and it costs you one feature: "
+        "entities no longer take shock damage from touching a live wire.", body))
+    S.append(Paragraph(
+        "That is not what anyone expected, including the author of city mode. The wire network's cost "
+        "turned out not to be its physics but a per-tick, whole-network broadcast that exists only to "
+        "feed that damage feature.", body))
+
+    S.append(Paragraph("Recommended configurations", h2))
+    rows = [
+        ["Goal", "Set", "Result"],
+        ["<b>Recommended</b> — fastest, keeps the gameplay",
+         "enableWireDamage = false<br/>cityMode = false",
+         "~60% less IE server CPU. Loss, voltage tiers, proportional distribution and wire burnout all intact. Only wire shock damage is lost."],
+        ["City / roleplay pack",
+         "cityMode = true<br/>enableWireDamage = false",
+         "~49% from city mode alone. Choose it for the gameplay — lossless voltage-agnostic wires, no burnout — not for speed; the row above is faster."],
+        ["Leave alone",
+         "validateConnections = false<br/>pump_placeCobble = true",
+         "Both already default. The first slows world load; the second stops flowing-fluid updates propagating."],
+        ["Client FPS only",
+         "increasedRenderboxes = false<br/>disableFancyTESR = true",
+         "No effect on TPS. For low-end GPUs."],
+    ]
+    data = [[Paragraph(c, cellb if i == 0 else (cellb if j == 0 else cell))
+             for j, c in enumerate(r)] for i, r in enumerate(rows)]
+    S.append(tbl(data, [1.7 * inch, 1.85 * inch, 3.0 * inch]))
+    S.append(Spacer(1, 12))
+
+    S.append(Paragraph("What city mode is", h2))
     S.append(Paragraph(
         "City mode trades simulation detail for server tick time. It is aimed at city and roleplay "
         "packs where the mod's machinery is set dressing rather than an engineering puzzle: you keep "
@@ -240,18 +262,24 @@ def build_pdf(path, chart_a, chart_b):
         "enables everything while any one subsystem can be declined. Switching the master off is "
         "always sufficient to restore stock behaviour, and nothing here touches saved data.", body))
 
-    S.append(Paragraph("Measured performance — the wire subsystem", h2))
-    S.append(Image(chart_a, width=6.3 * inch, height=2.17 * inch))
+    S.append(Paragraph("Measured results", h2))
+    S.append(Image(chart_a, width=6.3 * inch, height=2.13 * inch))
     S.append(Spacer(1, 10))
     S.append(Paragraph(
-        "<b>Measured, not modelled.</b> Three 120-second spark captures of the Server thread on a "
+        "<b>Measured, not modelled.</b> Four 120-second spark captures of the Server thread on a "
         "local world, flying along power lines — the worst case for the route cache, since chunk "
         "streaming keeps invalidating it. Library time is attributed to the calling mod and idle "
-        "(the server thread sleeps ~85% of the time on an unsaturated world) is excluded. Immersive "
-        "Engineering's cost fell from 6.53 s to 2.72 s per capture. The raw drop is 58%, but the runs "
-        "were not perfectly load-matched — non-IE time fell too, which city mode cannot cause — so "
-        "normalising against non-IE work gives <b>~49%</b>, and that is the number to quote. These "
-        "figures cover the wire subsystem only.", note))
+        "(the server thread sleeps 84–90% of the time on an unsaturated world) is excluded. The runs "
+        "were not perfectly load-matched — non-IE time varied between them, which no IE setting can "
+        "cause — so the quoted percentages normalise IE cost against non-IE server work, which "
+        "cancels overall load out. Raw absolutes tell the same story.", note))
+    S.append(Spacer(1, 4))
+    S.append(Paragraph(
+        "<b>The physics is nearly free.</b> The wire-damage-off run keeps the entire realistic "
+        "distribution — per-wire loss, the TreeMap sort by loss rate, proportional splitting, the "
+        "double simulate/real pass, the burnout ledger — and transferEnergy costs 1212 ms against "
+        "city mode's stripped-down cityModeTransfer at 996 ms. That 216 ms is the price of "
+        "everything city mode removes from power behaviour: about 1.6% of active CPU.", note))
     S.append(Spacer(1, 4))
     S.append(Paragraph(
         "The floodlight, machine and generator subsystems did not register in these captures — "
@@ -375,7 +403,7 @@ def build_pdf(path, chart_a, chart_b):
     S.append(Spacer(1, 10))
     S.append(Paragraph(
         "Full technical detail, including the annotated transfer routine, wire-type tables and the "
-        "testing checklist, is in <font face='Courier'>docs/CITY_MODE.md</font>.", note))
+        "testing checklist, is in <font face='Courier'>docs/CITY_MODE_AND_PERF.md</font>.", note))
 
     doc.build(S)
 
@@ -388,6 +416,6 @@ if __name__ == "__main__":
         b = os.path.join(tmp, "chart_work.png")
         chart_cpu_share(a)
         chart_work(b)
-        out = os.path.join(DOCS, "CITY_MODE.pdf")
+        out = os.path.join(DOCS, "CITY_MODE_AND_PERF.pdf")
         build_pdf(out, a, b)
     print("wrote", out, os.path.getsize(out), "bytes")
