@@ -43,10 +43,15 @@ public class TileEntityFurnaceHeater extends TileEntityIEBase implements ITickab
 		if(!world.isRemote)
 		{
 			boolean a = active;
-			boolean redstonePower = world.getRedstonePowerFromNeighbors(getPos()) > 0;
-			if(active&&!redstonePower)
-				active = false;
+			//The redstone poll moved inside the guard. It reads all six neighbouring block states, and
+			//it was run every tick even by a heater that was neither active nor holding enough energy
+			//to do anything -- in which case the value was computed and then never used, because the
+			//loop below did not run and the deactivation branch only matters while already active.
 			if(energyStorage.getEnergyStored() > 3200||a)
+			{
+				boolean redstonePower = world.getRedstonePowerFromNeighbors(getPos()) > 0;
+				if(active&&!redstonePower)
+					active = false;
 				for(EnumFacing fd : EnumFacing.VALUES)
 				{
 					TileEntity tileEntity = Utils.getExistingTileEntity(world, getPos().offset(fd));
@@ -67,6 +72,7 @@ public class TileEntityFurnaceHeater extends TileEntityIEBase implements ITickab
 							active = true;
 					}
 				}
+			}
 			if(active!=a)
 			{
 				this.markDirty();

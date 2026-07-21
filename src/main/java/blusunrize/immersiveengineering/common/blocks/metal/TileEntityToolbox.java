@@ -74,6 +74,11 @@ public class TileEntityToolbox extends TileEntityIEBase implements IDirectionalT
 	{
 		if(player.isSneaking())
 		{
+			//Sneak-picking the toolbox removes the block, so it needs the same permission test as
+			//breaking it. Without one it was a way to take a toolbox out of a region the player has no
+			//right to modify -- the contents were never at risk, but the block was.
+			if(!getWorld().isBlockModifiable(player, getPos()))
+				return false;
 			if(!getWorld().isRemote)
 			{
 				EntityItem entityitem = new EntityItem(getWorld(), getPos().getX()+.5, getPos().getY()+.5, getPos().getZ()+.5, getTileDrop(player, getWorld().getBlockState(getPos())));

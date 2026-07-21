@@ -16,8 +16,16 @@ public class TileEntityMetalBarrel extends TileEntityWoodenBarrel
 	@Override
 	public void update()
 	{
-		if(world.isRemote||world.getRedstonePowerFromNeighbors(getPos()) > 0) return;
-		else super.update();
+		if(world.isRemote)
+			return;
+		//An empty barrel has nothing to push, so there is no reason to read six neighbouring block
+		//states to find out whether it is allowed to. The redstone poll ran unconditionally on every
+		//metal barrel in the world, empty or not.
+		if(tank.getFluidAmount() <= 0)
+			return;
+		if(world.getRedstonePowerFromNeighbors(getPos()) > 0)
+			return;
+		super.update();
 	}
 
 	@Override

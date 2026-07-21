@@ -51,6 +51,10 @@ public class TileEntityThermoelectricGen extends TileEntityIEBase implements ITi
 	{
 		for(EnumFacing fd : EnumFacing.VALUES)
 		{
+			//Stop once it has all been handed over. The loop used to walk all six faces regardless,
+			//doing a BlockPos allocation and a tile entity lookup per face to insert zero.
+			if(amount <= 0)
+				return;
 			TileEntity te = Utils.getExistingTileEntity(world, getPos().offset(fd));
 			amount -= EnergyHelper.insertFlux(te, fd.getOpposite(), amount, false);
 		}
