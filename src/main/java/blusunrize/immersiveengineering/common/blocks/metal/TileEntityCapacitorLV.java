@@ -49,8 +49,12 @@ public class TileEntityCapacitorLV extends TileEntityIEBase implements ITickable
 	{
 		if(!world.isRemote)
 		{
-			for(int i = 0; i < 6; i++)
-				this.transferEnergy(i);
+			//An empty capacitor has nothing to push, and pushing is the expensive half: each configured
+			//output side allocates a BlockPos and does a world.getTileEntity lookup. Without this guard
+			//a drained or idle capacitor paid that on every tick forever.
+			if(energyStorage.getEnergyStored() > 0)
+				for(int i = 0; i < 6; i++)
+					this.transferEnergy(i);
 
 			if(world.getTotalWorldTime()%32==((getPos().getX()^getPos().getZ())&31))
 			{

@@ -38,7 +38,13 @@ public class TileEntityConnectorProbe extends TileEntityConnectorRedstone
 	@Override
 	public void update()
 	{
-		if(!world.isRemote&&world.getTotalWorldTime()%8!=((getPos().getX()^getPos().getZ())&8))
+		//Was "%8 != ((x^z)&8)", which does not throttle anything: %8 produces 0..7 while &8 produces
+		//only 0 or 8, so the comparison was true on every tick for half of all positions and on seven
+		//ticks in eight for the rest -- and the != inverted the intent on top of that. The probe was
+		//polling its comparator signal roughly 94% of ticks instead of one tick in eight, and that
+		//poll reads the neighbouring block's comparator override, which for a container is a full
+		//inventory scan. Now the same pos-staggered form the rest of the mod uses.
+		if(!world.isRemote&&world.getTotalWorldTime()%8==((getPos().getX()^getPos().getZ())&7))
 		{
 			int out = getComparatorSignal();
 			if(out!=lastOutput)

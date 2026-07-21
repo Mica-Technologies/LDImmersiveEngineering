@@ -58,7 +58,12 @@ public class TileEntitySilo extends TileEntityMultiblockPart<TileEntitySilo> imp
 	{
 		ApiUtils.checkForNeedlessTicking(this);
 
-		if(pos==4&&!world.isRemote&&!this.identStack.isEmpty()&&storageAmount > 0&&world.getRedstonePowerFromNeighbors(getPos()) > 0&&world.getTotalWorldTime()%8==0)
+		//The tick throttle now comes before the redstone poll. && evaluates left to right, so with the
+		//poll first every silo scanned all six neighbours every tick only to be thrown away seven
+		//times in eight. Also position-staggered, so a row of silos no longer fires on the same tick.
+		if(pos==4&&!world.isRemote&&!this.identStack.isEmpty()&&storageAmount > 0
+				&&world.getTotalWorldTime()%8==((getPos().getX()^getPos().getZ())&7)
+				&&world.getRedstonePowerFromNeighbors(getPos()) > 0)
 		{
 			updateComparatorValuesPart1();
 			for(EnumFacing f : EnumFacing.values())

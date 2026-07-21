@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.common.blocks.metal;
 
 import blusunrize.immersiveengineering.api.AdvancedAABB;
+import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.fluid.IFluidPipe;
 import blusunrize.immersiveengineering.client.models.IOBJModelCallback;
 import blusunrize.immersiveengineering.common.Config.IEConfig;
@@ -65,7 +66,12 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 		IOBJModelCallback<IBlockState>, IColouredTile, IPlayerInteraction, IHammerInteraction, IPlacementInteraction,
 		IAdvancedSelectionBounds, IAdvancedCollisionBounds, IAdditionalDrops, INeighbourChangeTile
 {
-	static ConcurrentHashMap<BlockPos, Set<DirectionalFluidOutput>> indirectConnections = new ConcurrentHashMap<BlockPos, Set<DirectionalFluidOutput>>();
+	//Keyed by DimensionBlockPos, not BlockPos. This map is static and shared by every world, so a
+	//bare position let a pipe at the same coordinates in two dimensions collide on one cache
+	//entry: whichever populated it first won, and the other then routed its fluid into tile
+	//entities belonging to the wrong world. The wire network's equivalent cache has always been
+	//keyed by dimension; this one was not.
+	static ConcurrentHashMap<DimensionBlockPos, Set<DirectionalFluidOutput>> indirectConnections = new ConcurrentHashMap<>();
 	//A pipe place/break/hammer used to clear the WHOLE endpoint cache immediately, forcing every pump on
 	//every network to re-flood on its next fill. Instead, mark it dirty and clear it at most once per
 	//server tick (flushDirtyCache, called from EventHandler.onWorldTick), so a burst of pipe edits (or
@@ -137,8 +143,10 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 
 	public static Set<DirectionalFluidOutput> getConnectedFluidHandlers(BlockPos node, World world)
 	{
-		if(indirectConnections.containsKey(node))
-			return indirectConnections.get(node);
+		DimensionBlockPos cacheKey = new DimensionBlockPos(node, world);
+		Set<DirectionalFluidOutput> cached = indirectConnections.get(cacheKey);
+		if(cached!=null)
+			return cached;
 
 		ArrayList<BlockPos> openList = new ArrayList<>();
 		ArrayList<BlockPos> closedList = new ArrayList<>();
@@ -181,10 +189,11 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 		}
 		if(FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
 		{
-			if(!indirectConnections.containsKey(node))
+			if(!indirectConnections.containsKey(cacheKey))
 			{
-				indirectConnections.put(node, newSetFromMap(new ConcurrentHashMap<DirectionalFluidOutput, Boolean>()));
-				indirectConnections.get(node).addAll(fluidHandlers);
+				Set<DirectionalFluidOutput> store = newSetFromMap(new ConcurrentHashMap<DirectionalFluidOutput, Boolean>());
+				store.addAll(fluidHandlers);
+				indirectConnections.put(cacheKey, store);
 			}
 		}
 		return fluidHandlers;
