@@ -60,6 +60,8 @@ public abstract class TileEntityTurret extends TileEntityIEBase implements ITick
 	public EnumFacing facing = EnumFacing.NORTH;
 
 	public String owner;
+	/** Ceiling on the client-supplied target list; it is serialized to NBT, so it must not grow without bound. */
+	private static final int MAX_TARGETS = 128;
 	public List<String> targetList = new ArrayList<>();
 	public boolean whitelist = false;
 	public boolean attackAnimals = false;
@@ -273,10 +275,22 @@ public abstract class TileEntityTurret extends TileEntityIEBase implements ITick
 	@Override
 	public void receiveMessageFromClient(NBTTagCompound message)
 	{
-		if(message.hasKey("add"))
-			targetList.add(message.getString("add"));
+		//Bounds-checked and capped. remove() takes an int, so it resolved to List.remove(int index) and
+		//threw for anything out of range -- after the add above had already been applied, leaving the
+		//list half-modified. The add was also unbounded, and the list is serialized to NBT, so a client
+		//repeating the packet could grow the chunk's saved data without limit.
+		if(message.hasKey("add")&&targetList.size() < MAX_TARGETS)
+		{
+			String name = message.getString("add");
+			if(!name.isEmpty()&&name.length() <= 64)
+				targetList.add(name);
+		}
 		if(message.hasKey("remove"))
-			targetList.remove(message.getInteger("remove"));
+		{
+			int idx = message.getInteger("remove");
+			if(idx >= 0&&idx < targetList.size())
+				targetList.remove(idx);
+		}
 		if(message.hasKey("whitelist"))
 			whitelist = message.getBoolean("whitelist");
 		if(message.hasKey("attackAnimals"))

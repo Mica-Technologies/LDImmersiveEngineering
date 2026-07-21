@@ -60,7 +60,21 @@ public class IEWorldGen implements IWorldGenerator
 			for(int i = 0; i < chunkOccurence; i++)
 				if(rand.nextInt(100) < weight)
 				{
-					pos = new BlockPos(x+rand.nextInt(16), minY+rand.nextInt(maxY-minY), z+rand.nextInt(16));
+					//Offset by 8, and the Y span guarded.
+					//
+					//IWorldGenerator.generate runs during population, whose safe write area is the 16x16
+					//region starting at chunkX*16+8. WorldGenMinable spreads roughly a further 8 blocks
+					//either side of its centre, so centres taken from the unshifted chunk origin reached
+					//into neighbours that may not exist yet and forced them to generate recursively --
+					//classic cascading worldgen.
+					//
+					//maxY-minY was also handed to nextInt unchecked, and only config[0] is validated on
+					//registration. Any pack setting maxY <= minY -- swapping the two, or pinning both to
+					//one layer -- threw out of chunk population.
+					int ySpan = maxY-minY;
+					if(ySpan <= 0)
+						continue;
+					pos = new BlockPos(x+8+rand.nextInt(16), minY+rand.nextInt(ySpan), z+8+rand.nextInt(16));
 					mineableGen.generate(world, rand, pos);
 				}
 		}

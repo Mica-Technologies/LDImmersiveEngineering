@@ -28,9 +28,20 @@ public class ContainerToolboxBlock extends ContainerIEBase implements ICallbackC
 	{
 		super(inventoryPlayer, tile);
 		this.tile = tile;
-		inv = new ItemStackHandler(tile.getInventory());
-		if(inv instanceof IEItemStackHandler)
-			((IEItemStackHandler)inv).setTile(tile);
+		//The handler wraps the tile's live list, so edits land in the tile entity -- but nothing was
+		//marking the chunk dirty, so they were never written to disk. ItemStackHandler.onContentsChanged
+		//is a no-op, and SlotItemHandler marks a dummy inventory rather than the tile. Put items into a
+		//toolbox block, walk away without anything else dirtying the chunk, and they were gone on
+		//return. The instanceof test that used to sit here could never be true: a plain ItemStackHandler
+		//had just been constructed, so setTile was dead code.
+		inv = new ItemStackHandler(tile.getInventory())
+		{
+			@Override
+			protected void onContentsChanged(int slot)
+			{
+				tile.markDirty();
+			}
+		};
 		this.addSlotToContainer(new IESlot.ContainerCallback(this, inv, slotCount++, 48, 24));
 		this.addSlotToContainer(new IESlot.ContainerCallback(this, inv, slotCount++, 30, 42));
 		this.addSlotToContainer(new IESlot.ContainerCallback(this, inv, slotCount++, 48, 42));
@@ -81,7 +92,9 @@ public class ContainerToolboxBlock extends ContainerIEBase implements ICallbackC
 	@Override
 	public void onContainerClosed(EntityPlayer playerIn)
 	{
-		if(inv instanceof IEItemStackHandler)
-			((IEItemStackHandler)inv).setTile(null);
+		//Calls super, which it previously did not. Skipping it skipped vanilla's cursor-stack handling,
+		//so closing the GUI while holding an item left the server thinking the player still had it
+		//while the client cleared its cursor, and skipped ContainerIEBase's own close pass.
+		super.onContainerClosed(playerIn);
 	}
 }

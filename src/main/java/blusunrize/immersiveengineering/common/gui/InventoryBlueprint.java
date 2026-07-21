@@ -15,6 +15,7 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.inventory.InventoryBasic;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.NonNullList;
+import net.minecraft.util.math.MathHelper;
 
 public class InventoryBlueprint extends InventoryBasic
 {
@@ -56,7 +57,13 @@ public class InventoryBlueprint extends InventoryBasic
 		for(int i = 0; i < inputs.size(); i++)
 			inputs.set(i, inputInventory.getStackInSlot(i+1));
 		//Consume
-		recipe.consumeInputs(inputs, taken.getCount()/recipe.output.getCount());
+		//Rounded up. Integer division let a partial take consume nothing at all: with an output of 3,
+		//right-clicking the slot takes 2, and 2/3 is 0 crafts, so the inputs were untouched, the player
+		//kept the items, and updateOutputs immediately refilled the slot. Repeatable without limit.
+		//Rounding up errs toward charging a full craft for a partial take, which costs the player at
+		//most one craft's inputs and cannot create items from nothing.
+		int crafts = MathHelper.ceil(taken.getCount()/(float)recipe.output.getCount());
+		recipe.consumeInputs(inputs, crafts);
 		//Update remains
 		for(int i = 0; i < inputs.size(); i++)
 			inputInventory.setInventorySlotContents(i+1, inputs.get(i));

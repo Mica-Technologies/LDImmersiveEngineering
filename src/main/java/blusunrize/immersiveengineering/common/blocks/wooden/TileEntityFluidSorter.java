@@ -135,7 +135,11 @@ public class TileEntityFluidSorter extends TileEntityIEBase implements IGuiTile
 		{
 			int side = message.getInteger("filter_side");
 			int slot = message.getInteger("filter_slot");
-			this.filters[side][slot] = FluidStack.loadFluidStackFromNBT(message.getCompoundTag("filter"));
+			//Both indices come straight off the wire. Unchecked they threw out of the network task,
+			//aborting the rest of the handler and spamming the log for as long as a client cared to
+			//repeat the packet.
+			if(side >= 0&&side < filters.length&&slot >= 0&&slot < filters[side].length)
+				this.filters[side][slot] = FluidStack.loadFluidStackFromNBT(message.getCompoundTag("filter"));
 		}
 		this.markDirty();
 	}

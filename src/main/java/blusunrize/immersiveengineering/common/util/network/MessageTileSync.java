@@ -13,6 +13,7 @@ import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -56,8 +57,23 @@ public class MessageTileSync implements IMessage
 		@Override
 		public IMessage onMessage(MessageTileSync message, MessageContext ctx)
 		{
-			WorldServer world = ctx.getServerHandler().player.getServerWorld();
+			EntityPlayerMP player = ctx.getServerHandler().player;
+			WorldServer world = player.getServerWorld();
 			world.addScheduledTask(() -> {
+				//This packet lets a client drive receiveMessageFromClient on a tile entity, and those
+				//implementations write real state: assembler patterns, turret target lists and attack
+				//flags, sorter filters, workbench tool config. It used to dispatch to any loaded tile in
+				//the sender's dimension with no checks at all, so a modified client could reconfigure
+				//anyone's machines anywhere in the world. Neither the packet nor
+				//receiveMessageFromClient carries the player, so the tile cannot authorise the sender
+				//itself -- the check has to live here.
+				//
+				//Reach is bounded to the same distance vanilla containers use for canInteractWith, which
+				//is also the distance at which the GUIs that send this packet can be open at all.
+				if(player.isDead||player.getServerWorld()!=world)
+					return;
+				if(player.getDistanceSq(message.pos.getX()+0.5, message.pos.getY()+0.5, message.pos.getZ()+0.5) > 64)
+					return;
 				if(world.isBlockLoaded(message.pos))
 				{
 					TileEntity tile = world.getTileEntity(message.pos);

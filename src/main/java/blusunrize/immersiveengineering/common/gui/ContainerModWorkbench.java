@@ -186,7 +186,14 @@ public class ContainerModWorkbench extends ContainerIEBase<TileEntityModWorkbenc
 
 			if(stackInSlot.getCount()==stack.getCount())
 				return ItemStack.EMPTY;
-			slotObject.onTake(player, stack);
+			//onTake is told what actually moved, not what was there before. mergeItemStack shrinks
+			//stackInSlot in place by the amount it transferred, while "stack" is the copy taken before
+			//it ran. Passing that copy meant a partial transfer -- an output slot holding 63 items
+			//shift-clicked into an inventory with room for 10 -- reported all 63 as taken, so a
+			//crafting output slot consumed the ingredients for 63 and delivered 10.
+			ItemStack taken = stack.copy();
+			taken.setCount(stack.getCount()-stackInSlot.getCount());
+			slotObject.onTake(player, taken);
 		}
 		return stack;
 	}

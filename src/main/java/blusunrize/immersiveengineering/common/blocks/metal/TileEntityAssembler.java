@@ -137,13 +137,19 @@ public class TileEntityAssembler extends TileEntityMultiblockMetal<TileEntityAss
 		}
 		else if(message.hasKey("patternSync"))
 		{
+			//Both indices arrive from the client unvalidated: the pattern index threw for anything
+			//outside 0..2, and the slot index was written straight into the pattern's list.
 			int r = message.getInteger("recipe");
+			if(r < 0||r >= patterns.length)
+				return;
 			NBTTagList list = message.getTagList("patternSync", 10);
 			CrafterPatternInventory pattern = patterns[r];
 			for(int i = 0; i < list.tagCount(); i++)
 			{
 				NBTTagCompound itemTag = list.getCompoundTagAt(i);
-				pattern.inv.set(itemTag.getInteger("slot"), new ItemStack(itemTag));
+				int slot = itemTag.getInteger("slot");
+				if(slot >= 0&&slot < pattern.inv.size())
+					pattern.inv.set(slot, new ItemStack(itemTag));
 			}
 		}
 	}
