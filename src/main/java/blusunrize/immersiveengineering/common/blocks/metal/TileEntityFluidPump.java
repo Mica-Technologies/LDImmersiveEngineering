@@ -48,6 +48,8 @@ import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.HashMap;
 
 public class TileEntityFluidPump extends TileEntityIEBase implements ITickable, IBlockBounds, IHasDummyBlocks, IConfigurableSides, IFluidPipe, IIEInternalFluxHandler, IBlockOverlayText
@@ -62,7 +64,11 @@ public class TileEntityFluidPump extends TileEntityIEBase implements ITickable, 
 	Fluid searchFluid = null;
 	ArrayList<BlockPos> openList = new ArrayList<BlockPos>();
 	ArrayList<BlockPos> closedList = new ArrayList<BlockPos>();
-	ArrayList<BlockPos> checked = new ArrayList<BlockPos>();
+	//HashSet, not ArrayList: only ever add/contains/clear, and it is probed twice per step of a scan
+	//that walks up to 2048 positions, so contains() was a linear scan inside the inner loop.
+	//openList and closedList keep their list types -- closedList is indexed by the drain path and
+	//openList is order-sensitive -- so their contains() calls remain, bounded by the 64-step budget.
+	Set<BlockPos> checked = new HashSet<>();
 
 	@Override
 	public void update()

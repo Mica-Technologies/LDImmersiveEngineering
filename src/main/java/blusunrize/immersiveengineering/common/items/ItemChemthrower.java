@@ -121,9 +121,13 @@ public class ItemChemthrower extends ItemUpgradeableTool implements IAdvancedFlu
 		FluidStack fs = this.getFluid(stack);
 		if(fs!=null&&fs.getFluid()!=null)
 		{
-			int duration = getMaxItemUseDuration(stack)-count;
 			int consumed = IEConfig.Tools.chemthrower_consumption;
-			if(consumed*duration <= fs.amount)
+			//Charged per tick as it is sprayed, rather than totalled up and billed once the player lets
+			//go. The whole deduction used to live in onPlayerStoppedUsing, and that is not guaranteed to
+			//run: vanilla calls resetActiveHand -- which does not route through it -- whenever the held
+			//stack stops being the active one, so scrolling the hotbar mid-spray ended the use with
+			//every shot already fired and the tank still full. Repeatable, and therefore free fuel.
+			if(consumed <= fs.amount)
 			{
 				Vec3d v = player.getLookVec();
 				int split = 8;
@@ -160,6 +164,10 @@ public class ItemChemthrower extends ItemUpgradeableTool implements IAdvancedFlu
 					if(!player.world.isRemote)
 						player.world.spawnEntity(chem);
 				}
+				//Server side only: the client's copy of the stack is replaced by the server's on the next
+				//sync, so deducting there as well would achieve nothing but a flicker.
+				if(!player.world.isRemote)
+					consumeFuel(stack, fs, consumed);
 				if(count%4==0)
 				{
 					if(ignite)
@@ -175,19 +183,17 @@ public class ItemChemthrower extends ItemUpgradeableTool implements IAdvancedFlu
 			player.stopActiveHand();
 	}
 
-	@Override
-	public void onPlayerStoppedUsing(ItemStack stack, World world, EntityLivingBase player, int timeLeft)
+	/**
+	 * Writes a tick's worth of fuel back to the stack. {@code getFluid} hands back a deserialized
+	 * copy rather than a live handle, so the tank only actually changes when it is written back here.
+	 */
+	private void consumeFuel(ItemStack stack, FluidStack fs, int amount)
 	{
-		FluidStack fs = this.getFluid(stack);
-		if(fs!=null)
-		{
-			int duration = getMaxItemUseDuration(stack)-timeLeft;
-			fs.amount -= IEConfig.Tools.chemthrower_consumption*duration;
-			if(fs.amount <= 0)
-				ItemNBTHelper.remove(stack, FluidHandlerItemStack.FLUID_NBT_KEY);
-			else
-				ItemNBTHelper.setFluidStack(stack, FluidHandlerItemStack.FLUID_NBT_KEY, fs);
-		}
+		fs.amount -= amount;
+		if(fs.amount <= 0)
+			ItemNBTHelper.remove(stack, FluidHandlerItemStack.FLUID_NBT_KEY);
+		else
+			ItemNBTHelper.setFluidStack(stack, FluidHandlerItemStack.FLUID_NBT_KEY, fs);
 	}
 
 	@Override

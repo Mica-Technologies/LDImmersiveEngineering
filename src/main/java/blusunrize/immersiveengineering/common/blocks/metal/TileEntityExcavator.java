@@ -78,8 +78,18 @@ public class TileEntityExcavator extends TileEntityMultiblockMetal<TileEntityExc
 			MineralWorldInfo info = ExcavatorHandler.getMineralWorldInfo(world, wheelPos.getX() >> 4, wheelPos.getZ() >> 4);
 			if(info==null)
 				return 0;
-			float remain = (ExcavatorHandler.mineralVeinCapacity-info.depletion)/(float)ExcavatorHandler.mineralVeinCapacity;
-			return MathHelper.floor(Math.max(remain, 0)*15);
+			//A capacity below zero means "infinite" (see excavator_depletion in the config), so the vein
+			//never depletes and the comparator reads full. Without this the division by a negative
+			//capacity produced a fraction above 1 -- capacity -1 against depletion 5 gives 6, so the
+			//method returned 90 -- and nothing downstream clamps it. A comparator override outside the
+			//vanilla 0-15 range is passed straight to redstone wire, whose power property rejects it.
+			int capacity = ExcavatorHandler.mineralVeinCapacity;
+			if(capacity < 0)
+				return 15;
+			if(capacity==0)
+				return 0;
+			float remain = (capacity-info.depletion)/(float)capacity;
+			return MathHelper.clamp(MathHelper.floor(Math.max(remain, 0)*15), 0, 15);
 		}
 		return 0;
 	}

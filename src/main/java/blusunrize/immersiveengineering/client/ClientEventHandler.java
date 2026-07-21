@@ -661,11 +661,11 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 						{
 							FluidStack fuel = FluidUtil.getFluidContained(equipped);
 							int amount = fuel!=null?fuel.amount: 0;
-							if(!drill&&player.isHandActive()&&player.getActiveHand()==hand)
-							{
-								int use = player.getItemInUseMaxCount();
-								amount -= use*IEConfig.Tools.chemthrower_consumption;
-							}
+							//No longer predicts the spray's cost. The chemthrower used to bill the whole
+							//use in one go when the player let go, so the gauge had to subtract the
+							//running total itself to look right. Fuel is now charged per tick, so the
+							//synced stack already reflects it and subtracting again drained the gauge at
+							//twice the real rate and could push it below empty.
 							float cap = (float)capacity;
 							float angle = 83-(166*amount/cap);
 							GlStateManager.rotate(angle, 0, 0, 1);
