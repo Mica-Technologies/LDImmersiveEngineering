@@ -83,7 +83,10 @@ public class TileEntitySheetmetalTank extends TileEntityMultiblockPart<TileEntit
 	public void update()
 	{
 		ApiUtils.checkForNeedlessTicking(this);
-		if(pos==4&&!world.isRemote&&world.getRedstonePowerFromNeighbors(getPos()) > 0)
+		//The fluid check comes before the redstone poll: && is left to right, and an empty tank -- which
+		//is the common idle state -- was scanning all six neighbours for redstone every tick to discover
+		//it had nothing to push anyway.
+		if(pos==4&&!world.isRemote&&tank.getFluidAmount() > 0&&world.getRedstonePowerFromNeighbors(getPos()) > 0)
 			for(int i = 0; i < 6; i++)
 				if(i!=1&&tank.getFluidAmount() > 0)
 				{
@@ -98,6 +101,14 @@ public class TileEntitySheetmetalTank extends TileEntityMultiblockPart<TileEntit
 						if(accepted > 0)
 						{
 							int drained = output.fill(Utils.copyFluidStackWithAmount(out, Math.min(out.amount, accepted), false), true);
+							//Snapshot the comparator levels before the drain so Part2 has something real to
+							//compare against. Part1 had no callers at all, which left the recorded levels at
+							//their zero initialisers forever: every transfer at any non-zero level re-fired
+							//36 neighbour notifications whether or not a level had actually changed, and a
+							//level genuinely falling to zero notified nobody, because zero matched the stale
+							//baseline. Part2 does not update the baseline either, so it has to be retaken
+							//each time.
+							updateComparatorValuesPart1();
 							this.tank.drain(drained, true);
 							this.markContainingBlockForUpdate(null);
 							updateComparatorValuesPart2();

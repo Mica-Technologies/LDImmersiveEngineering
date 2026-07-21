@@ -351,7 +351,13 @@ public class ExcavatorHandler
 					}
 
 			int weight = 0;
-			this.validMinerals = new HashSet<>();
+			//LinkedHashSet, not HashSet: mineralList is a LinkedHashMap and so iterates in a fixed
+			//order, but copying it into a HashSet threw that away. MineralMix overrides neither
+			//hashCode nor equals, so the set ordered by identity hash, which varies from one JVM run
+			//to the next -- and getMineralWorldInfo picks a vein by walking this set subtracting a
+			//seeded weight. The same uncached chunk could therefore resolve to a different vein after
+			//a restart, despite the seed being deterministic.
+			this.validMinerals = new LinkedHashSet<>();
 			for(Map.Entry<MineralMix, Integer> e : mineralList.entrySet())
 				if(e.getKey().isValid()&&e.getKey().validDimension(chunkCoords.dimension)&&!surrounding.contains(e.getKey()))
 				{

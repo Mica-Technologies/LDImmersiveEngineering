@@ -71,7 +71,7 @@ public class ConveyorSplit extends ConveyorBasic
 	@Override
 	public void handleInsertion(TileEntity tile, EntityItem entity, EnumFacing facing, ConveyorDirection conDir, double distX, double distZ)
 	{
-		String nbtKey = "immersiveengineering:conveyorDir"+Integer.toHexString(tile.getPos().hashCode());
+		String nbtKey = "immersiveengineering:conveyorDir"+Long.toHexString(tile.getPos().toLong());
 		if(entity.getEntityData().hasKey(nbtKey))
 		{
 			EnumFacing redirect = EnumFacing.values()[entity.getEntityData().getInteger(nbtKey)];
@@ -90,7 +90,7 @@ public class ConveyorSplit extends ConveyorBasic
 		EnumFacing redirect = null;
 		if(entity!=null&&!entity.isDead)
 		{
-			String nbtKey = "immersiveengineering:conveyorDir"+Integer.toHexString(tile.getPos().hashCode());
+			String nbtKey = "immersiveengineering:conveyorDir"+Long.toHexString(tile.getPos().toLong());
 			if(entity.getEntityData().hasKey(nbtKey))
 				redirect = EnumFacing.values()[entity.getEntityData().getInteger(nbtKey)];
 			else
@@ -111,7 +111,7 @@ public class ConveyorSplit extends ConveyorBasic
 		super.onEntityCollision(tile, entity, facing);
 		if(redirect!=null)
 		{
-			String nbtKey = "immersiveengineering:conveyorDir"+Integer.toHexString(tile.getPos().hashCode());
+			String nbtKey = "immersiveengineering:conveyorDir"+Long.toHexString(tile.getPos().toLong());
 			BlockPos nextPos = tile.getPos().offset(redirect);
 			double distNext = Math.abs((redirect.getAxis()==Axis.Z?nextPos.getZ(): nextPos.getX())+.5-(redirect.getAxis()==Axis.Z?entity.posZ: entity.posX));
 			double treshold = .4;
@@ -137,7 +137,7 @@ public class ConveyorSplit extends ConveyorBasic
 	public Vec3d getDirection(TileEntity conveyorTile, Entity entity, EnumFacing facing)
 	{
 		Vec3d vec = super.getDirection(conveyorTile, entity, facing);
-		String nbtKey = "immersiveengineering:conveyorDir"+Integer.toHexString(conveyorTile.getPos().hashCode());
+		String nbtKey = "immersiveengineering:conveyorDir"+Long.toHexString(conveyorTile.getPos().toLong());
 		if(!entity.getEntityData().hasKey(nbtKey))
 			return vec;
 		EnumFacing redirect = EnumFacing.byIndex(entity.getEntityData().getInteger(nbtKey));

@@ -169,7 +169,10 @@ public class TileEntityBucketWheel extends TileEntityMultiblockPart<TileEntityBu
 				this.digStacks.set(message.getInteger("empty"), ItemStack.EMPTY);
 			if(message.hasKey("rotation"))
 			{
-				int packetRotation = message.getInteger("rotation");
+				//Read as a float, matching the writer. getInteger on a float tag floors it, so the
+				//once-a-second resync was snapping the wheel to whole degrees and comparing a truncated
+				//value against the real one.
+				float packetRotation = message.getFloat("rotation");
 				if(Math.abs(packetRotation-rotation) > 5*IEConfig.Machines.excavator_speed)
 					rotation = packetRotation;
 			}
