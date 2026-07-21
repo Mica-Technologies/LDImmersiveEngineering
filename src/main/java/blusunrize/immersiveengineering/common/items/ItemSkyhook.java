@@ -92,7 +92,12 @@ public class ItemSkyhook extends ItemUpgradeableTool implements ITool
 		if(getUpgrades(stack).getBoolean("fallBoost"))
 		{
 			float dmg = (float)Math.ceil(ent.fallDistance/5);
-			ItemNBTHelper.setFloat(stack, "fallDamageBoost", dmg);
+			//Written only when it actually changes. Every write dirties the stack and forces the
+			//inventory to re-sync to the client, and the value is 0 for as long as the holder is on
+			//the ground -- which is nearly always -- so this was re-sending an unchanged 0 every tick
+			//for anyone carrying a fall-boosted skyhook.
+			if(ItemNBTHelper.getFloat(stack, "fallDamageBoost")!=dmg)
+				ItemNBTHelper.setFloat(stack, "fallDamageBoost", dmg);
 		}
 	}
 	/*@Override

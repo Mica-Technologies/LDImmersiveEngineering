@@ -128,23 +128,34 @@ public class ItemIEShield extends ItemUpgradeableTool implements IIEEnergyItem, 
 		boolean blocking = ent instanceof EntityLivingBase&&((EntityLivingBase)ent).isActiveItemStackBlocking();
 		if(!inHand||!blocking)//Don't recharge if in use, to avoid flickering
 		{
-			if(getUpgrades(stack).hasKey("flash_cooldown")&&this.extractEnergy(stack, 20, true)==20)
+			//Fetched once instead of up to six times. getUpgrades goes through
+			//NBTTagCompound.getCompoundTag, which allocates a fresh compound whenever the tag is
+			//absent, so the old form allocated garbage every tick for a shield with no upgrades.
+			NBTTagCompound upgrades = getUpgrades(stack);
+			boolean flash = upgrades.hasKey("flash_cooldown");
+			boolean shock = upgrades.hasKey("shock_cooldown");
+			//The common case by far: nothing is on cooldown, so there is nothing to tick down and no
+			//reason to touch the shield's energy at all.
+			if(!flash&&!shock)
+				return;
+
+			if(flash&&this.extractEnergy(stack, 20, true)==20)
 			{
 				this.extractEnergy(stack, 20, false);
-				int cooldown = getUpgrades(stack).getInteger("flash_cooldown");
+				int cooldown = upgrades.getInteger("flash_cooldown");
 				if(--cooldown <= 0)
-					getUpgrades(stack).removeTag("flash_cooldown");
+					upgrades.removeTag("flash_cooldown");
 				else
-					getUpgrades(stack).setInteger("flash_cooldown", cooldown);
+					upgrades.setInteger("flash_cooldown", cooldown);
 			}
-			if(getUpgrades(stack).hasKey("shock_cooldown")&&this.extractEnergy(stack, 20, true)==20)
+			if(shock&&this.extractEnergy(stack, 20, true)==20)
 			{
 				this.extractEnergy(stack, 20, false);
-				int cooldown = getUpgrades(stack).getInteger("shock_cooldown");
+				int cooldown = upgrades.getInteger("shock_cooldown");
 				if(--cooldown <= 0)
-					getUpgrades(stack).removeTag("shock_cooldown");
+					upgrades.removeTag("shock_cooldown");
 				else
-					getUpgrades(stack).setInteger("shock_cooldown", cooldown);
+					upgrades.setInteger("shock_cooldown", cooldown);
 			}
 		}
 	}
