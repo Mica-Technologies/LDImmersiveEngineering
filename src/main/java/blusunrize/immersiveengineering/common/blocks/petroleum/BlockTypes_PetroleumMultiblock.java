@@ -47,7 +47,23 @@ public enum BlockTypes_PetroleumMultiblock implements IStringSerializable, Block
 	/**
 	 * Burns gas for flux, with a spool-up that makes it a peaker rather than a base load.
 	 */
-	GAS_TURBINE;
+	GAS_TURBINE,
+	/**
+	 * Burns the heavy fuels for steam rather than flux -- the furnace half of a power station.
+	 */
+	FUEL_OIL_BOILER,
+	/**
+	 * Makes steam from a Gas Turbine's exhaust heat, consuming no fuel of its own.
+	 */
+	HRSG,
+	/**
+	 * Turns steam into flux at the largest scale the expansion offers.
+	 */
+	STEAM_TURBINE_HALL,
+	/**
+	 * Cylinder banks that scale by building another one alongside.
+	 */
+	ENGINE_BANK;
 
 	@Override
 	public String getName()

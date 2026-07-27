@@ -1829,6 +1829,14 @@ tile.immersiveengineering.fluidBitumen.name=Bitumen
 tile.immersiveengineering.petroleum_device.oilfield_frame.name=Oilfield Frame
 tile.immersiveengineering.petroleum_multiblock.derrick.name=Drilling Derrick
 tile.immersiveengineering.petroleum_multiblock.pumpjack.name=Pumpjack
+
+#Petroleum -- power generation
+fluid.ie_steam=Steam
+tile.immersiveengineering.fluidSteam.name=Steam
+tile.immersiveengineering.petroleum_multiblock.fuel_oil_boiler.name=Fuel Oil Boiler
+tile.immersiveengineering.petroleum_multiblock.hrsg.name=Heat Recovery Steam Generator
+tile.immersiveengineering.petroleum_multiblock.steam_turbine_hall.name=Steam Turbine Hall
+tile.immersiveengineering.petroleum_multiblock.engine_bank.name=Reciprocating Engine Bank
 desc.immersiveengineering.info.petroleum.dryHole=Dry hole -- no reservoir beneath this block.
 desc.immersiveengineering.info.petroleum.remaining=%1$s remaining
 desc.immersiveengineering.info.petroleum.freeFlowing=Free-flowing

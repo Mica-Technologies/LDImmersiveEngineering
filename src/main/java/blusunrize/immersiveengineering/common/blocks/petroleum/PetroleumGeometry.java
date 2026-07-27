@@ -101,6 +101,53 @@ public final class PetroleumGeometry
 	public static final int TURBINE_WIDTH = 3;
 	public static final int[] TURBINE_SIZE = {TURBINE_HEIGHT, TURBINE_DEPTH, TURBINE_WIDTH};
 
+	//	=================================
+	//		FUEL OIL BOILER
+	//	=================================
+	/**
+	 * H, L, W. The furnace half of a power station: a firing floor with a water wall above it.
+	 */
+	public static final int BOILER_HEIGHT = 5;
+	public static final int BOILER_DEPTH = 5;
+	public static final int BOILER_WIDTH = 7;
+	public static final int[] BOILER_SIZE = {BOILER_HEIGHT, BOILER_DEPTH, BOILER_WIDTH};
+
+	//	=================================
+	//		HEAT RECOVERY STEAM GENERATOR
+	//	=================================
+	/**
+	 * H, L, W. Sized to sit in line behind a Gas Turbine, whose exhaust end is three wide and
+	 * three tall -- the HRSG has to present a matching face or it could not butt against it.
+	 */
+	public static final int HRSG_HEIGHT = 3;
+	public static final int HRSG_DEPTH = 5;
+	public static final int HRSG_WIDTH = 3;
+	public static final int[] HRSG_SIZE = {HRSG_HEIGHT, HRSG_DEPTH, HRSG_WIDTH};
+
+	//	=================================
+	//		STEAM TURBINE HALL
+	//	=================================
+	/**
+	 * H, L, W. The largest structure in the expansion: condenser, generator hall, switchyard in
+	 * a line down the long axis.
+	 */
+	public static final int HALL_HEIGHT = 5;
+	public static final int HALL_DEPTH = 9;
+	public static final int HALL_WIDTH = 5;
+	public static final int[] HALL_SIZE = {HALL_HEIGHT, HALL_DEPTH, HALL_WIDTH};
+
+	//	=================================
+	//		RECIPROCATING ENGINE BANK
+	//	=================================
+	/**
+	 * H, L, W. One bank. Scaling is done by building another alongside rather than by growing
+	 * this one -- see {@code TileEntityEngineBank}.
+	 */
+	public static final int ENGINE_HEIGHT = 4;
+	public static final int ENGINE_DEPTH = 5;
+	public static final int ENGINE_WIDTH = 5;
+	public static final int[] ENGINE_SIZE = {ENGINE_HEIGHT, ENGINE_DEPTH, ENGINE_WIDTH};
+
 	/**
 	 * Linear index into a structure, matching {@code TileEntityMultiblockPart.pos}.
 	 */

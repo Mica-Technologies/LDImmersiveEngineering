@@ -241,6 +241,9 @@ FRACTION_RAMPS = {
     "ie_bitumen": (((72, 68, 66), (48, 45, 44), (28, 26, 26)), (44, 42, 41)),
     "ie_asphalt": (((88, 84, 82), (62, 59, 58), (40, 38, 38)), (58, 55, 54)),
     "ie_sour_gas": (((198, 206, 150), (168, 178, 112), (132, 142, 78)), (162, 172, 108)),
+    # Steam is the one fluid here that is not a hydrocarbon and should not read as one:
+    # near-white and barely tinted, so a steam line is obviously not a fuel line at a glance.
+    "ie_steam": (((242, 244, 246), (216, 220, 226), (188, 194, 202)), (224, 228, 234)),
 }
 
 
@@ -397,12 +400,87 @@ def propane_cylinder():
     return img
 
 
+FIREBOX = (94, 46, 30, 255)
+EMBER = (206, 96, 38, 255)
+PALE = (142, 141, 136, 255)
+PALE_DARK = (112, 111, 107, 255)
+GLASS = (96, 124, 138, 255)
+
+
+def boiler_wall():
+    """Firebox casing: refractory panel behind a steel frame, glowing at the seams."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 2, 2, 13, 13, FIREBOX)
+    # Seams between the refractory blocks, lit from behind. A boiler that does not look hot
+    # is indistinguishable from a tank, and this is the one machine that is all furnace.
+    for y in (5, 9):
+        _rect(px, 2, y, 13, y, EMBER)
+    _rect(px, 7, 2, 7, 13, EMBER)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _rect(px, 0, 0, 0, 15, OUTLINE)
+    _rect(px, 15, 0, 15, 15, OUTLINE)
+    _dots(px, [(1, 1), (14, 1), (1, 14), (14, 14)], BOLT)
+    return img
+
+
+def hrsg_wall():
+    """Finned tube bank: the whole machine is surface area, so the texture is stripes."""
+    img = _blank(STEEL)
+    px = img.load()
+    for x in range(0, 16, 3):
+        _rect(px, x, 1, x, 14, STEEL_DARK)
+        _rect(px, x+1, 1, x+1, 14, STEEL_LIT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _rect(px, 0, 7, 15, 7, STEEL_DARK)
+    _dots(px, [(3, 7), (11, 7)], BOLT)
+    return img
+
+
+def hall_wall():
+    """Generator hall cladding: pale industrial panel with a run of clerestory glazing."""
+    img = _blank(PALE)
+    px = img.load()
+    _rect(px, 0, 0, 15, 4, PALE_DARK)
+    # The glazing band is what makes this read as a building you walk into rather than a
+    # machine you stand next to, which is the whole point of the Steam Turbine Hall.
+    _rect(px, 1, 1, 14, 3, GLASS)
+    for x in range(4, 15, 4):
+        _rect(px, x, 1, x, 3, PALE_DARK)
+    for x in range(0, 16, 4):
+        _rect(px, x, 5, x, 15, PALE_DARK)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    return img
+
+
+def engine_block():
+    """Cylinder heads in a row: an engine bank read end-on."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    for x in (2, 8):
+        _rect(px, x, 3, x+5, 12, STEEL)
+        _rect(px, x, 3, x+5, 3, STEEL_LIT)
+        _rect(px, x+1, 5, x+4, 5, STEEL_DARK)
+        _rect(px, x+1, 8, x+4, 8, STEEL_DARK)
+        _dots(px, [(x, 3), (x+5, 3), (x, 12), (x+5, 12)], BOLT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _rect(px, 0, 13, 15, 13, RUST)
+    return img
+
 EXTRA_BLOCKS = {
     "petroleum_flare_stack": flare_stack,
     "petroleum_vessel": vessel,
     "petroleum_turbine_body": turbine_body,
     "petroleum_manifold": manifold,
     "petroleum_propane_cylinder": propane_cylinder,
+    "petroleum_boiler_wall": boiler_wall,
+    "petroleum_hrsg_wall": hrsg_wall,
+    "petroleum_hall_wall": hall_wall,
+    "petroleum_engine_block": engine_block,
 }
 
 

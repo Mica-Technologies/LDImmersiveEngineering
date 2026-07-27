@@ -24,6 +24,18 @@
 		"inventory,type=gas_turbine": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_turbine_body"}
 		}],
+		"inventory,type=fuel_oil_boiler": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_boiler_wall"}
+		}],
+		"inventory,type=hrsg": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_hrsg_wall"}
+		}],
+		"inventory,type=steam_turbine_hall": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_hall_wall"}
+		}],
+		"inventory,type=engine_bank": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_engine_block"}
+		}],
 		"type": {
 			"derrick": {},
 			"pumpjack": {
@@ -40,6 +52,18 @@
 			},
 			"gas_turbine": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_turbine_body"}
+			},
+			"fuel_oil_boiler": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_boiler_wall"}
+			},
+			"hrsg": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_hrsg_wall"}
+			},
+			"steam_turbine_hall": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_hall_wall"}
+			},
+			"engine_bank": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_engine_block"}
 			}
 		},
 		"boolean0": {

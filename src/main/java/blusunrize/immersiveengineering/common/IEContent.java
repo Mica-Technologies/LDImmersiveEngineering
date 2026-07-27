@@ -182,6 +182,7 @@ public class IEContent
 	public static BlockIEFluid blockFluidBitumen;
 	public static BlockIEFluid blockFluidAsphalt;
 	public static BlockIEFluid blockFluidSourGas;
+	public static BlockIEFluid blockFluidSteam;
 	public static BlockIEBase<BlockTypes_PetroleumDecoration> blockPetroleumDecoration;
 	public static BlockIEFluid blockFluidConcrete;
 
@@ -229,6 +230,7 @@ public class IEContent
 	public static Fluid fluidBiodiesel;
 	public static Fluid fluidPropane;
 	public static Fluid fluidNaturalGas;
+	public static Fluid fluidSteam;
 	public static Fluid fluidCrudeOil;
 	public static Fluid fluidNaphtha;
 	public static Fluid fluidGasoline;
@@ -265,6 +267,9 @@ public class IEContent
 		// anything but the scrubber: until it is cleaned it is a problem to be dealt with, which
 		// is what gives the gas branch its shape.
 		fluidSourGas = setupFluid(new Fluid("ie_sour_gas", new ResourceLocation("immersiveengineering:blocks/fluid/ie_sour_gas_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_sour_gas_flow")).setDensity(520).setViscosity(650));
+		// Steam is a working fluid, not a fuel: it carries heat from whatever raised it to whatever
+		// turns it, and nothing burns it. Gaseous, so it is lighter than air and moves like it.
+		fluidSteam = setupFluid(new Fluid("ie_steam", new ResourceLocation("immersiveengineering:blocks/fluid/ie_steam_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_steam_flow")).setDensity(-500).setViscosity(200).setTemperature(650).setGaseous(true));
 		// Wet asphalt: mixed from bitumen and aggregate, poured, and left to set.
 		fluidAsphalt = setupFluid(new Fluid("ie_asphalt", new ResourceLocation("immersiveengineering:blocks/fluid/ie_asphalt_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_asphalt_flow")).setDensity(2100).setViscosity(5000));
 		fluidBitumen = setupFluid(new Fluid("ie_bitumen", new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_flow")).setDensity(1250).setViscosity(6000));
@@ -353,6 +358,9 @@ public class IEContent
 		blockFluidBitumen = new BlockIEFluid("fluidBitumen", fluidBitumen, Material.WATER);
 		blockFluidAsphalt = new BlockIEFluidAsphalt("fluidAsphalt", fluidAsphalt, Material.WATER);
 		blockFluidSourGas = new BlockIEFluid("fluidSourGas", fluidSourGas, Material.WATER).setFlammability(60, 400);
+		// No flammability: steam is the one gas here that does not burn. It is a working fluid, and
+		// a burnable one would let a leaking steam line set a power station alight.
+		blockFluidSteam = new BlockIEFluid("fluidSteam", fluidSteam, Material.WATER);
 		blockFluidConcrete = new BlockIEFluidConcrete("fluidConcrete", fluidConcrete, Material.WATER);
 
 		itemMaterial = new ItemMaterial();
@@ -925,6 +933,9 @@ public class IEContent
 		blockFluidPropane.setPotionEffects(new PotionEffect(IEPotions.flammable, 100, 1), new PotionEffect(MobEffects.NAUSEA, 60, 0));
 		blockFluidNaturalGas.setPotionEffects(new PotionEffect(IEPotions.flammable, 100, 1), new PotionEffect(MobEffects.NAUSEA, 60, 0));
 		blockFluidConcrete.setPotionEffects(new PotionEffect(MobEffects.SLOWNESS, 20, 3, false, false));
+		// You cannot see inside a steam cloud, and standing in one is unpleasant rather than fatal.
+		blockFluidSteam.setPotionEffects(new PotionEffect(MobEffects.BLINDNESS, 60, 0),
+				new PotionEffect(MobEffects.NAUSEA, 40, 0));
 
 		ChemthrowerHandler.registerEffect(FluidRegistry.WATER, new ChemthrowerEffect_Extinguish());
 

@@ -9,19 +9,20 @@ from a hash of the world seed and the cell's coordinates. That makes world gener
 gives existing worlds oil retroactively with no retrogen pass, and means only cells somebody has
 actually drawn from are worth persisting.
 
-**Status: complete through the Distillation Tower and Industrial Burner.** The reservoir model,
-prospecting, the Wellhead, the Drilling Derrick, the Pumpjack, the Distillation Tower and the
-Industrial Burner are all implemented, hammer-formable and tested — see
-[Distillation Tower](#distillation-tower) and [Industrial Burner](#industrial-burner). The
-`DistillationRecipe` type and the shipped crude-oil recipe are registered, and the tower is what
-actually drives them now: `DistillationRecipe.findRecipe` is called from the tower's own `update()`
-(`TileEntityDistillationTower.java:221`) and `findIncompleteRecipes` gates what the feed tank will
-even accept (`TileEntityDistillationTower.java:148`).
+**Status: the extraction, refining and gas branches are complete.** The reservoir model,
+prospecting, the Wellhead, the Drilling Derrick, the Pumpjack, the Distillation Tower, the
+Industrial Burner, the Flare Stack, the Gas Scrubber, the Gas Turbine, the Lubrication Manifold
+and the Propane Cylinder are all implemented, hammer-formable where they are multiblocks, and
+tested. The `DistillationRecipe` type and the shipped crude-oil recipe are registered, and the
+tower is what actually drives them: `DistillationRecipe.findRecipe` is called from the tower's own
+`update()` and `findIncompleteRecipes` gates what the feed tank will even accept.
 
-Work on the rest of the gas side (a Gas Scrubber and a Gas Turbine, both already present as block
-metas on `BlockTypes_PetroleumMultiblock`) is in progress in the tree but not yet in a state this
-document covers; see those classes directly for the current state rather than trusting a snapshot
-here.
+Large-scale power generation — the Fuel Oil Boiler, the Heat Recovery Steam Generator, the Steam
+Turbine Hall and the Reciprocating Engine Bank, plus the `ie_steam` fluid that ties them together
+— is being built now and is not covered below. Storage, pipes and the virtual fluid network come
+after it. See `docs/agent-plans/FUELS.md` for the roadmap.
+
+Line numbers in this document are a reading aid, not a contract; the tree moves under them.
 
 ---
 
@@ -32,12 +33,13 @@ here.
 | **Wellhead** | Complete | Caps a drilled bore. Collects whatever the deposit gives up and pushes it into any adjacent fluid handler. |
 | **Drilling Derrick** | Complete | A 3×3×9 lattice tower, hammered together from Oilfield Frame. Sinks a bore over one minute of powered drilling, then hands over a Wellhead and packs itself back into frame. |
 | **Pumpjack** | Complete | A 3×6×5 machine that drives a Wellhead whose deposit has fallen below free-flow pressure. Carries no fluid of its own. |
-| **Distillation Tower** | Complete | A 4×4×12 column that splits crude into its seven cuts, drawn off at heights matching the column order. |
+| **Distillation Tower** | Complete | A 4×4×14 column that splits crude into its seven cuts, drawn off at heights matching the column order. |
 | **Industrial Burner** | Complete | A 3×3×3 firebox that burns the fuels nothing else wants for process heat, never Flux. |
-
-The Gas Scrubber and the Gas Turbine (`BlockTypes_PetroleumMultiblock.GAS_SCRUBBER`, `.GAS_TURBINE`)
-are under active development in the tree and not yet at a fixed enough state for this document to
-describe; not covered below.
+| **Flare Stack** | Complete | A single block that destroys gas nobody has anywhere better to put. Yields nothing, deliberately — it is what makes building a Scrubber pay for itself. |
+| **Gas Scrubber** | Complete | A 3×3×6 pair of vessels that cleans raw wellhead gas into natural gas, dropping sulfur out of it. |
+| **Gas Turbine** | Complete | A 3×6×3 machine that burns natural gas for Flux, with a spool-up curve that makes it a peaker rather than a base load. |
+| **Lubrication Manifold** | Complete | A single block that bolts onto a working machine and rebates part of its running cost while it has lubricant. |
+| **Propane Cylinder** | Complete | A portable four-bucket bottle that keeps its contents when broken. The domestic-scale answer to "I have propane, now what". |
 
 Oilfield Frame (`BlockTypes_PetroleumDevice.OILFIELD_FRAME`,
 `src/main/java/blusunrize/immersiveengineering/common/blocks/petroleum/BlockTypes_PetroleumDevice.java:32`)
@@ -289,11 +291,11 @@ Both halves of the registration are present: `registerTile(TileEntityDistillatio
 (`IEContent.java:1106`), immediately alongside the Derrick's and Pumpjack's own calls.
 
 `MultiblockDistillationTower` (`common/blocks/multiblocks/MultiblockDistillationTower.java`)
-defines the shape: a two-by-two steel shell that runs the full twelve-block height — the vessel —
+defines the shape: a two-by-two steel shell that runs the full fourteen-block height — the vessel —
 ringed at its foot by a scaffolding deck where crude goes in and where power and redstone connect,
 with four pairs of Oilfield Frame nozzles sticking out of the shell at each of seven draw heights,
 one pair per face (class doc, `MultiblockDistillationTower.java:38-57`). The footprint is
-`PetroleumGeometry.TOWER_SIZE`, four by four by twelve (`PetroleumGeometry.java:57-60`). As with
+`PetroleumGeometry.TOWER_SIZE`, four by four by fourteen (`PetroleumGeometry.java:57-60`). As with
 the Derrick, the shape is a pure predicate (`isPart`, `MultiblockDistillationTower.java:155-164`)
 and the manual `ItemStack[][][]` template is built lazily rather than in a static initialiser, so
 the shape math stays loadable — and testable — outside a running game (`getStructureManual`,
@@ -312,13 +314,20 @@ the mapping is:
 
 | Cut | Fluid (shipped recipe) | Height | Port |
 |---|---|---|---|
-| 0 | Natural gas | 11 | `TOP_PORT` |
-| 1 | Naphtha | 9 | |
-| 2 | Gasoline | 8 | |
-| 3 | Diesel | 6 | |
-| 4 | Heavy fuel oil | 4 | |
+| 0 | Natural gas | 13 | `TOP_PORT` |
+| 1 | Naphtha | 11 | |
+| 2 | Gasoline | 9 | |
+| 3 | Diesel | 7 | |
+| 4 | Heavy fuel oil | 5 | |
 | 5 | Lubricant | 3 | |
 | 6 | Bitumen | 1 | `BOTTOM_PORT` |
+
+The column is fourteen layers because seven ports two apart need a twelve-layer span and nothing
+less. At twelve the rounding produced 11, 9, 8, 6, 4, 3, 1 — two pairs of ports on adjacent
+layers. Each block only ever exposes its own cut, so nothing mixed by standing still; but a pipe
+climbing the tower to reach the upper port of a pair connected to the lower one on the way past,
+and two cuts ended up in one line. `portsAreNeverAdjacent` in `DistillationTowerTest` now fails if
+that spacing is ever lost again.
 
 `DistillationTowerTest` pins this table by value (`theMapping`,
 `DistillationTowerTest.java:66-76`), specifically because every tower already built in a save is
@@ -446,6 +455,99 @@ cannot double as a free fluid store that happens to also be a machine (`isFuelPo
 `canDrainTankFrom`, `TileEntityIndustrialBurner.java:504-513,531-537`).
 
 ---
+
+
+## Flare Stack
+
+A single block, and the only thing in the feature that is a deliberate **loss**. It accepts sour
+gas, natural gas or propane and destroys them, yielding nothing whatsoever.
+
+That is the point. An oilfield produces gas whether or not there is a use for it, and a Wellhead
+whose gas tank has backed up stops producing oil as well. Before a Gas Scrubber exists there is
+nothing else to do with the stream, so the flare is what keeps a well running. It is also the
+strongest argument the feature makes for building a Scrubber: the player can watch, in
+millibuckets, exactly how much is going up the stack (`lifetimeBurned` in the block overlay), and
+that number is the Scrubber's business case.
+
+**It is not `ITickable`.** Burning happens on delivery, which is the only moment anything can
+change, and the flame is extinguished by a scheduled block update rather than by a countdown that
+has to be checked. An idle flare costs the server literally nothing. `BURN_RATE` (200 mB per
+delivery) is sized so a Wellhead's gas stream is consumed as fast as it arrives and the well never
+backs up behind the flare; `FLAME_TICKS` (40) outlasts a Wellhead's production interval, so a
+steady feed reads as a steady flame rather than a stutter. It emits light 14 while lit and a full
+comparator signal, so the waste stream can drive a lamp or an alarm.
+
+Its intake is fill-only at the capability level, not merely by convention: the face a pipe sees is
+a wrapper whose `drain` returns null in both overloads. A flare is where gas goes to stop existing,
+and a drainable one would just be a tank that happens to glow.
+
+---
+
+## Gas Scrubber
+
+A 3×3×6 pair of vertical vessels that turns the field's one worthless product into two useful
+ones: 100 mB of sour gas yields 80 mB of natural gas (`SWEET_PERCENT = 80`), and every 2000 mB of
+sour gas processed also drops a sulfur dust (`SOUR_PER_SULFUR`).
+
+**Its operating cost is heat, not flux.** Sweetening gas is a reboiler duty in reality and the
+machine is modelled that way: it draws heat units from an Industrial Burner standing against its
+skid and does nothing at all without one (`HEAT_PER_BUCKET = 2000`). This is what stops the
+machine being free money, and it is also the nicest loop in the feature — a burner will run on the
+scrubber's own natural gas, so the plant bootstraps itself at a cost of roughly a quarter of what
+it makes, while feeding the burner heavy fuel oil instead (the cut with no other consumer) keeps
+the whole of the gas. Two waste streams cancelling each other out.
+
+Partial heat is honoured rather than refused: a pass scrubs however much gas the heat on offer
+pays for. An underfed scrubber runs visibly slowly, which is legible, instead of stalling on a
+threshold nothing tells the player about. It reports four states on the overlay — idle, scrubbing,
+no heat, backed up — so each way of being stopped is distinguishable without guesswork.
+
+It works on a 20-tick interval (`SCRUB_INTERVAL`), scrubbing `SCRUB_RATE` mB per tick of that
+interval in one batch, and its comparator output — gated to a single designated block, like every
+other multiblock — reports the sour feed level, because a feed backing up means the machine is not
+keeping pace with the field.
+
+---
+
+## Lubrication Manifold
+
+A single block that bolts onto a working machine and rebates part of its running cost while it has
+lubricant in it: a flat 8 FE/t, topped up in 20-tick batches, for 2 mB of lubricant per batch — a
+bucket lasts about eight minutes of continuous running.
+
+This exists because lubricant needs a job. Every other cut off the column burns; lubricant is the
+one that does not, and without a consumer the heaviest useful fraction of a barrel would be a
+fluid with nothing to do. The benefit is expressed as an energy rebate rather than a speed
+multiplier for an implementation reason as much as a design one: a speed multiplier would mean
+reaching into the shared multiblock process queue every machine in the mod runs on, whereas a
+rebate is paid by topping the host's own buffer back up through the accessor it already exposes.
+
+The rebate is **flat and absolute**, and that is load-bearing. It was briefly a fraction of the
+host's buffer capacity — a quantity unrelated to what the host actually spends — which worked out
+at a 59% discount on the Distillation Tower and, stacked with the Industrial Burner's heat rebate,
+made the tower net-positive: it ran indefinitely with its power supply disconnected. A small
+absolute offset cannot do that to anything, and it degrades honestly on a big machine instead of
+scaling into absurdity.
+
+It resolves its host on neighbour change rather than searching every interval, greases nothing
+when the host has an empty process queue (burning lubricant on an idle machine is exactly the kind
+of quiet drain that is miserable to diagnose), and syncs whether it is attached — host resolution
+is server-side while the overlay draws client-side.
+
+---
+
+## Propane Cylinder
+
+The bottle off the back of a barbecue: 4000 mB, portable, and it keeps its contents when broken so
+that swapping an empty for a full one is the gesture rather than plumbing anything. The same trick
+the wooden barrel uses.
+
+It is the smallest rung of the tank ladder and the only portable one. Everything else in this
+feature is infrastructure — wells, towers, pipe runs — and all of it is useless to a player who
+just wants to run one thing in one place. A bottle filled at a tank and set down next to a burner
+is a complete loop with no plumbing at all. It takes propane and nothing else, deliberately:
+letting it hold anything would quietly make it the cheapest portable tank in the mod for every
+fluid at once.
 
 ## Distillation recipes
 
