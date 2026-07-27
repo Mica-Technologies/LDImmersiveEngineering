@@ -1,0 +1,53 @@
+{
+	"parent": "block/block",
+	"textures": {
+		"particle": "#tank"
+	},
+	"elements": [
+		{
+			"from": [5, 0, 5],
+			"to": [11, 1, 11],
+			"faces": {
+				"north": {"texture": "#tank"},
+				"south": {"texture": "#tank"},
+				"east": {"texture": "#tank"},
+				"west": {"texture": "#tank"},
+				"down": {"texture": "#tank", "cullface": "down"}
+			}
+		},
+		{
+			"from": [4, 1, 4],
+			"to": [12, 11, 12],
+			"faces": {
+				"north": {"texture": "#tank"},
+				"south": {"texture": "#tank"},
+				"east": {"texture": "#tank"},
+				"west": {"texture": "#tank"},
+				"up": {"texture": "#tank"},
+				"down": {"texture": "#tank"}
+			}
+		},
+		{
+			"from": [6, 11, 6],
+			"to": [10, 13, 10],
+			"faces": {
+				"north": {"texture": "#tank"},
+				"south": {"texture": "#tank"},
+				"east": {"texture": "#tank"},
+				"west": {"texture": "#tank"},
+				"up": {"texture": "#tank"}
+			}
+		},
+		{
+			"from": [7, 13, 7],
+			"to": [9, 15, 9],
+			"faces": {
+				"north": {"texture": "#tank"},
+				"south": {"texture": "#tank"},
+				"east": {"texture": "#tank"},
+				"west": {"texture": "#tank"},
+				"up": {"texture": "#tank"}
+			}
+		}
+	]
+}

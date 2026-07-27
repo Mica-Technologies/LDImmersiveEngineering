@@ -374,11 +374,35 @@ def manifold():
     return img
 
 
+BOTTLE_WHITE = (222, 222, 218, 255)
+BOTTLE_SHADE = (188, 188, 184, 255)
+BOTTLE_DARK = (150, 150, 148, 255)
+BRASS = (176, 140, 68, 255)
+
+
+def propane_cylinder():
+    """The barbecue bottle: white steel, a brass valve, a rolled foot ring."""
+    img = _blank(BOTTLE_SHADE)
+    px = img.load()
+    # Cylindrical shading, lit from the left.
+    for x in range(16):
+        shade = BOTTLE_WHITE if x < 6 else BOTTLE_SHADE if x < 12 else BOTTLE_DARK
+        _rect(px, x, 0, x, 15, shade)
+    # Rolled foot and shoulder bands.
+    _rect(px, 0, 14, 15, 15, BOTTLE_DARK)
+    _rect(px, 0, 0, 15, 1, BOTTLE_DARK)
+    # Valve fitting.
+    _rect(px, 6, 2, 9, 4, BRASS)
+    _dots(px, [(7, 3), (8, 3)], (206, 172, 96, 255))
+    return img
+
+
 EXTRA_BLOCKS = {
     "petroleum_flare_stack": flare_stack,
     "petroleum_vessel": vessel,
     "petroleum_turbine_body": turbine_body,
     "petroleum_manifold": manifold,
+    "petroleum_propane_cylinder": propane_cylinder,
 }
 
 

@@ -810,6 +810,7 @@ public class IEContent
 		registerTile(TileEntityGasTurbine.class);
 		registerTile(TileEntityFlareStack.class);
 		registerTile(TileEntityLubricationManifold.class);
+		registerTile(TileEntityPropaneCylinder.class);
 
 
 

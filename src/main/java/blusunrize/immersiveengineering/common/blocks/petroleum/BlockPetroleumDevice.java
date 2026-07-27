@@ -38,6 +38,8 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 		this.lightOpacity = 0;
 		//The wellhead is a valve stack, not a solid cube.
 		this.setNotNormalBlock(BlockTypes_PetroleumDevice.WELLHEAD.getMeta());
+		this.setNotNormalBlock(BlockTypes_PetroleumDevice.PROPANE_CYLINDER.getMeta());
+		this.setMetaBlockLayer(BlockTypes_PetroleumDevice.PROPANE_CYLINDER.getMeta(), BlockRenderLayer.CUTOUT);
 		this.setMetaBlockLayer(BlockTypes_PetroleumDevice.WELLHEAD.getMeta(), BlockRenderLayer.CUTOUT);
 	}
 
@@ -68,6 +70,8 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 		{
 			case WELLHEAD:
 				return new TileEntityWellhead();
+			case PROPANE_CYLINDER:
+				return new TileEntityPropaneCylinder();
 			case LUBRICATION_MANIFOLD:
 				return new TileEntityLubricationManifold();
 			case FLARE_STACK:

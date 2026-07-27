@@ -9,6 +9,11 @@
 	},
 	"variants": {
 		"inventory,type=oilfield_frame": [{}],
+		"inventory,type=propane_cylinder": [{
+			"model": "immersiveengineering:petroleum/propane_cylinder",
+			"textures": {"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+				"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"}
+		}],
 		"inventory,type=lubrication_manifold": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_manifold"}
 		}],
@@ -24,6 +29,11 @@
 		}],
 		"type": {
 			"oilfield_frame": {},
+			"propane_cylinder": {
+				"model": "immersiveengineering:petroleum/propane_cylinder",
+				"textures": {"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"}
+			},
 			"lubrication_manifold": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_manifold"}
 			},

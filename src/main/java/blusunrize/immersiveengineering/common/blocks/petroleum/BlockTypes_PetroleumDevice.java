@@ -37,7 +37,11 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * Keeps an adjacent machine greased, so lubricant has somewhere to go.
 	 */
-	LUBRICATION_MANIFOLD;
+	LUBRICATION_MANIFOLD,
+	/**
+	 * A bottle of propane you fill somewhere and carry to wherever it is needed.
+	 */
+	PROPANE_CYLINDER;
 
 	@Override
 	public String getName()
