@@ -51,6 +51,9 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IIEMetaBlock;
 import blusunrize.immersiveengineering.common.blocks.cloth.BlockTypes_ClothDevice;
 import blusunrize.immersiveengineering.common.blocks.cloth.TileEntityShaderBanner;
+import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridConsole;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
 import blusunrize.immersiveengineering.common.blocks.metal.*;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorBasic;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorDrop;
@@ -776,6 +779,25 @@ public class ClientProxy extends CommonProxy
 				new ManualPages.Text(ManualHelper.getManual(), "redstoneWires3"),
 				new ManualPages.Text(ManualHelper.getManual(), "redstoneWires4"),
 				new ManualPages.Text(ManualHelper.getManual(), "redstoneWires5"));
+		//The virtual grid. Kept in CAT_ENERGY next to wiring, because everything here is an
+		//alternative to running a wire and the comparison only makes sense side by side.
+		ManualHelper.getManual().addEntry("virtualGrid", ManualHelper.CAT_ENERGY,
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid0"),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid1"),
+				new ManualPages.CraftingMulti(ManualHelper.getManual(), "virtualGrid2",
+						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.FEED_UNIT.getMeta()),
+						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SERVICE_UNIT.getMeta())),
+				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid3",
+						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta())),
+				new ManualPageMultiblock(ManualHelper.getManual(), "virtualGrid4", MultiblockGridConsole.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid5"),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid6"),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid7"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid8",
+						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta())),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid9"),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"));
+
 		Map<String, Integer> sortedMap = ThermoelectricHandler.getThermalValuesSorted(true);
 		String[][] table = formatToTable_ItemIntHashmap(sortedMap, "K");
 		ManualHelper.getManual().addEntry("thermoElectric", ManualHelper.CAT_ENERGY,
@@ -1346,6 +1368,10 @@ public class ClientProxy extends CommonProxy
 					gui = new GuiBelljar(player.inventory, (TileEntityBelljar)te);
 				if(ID==Lib.GUIID_ToolboxBlock&&te instanceof TileEntityToolbox)
 					gui = new GuiToolboxBlock(player.inventory, (TileEntityToolbox)te);
+				if(ID==Lib.GUIID_GridConsole&&te instanceof TileEntityGridConsole)
+					gui = new GuiGridConsole(player.inventory, (TileEntityGridConsole)te);
+				if(ID==Lib.GUIID_GridDevice&&te instanceof TileEntityGridDevice)
+					gui = new GuiGridDevice(player.inventory, (TileEntityGridDevice)te);
 				if(gui!=null)
 					((IGuiTile)te).onGuiOpened(player, true);
 				return gui;

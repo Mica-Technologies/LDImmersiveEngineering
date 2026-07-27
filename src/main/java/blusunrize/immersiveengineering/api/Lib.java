@@ -64,6 +64,8 @@ public class Lib
 	public static final int GUIID_FluidSorter = GUIID_Base_Tile+14;
 	public static final int GUIID_Belljar = GUIID_Base_Tile+15;
 	public static final int GUIID_ToolboxBlock = GUIID_Base_Tile+16;
+	public static final int GUIID_GridConsole = GUIID_Base_Tile+17;
+	public static final int GUIID_GridDevice = GUIID_Base_Tile+18;
 	//Items
 	public static final int GUIID_Base_Item = 64;
 	public static final int GUIID_Manual = GUIID_Base_Item+0;

@@ -1,0 +1,31 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:grid_device",
+		"data": 2,
+		"count": 4
+	},
+	"pattern": [
+		"SGS",
+		"WRW",
+		"SCS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"G": {
+			"item": "#paneGlass"
+		},
+		"W": {
+			"item": "#plankTreatedWood"
+		},
+		"R": {
+			"item": "immersiveengineering:metal_decoration0",
+			"data": 3
+		},
+		"C": {
+			"item": "#componentSteel"
+		}
+	}
+}

@@ -28,6 +28,7 @@ import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.blocks.*;
 import blusunrize.immersiveengineering.common.blocks.BlockFakeLight.TileEntityFakeLight;
 import blusunrize.immersiveengineering.common.blocks.cloth.*;
+import blusunrize.immersiveengineering.common.blocks.grid.*;
 import blusunrize.immersiveengineering.common.blocks.metal.*;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.*;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorChute.ConveyorChuteAluminum;
@@ -160,6 +161,8 @@ public class IEContent
 	public static BlockIEBase<BlockTypes_MetalDevice1> blockMetalDevice1;
 	public static BlockIEBase<BlockTypes_Conveyor> blockConveyor;
 	public static BlockIEBase<BlockTypes_MetalMultiblock> blockMetalMultiblock;
+	public static BlockIEBase<BlockTypes_GridDevice> blockGridDevice;
+	public static BlockIEBase<BlockTypes_GridMultiblock> blockGridMultiblock;
 	public static BlockIEFluid blockFluidCreosote;
 	public static BlockIEFluid blockFluidPlantoil;
 	public static BlockIEFluid blockFluidEthanol;
@@ -288,6 +291,8 @@ public class IEContent
 		blockMetalDevice1 = new BlockMetalDevice1();
 		blockConveyor = new BlockConveyor();
 		blockMetalMultiblock = new BlockMetalMultiblocks();
+		blockGridDevice = new BlockGridDevice();
+		blockGridMultiblock = new BlockGridMultiblock();
 
 		blockFluidCreosote = new BlockIEFluid("fluidCreosote", fluidCreosote, Material.WATER).setFlammability(40, 400);
 		blockFluidPlantoil = new BlockIEFluid("fluidPlantoil", fluidPlantoil, Material.WATER);
@@ -722,6 +727,11 @@ public class IEContent
 		//		registerTile(TileEntitySkycrateDispenser.class);
 		registerTile(TileEntityFakeLight.class);
 
+		registerTile(TileEntityGridFeed.class);
+		registerTile(TileEntityGridService.class);
+		registerTile(TileEntityGridSignal.class);
+		registerTile(TileEntityGridConsole.class);
+
 
 
 		/*ENTITIES*/
@@ -990,6 +1000,7 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockLightningrod.instance);
 		MultiblockHandler.registerMultiblock(MultiblockMixer.instance);
 		MultiblockHandler.registerMultiblock(MultiblockFeedthrough.instance);
+		MultiblockHandler.registerMultiblock(MultiblockGridConsole.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();

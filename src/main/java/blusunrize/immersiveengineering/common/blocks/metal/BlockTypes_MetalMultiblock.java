@@ -31,6 +31,9 @@ public enum BlockTypes_MetalMultiblock implements IStringSerializable, BlockIEBa
 	ARC_FURNACE(true),
 	LIGHTNINGROD(false),
 	MIXER(true);
+	//NOTE: this enum is FULL. Block metadata is 4 bits, so meta 15 (MIXER) is the last
+	//value that can be stored in a block state. Anything new needs its own block -- see
+	//BlockGridMultiblock for how the Grid Management Console does it.
 
 	private boolean needsCustomState;
 

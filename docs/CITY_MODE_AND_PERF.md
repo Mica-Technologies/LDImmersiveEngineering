@@ -101,7 +101,7 @@ City mode trades Immersive Engineering's simulation detail for server tick time.
 city/roleplay packs where the mod's machinery is set dressing rather than an engineering puzzle:
 you keep the entire look of the build, and give up the physics behind it.
 
-It covers four subsystems:
+It covers five subsystems:
 
 | Subsystem | What is simplified |
 |---|---|
@@ -109,6 +109,7 @@ It covers four subsystems:
 | **Floodlights** | Beams are re-traced only when the light switches or a neighbour changes, never on a timer, and the number of light blocks one lamp may place is capped. |
 | **Generators** | Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and a per-tick tank drain. |
 | **Machines** | Idle multiblocks stop re-scanning the recipe list every tick, and the scan interval widens. |
+| **Virtual grid** | Segments stop accounting for flux and switch to presence: a segment is energized or it is not, and its Service Units deliver freely. See [Virtual Power Grid](#virtual-power-grid). |
 
 **It is off by default**, and off means byte-identical to stock.
 
@@ -119,17 +120,18 @@ Config → Immersive Engineering → general
     cityModeFloodlights  (default: true)
     cityModeGenerators   (default: true)
     cityModeMachines     (default: true)
+    cityModeVirtualGrid  (default: true)
 ```
 
-`cityMode` is the master switch. The four sub-flags default to on, so enabling the master alone
+`cityMode` is the master switch. The five sub-flags default to on, so enabling the master alone
 turns on everything; a subsystem is simplified only when the master is on **and** that sub-flag
 has not been turned off. Switching the master off is therefore always sufficient to restore stock
-behaviour. All five are plain booleans read live, so they take effect on config reload without a
+behaviour. All six are plain booleans read live, so they take effect on config reload without a
 world restart, and none of them touch saved data in either direction.
 
 Every call site resolves the pairing through `common/util/CityMode.java`
-(`CityMode.wires()`, `.floodlights()`, `.generators()`, `.machines()`) rather than repeating the
-conjunction.
+(`CityMode.wires()`, `.floodlights()`, `.generators()`, `.machines()`, `.grid()`) rather than
+repeating the conjunction.
 
 ### Why these four, in this order
 
@@ -525,6 +527,45 @@ indefinitely.
 
 **What you give up:** a machine can take up to 1.6 seconds to notice newly inserted items. Recipe
 outputs, processing rates and throughput once running are all untouched.
+
+---
+
+## Virtual Power Grid
+
+Gated behind `cityModeVirtualGrid`. Implemented in `api/energy/grid/GridEngine`, resolved through
+`CityMode.grid()`. Full feature documentation lives in [VIRTUAL_GRID.md](VIRTUAL_GRID.md); this
+section is only about what city mode changes.
+
+The virtual grid is this fork's own feature, not stock IE: named **segments** of Feed and Service
+Units that move flux between places with no wire between them. In normal mode it is real
+accounting — what leaves a segment came into it, through a small buffer, under per-tick caps.
+
+**City mode replaces the accounting with presence**, exactly as it does for wires:
+
+- A segment is **energized** if it is switched on and at least one of its Feed Units has recently
+  proved its source is alive. Proving it is a **sip**: `gridSipAmount` flux (default 1) every
+  `gridSipIntervalTicks` (default 100), staggered across feed units by position so a city's worth
+  of them never all check on the same tick. That works out to one flux per feed unit per five
+  seconds, and it is the entire running cost of a city-mode grid.
+- Service Units on an energized segment deliver up to their own transfer cap, with no pool, no
+  buffer and no loss. The segment's configured output cap is still honoured — that is a number a
+  player chose, not a physics term.
+- Failover becomes a boolean cascade ("is any linked segment energized?") instead of energy
+  arithmetic, so a backed-up grid is *cheaper* in city mode, not more expensive.
+
+Everything else behaves identically in both modes: segment switches, breakers, schedules, Signal
+Units, chunk loading, the console GUI and every statistic the console shows.
+
+**Cost.** Normal mode is already `O(active devices)` with no per-tick allocation and no ticking
+tile entities — the grid was built after the wire work, with those lessons applied. City mode
+reduces it further to `O(segments)` plus the staggered sips. Neither is a figure worth tuning
+around; the grid is not the reason anyone's tick is long.
+
+**What you give up:** the numbers stop being conservation. A segment can deliver more than its
+feeds collected, because nothing is being collected — the feed is only being *checked*. The Stats
+tab says so directly rather than letting the graphs be misread: it labels a city-mode segment as
+presence accounting. If you want a grid where the arithmetic is honest, leave
+`cityModeVirtualGrid=false` while the master switch is on; the two are independent.
 
 ---
 

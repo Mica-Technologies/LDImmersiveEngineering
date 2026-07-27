@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.common.items;
 
 import blusunrize.immersiveengineering.api.ApiUtils;
+import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.MultiblockHandler;
 import blusunrize.immersiveengineering.api.TargetingInfo;
@@ -25,6 +26,7 @@ import blusunrize.immersiveengineering.common.blocks.BlockIEBase;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IConfigurableSides;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectionalTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IHammerInteraction;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
 import blusunrize.immersiveengineering.common.items.IEItemInterfaces.IGuiItem;
 import blusunrize.immersiveengineering.common.items.IEItemInterfaces.IItemDamageableIE;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
@@ -32,6 +34,7 @@ import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
 import blusunrize.immersiveengineering.common.util.RotationUtil;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.advancements.IEAdvancements;
+import blusunrize.immersiveengineering.common.util.grid.GridQuickAssign;
 import com.google.common.collect.ImmutableSet;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.block.state.IBlockState;
@@ -98,6 +101,11 @@ public class ItemIETool extends ItemIEBase implements ITool, IGuiItem, IItemDama
 			if(link!=null&&link.length > 3)
 				list.add(I18n.format(Lib.DESC_INFO+"attachedToDim", link[1], link[2], link[3], link[0]));
 		}
+		//A voltmeter carrying a segment behaves differently on every sneak-click, so the fact
+		//that it is loaded has to be visible without clicking something to find out.
+		if(stack.getMetadata()==VOLTMETER_META&&GridQuickAssign.hasHeldSegment(stack))
+			list.add(TextFormatting.GREEN+I18n.format(Lib.DESC_INFO+"grid.heldSegment",
+					GridQuickAssign.describeHeldSegment(stack)));
 		if(stack.getMetadata()==HAMMER_META)
 		{
 			if(ItemNBTHelper.hasKey(stack, "multiblockPermission"))
@@ -355,6 +363,13 @@ public class ItemIETool extends ItemIEBase implements ITool, IGuiItem, IItemDama
 					ChatUtils.sendServerNoSpamMessages(player, new TextComponentTranslation(Lib.CHAT_INFO+"energyStorage", stored, max));
 				return EnumActionResult.SUCCESS;
 			}
+			//Grid boxes first: they are not IImmersiveConnectable, so the wire-loss branch
+			//below would never have claimed the click anyway, and a sneak-click on one is
+			//unambiguously about the grid.
+			if(player.isSneaking()&&tileEntity instanceof TileEntityGridDevice
+					&&GridQuickAssign.onDeviceClicked(stack, player,
+					new DimensionBlockPos(pos, world)))
+				return EnumActionResult.SUCCESS;
 			if(player.isSneaking()&&tileEntity instanceof IImmersiveConnectable)
 			{
 				if(!ItemNBTHelper.hasKey(stack, "linkingPos"))
@@ -417,6 +432,14 @@ public class ItemIETool extends ItemIEBase implements ITool, IGuiItem, IItemDama
 					ImmersiveNetHandler.INSTANCE.removeConnectionAndDrop(target, world, player.getPosition());
 			}
 			return new ActionResult<>(EnumActionResult.SUCCESS, stack);
+		}
+		else if(stack.getMetadata()==VOLTMETER_META&&player.isSneaking())
+		{
+			//Sneak-click on nothing: put the voltmeter back into "read" mode. Being able to
+			//drop a held segment without hunting for a particular block to click is what
+			//makes the copy/paste gesture safe to experiment with.
+			if(!world.isRemote&&GridQuickAssign.clear(stack, player))
+				return new ActionResult<>(EnumActionResult.SUCCESS, stack);
 		}
 		return new ActionResult<>(EnumActionResult.PASS, stack);
 	}

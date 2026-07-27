@@ -10,6 +10,8 @@ package blusunrize.immersiveengineering.common;
 
 import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.crafting.*;
+import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
+import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.tool.BelljarHandler;
 import blusunrize.immersiveengineering.common.Config.IEConfig.Machines;
@@ -98,6 +100,12 @@ public class Config
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModeMachines = true;
 
+		@Comment({"City mode: the virtual power grid. Grid segments stop accounting for flux and switch to presence semantics -- a segment is either energized or it is not, and its Service Units then deliver freely with no pool, no buffer and no loss.",
+				"Feed Units consume only a token 'sip' (see gridSipAmount / gridSipIntervalTicks) to prove their source is still live, so a city-scale grid costs almost nothing per tick.",
+				"Segment on/off switches, failover links, the console GUI and chunk loading all behave identically in both modes.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeVirtualGrid = true;
+
 		@Comment({"By default all devices that accept cables have increased renderbounds to show cables even if the block itself is not in view.", "Disabling this reduces them to their minimum sizes, which might improve FPS on low-power PCs"})
 		//TODO this is for TESR wires. Remove?
 		public static boolean increasedRenderboxes = true;
@@ -149,6 +157,63 @@ public class Config
 		public static Ores ores;
 		@SubConfig
 		public static Tools tools;
+		@SubConfig
+		public static VirtualGrid virtualGrid;
+
+		/**
+		 * The virtual power grid: named segments of Feed and Service Units that move flux
+		 * without physical wire between them. Values are pushed into
+		 * {@link blusunrize.immersiveengineering.api.energy.grid.GridConfig} on load so the
+		 * model in {@code api} never has to reach back into {@code common}.
+		 */
+		public static class VirtualGrid
+		{
+			@Comment({"Master switch for the virtual power grid. When false the tick engine does no work at all and Feed/Service Units stay inert (they are still placeable, so turning this off cannot destroy an existing build)."})
+			public static boolean enableVirtualGrid = true;
+			@Comment({"Whether a single grid segment may contain devices in more than one dimension. When false, a segment is pinned to the dimension of the first device assigned to it."})
+			public static boolean gridCrossDimension = true;
+			@Comment({"Default throughput of a single Feed or Service Unit, in Flux/t. The default matches an HV connector."})
+			@RangeInt(min = 0)
+			public static int gridDefaultDeviceCap = 4096;
+			@Comment({"The highest per-segment input/output rate that may be set from the Grid Management Console, in Flux/t. Also the ceiling for a single device's transfer cap."})
+			@RangeInt(min = 0)
+			public static int gridMaxSegmentIO = 32768;
+			@Comment({"Fraction of energy lost in transmission through a new segment, 0.0 to 1.0. Ships at 0: by default the grid is a convenience feature, not a lossy one. Raise it if you want physical wire to keep an efficiency advantage."})
+			@RangeDouble(min = 0, max = 1)
+			public static double gridDefaultLossPct = 0.0;
+			@Comment({"Default state of a new segment's 'backups also cover shortfalls' toggle. When false, linked backup segments only step in if the segment is switched off or has tripped."})
+			public static boolean gridFailoverTopUpDefault = true;
+			@Comment({"How many ticks of its own output rate a segment buffers by default. This buffer only exists so energy collected this tick can be delivered this tick; it is deliberately far too small to be used as storage."})
+			@RangeInt(min = 1, max = 20)
+			public static int gridBufferTicks = 2;
+			@Comment({"Hard ceiling on a segment's buffer, in Flux. This is the anti-battery clamp -- the grid is a conduit, not free storage."})
+			@RangeInt(min = 0)
+			public static int gridBufferCapMax = 262144;
+			@Comment({"Whether the Grid Management Console needs standby power to light its screen. The GUI still opens without power, in read-only mode, so losing power can never lock you out of your own grid."})
+			public static boolean gridConsoleRequiresPower = true;
+			@Comment({"Standby draw of a Grid Management Console, in Flux/t."})
+			@RangeInt(min = 0)
+			public static int gridConsoleStandbyDraw = 8;
+			@Comment({"Master switch for the per-device chunk loading toggle. When false, the toggle is ignored and no grid device keeps chunks loaded."})
+			public static boolean gridAllowChunkloading = true;
+			@Comment({"Server-wide maximum number of chunks that grid devices may hold loaded between them."})
+			@RangeInt(min = 0)
+			public static int gridChunkloadBudget = 25;
+			@Comment({"City mode only: how often, in ticks, a Feed Unit checks that its power source is still live. 100 ticks is once every five seconds."})
+			@RangeInt(min = 1)
+			public static int gridSipIntervalTicks = 100;
+			@Comment({"City mode only: how much Flux a Feed Unit consumes per liveness check. This is the entire running cost of a city-mode grid."})
+			@RangeInt(min = 0)
+			public static int gridSipAmount = 1;
+			@Comment({"How many failover links a shortfall may travel along before giving up. Cycles are always broken regardless of this value."})
+			@RangeInt(min = 1, max = 32)
+			public static int gridMaxFailoverDepth = 4;
+			@Comment({"Set to true to make segments trip like a real breaker: a segment held at its output ceiling for gridBreakerTripSeconds latches off and must be switched back on by hand.", "Off by default -- with it off, demand above the ceiling is simply clamped."})
+			public static boolean gridBreakersEnabled = false;
+			@Comment({"Seconds of continuous output saturation before a segment's breaker trips. Only applies when gridBreakersEnabled is true."})
+			@RangeInt(min = 1)
+			public static int gridBreakerTripSeconds = 5;
+		}
 
 
 		public static class Machines
@@ -560,6 +625,30 @@ public class Config
 		Config.manual_int.put("excavator_depletion_days", Machines.excavator_depletion*45/24000);
 		Config.manual_bool.put("literalRailGun", false);//preventive measure for Railcraft
 		validateAndMapValues(IEConfig.class);
+
+		//Push the virtual grid settings into the api-side mirror. Same arrangement as the
+		//WireType arrays below: the model in api never reaches back into common, which
+		//also makes it trivially configurable from unit tests.
+		GridConfig.enabled = IEConfig.VirtualGrid.enableVirtualGrid;
+		GridConfig.crossDimension = IEConfig.VirtualGrid.gridCrossDimension;
+		GridConfig.defaultDeviceCap = IEConfig.VirtualGrid.gridDefaultDeviceCap;
+		GridConfig.maxSegmentIO = IEConfig.VirtualGrid.gridMaxSegmentIO;
+		GridConfig.defaultLossPct = IEConfig.VirtualGrid.gridDefaultLossPct;
+		GridConfig.failoverTopUpDefault = IEConfig.VirtualGrid.gridFailoverTopUpDefault;
+		GridConfig.bufferTicks = IEConfig.VirtualGrid.gridBufferTicks;
+		GridConfig.bufferCapMax = IEConfig.VirtualGrid.gridBufferCapMax;
+		GridConfig.consoleRequiresPower = IEConfig.VirtualGrid.gridConsoleRequiresPower;
+		GridConfig.consoleStandbyDraw = IEConfig.VirtualGrid.gridConsoleStandbyDraw;
+		GridConfig.allowChunkloading = IEConfig.VirtualGrid.gridAllowChunkloading;
+		GridConfig.chunkloadBudget = IEConfig.VirtualGrid.gridChunkloadBudget;
+		GridConfig.sipIntervalTicks = IEConfig.VirtualGrid.gridSipIntervalTicks;
+		GridConfig.sipAmount = IEConfig.VirtualGrid.gridSipAmount;
+		GridConfig.maxFailoverDepth = IEConfig.VirtualGrid.gridMaxFailoverDepth;
+		GridConfig.breakersEnabled = IEConfig.VirtualGrid.gridBreakersEnabled;
+		GridConfig.breakerTripSeconds = IEConfig.VirtualGrid.gridBreakerTripSeconds;
+		//Existing segments may now sit outside a lowered ceiling; pull them back inside it.
+		VirtualGrid.INSTANCE.onConfigChanged();
+
 		WireType.wireLossRatio = IEConfig.wireLossRatio;
 		WireType.wireTransferRate = IEConfig.wireTransferRate;
 		WireType.wireColouration =

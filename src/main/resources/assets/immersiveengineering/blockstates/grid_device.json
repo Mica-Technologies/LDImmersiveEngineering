@@ -1,0 +1,55 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"transform": "forge:default-block",
+		"model": "immersiveengineering:grid/utility_box",
+		"textures": {
+			"side": "immersiveengineering:blocks/grid_device_side",
+			"top": "immersiveengineering:blocks/grid_device_top",
+			"back": "immersiveengineering:blocks/grid_device_side",
+			"front": "immersiveengineering:blocks/grid_device_feed_front"
+		}
+	},
+	"variants": {
+		"inventory,type=feed_unit": [{
+			"y": 180
+		}],
+		"inventory,type=service_unit": [{
+			"y": 180,
+			"textures": {"front": "immersiveengineering:blocks/grid_device_service_front"}
+		}],
+		"inventory,type=console_housing": [{
+			"model": "cube_all",
+			"textures": {"all": "immersiveengineering:blocks/grid_console_housing"}
+		}],
+		"inventory,type=signal_unit": [{
+			"y": 180,
+			"textures": {"front": "immersiveengineering:blocks/grid_device_signal_front"}
+		}],
+		"type": {
+			"feed_unit": {},
+			"service_unit": {
+				"textures": {"front": "immersiveengineering:blocks/grid_device_service_front"}
+			},
+			"console_housing": {
+				"model": "cube_all",
+				"textures": {"all": "immersiveengineering:blocks/grid_console_housing"}
+			},
+			"signal_unit": {
+				"textures": {"front": "immersiveengineering:blocks/grid_device_signal_front"}
+			}
+		},
+		"facing": {
+			"north": {},
+			"east": {"y": 90},
+			"south": {"y": 180},
+			"west": {"y": 270},
+			"up": {"x": 270},
+			"down": {"x": 90}
+		},
+		"boolean0": {
+			"false": {},
+			"true": {}
+		}
+	}
+}

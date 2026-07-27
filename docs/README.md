@@ -24,6 +24,9 @@ implements which system and how those systems behave. All entries cite real sour
   while keeping all the physics), every perf-relevant config knob, what the fork already optimises
   for free, and the full reference for this fork's config-gated "city mode".
   ([PDF summary](CITY_MODE_AND_PERF.pdf))
+- **[VIRTUAL_GRID.md](VIRTUAL_GRID.md)** — this fork's virtual power grid: named segments of Feed
+  and Service Units that move flux with no wire between them, failover chains, breakers, schedules,
+  Signal Units, and the Grid Management Console.
 - **[MULTIBLOCK_SYSTEM.md](MULTIBLOCK_SYSTEM.md)** — the multiblock structure framework
   (master/slave/mirror), formation/disassembly, and the machine catalog (crusher, blast
   furnace, arc furnace, assembler, refinery, etc.).

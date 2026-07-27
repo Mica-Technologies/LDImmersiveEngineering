@@ -1,0 +1,23 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:grid_device",
+		"data": 3
+	},
+	"pattern": [
+		"SSS",
+		"RTR",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"T": {
+			"item": "#elecTube"
+		},
+		"R": {
+			"item": "minecraft:redstone"
+		}
+	}
+}

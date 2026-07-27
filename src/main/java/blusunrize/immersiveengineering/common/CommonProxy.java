@@ -19,6 +19,8 @@ package blusunrize.immersiveengineering.common;
 import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridConsole;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
 import blusunrize.immersiveengineering.common.blocks.metal.*;
 import blusunrize.immersiveengineering.common.blocks.stone.TileEntityAlloySmelter;
 import blusunrize.immersiveengineering.common.blocks.stone.TileEntityBlastFurnace;
@@ -157,6 +159,10 @@ public class CommonProxy implements IGuiHandler
 					gui = new ContainerBelljar(player.inventory, (TileEntityBelljar)te);
 				if(ID==Lib.GUIID_ToolboxBlock&&te instanceof TileEntityToolbox)
 					gui = new ContainerToolboxBlock(player.inventory, (TileEntityToolbox)te);
+				if(ID==Lib.GUIID_GridConsole&&te instanceof TileEntityGridConsole)
+					gui = new ContainerGridConsole(player.inventory, (TileEntityGridConsole)te);
+				if(ID==Lib.GUIID_GridDevice&&te instanceof TileEntityGridDevice)
+					gui = new ContainerGridDevice(player.inventory, (TileEntityGridDevice)te);
 				if(gui!=null)
 					((IGuiTile)te).onGuiOpened(player, false);
 				return gui;

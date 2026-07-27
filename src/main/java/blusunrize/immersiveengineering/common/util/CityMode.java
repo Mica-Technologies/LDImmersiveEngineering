@@ -66,4 +66,16 @@ public final class CityMode
 	{
 		return IEConfig.cityMode&&IEConfig.cityModeMachines;
 	}
+
+	/**
+	 * The virtual grid switches from real flux accounting to presence semantics: a segment
+	 * either has power or it does not, and its service units deliver freely when it does.
+	 * Feed units only sip a token amount to prove their source is still live.
+	 * <p>
+	 * This is the grid's counterpart to {@link #wires()} -- same trade, same reasoning.
+	 */
+	public static boolean grid()
+	{
+		return IEConfig.cityMode&&IEConfig.cityModeVirtualGrid;
+	}
 }

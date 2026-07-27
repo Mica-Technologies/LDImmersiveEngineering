@@ -247,7 +247,7 @@ def build_pdf(path, chart_a, chart_b):
     S.append(Paragraph(
         "City mode trades simulation detail for server tick time. It is aimed at city and roleplay "
         "packs where the mod's machinery is set dressing rather than an engineering puzzle: you keep "
-        "the entire look of the build and give up the physics behind it. It covers four subsystems.", body))
+        "the entire look of the build and give up the physics behind it. It covers five subsystems.", body))
 
     rows = [
         ["Subsystem", "What is simplified"],
@@ -255,6 +255,7 @@ def build_pdf(path, chart_a, chart_b):
         ["Floodlights", "Beams re-traced only when the light switches or a neighbour changes, never on a timer; light-block count capped per lamp."],
         ["Generators", "Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and tank drain."],
         ["Machines", "Idle multiblocks stop re-scanning the recipe list every tick; the scan interval widens."],
+        ["Virtual grid", "Segments stop accounting for flux and switch to presence: energized or not, with Service Units delivering freely and Feed Units taking only a token sip."],
     ]
     data = [[Paragraph(c, cellb if i == 0 else (cellb if j == 0 else cell))
              for j, c in enumerate(r)] for i, r in enumerate(rows)]
@@ -266,8 +267,9 @@ def build_pdf(path, chart_a, chart_b):
         "<font face='Courier'>cityMode</font> is the master switch; "
         "<font face='Courier'>cityModeWires</font>, "
         "<font face='Courier'>cityModeFloodlights</font>, "
-        "<font face='Courier'>cityModeGenerators</font> and "
-        "<font face='Courier'>cityModeMachines</font> each default to on, so the master alone "
+        "<font face='Courier'>cityModeGenerators</font>, "
+        "<font face='Courier'>cityModeMachines</font> and "
+        "<font face='Courier'>cityModeVirtualGrid</font> each default to on, so the master alone "
         "enables everything while any one subsystem can be declined. Switching the master off is "
         "always sufficient to restore stock behaviour, and nothing here touches saved data.", body))
 
@@ -404,6 +406,7 @@ def build_pdf(path, chart_a, chart_b):
         ["Lightning Rod", "16,000,000 FE on a strike", "No"],
         ["Connector LV/MV/HV", "the only blocks moving energy over wires", "<b>Yes</b> — push path replaced; its own rate caps still apply"],
         ["Relay LV/MV/HV", "routing waypoint, never holds energy", "No — tick body never runs either way"],
+        ["Grid Feed / Service Unit", "wireless segment endpoints; never tick individually", "<b>Yes</b> — pool accounting replaced by a presence check"],
         ["Transformer", "tier adapter; holds no energy", "<b>Yes</b> — tier throttling disappears"],
         ["Breaker Switch", "interrupts the network", "No — still cuts"],
         ["Energy Meter", "passive throughput accumulator", "Works, and reads the full unattenuated amount"],

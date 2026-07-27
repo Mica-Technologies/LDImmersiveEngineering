@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering;
 
 import blusunrize.immersiveengineering.api.IEApi;
+import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler;
 import blusunrize.immersiveengineering.api.shader.ShaderRegistry;
 import blusunrize.immersiveengineering.api.tool.ExcavatorHandler;
@@ -21,6 +22,9 @@ import blusunrize.immersiveengineering.common.util.IESounds;
 import blusunrize.immersiveengineering.common.util.advancements.IEAdvancements;
 import blusunrize.immersiveengineering.common.util.commands.CommandHandler;
 import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
+import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
+import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
+import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
 import blusunrize.immersiveengineering.common.util.network.*;
 import blusunrize.immersiveengineering.common.world.IEWorldGen;
 import com.google.gson.Gson;
@@ -112,6 +116,7 @@ public class ImmersiveEngineering
 		MinecraftForge.EVENT_BUS.register(ieWorldGen);
 
 		MinecraftForge.EVENT_BUS.register(new EventHandler());
+		GridChunkLoader.init();
 		NetworkRegistry.INSTANCE.registerGuiHandler(instance, proxy);
 		proxy.init();
 
@@ -142,6 +147,8 @@ public class ImmersiveEngineering
 		packetHandler.registerMessage(MessageSetGhostSlots.Handler.class, MessageSetGhostSlots.class, messageId++, Side.SERVER);
 		packetHandler.registerMessage(MessageMaintenanceKit.Handler.class, MessageMaintenanceKit.class, messageId++, Side.SERVER);
 		packetHandler.registerMessage(MessageRevolverRotate.Handler.class, MessageRevolverRotate.class, messageId++, Side.SERVER);
+		packetHandler.registerMessage(MessageGridSync.Handler.class, MessageGridSync.class, messageId++, Side.CLIENT);
+		packetHandler.registerMessage(MessageGridAction.Handler.class, MessageGridAction.class, messageId++, Side.SERVER);
 
 		IEIMCHandler.init();
 		IEIMCHandler.handleIMCMessages(FMLInterModComms.fetchRuntimeMessages(instance));
@@ -189,6 +196,15 @@ public class ImmersiveEngineering
 
 
 	@Mod.EventHandler
+	public void serverStopped(FMLServerStoppedEvent event)
+	{
+		//Drop chunk-loading tickets and live tile attachments so a second world started in
+		//the same session does not inherit either.
+		GridChunkLoader.releaseAll();
+		VirtualGrid.INSTANCE.detachAll();
+	}
+
+	@Mod.EventHandler
 	public void serverStarting(FMLServerStartingEvent event)
 	{
 		proxy.serverStarting();
@@ -219,6 +235,13 @@ public class ImmersiveEngineering
 				else
 					IELogger.info("WorldData retrieved");
 				IESaveData.setInstance(world.provider.getDimension(), worldData);
+
+				//The virtual grid keeps its own save file (see GridSaveData). load() also
+				//clears the process-global grid first, so a second world in the same
+				//session cannot inherit the previous one's segments.
+				GridTickHandler.reset();
+				GridSaveData.load(world);
+				GridChunkLoader.refresh();
 			}
 		}
 		IEContent.refreshFluidReferences();
