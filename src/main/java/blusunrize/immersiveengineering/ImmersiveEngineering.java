@@ -25,8 +25,9 @@ import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
 import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
-import blusunrize.immersiveengineering.common.util.petroleum.PetroleumSaveData;
 import blusunrize.immersiveengineering.common.util.network.*;
+import blusunrize.immersiveengineering.common.util.petroleum.PetroleumSaveData;
+import blusunrize.immersiveengineering.common.util.petroleum.PetroleumTickHandler;
 import blusunrize.immersiveengineering.common.world.IEWorldGen;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -245,7 +246,11 @@ public class ImmersiveEngineering
 				GridChunkLoader.refresh();
 
 				//Reservoirs likewise. Nothing is generated here -- deposits are rolled from the
-				//seed on demand -- so this only restores which ones have been drawn down.
+				//seed on demand -- so this only restores which ones have been drawn down. The
+				//tick handler is reset for the same reason the grid's is: its registry of live
+				//wellheads is process-global, and a second world in one session must not inherit
+				//the previous one's.
+				PetroleumTickHandler.reset();
 				PetroleumSaveData.load(world);
 			}
 		}
