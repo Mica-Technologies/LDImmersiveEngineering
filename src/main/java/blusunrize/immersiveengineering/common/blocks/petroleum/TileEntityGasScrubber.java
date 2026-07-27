@@ -302,7 +302,10 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 			return Integer.MAX_VALUE;
 		if(dustRoom < 0)
 			dustRoom = 0;
-		return Math.max(0, dustRoom*perSulfur+perSulfur-1-progress);
+		//In longs, because a deep buffer times a coarse rate overflows an int and would come back
+		//negative -- which reads as "stop", and would silently jam the machine rather than crash.
+		long allowed = (long)dustRoom*perSulfur+perSulfur-1-progress;
+		return (int)Math.max(0, Math.min(Integer.MAX_VALUE, allowed));
 	}
 
 	//	=================================
@@ -334,6 +337,20 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	 */
 	private static final int CITY_HEAT_SIP = 1;
 
+	/**
+	 * Nothing to do: the feed is empty, or holds something the machine will not take.
+	 */
+	public static final int STATUS_IDLE = 0;
+	public static final int STATUS_SCRUBBING = 1;
+	/**
+	 * No lit firebox is leaning on the skid, so there is no reboiler duty to be had.
+	 */
+	public static final int STATUS_NO_HEAT = 2;
+	/**
+	 * The product tank or the sulfur buffer is full, so a pass would have to destroy something.
+	 */
+	public static final int STATUS_BACKED_UP = 3;
+
 	private static final IFluidTank[] NO_TANKS = new IFluidTank[0];
 
 	public final FluidTank tankSour = new FluidTank(TANK_CAPACITY)
@@ -354,20 +371,6 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	 * Millibuckets banked towards the next dust. Master only.
 	 */
 	private int sulfurProgress;
-	/**
-	 * Nothing to do: the feed is empty, or holds something the machine will not take.
-	 */
-	public static final int STATUS_IDLE = 0;
-	public static final int STATUS_SCRUBBING = 1;
-	/**
-	 * No lit firebox is leaning on the skid, so there is no reboiler duty to be had.
-	 */
-	public static final int STATUS_NO_HEAT = 2;
-	/**
-	 * The product tank or the sulfur buffer is full, so a pass would have to destroy something.
-	 */
-	public static final int STATUS_BACKED_UP = 3;
-
 	/**
 	 * What the machine did, or did not do, on its last pass.
 	 * <p>

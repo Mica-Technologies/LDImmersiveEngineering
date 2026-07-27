@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_decoration",
+		"data": 1,
+		"count": 4
+	},
+	"pattern": [
+		"AA",
+		"AA"
+	],
+	"key": {
+		"A": {
+			"item": "immersiveengineering:petroleum_decoration",
+			"data": 0
+		}
+	}
+}

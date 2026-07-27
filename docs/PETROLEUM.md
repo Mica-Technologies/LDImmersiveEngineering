@@ -495,26 +495,26 @@ Registered in `IEContent.java:256-270`:
 | Bitumen | `ie_bitumen` | Heaviest cut; the Mixer's feedstock for wet asphalt. |
 
 All seven are prefixed `ie_`. The comment at the crude oil registration explains why
-(`IEContent.java:252-253`): `setupFluid` yields to whoever registered a fluid name first, and a
+(`IEContent.java:254-255`): `setupFluid` yields to whoever registered a fluid name first, and a
 bare name as common as `crude_oil` risks silently inheriting another mod's density, viscosity and
-texture rather than this fork's own. `ie_asphalt` — the wet, pourable form of asphalt, registered
-between lubricant and bitumen (`IEContent.java:263`) — is prefixed for the same reason but is not
-itself a distillation cut; see [Asphalt and roads](#asphalt-and-roads) below.
+texture rather than this fork's own. `ie_asphalt`, registered just after the six cuts
+(`IEContent.java:269`), is prefixed for the same reason but is the wet, pourable form of asphalt,
+not itself a distillation cut; see [Asphalt and roads](#asphalt-and-roads) below.
 
-**The engine-type split**, registered at `IEContent.java:883-902`:
+**The engine-type split**, registered at `IEContent.java:893-918`:
 
 - `DieselHandler.registerFuel` — burnable in the Diesel Generator. Crude oil is registered but
   deliberately awful (`50`, well under half of biodiesel's `125`), so burning it raw always reads
-  as the wasteful choice next to refining it first (`IEContent.java:889-891`). Diesel (`162`) and
+  as the wasteful choice next to refining it first (`IEContent.java:899-901`). Diesel (`162`) and
   naphtha (`112`) are the refined cuts registered here; **gasoline is absent** — a diesel
-  generator cannot burn it at all (`IEContent.java:892-897`).
+  generator cannot burn it at all (`IEContent.java:902-907`).
 - `DieselHandler.registerDrillFuel` — burnable by handheld drills (spark engines, not compression
-  engines). Gasoline and diesel are both registered here (`IEContent.java:901-902`), so gasoline
+  engines). Gasoline and diesel are both registered here (`IEContent.java:911-912`), so gasoline
   has a use even though nothing else in the current tree consumes it, and diesel is deliberately
   on both lists.
 
 The split — gasoline works in tools but never in a generator, diesel works in both — is what stops
-one fluid being strictly the best fuel in every situation (`IEContent.java:892-900`).
+one fluid being strictly the best fuel in every situation (`IEContent.java:902-910`).
 
 ---
 
@@ -524,11 +524,11 @@ Wet asphalt is downstream of distillation, not a cut of it: the Mixer turns bitu
 least useful cut — into something a base can actually use, the same story lubricant and diesel
 tell for the lighter ones. `MixerRecipe.addRecipe(new FluidStack(fluidAsphalt, 500), new
 FluidStack(fluidBitumen, 250), new Object[]{"sand", "gravel", "gravel"}, 3200)`
-(`IEContent.java:542`) turns 250 mB of bitumen and a shovelful of aggregate (one `sand`, two
-`gravel`, by ore dictionary tag) into 500 mB of `ie_asphalt` (registered `IEContent.java:263`) —
+(`IEContent.java:549`) turns 250 mB of bitumen and a shovelful of aggregate (one `sand`, two
+`gravel`, by ore dictionary tag) into 500 mB of `ie_asphalt` (registered `IEContent.java:269`) —
 bitumen is the bottleneck, not the aggregate, so paving is what stops the bottom of the barrel
 being a waste product the player has to dump (comment at the registration site,
-`IEContent.java:540-541`).
+`IEContent.java:547-548`).
 
 `BlockIEFluidAsphalt` (`common/blocks/petroleum/BlockIEFluidAsphalt.java`) is the poured, flowing
 form — modelled on the concrete this fork already ships, and deliberately simpler than it. Concrete
@@ -724,7 +724,7 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 | Core-sample survey banding + NBT | `common/util/petroleum/ReservoirSurvey.java` |
 | Server-side survey write | `common/blocks/metal/TileEntitySampleDrill.java` |
 | Client-side survey tooltip | `common/items/ItemCoresample.java` |
-| Fluids, distillation recipe, asphalt Mixer recipe, `DieselHandler` fuel/drill-fuel registration | `common/IEContent.java` (fluid block ~L254-266, distillation recipe ~L529-537, asphalt Mixer recipe ~L542, `DieselHandler` calls ~L883-902) |
+| Fluids, distillation recipe, asphalt Mixer recipe, `DieselHandler` fuel/drill-fuel registration | `common/IEContent.java` (fluid block ~L256-270, distillation recipe ~L536-544, asphalt Mixer recipe ~L549, `DieselHandler` calls ~L893-918) |
 | City mode gate | `common/util/CityMode.java` |
 | Commands | `common/util/commands/CommandReservoir.java` |
 | Tests | `src/test/java/blusunrize/immersiveengineering/api/petroleum/` (`ReservoirHandlerTest`, `ReservoirModelTest`), `src/test/java/.../common/util/petroleum/ReservoirSurveyTest.java`, `src/test/java/.../common/blocks/petroleum/` (`DerrickTest`, `PumpjackTest`, `DistillationTowerTest`, `IndustrialBurnerTest`, `PetroleumAssetsTest`) |

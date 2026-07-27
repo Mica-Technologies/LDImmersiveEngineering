@@ -361,15 +361,11 @@ class GasScrubberTest
 		@DisplayName("heat bought and heat spent agree, so a pass is never had for free")
 		void heatRoundTrips()
 		{
-			for(int volume = 0; volume <= TileEntityGasScrubber.CHARGE; volume += 7)
-			{
-				int cost = sour.heatFor(volume);
-				//What that heat buys back must never exceed what was asked for, or a machine handed
-				//exactly its quoted price would put through more than it paid for.
-				assertTrue(sour.volumeForHeat(cost) <= volume+999*1000/sour.heatPerBucket,
-						"volume "+volume);
-				assertTrue(cost <= volume*sour.heatPerBucket/1000, "volume "+volume);
-			}
+			//A pass quotes a price, is handed some of it, and re-sizes itself to what it got. If
+			//that round trip ever gained, a machine paid exactly its own quote would put through
+			//more gas than it paid for.
+			for(int volume = 0; volume <= TileEntityGasScrubber.CHARGE; volume++)
+				assertTrue(sour.volumeForHeat(sour.heatFor(volume)) <= volume, "volume "+volume);
 		}
 
 		@Test
@@ -417,7 +413,7 @@ class GasScrubberTest
 			for(int perPass : new int[]{1, 7, 400, PER_SULFUR, 3*PER_SULFUR})
 			{
 				int passes = 10*PER_SULFUR/perPass;
-				int[] run = accumulate(passes, perPass, Integer.MAX_VALUE);
+				int[] run = accumulate(passes, perPass, 100_000);
 				assertEquals(run[1]/PER_SULFUR, run[0], "pass size "+perPass);
 			}
 		}

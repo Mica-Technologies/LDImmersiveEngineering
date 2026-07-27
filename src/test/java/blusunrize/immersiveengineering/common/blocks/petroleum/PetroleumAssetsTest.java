@@ -354,6 +354,25 @@ class PetroleumAssetsTest
 			}
 		}
 
+		/**
+		 * A block that is only reachable in creative is, in practice, not in the game. Every
+		 * road surface has to have a path to it from the asphalt that pours out of a mixer.
+		 */
+		@Test
+		@DisplayName("every road surface is obtainable in survival")
+		void everyRoadSurfaceIsReachable()
+		{
+			//Plain asphalt sets from the wet fluid, so it needs no recipe; the other two do.
+			for(BlockTypes_PetroleumDecoration type : BlockTypes_PetroleumDecoration.values())
+			{
+				if(type==BlockTypes_PetroleumDecoration.ASPHALT)
+					continue;
+				File recipe = new File(ASSETS+"recipes/petroleum/"+type.getName()+".json");
+				assertTrue(recipe.isFile(),
+						type.getName()+" has no recipe, so it can only be had in creative");
+			}
+		}
+
 		@Test
 		@DisplayName("the wellhead has no crafting recipe")
 		void wellheadIsNotCraftable()
