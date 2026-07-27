@@ -286,6 +286,10 @@ in one view.
 
 ## Distillation Tower
 
+Both halves of the registration are present: `registerTile(TileEntityDistillationTower.class)`
+(`IEContent.java:800`) and `MultiblockHandler.registerMultiblock(MultiblockDistillationTower.instance)`
+(`IEContent.java:1096`), immediately alongside the Derrick's and Pumpjack's own calls.
+
 `MultiblockDistillationTower` (`common/blocks/multiblocks/MultiblockDistillationTower.java`)
 defines the shape: a two-by-two steel shell that runs the full twelve-block height — the vessel —
 ringed at its foot by a scaffolding deck where crude goes in and where power and redstone connect,
@@ -370,6 +374,10 @@ fullness, floored at 1 rather than 0 so a tower holding any crude at all never r
 ---
 
 ## Industrial Burner
+
+Registration is likewise complete: `registerTile(TileEntityIndustrialBurner.class)`
+(`IEContent.java:801`) and `MultiblockHandler.registerMultiblock(MultiblockIndustrialBurner.instance)`
+(`IEContent.java:1097`).
 
 `MultiblockIndustrialBurner` (`common/blocks/multiblocks/MultiblockIndustrialBurner.java`) is a
 three-by-three-by-three firebox: a refractory hearth and lining of Blast Brick carrying the fire, a
@@ -476,7 +484,7 @@ recipe — `findRecipe` returns the first match — but only the crude-oil recip
 
 ## Fluids
 
-The seven distillation cuts (plus crude itself) are registered at `IEContent.java:254-264`:
+Registered in `IEContent.java:254-264`:
 
 | Fluid | Registry name | Role |
 |---|---|---|
@@ -708,8 +716,10 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 | Wellhead | `common/blocks/petroleum/TileEntityWellhead.java` |
 | Drilling Derrick tile entity / shape | `common/blocks/petroleum/TileEntityDerrick.java`, `common/blocks/multiblocks/MultiblockDerrick.java` |
 | Pumpjack tile entity / shape | `common/blocks/petroleum/TileEntityPumpjack.java`, `common/blocks/multiblocks/MultiblockPumpjack.java` |
-| Distillation Tower (stub) | `common/blocks/petroleum/TileEntityDistillationTower.java` |
-| Industrial Burner (stub) | `common/blocks/petroleum/TileEntityIndustrialBurner.java` |
+| Distillation Tower tile entity / shape | `common/blocks/petroleum/TileEntityDistillationTower.java`, `common/blocks/multiblocks/MultiblockDistillationTower.java` |
+| Industrial Burner tile entity / shape | `common/blocks/petroleum/TileEntityIndustrialBurner.java`, `common/blocks/multiblocks/MultiblockIndustrialBurner.java` |
+| Wet asphalt fluid block / laid road blocks | `common/blocks/petroleum/BlockIEFluidAsphalt.java`, `BlockPetroleumDecoration.java`, `BlockTypes_PetroleumDecoration.java` |
+| Gas Scrubber / Gas Turbine (still stubs) | `common/blocks/petroleum/TileEntityGasScrubber.java`, `TileEntityGasTurbine.java` |
 | Placeable device / assembled-structure block metas | `common/blocks/petroleum/BlockPetroleumDevice.java`, `BlockTypes_PetroleumDevice.java`, `BlockPetroleumMultiblock.java`, `BlockTypes_PetroleumMultiblock.java` |
 | Shared structure geometry | `common/blocks/petroleum/PetroleumGeometry.java` |
 | Tick driver (why Wellheads are not `ITickable`) | `common/util/petroleum/PetroleumTickHandler.java` |
@@ -717,10 +727,10 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 | Core-sample survey banding + NBT | `common/util/petroleum/ReservoirSurvey.java` |
 | Server-side survey write | `common/blocks/metal/TileEntitySampleDrill.java` |
 | Client-side survey tooltip | `common/items/ItemCoresample.java` |
-| Fluids, `DieselHandler` fuel/drill-fuel registration | `common/IEContent.java` (fluid block ~L251-259, distillation recipe ~L518-530, `DieselHandler` calls ~L871-896) |
+| Fluids, distillation recipe, asphalt Mixer recipe, `DieselHandler` fuel/drill-fuel registration | `common/IEContent.java` (fluid block ~L254-266, distillation recipe ~L529-537, asphalt Mixer recipe ~L542, `DieselHandler` calls ~L883-902) |
 | City mode gate | `common/util/CityMode.java` |
 | Commands | `common/util/commands/CommandReservoir.java` |
-| Tests | `src/test/java/blusunrize/immersiveengineering/api/petroleum/` (`ReservoirHandlerTest`, `ReservoirModelTest`), `src/test/java/.../common/util/petroleum/ReservoirSurveyTest.java`, `src/test/java/.../common/blocks/petroleum/` (`DerrickTest`, `PumpjackTest`) |
+| Tests | `src/test/java/blusunrize/immersiveengineering/api/petroleum/` (`ReservoirHandlerTest`, `ReservoirModelTest`), `src/test/java/.../common/util/petroleum/ReservoirSurveyTest.java`, `src/test/java/.../common/blocks/petroleum/` (`DerrickTest`, `PumpjackTest`, `DistillationTowerTest`, `IndustrialBurnerTest`, `PetroleumAssetsTest`) |
 
 The reservoir model (`ReservoirHandler`, `ReservoirModel`, `Reservoir`, `ReservoirType`) and
 `ReservoirSurvey` are expressed purely in terms of plain data and `java.util.Random` — none of them

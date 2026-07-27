@@ -1105,6 +1105,8 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockPumpjack.instance);
 		MultiblockHandler.registerMultiblock(MultiblockDistillationTower.instance);
 		MultiblockHandler.registerMultiblock(MultiblockIndustrialBurner.instance);
+		MultiblockHandler.registerMultiblock(MultiblockGasScrubber.instance);
+		MultiblockHandler.registerMultiblock(MultiblockGasTurbine.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();
