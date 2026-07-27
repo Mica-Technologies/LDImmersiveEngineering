@@ -233,6 +233,14 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	private TileEntityDistillationTower towerTarget;
 	private TileEntity[] heatTargets = new TileEntity[0];
 
+	/**
+	 * The one block of the structure a comparator reads from: a front corner of the firebox.
+	 * <p>
+	 * Every block used to answer, which turned the whole machine into one big comparator face
+	 * and made redstone next to it behave differently from every other multiblock in the mod.
+	 */
+	public static final int REDSTONE_INDEX = PetroleumGeometry.structureIndex(PetroleumGeometry.BURNER_SIZE, 0, 0, 0);
+
 	public TileEntityIndustrialBurner()
 	{
 		super(PetroleumGeometry.BURNER_SIZE);
@@ -439,6 +447,11 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 		//Do not spend fuel heating a tower with nothing to distil.
 		if(!towerTarget.isDistilling())
 			return;
+		//A cold firebox heats nothing. Without this an unfuelled burner charges zero and
+		//passes the affordability check trivially, handing the tower a permanent free
+		//rebate while reporting itself as cold.
+		if(!isBurning())
+			return;
 		//A whole interval's worth, charged in one go, matching how the fuel for it was burnt.
 		int cost = heatRate*BURN_INTERVAL;
 		if(heatBuffer < cost)
@@ -510,7 +523,7 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	public int getStagger()
 	{
 		if(stagger < 0)
-			stagger = Math.floorMod(getPos().getX()^getPos().getZ()*31, BURN_INTERVAL);
+			stagger = ApiUtils.positionStagger(getPos().getX(), getPos().getZ(), BURN_INTERVAL);
 		return stagger;
 	}
 
@@ -540,6 +553,8 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	@Override
 	public int getComparatorInputOverride()
 	{
+		if(pos!=REDSTONE_INDEX)
+			return 0;
 		TileEntityIndustrialBurner master = master();
 		if(master==null||!master.formed)
 			return 0;

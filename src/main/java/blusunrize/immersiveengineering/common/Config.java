@@ -712,6 +712,8 @@ public class Config
 		//to be rebuilt or a changed ceiling would silently do nothing until the next restart.
 		//Deposits already rolled keep their size -- re-rolling would rewrite a player's field.
 		ReservoirHandler.registerDefaults();
+		//Cells cached as empty while the feature was off would otherwise stay empty forever.
+		ReservoirHandler.invalidateEmptyCells();
 
 		WireType.wireLossRatio = IEConfig.wireLossRatio;
 		WireType.wireTransferRate = IEConfig.wireTransferRate;

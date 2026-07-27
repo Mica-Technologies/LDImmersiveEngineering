@@ -1288,4 +1288,28 @@ public class ApiUtils
 			};
 		}
 	}
+
+	/**
+	 * Spreads periodic work across ticks by position, so a field of throttled machines never all
+	 * fire on the same one.
+	 * <p>
+	 * The obvious {@code (x^z*31)%interval} is not good enough here, and neither is any other
+	 * linear combination of the coordinates: players build on grids. Every machine on an 8-block
+	 * spacing lands on a multiple of gcd(8, interval), which for a 20-tick interval leaves only 5
+	 * of the 20 phases in use and puts a fifth of the field on the same tick -- the exact spike
+	 * staggering exists to avoid, appearing precisely in the tidy layouts most likely to be large.
+	 * Mixing the bits first breaks that up: every phase gets used at every spacing tested.
+	 *
+	 * @param interval the period being spread across; values below 1 are treated as 1
+	 * @return a phase offset in [0, interval)
+	 */
+	public static int positionStagger(int x, int z, int interval)
+	{
+		int h = x*0x9E3779B1;
+		h ^= z*0x85EBCA6B;
+		h ^= h >>> 15;
+		h *= 0x2545F491;
+		h ^= h >>> 13;
+		return Math.floorMod(h, Math.max(1, interval));
+	}
 }

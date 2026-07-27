@@ -389,6 +389,14 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	 */
 	private TileEntityIndustrialBurner heatSource;
 
+	/**
+	 * The one block of the structure a comparator reads from: a base corner, at eye level where a comparator can reach.
+	 * <p>
+	 * Every block used to answer, which turned the whole machine into one big comparator face
+	 * and made redstone next to it behave differently from every other multiblock in the mod.
+	 */
+	public static final int REDSTONE_INDEX = PetroleumGeometry.structureIndex(PetroleumGeometry.SCRUBBER_SIZE, 0, 0, 0);
+
 	public TileEntityGasScrubber()
 	{
 		super(PetroleumGeometry.SCRUBBER_SIZE);
@@ -601,7 +609,7 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	public int getStagger()
 	{
 		if(stagger < 0)
-			stagger = Math.floorMod(getPos().getX()^getPos().getZ()*31, SCRUB_INTERVAL);
+			stagger = ApiUtils.positionStagger(getPos().getX(), getPos().getZ(), SCRUB_INTERVAL);
 		return stagger;
 	}
 
@@ -660,6 +668,8 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	@Override
 	public int getComparatorInputOverride()
 	{
+		if(pos!=REDSTONE_INDEX)
+			return 0;
 		TileEntityGasScrubber master = master();
 		if(master==null||!master.formed)
 			return 0;

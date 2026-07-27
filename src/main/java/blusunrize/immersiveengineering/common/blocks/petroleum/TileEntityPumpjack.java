@@ -176,12 +176,17 @@ public class TileEntityPumpjack extends TileEntityMultiblockPart<TileEntityPumpj
 			//city mode exists to remove, while a sip still means an unpowered pumpjack stops.
 			if(energyStorage.getEnergyStored() <= 0)
 				return false;
-			energyStorage.extractEnergy(CITY_SIP, false);
+			energyStorage.modifyEnergyStored(-CITY_SIP);
 			return true;
 		}
-		if(energyStorage.extractEnergy(ENERGY_PER_PASS, true) < ENERGY_PER_PASS)
+		if(energyStorage.getEnergyStored() < ENERGY_PER_PASS)
 			return false;
-		energyStorage.extractEnergy(ENERGY_PER_PASS, false);
+		//Not extractEnergy: this storage is built with an extract limit of zero so that
+		//nothing wired to the pumpjack can siphon its buffer back out, and that limit
+		//applies to the machine itself too. Going through it meant the pumpjack could
+		//never spend a single flux, so it never drove its well and the whole progression
+		//past free-flow was dead.
+		energyStorage.modifyEnergyStored(-ENERGY_PER_PASS);
 		return true;
 	}
 
@@ -213,7 +218,7 @@ public class TileEntityPumpjack extends TileEntityMultiblockPart<TileEntityPumpj
 	public int getStagger()
 	{
 		if(stagger < 0)
-			stagger = Math.floorMod(getPos().getX()^getPos().getZ()*31,
+			stagger = ApiUtils.positionStagger(getPos().getX(), getPos().getZ(),
 					PetroleumTickHandler.PRODUCTION_INTERVAL);
 		return stagger;
 	}

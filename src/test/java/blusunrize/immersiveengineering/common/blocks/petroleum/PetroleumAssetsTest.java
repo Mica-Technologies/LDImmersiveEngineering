@@ -337,20 +337,58 @@ class PetroleumAssetsTest
 						+type.getName()+".name"), "unnamed multiblock meta: "+type.getName());
 		}
 
+		/**
+		 * Checks every recipe file rather than a named list.
+		 * <p>
+		 * The list version passed while the propane cylinder pointed at meta 5, a value no block
+		 * enum has: the file was simply not on the list. Forge does not validate result metadata,
+		 * so nothing anywhere would have complained -- the recipe would have crafted a broken
+		 * stack, in a build that was otherwise green.
+		 */
 		@Test
-		@DisplayName("petroleum recipes parse and target the right block and meta")
+		@DisplayName("every petroleum recipe targets a meta that exists")
 		void recipesTargetCorrectMetas()
 		{
-			Object[][] expected = {
-					{"oilfield_frame", BlockTypes_PetroleumDevice.OILFIELD_FRAME.getMeta()}
-			};
-			for(Object[] row : expected)
+			Map<String, Set<Integer>> validMetas = new HashMap<>();
+			Set<Integer> deviceMetas = new HashSet<>();
+			for(BlockTypes_PetroleumDevice type : BlockTypes_PetroleumDevice.values())
+				deviceMetas.add(type.getMeta());
+			validMetas.put("immersiveengineering:petroleum_device", deviceMetas);
+			Set<Integer> decoMetas = new HashSet<>();
+			for(BlockTypes_PetroleumDecoration type : BlockTypes_PetroleumDecoration.values())
+				decoMetas.add(type.getMeta());
+			validMetas.put("immersiveengineering:petroleum_decoration", decoMetas);
+			Set<Integer> multiMetas = new HashSet<>();
+			for(BlockTypes_PetroleumMultiblock type : BlockTypes_PetroleumMultiblock.values())
+				multiMetas.add(type.getMeta());
+			validMetas.put("immersiveengineering:petroleum_multiblock", multiMetas);
+
+			for(String file : recipeFiles())
 			{
-				JsonObject result = read("recipes/petroleum/"+row[0]+".json").getAsJsonObject("result");
-				assertEquals("immersiveengineering:petroleum_device",
-						result.get("item").getAsString(), row[0].toString());
-				assertEquals(row[1], result.get("data").getAsInt(),
-						row[0]+" targets the wrong meta");
+				JsonObject result = read("recipes/petroleum/"+file).getAsJsonObject("result");
+				String item = result.get("item").getAsString();
+				Set<Integer> valid = validMetas.get(item);
+				assertNotNull(valid, file+" produces an unknown block: "+item);
+				int data = result.has("data")?result.get("data").getAsInt(): 0;
+				assertTrue(valid.contains(data),
+						file+" produces "+item+" meta "+data+", which no block enum defines");
+			}
+		}
+
+		/**
+		 * The flare stack shipped with no recipe at all, which in a feature whose early game is
+		 * "you have gas and nowhere to put it" meant the answer to that problem was creative mode.
+		 */
+		@Test
+		@DisplayName("every device except the wellhead is craftable")
+		void everyDeviceIsObtainable()
+		{
+			for(BlockTypes_PetroleumDevice type : BlockTypes_PetroleumDevice.values())
+			{
+				if(type==BlockTypes_PetroleumDevice.WELLHEAD)
+					continue;
+				assertTrue(new File(ASSETS+"recipes/petroleum/"+type.getName()+".json").isFile(),
+						type.getName()+" has no recipe, so it can only be had in creative");
 			}
 		}
 
@@ -388,9 +426,14 @@ class PetroleumAssetsTest
 		@DisplayName("recipe keys and pattern symbols match exactly")
 		void recipeKeysMatchPattern()
 		{
-			for(String name : new String[]{"oilfield_frame"})
+			for(String name : recipeFiles())
 			{
-				JsonObject json = read("recipes/petroleum/"+name+".json");
+				JsonObject json = read("recipes/petroleum/"+name);
+				//Shapeless recipes have neither; a recipe with one and not the other is broken.
+				assertEquals(json.has("pattern"), json.has("key"),
+						name+": a shaped recipe needs both a pattern and a key");
+				if(!json.has("pattern"))
+					continue;
 				Set<String> recipeKeys = keys(json.getAsJsonObject("key"));
 				Set<String> used = new HashSet<>();
 				for(JsonElement row : json.getAsJsonArray("pattern"))
@@ -401,6 +444,19 @@ class PetroleumAssetsTest
 						name+": pattern symbols and key entries must match exactly");
 			}
 		}
+	}
+
+	/**
+	 * @return every recipe file in the feature's folder, so a test can never pass by simply not
+	 * knowing about a file.
+	 */
+	private static String[] recipeFiles()
+	{
+		String[] files = new File(ASSETS+"recipes/petroleum").list((dir, n) -> n.endsWith(".json"));
+		assertNotNull(files, "the petroleum recipe folder is missing");
+		assertTrue(files.length > 0, "no petroleum recipes at all");
+		Arrays.sort(files);
+		return files;
 	}
 
 	private static JsonObject blockstate(String name)

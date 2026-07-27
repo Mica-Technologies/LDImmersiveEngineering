@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.common.blocks.petroleum;
 
+import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.petroleum.*;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
@@ -71,13 +72,32 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 		return Math.max(1000, 2*PetroleumTickHandler.PRODUCTION_INTERVAL*Math.max(1, peakFlowRate));
 	}
 
-	public final FluidTank tank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate));
+	public final FluidTank tank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate))
+	{
+		@Override
+		public boolean canFillFluidType(FluidStack fluid)
+		{
+			//A bore brings up what is underneath it and nothing else. Without this a bucket of
+			//water piped in would leave room measured in volume but fill() returning zero, so
+			//every pass would deplete the reservoir and destroy the oil it drew.
+			return fluid!=null&&fluid.getFluid()!=null
+					&&!"ie_sour_gas".equals(fluid.getFluid().getName());
+		}
+	};
 	/**
 	 * Associated gas. Oil comes up with gas dissolved in it whether or not anything wants the
 	 * gas, so this fills on its own and, with nothing plumbed to it, backs up and stops the
 	 * well. That is the pressure a flare stack exists to relieve.
 	 */
-	public final FluidTank gasTank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate));
+	public final FluidTank gasTank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate))
+	{
+		@Override
+		public boolean canFillFluidType(FluidStack fluid)
+		{
+			return fluid!=null&&fluid.getFluid()!=null
+					&&"ie_sour_gas".equals(fluid.getFluid().getName());
+		}
+	};
 
 	/**
 	 * Set by an attached Pumpjack. Without one a depleted well produces nothing at all.
@@ -133,7 +153,7 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	public int getStagger()
 	{
 		if(stagger < 0)
-			stagger = Math.floorMod(pos.getX()^pos.getZ()*31, PetroleumTickHandler.PRODUCTION_INTERVAL);
+			stagger = ApiUtils.positionStagger(getPos().getX(), getPos().getZ(), PetroleumTickHandler.PRODUCTION_INTERVAL);
 		return stagger;
 	}
 
@@ -176,13 +196,27 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 			return;
 		Reservoir reservoir = getReservoir();
 		if(reservoir.isEmpty())
+		{
+			//Still drain and reset, or a wellhead over a dry cell keeps whatever it holds forever
+			//and stays flagged as pumped.
+			pushOut();
+			pumped = false;
 			return;
+		}
 		ReservoirType type = reservoir.resolveType();
 		if(type==null)
+		{
+			pushOut();
+			pumped = false;
 			return;
+		}
 		Fluid fluid = FluidRegistry.getFluid(type.getFluidName());
 		if(fluid==null)
+		{
+			pushOut();
+			pumped = false;
 			return;
+		}
 
 		//Gas comes up with the oil whether or not there is anywhere to put it, so a full gas
 		//tank throttles the whole well. Without this the excess would be quietly destroyed and
@@ -245,11 +279,15 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 
 	private void pushOut()
 	{
-		pushTank(tank);
-		pushTank(gasTank);
+		//Oil leaves sideways and down, gas leaves upward -- which is both how a real wellhead is
+		//arranged and, more importantly, the only way a player can plumb the two separately. They
+		//previously shared one set of faces in one order, so whichever pipe was found first took
+		//both streams and ended up carrying a mixture no machine downstream would accept.
+		pushTank(tank, false);
+		pushTank(gasTank, true);
 	}
 
-	private void pushTank(FluidTank tank)
+	private void pushTank(FluidTank tank, boolean upwards)
 	{
 		if(tank.getFluidAmount() <= 0)
 			return;
@@ -259,7 +297,7 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 		{
 			if(tank.getFluidAmount() <= 0)
 				break;
-			if(!outputFaces[side.ordinal()])
+			if(!outputFaces[side.ordinal()]||(side==EnumFacing.UP)!=upwards)
 				continue;
 			TileEntity target = Utils.getExistingTileEntity(world, pos.offset(side));
 			if(target==null||target instanceof TileEntityWellhead)
@@ -305,7 +343,10 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	public <T> T getCapability(@Nonnull Capability<T> capability, @Nullable EnumFacing facing)
 	{
 		if(capability==CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY)
-			return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(tank);
+			//Same split as the push side: gas off the crown, oil from everywhere else. A puller
+			//that could reach both through one face would make the separation unenforceable.
+			return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(
+					facing==EnumFacing.UP?gasTank: tank);
 		return super.getCapability(capability, facing);
 	}
 

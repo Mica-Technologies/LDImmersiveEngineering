@@ -165,7 +165,7 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	private int getStagger()
 	{
 		if(stagger < 0)
-			stagger = Math.floorMod(getPos().getX()^getPos().getZ()*31, DRILL_INTERVAL);
+			stagger = ApiUtils.positionStagger(getPos().getX(), getPos().getZ(), DRILL_INTERVAL);
 		return stagger;
 	}
 

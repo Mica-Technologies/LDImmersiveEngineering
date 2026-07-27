@@ -2,11 +2,11 @@
 	"type": "forge:ore_shaped",
 	"result": {
 		"item": "immersiveengineering:petroleum_device",
-		"data": 4
+		"data": 2
 	},
 	"pattern": [
-		" C ",
-		"S S",
+		" T ",
+		"SCS",
 		"SSS"
 	],
 	"key": {
@@ -15,6 +15,9 @@
 		},
 		"C": {
 			"item": "#componentSteel"
+		},
+		"T": {
+			"item": "#torch"
 		}
 	}
 }

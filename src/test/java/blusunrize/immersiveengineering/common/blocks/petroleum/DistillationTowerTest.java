@@ -62,12 +62,15 @@ class DistillationTowerTest
 		/**
 		 * The mapping as it stands, spelled out. Changing it is allowed -- changing it by accident
 		 * is not, because every tower already built in a save is plumbed to these heights.
+		 * <p>
+		 * These were 11, 9, 8, 6, 4, 3, 1 on the twelve-layer column, which put two pairs of
+		 * ports on adjacent layers; the column grew to fourteen so all seven land two apart.
 		 */
 		@Test
 		@DisplayName("gas off the top, residue out of the bottom")
 		void theMapping()
 		{
-			assertArrayEquals(new int[]{11, 9, 8, 6, 4, 3, 1}, heights());
+			assertArrayEquals(new int[]{13, 11, 9, 7, 5, 3, 1}, heights());
 			assertEquals(HEIGHT-1, MultiblockDistillationTower.drawHeight(0),
 					"the lightest cut leaves at the very top of the column");
 			assertEquals(MultiblockDistillationTower.BOTTOM_PORT,
@@ -151,12 +154,12 @@ class DistillationTowerTest
 	class Shape
 	{
 		@Test
-		@DisplayName("the tower is twelve tall on a four by four footprint")
+		@DisplayName("the tower is fourteen tall on a four by four footprint")
 		void size()
 		{
 			assertArrayEquals(PetroleumGeometry.TOWER_SIZE, MultiblockDistillationTower.SIZE,
 					"the structure definition and the geometry must agree on H, L, W");
-			assertEquals(12, HEIGHT);
+			assertEquals(14, HEIGHT);
 			assertEquals(4, DEPTH);
 			assertEquals(4, WIDTH);
 		}
@@ -230,7 +233,7 @@ class DistillationTowerTest
 		@DisplayName("the column is a column and not a solid block")
 		void theTowerIsMostlyAir()
 		{
-			assertEquals(116, MultiblockDistillationTower.blockCount());
+			assertEquals(124, MultiblockDistillationTower.blockCount());
 			assertTrue(MultiblockDistillationTower.blockCount() < HEIGHT*DEPTH*WIDTH*3/4,
 					"a tower filling its own box is a chimney, not a column");
 		}
@@ -333,6 +336,69 @@ class DistillationTowerTest
 								PetroleumGeometry.structureIndex(
 										PetroleumGeometry.TOWER_SIZE, h, l, w)),
 								"the tile entity works out its draw height from this");
+		}
+	}
+
+	@Nested
+	@DisplayName("draw port spacing")
+	class DrawPorts
+	{
+		/**
+		 * The regression this class exists for.
+		 * <p>
+		 * At a twelve-layer column the rounding put ports on layers 11, 9, 8, 6, 4, 3 and 1 --
+		 * two pairs on adjacent layers. Each block exposes only its own cut, so nothing was
+		 * mixed by standing still; but a pipe climbing the tower to reach the upper port of a
+		 * pair connects to the lower one as it passes, and two cuts end up in one line. Which
+		 * is exactly the failure the spacing rule was written to prevent.
+		 */
+		@Test
+		@DisplayName("no two draw ports sit on adjacent layers")
+		void portsAreNeverAdjacent()
+		{
+			for(int cut = 1; cut < MultiblockDistillationTower.CUT_COUNT; cut++)
+			{
+				int gap = MultiblockDistillationTower.drawHeight(cut-1)
+						-MultiblockDistillationTower.drawHeight(cut);
+				assertTrue(gap >= 2, "cuts "+(cut-1)+" and "+cut+" are only "+gap+" layers apart");
+			}
+		}
+
+		@Test
+		@DisplayName("ports run top down, one per cut, within the column")
+		void portsAreOrderedAndInRange()
+		{
+			Set<Integer> seen = new HashSet<>();
+			int previous = Integer.MAX_VALUE;
+			for(int cut = 0; cut < MultiblockDistillationTower.CUT_COUNT; cut++)
+			{
+				int height = MultiblockDistillationTower.drawHeight(cut);
+				assertTrue(height > MultiblockDistillationTower.FEED_LAYER,
+						"a port on the feed deck would both fill and drain the same face");
+				assertTrue(height < PetroleumGeometry.TOWER_HEIGHT, "port above the column");
+				assertTrue(height < previous, "the lighter cut must leave higher up");
+				assertTrue(seen.add(height), "two cuts share a port");
+				assertEquals(cut, MultiblockDistillationTower.cutAtHeight(height),
+						"the tile entity resolves the tank by reading the height back");
+				previous = height;
+			}
+			assertEquals(MultiblockDistillationTower.TOP_PORT,
+					MultiblockDistillationTower.drawHeight(0), "the lightest cut leaves at the top");
+			assertEquals(MultiblockDistillationTower.BOTTOM_PORT,
+					MultiblockDistillationTower.drawHeight(MultiblockDistillationTower.CUT_COUNT-1),
+					"the residue leaves just above the deck");
+		}
+
+		@Test
+		@DisplayName("layers between ports are inert")
+		void shellLayersExposeNothing()
+		{
+			int ports = 0;
+			for(int h = 0; h < PetroleumGeometry.TOWER_HEIGHT; h++)
+				if(MultiblockDistillationTower.cutAtHeight(h) >= 0)
+					ports++;
+			assertEquals(MultiblockDistillationTower.CUT_COUNT, ports,
+					"every port height must belong to exactly one cut and no others");
 		}
 	}
 }

@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.common.blocks.petroleum;
 
+import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.FluxStorage;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
@@ -68,9 +69,15 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 	 */
 	public static final int LUBRICANT_PER_INTERVAL = 2;
 	/**
-	 * Fraction of the host's energy cost the rebate covers.
+	 * Flux returned to the host per tick of work. Flat, not a percentage of anything.
+	 * <p>
+	 * It was briefly a fraction of the host's buffer capacity, which is unrelated to what the
+	 * host actually spends: on the distillation tower that worked out at a 59% discount, and
+	 * stacked with the burner's heat rebate it made the tower net-positive -- it ran forever
+	 * with its power disconnected. A small absolute offset cannot do that to anything, and it
+	 * degrades honestly on a big machine instead of scaling into absurdity.
 	 */
-	public static final float REBATE = 0.15F;
+	public static final int REBATE_PER_TICK = 8;
 
 	private final FluidTank tank = new FluidTank(CAPACITY)
 	{
@@ -89,6 +96,12 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 	private TileEntityMultiblockMetal<?, ?> host;
 	private boolean hostDirty = true;
 	private boolean active;
+	/**
+	 * Synced, because {@code host} is only ever resolved server-side and the overlay is drawn
+	 * on the client -- which otherwise always reported the manifold as unattached, even while
+	 * it was visibly consuming lubricant.
+	 */
+	private boolean attached;
 
 	@Override
 	public void onLoad()
@@ -114,7 +127,9 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 			resolveHost();
 
 		boolean wasActive = active;
+		boolean wasAttached = attached;
 		active = false;
+		attached = host!=null&&!host.isInvalid();
 		if(host!=null&&!host.isInvalid()&&isWorking(host))
 		{
 			int cost = LUBRICANT_PER_INTERVAL;
@@ -129,7 +144,7 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 				rebate();
 			}
 		}
-		if(active!=wasActive)
+		if(active!=wasActive||attached!=wasAttached)
 		{
 			markDirty();
 			markContainingBlockForUpdate(null);
@@ -137,14 +152,14 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 	}
 
 	/**
-	 * Tops the host's buffer back up by a fraction of what an interval of work costs it.
+	 * Tops the host's buffer back up by an interval's worth of the standing rebate.
 	 */
 	private void rebate()
 	{
 		FluxStorage storage = host.getFluxStorage();
 		if(storage==null)
 			return;
-		int perInterval = Math.round(host.getMaxEnergyStored(null)*REBATE/8F);
+		int perInterval = REBATE_PER_TICK*INTERVAL;
 		if(perInterval > 0)
 			storage.modifyEnergyStored(perInterval);
 	}
@@ -179,7 +194,7 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 
 	private int getStagger()
 	{
-		return Math.floorMod(pos.getX()^pos.getZ()*31, INTERVAL);
+		return ApiUtils.positionStagger(getPos().getX(), getPos().getZ(), INTERVAL);
 	}
 
 	public boolean isActive()
@@ -214,7 +229,7 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 	@Override
 	public String[] getOverlayText(EntityPlayer player, RayTraceResult mop, boolean hammer)
 	{
-		if(host==null)
+		if(!attached)
 			return new String[]{TextFormatting.YELLOW+"Not attached to a machine"+TextFormatting.RESET};
 		return new String[]{
 				active?TextFormatting.GREEN+"Lubricating"+TextFormatting.RESET
@@ -244,6 +259,7 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 	{
 		nbt.setTag("tank", tank.writeToNBT(new NBTTagCompound()));
 		nbt.setBoolean("active", active);
+		nbt.setBoolean("attached", attached);
 	}
 
 	@Override
@@ -251,5 +267,6 @@ public class TileEntityLubricationManifold extends TileEntityIEBase implements I
 	{
 		tank.readFromNBT(nbt.getCompoundTag("tank"));
 		active = nbt.getBoolean("active");
+		attached = nbt.getBoolean("attached");
 	}
 }

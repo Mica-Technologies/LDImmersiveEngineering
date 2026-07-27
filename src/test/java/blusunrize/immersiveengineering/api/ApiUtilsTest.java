@@ -11,6 +11,7 @@ package blusunrize.immersiveengineering.api;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -239,5 +240,72 @@ class ApiUtilsTest
 
 		ApiUtils.ValueComparator ascending = new ApiUtils.ValueComparator(base, true);
 		assertTrue(ascending.compare("x", "z") < 0, "the smaller value must sort first when inverted");
+	}
+
+	@Nested
+	@DisplayName("positionStagger")
+	class PositionStagger
+	{
+		@Test
+		@DisplayName("always lands inside the interval, including at negative coordinates")
+		void staysInRange()
+		{
+			for(int x = -600; x <= 600; x += 7)
+				for(int z = -600; z <= 600; z += 13)
+				{
+					int phase = ApiUtils.positionStagger(x, z, 20);
+					assertTrue(phase >= 0&&phase < 20, "out of range at "+x+", "+z+": "+phase);
+				}
+		}
+
+		@Test
+		@DisplayName("an interval of zero or less does not divide by zero")
+		void degenerateIntervalIsSafe()
+		{
+			assertEquals(0, ApiUtils.positionStagger(17, -4, 1));
+			assertEquals(0, ApiUtils.positionStagger(17, -4, 0));
+			assertEquals(0, ApiUtils.positionStagger(17, -4, -5));
+		}
+
+		@Test
+		@DisplayName("the same block always gets the same phase")
+		void isStable()
+		{
+			assertEquals(ApiUtils.positionStagger(120, -37, 20),
+					ApiUtils.positionStagger(120, -37, 20));
+		}
+
+		/**
+		 * The reason this is a hash and not {@code (x^z*31)%interval}.
+		 * <p>
+		 * Any linear function of the coordinates keeps its low bits, so a field of machines on an
+		 * 8-block grid -- which is to say any tidy build, which is to say the large ones -- lands
+		 * only on multiples of gcd(8, 20). That left 5 of the 20 phases in use and a fifth of the
+		 * machines firing on the same tick: the spike staggering exists to prevent, showing up
+		 * precisely where it costs the most.
+		 */
+		@Test
+		@DisplayName("grid-aligned builds still use every phase")
+		void spreadsOnGridAlignedLayouts()
+		{
+			for(int spacing : new int[]{1, 2, 3, 4, 8, 16, 32})
+			{
+				int[] counts = new int[20];
+				for(int i = 0; i < 40; i++)
+					for(int j = 0; j < 40; j++)
+						counts[ApiUtils.positionStagger(i*spacing, j*spacing, 20)]++;
+				int used = 0;
+				int busiest = 0;
+				for(int count : counts)
+				{
+					if(count > 0)
+						used++;
+					busiest = Math.max(busiest, count);
+				}
+				assertEquals(20, used, "spacing "+spacing+" leaves phases unused");
+				assertTrue(busiest < 1600/20*2,
+						"spacing "+spacing+" piles "+busiest+" of 1600 machines onto one tick");
+			}
+		}
 	}
 }

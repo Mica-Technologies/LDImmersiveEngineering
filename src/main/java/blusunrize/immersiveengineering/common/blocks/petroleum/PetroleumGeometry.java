@@ -54,7 +54,16 @@ public final class PetroleumGeometry
 	 * H, L, W. Tall and square: the draw ports sit at heights matching the column order, so
 	 * the height is the mechanic and not just the silhouette.
 	 */
-	public static final int TOWER_HEIGHT = 12;
+	/**
+	 * Tall enough that all seven draw ports sit exactly two layers apart.
+	 * <p>
+	 * This is a derived number, not a taste one: ports run from {@code HEIGHT-1} down to layer 1,
+	 * so seven of them spaced two apart need a span of twelve and therefore a column of fourteen.
+	 * At twelve the spacing rounded to 11, 9, 8, 6, 4, 3, 1 -- two pairs landing on adjacent
+	 * layers, where a pipe run climbing to the upper port of a pair connects to the lower one on
+	 * the way past and quietly mixes two cuts into one line.
+	 */
+	public static final int TOWER_HEIGHT = 14;
 	public static final int TOWER_DEPTH = 4;
 	public static final int TOWER_WIDTH = 4;
 	public static final int[] TOWER_SIZE = {TOWER_HEIGHT, TOWER_DEPTH, TOWER_WIDTH};

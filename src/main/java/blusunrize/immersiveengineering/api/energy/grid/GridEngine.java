@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.api.energy.grid;
 
+import blusunrize.immersiveengineering.api.ApiUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -500,8 +501,8 @@ public final class GridEngine
 	 */
 	private static int stagger(GridDevice device)
 	{
-		int hash = device.getPos().getX()^device.getPos().getZ()^(device.getDimension()*31);
-		return Math.floorMod(hash, Math.max(1, GridConfig.sipIntervalTicks));
+		return ApiUtils.positionStagger(device.getPos().getX(),
+				device.getPos().getZ()^(device.getDimension()*31), GridConfig.sipIntervalTicks);
 	}
 
 	/**

@@ -239,6 +239,23 @@ public class ReservoirHandler
 		return out;
 	}
 
+	/**
+	 * Drops cells that were cached as holding nothing.
+	 * <p>
+	 * A cell rolled while the feature was disabled -- or while its dimension was blacklisted --
+	 * caches as empty like any genuine miss, and nothing ever asked it again. Turning petroleum
+	 * back on mid-session therefore left every cell a player had already walked over permanently
+	 * dry, with no way to tell that from bad luck.
+	 * <p>
+	 * Only the empty ones go. Rolling is deterministic, so a genuine miss re-rolls to the same
+	 * miss and this costs nothing; a deposit that has been drawn from is never empty, so no
+	 * player's depletion is thrown away by this.
+	 */
+	public static void invalidateEmptyCells()
+	{
+		CACHE.values().removeIf(Reservoir::isEmpty);
+	}
+
 	public static int getCachedCellCount()
 	{
 		return CACHE.size();
