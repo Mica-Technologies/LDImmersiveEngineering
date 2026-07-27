@@ -41,10 +41,20 @@ fluid's *own* properties, not just compatibility.
 | Propane | `propane` | `Fluid` | 493 | 800 | Pressurised liquid (LPG). Fractionated from natural gas in the Refinery (`:485`); Diesel Generator fuel (`:828`); block flammable 80/400 (`:307`), chemthrower-flammable (`:933`) |
 | Natural gas | `natural_gas` | `Fluid` | 450 | 600 | Pressurised liquid (LNG). Fermented from rotten flesh/leaves (`:479`-`:480`); Diesel Generator fuel (`:827`); block flammable 80/500 (`:308`), chemthrower-flammable (`:934`) |
 | Crude oil | `ie_crude_oil` | `Fluid` | 1050 | 3500 | `ie_`-prefixed — see note below. Drawn from oil reservoirs (`api/petroleum/`, below); Diesel Generator fuel at a deliberately punitive rate (`:831`); block flammable 30/400 (`:310`) |
+| Naphtha | `ie_naphtha` | `Fluid` | 730 | 700 | Distillation cut. Diesel Generator fuel at 112 — it runs, but it is worth more fed to a cracker than set on fire, which is the decision it exists to pose |
+| Gasoline | `ie_gasoline` | `Fluid` | 750 | 800 | Distillation cut. **Not** a Diesel Generator fuel; it is a spark fuel, so it powers handheld tools via `registerDrillFuel` instead. That engine-type split is what stops one fluid being strictly the best |
+| Diesel | `ie_diesel` | `Fluid` | 840 | 1400 | Distillation cut. The best thing a compression engine can burn: Diesel Generator fuel at 162, and a drill fuel |
+| Heavy fuel oil | `ie_heavy_fuel_oil` | `Fluid` | 980 | 4000 | Distillation cut. Burns nowhere small; its consumers are the Industrial Burner and the Fuel Oil Boiler, where it is the *best* fuel |
+| Lubricant | `ie_lubricant` | `Fluid` | 890 | 3000 | Distillation cut, and the only one that is not burned anywhere. Consumed by the Lubrication Manifold |
+| Bitumen | `ie_bitumen` | `Fluid` | 1250 | 6000 | The bottom of the barrel, with no fuel value at all. Mixed into asphalt so it is not a waste product the player has to dump |
+| Wet asphalt | `ie_asphalt` | `Fluid` | 2100 | 5000 | `BlockIEFluidAsphalt`; sets into road surface rather than staying a fluid |
+| Sour gas | `ie_sour_gas` | `Fluid` | 520 | 650 | What a wellhead produces alongside oil. Worth nothing until a Gas Scrubber exists; flare it or back the well up |
+| Steam | `ie_steam` | `Fluid` | -500 | 200 | Gaseous, and the one fluid here that is **not** a fuel and not flammable: a working fluid that carries heat from a boiler or HRSG to a Steam Turbine Hall |
 | Concrete | `concrete` | `Fluid` | 2400 | 4000 | Mixed from water+sand+clay+gravel (`:487`); hardens into blocks |
 | Potion | `potion` | `IEFluid.FluidPotion` | default | default | Potion-carrying fluid; effects stored in NBT |
 
-Declarations (`IEContent.java:227`-`:238`; texture `ResourceLocation`s omitted for brevity):
+Declarations, in registration order (texture `ResourceLocation`s omitted for brevity; line
+numbers are deliberately left off, because this block has moved twice already):
 
 ```java
 fluidCreosote  = setupFluid(new Fluid("creosote", ..., ...).setDensity(1100).setViscosity(3000));    // :227
@@ -53,26 +63,37 @@ fluidEthanol   = setupFluid(new Fluid("ethanol",  ..., ...).setDensity(789).setV
 fluidBiodiesel = setupFluid(new Fluid("biodiesel",..., ...).setDensity(789).setViscosity(1000));     // :230
 fluidPropane   = setupFluid(new Fluid("propane",  ..., ...).setDensity(493).setViscosity(800));      // :232
 fluidNaturalGas= setupFluid(new Fluid("natural_gas",..., ...).setDensity(450).setViscosity(600));    // :233
-fluidCrudeOil  = setupFluid(new Fluid("ie_crude_oil",..., ...).setDensity(1050).setViscosity(3500)); // :236
-fluidConcrete  = setupFluid(new Fluid("concrete", ..., ...).setDensity(2400).setViscosity(4000));    // :237
-fluidPotion    = setupFluid(new FluidPotion("potion", ..., ...));                                     // :238
+fluidCrudeOil  = setupFluid(new Fluid("ie_crude_oil",..., ...).setDensity(1050).setViscosity(3500));
+fluidNaphtha   = setupFluid(new Fluid("ie_naphtha", ..., ...).setDensity(730).setViscosity(700));
+fluidGasoline  = setupFluid(new Fluid("ie_gasoline",..., ...).setDensity(750).setViscosity(800));
+fluidDiesel    = setupFluid(new Fluid("ie_diesel",  ..., ...).setDensity(840).setViscosity(1400));
+fluidHeavyFuelOil = setupFluid(new Fluid("ie_heavy_fuel_oil",...).setDensity(980).setViscosity(4000));
+fluidLubricant = setupFluid(new Fluid("ie_lubricant",...,...).setDensity(890).setViscosity(3000));
+fluidSourGas   = setupFluid(new Fluid("ie_sour_gas",..., ...).setDensity(520).setViscosity(650));
+fluidSteam     = setupFluid(new Fluid("ie_steam",   ..., ...).setDensity(-500).setViscosity(200)
+                                                             .setTemperature(650).setGaseous(true));
+fluidAsphalt   = setupFluid(new Fluid("ie_asphalt", ..., ...).setDensity(2100).setViscosity(5000));
+fluidBitumen   = setupFluid(new Fluid("ie_bitumen", ..., ...).setDensity(1250).setViscosity(6000));
+fluidConcrete  = setupFluid(new Fluid("concrete", ..., ...).setDensity(2400).setViscosity(4000));
+fluidPotion    = setupFluid(new FluidPotion("potion", ..., ...));
 ```
 
 The corresponding fluid blocks (`BlockIEFluid`, plus `BlockIEFluidConcrete` for the hardening
 concrete) are created at `:303`-`:311`. Flammability and chemthrower effects are registered
 later in init (`:823`-`:946`).
 
-> **Why `ie_crude_oil` is prefixed and the other eight aren't:** `setupFluid` yields to
-> whoever registered a name first (`:507`-`:508`), so claiming a bare, generic name like
-> `crude_oil` risks silently adopting *another* mod's registration — and inheriting its
-> density, viscosity and texture — instead of IE's own (`:234`-`:236`). The eight older
-> fluids stay unprefixed because they're already in existing saves; renaming them would
-> orphan placed fluid blocks and stored buckets.
+> **Why every petroleum fluid is prefixed and the older ones aren't:** `setupFluid` yields to
+> whoever registered a name first, so claiming a bare, generic name like `crude_oil`,
+> `gasoline` or `steam` risks silently adopting *another* mod's registration — and inheriting
+> its density, viscosity and texture — instead of this fork's own. Every fluid added by the
+> petroleum feature therefore carries an `ie_` prefix. The older fluids stay unprefixed
+> because they are already in existing saves; renaming them would orphan placed fluid blocks
+> and stored buckets.
 
-> Note: all eight base process fluids (creosote, plantoil, ethanol, biodiesel, propane,
-> natural gas, crude oil, concrete) are plain `Fluid` instances; only the potion fluid uses
-> the custom `IEFluid` subclass. Molten-metal compat fluids (uranium, constantan) are
-> registered separately by the TConstruct integration when that mod is present.
+> Note: all of these are plain `Fluid` instances; only the potion fluid uses the custom
+> `IEFluid` subclass, and wet asphalt and concrete use `BlockIEFluid` subclasses for their
+> blocks rather than for the fluid itself. Molten-metal compat fluids (uranium, constantan)
+> are registered separately by the TConstruct integration when that mod is present.
 
 ### Diesel Generator fuel values
 
@@ -84,14 +105,23 @@ bucket, i.e. more efficiently. Registered in `IEContent.java` (`:823`-`:831`):
 | Fluid | Burn time (per 1000 mB) |
 |---|---|
 | `"fuel"` (another mod's) | 375 |
-| `"diesel"` (another mod's) | 175 |
 | Propane | 250 |
 | Natural gas | 200 |
+| `"diesel"` (another mod's) | 175 |
+| Diesel (`ie_diesel`) | 162 |
 | Biodiesel | 125 |
+| Naphtha | 112 |
 | Crude oil | 50 |
 
 Crude's value is deliberately low — well under half of biodiesel's — so burning it raw always
-reads as the wasteful option next to refining it into propane. `"fuel"` and `"diesel"` are
+reads as the wasteful option next to refining it. Gasoline is deliberately **absent** from this
+table: a compression engine cannot burn it. It appears in the drill-fuel list instead, alongside
+diesel, so handheld spark engines take the opposite half of the split. Heavy fuel oil, lubricant
+and bitumen are absent too, and each for its own reason — HFO belongs in a burner or a boiler,
+lubricant is never burned at all, and bitumen has no fuel value to give.
+
+The drill-fuel whitelist (`registerDrillFuel`) is a separate list, not a subset of this one:
+gasoline, diesel, biodiesel and the two foreign fuels. `"fuel"` and `"diesel"` are
 resolved via `FluidRegistry.getFluid(...)` (`:824`-`:825`) rather than an IE fluid field,
 since they come from other mods when present.
 
