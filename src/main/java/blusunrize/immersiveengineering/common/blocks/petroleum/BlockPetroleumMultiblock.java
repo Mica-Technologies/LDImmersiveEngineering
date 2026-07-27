@@ -51,6 +51,10 @@ public class BlockPetroleumMultiblock extends BlockIEMultiblock<BlockTypes_Petro
 				return new TileEntityDerrick();
 			case PUMPJACK:
 				return new TileEntityPumpjack();
+			case DISTILLATION_TOWER:
+				return new TileEntityDistillationTower();
+			case INDUSTRIAL_BURNER:
+				return new TileEntityIndustrialBurner();
 		}
 		return null;
 	}

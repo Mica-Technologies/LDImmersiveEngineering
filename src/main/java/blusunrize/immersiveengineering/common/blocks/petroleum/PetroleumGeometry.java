@@ -47,6 +47,29 @@ public final class PetroleumGeometry
 	public static final int PUMPJACK_WIDTH = 3;
 	public static final int[] PUMPJACK_SIZE = {PUMPJACK_HEIGHT, PUMPJACK_DEPTH, PUMPJACK_WIDTH};
 
+	//	=================================
+	//		DISTILLATION TOWER
+	//	=================================
+	/**
+	 * H, L, W. Tall and square: the draw ports sit at heights matching the column order, so
+	 * the height is the mechanic and not just the silhouette.
+	 */
+	public static final int TOWER_HEIGHT = 12;
+	public static final int TOWER_DEPTH = 4;
+	public static final int TOWER_WIDTH = 4;
+	public static final int[] TOWER_SIZE = {TOWER_HEIGHT, TOWER_DEPTH, TOWER_WIDTH};
+
+	//	=================================
+	//		INDUSTRIAL BURNER
+	//	=================================
+	/**
+	 * H, L, W. A squat firebox that sits beside whatever it heats.
+	 */
+	public static final int BURNER_HEIGHT = 3;
+	public static final int BURNER_DEPTH = 3;
+	public static final int BURNER_WIDTH = 3;
+	public static final int[] BURNER_SIZE = {BURNER_HEIGHT, BURNER_DEPTH, BURNER_WIDTH};
+
 	/**
 	 * Linear index into a structure, matching {@code TileEntityMultiblockPart.pos}.
 	 */

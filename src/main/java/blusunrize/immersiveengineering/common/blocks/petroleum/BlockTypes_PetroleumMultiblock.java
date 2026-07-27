@@ -31,7 +31,15 @@ public enum BlockTypes_PetroleumMultiblock implements IStringSerializable, Block
 	/**
 	 * Drives a Wellhead whose deposit has lost the pressure to flow on its own.
 	 */
-	PUMPJACK;
+	PUMPJACK,
+	/**
+	 * Splits crude into its cuts, drawn off at heights matching the column order.
+	 */
+	DISTILLATION_TOWER,
+	/**
+	 * Burns the fuels nothing else wants, for process heat rather than flux.
+	 */
+	INDUSTRIAL_BURNER;
 
 	@Override
 	public String getName()

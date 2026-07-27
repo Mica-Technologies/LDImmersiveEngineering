@@ -515,6 +515,20 @@ public class IEContent
 		// Propane is fractionated out of natural gas (single-input refining).
 		RefineryRecipe.addRecipe(new FluidStack(fluidPropane, 12), new FluidStack(fluidNaturalGas, 24), null, 80);
 
+		// The cut curve, in column order: gas off the top, residue out of the bottom. Batched at
+		// 100 mB of crude per run rather than modelled as continuous flow -- the process queue is
+		// discrete, and at this size the granularity is invisible while the plumbing stays simple.
+		// Kerosene was deliberately cut from the design; its yield is folded into diesel.
+		DistillationRecipe.addRecipe(new FluidStack(fluidCrudeOil, 100), new FluidStack[]{
+				new FluidStack(fluidNaturalGas, 10),
+				new FluidStack(fluidNaphtha, 15),
+				new FluidStack(fluidGasoline, 25),
+				new FluidStack(fluidDiesel, 30),
+				new FluidStack(fluidHeavyFuelOil, 10),
+				new FluidStack(fluidLubricant, 4),
+				new FluidStack(fluidBitumen, 6)
+		}, 2048, 40);
+
 		MixerRecipe.addRecipe(new FluidStack(fluidConcrete, 500), new FluidStack(FluidRegistry.WATER, 500), new Object[]{"sand", "sand", Items.CLAY_BALL, "gravel"}, 3200);
 
 		BottlingMachineRecipe.addRecipe(new ItemStack(Blocks.SPONGE, 1, 1), new ItemStack(Blocks.SPONGE, 1, 0), new FluidStack(FluidRegistry.WATER, 1000));
