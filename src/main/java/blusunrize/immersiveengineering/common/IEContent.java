@@ -12,6 +12,7 @@ import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.*;
 import blusunrize.immersiveengineering.api.crafting.*;
 import blusunrize.immersiveengineering.api.energy.DieselHandler;
+import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
 import blusunrize.immersiveengineering.api.energy.ThermoelectricHandler;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.shader.CapabilityShader;
@@ -169,6 +170,7 @@ public class IEContent
 	public static BlockIEFluid blockFluidBiodiesel;
 	public static BlockIEFluid blockFluidPropane;
 	public static BlockIEFluid blockFluidNaturalGas;
+	public static BlockIEFluid blockFluidCrudeOil;
 	public static BlockIEFluid blockFluidConcrete;
 
 	public static ItemIEBase itemMaterial;
@@ -215,6 +217,7 @@ public class IEContent
 	public static Fluid fluidBiodiesel;
 	public static Fluid fluidPropane;
 	public static Fluid fluidNaturalGas;
+	public static Fluid fluidCrudeOil;
 	public static Fluid fluidConcrete;
 
 	public static Fluid fluidPotion;
@@ -228,6 +231,9 @@ public class IEContent
 		// Stored as pressurised liquids (LPG/LNG), so they behave like the other fuel fluids in tanks and pipes.
 		fluidPropane = setupFluid(new Fluid("propane", new ResourceLocation("immersiveengineering:blocks/fluid/propane_still"), new ResourceLocation("immersiveengineering:blocks/fluid/propane_flow")).setDensity(493).setViscosity(800));
 		fluidNaturalGas = setupFluid(new Fluid("natural_gas", new ResourceLocation("immersiveengineering:blocks/fluid/natural_gas_still"), new ResourceLocation("immersiveengineering:blocks/fluid/natural_gas_flow")).setDensity(450).setViscosity(600));
+		// Prefixed: setupFluid yields to whoever registered a name first, and the bare "crude_oil" is
+		// common enough that we would silently inherit another mod's density, viscosity and texture.
+		fluidCrudeOil = setupFluid(new Fluid("ie_crude_oil", new ResourceLocation("immersiveengineering:blocks/fluid/ie_crude_oil_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_crude_oil_flow")).setDensity(1050).setViscosity(3500));
 		fluidConcrete = setupFluid(new Fluid("concrete", new ResourceLocation("immersiveengineering:blocks/fluid/concrete_still"), new ResourceLocation("immersiveengineering:blocks/fluid/concrete_flow")).setDensity(2400).setViscosity(4000));
 		fluidPotion = setupFluid(new FluidPotion("potion", new ResourceLocation("immersiveengineering:blocks/fluid/potion_still"), new ResourceLocation("immersiveengineering:blocks/fluid/potion_flow")));
 
@@ -300,6 +306,8 @@ public class IEContent
 		blockFluidBiodiesel = new BlockIEFluid("fluidBiodiesel", fluidBiodiesel, Material.WATER).setFlammability(60, 200);
 		blockFluidPropane = new BlockIEFluid("fluidPropane", fluidPropane, Material.WATER).setFlammability(80, 400);
 		blockFluidNaturalGas = new BlockIEFluid("fluidNaturalGas", fluidNaturalGas, Material.WATER).setFlammability(80, 500);
+		// Unrefined, so it takes a lot more to light than the distilled fuels, but it feeds a fire well once lit.
+		blockFluidCrudeOil = new BlockIEFluid("fluidCrudeOil", fluidCrudeOil, Material.WATER).setFlammability(30, 400);
 		blockFluidConcrete = new BlockIEFluidConcrete("fluidConcrete", fluidConcrete, Material.WATER);
 
 		itemMaterial = new ItemMaterial();
@@ -818,6 +826,12 @@ public class IEContent
 		// Energy-dense gaseous fuels burn cleaner and more efficiently than biodiesel (higher = less consumed per tick).
 		DieselHandler.registerFuel(fluidNaturalGas, 200);
 		DieselHandler.registerFuel(fluidPropane, 250);
+		// Deliberately awful: crude ships with a consumer from day one, but at well under half of
+		// biodiesel's yield, so burning it raw always reads as the wasteful option next to refining it.
+		DieselHandler.registerFuel(fluidCrudeOil, 50);
+		//What the world rolls underground. Nothing is generated at chunk-gen time -- deposits
+		//are computed from the seed on demand -- so this also applies to existing worlds.
+		ReservoirHandler.registerDefaults();
 		DieselHandler.registerDrillFuel(fluidBiodiesel);
 		DieselHandler.registerDrillFuel(FluidRegistry.getFluid("fuel"));
 		DieselHandler.registerDrillFuel(FluidRegistry.getFluid("diesel"));
@@ -1094,6 +1108,7 @@ public class IEContent
 		fluidBiodiesel = FluidRegistry.getFluid("biodiesel");
 		fluidPropane = FluidRegistry.getFluid("propane");
 		fluidNaturalGas = FluidRegistry.getFluid("natural_gas");
+		fluidCrudeOil = FluidRegistry.getFluid("ie_crude_oil");
 		fluidConcrete = FluidRegistry.getFluid("concrete");
 		fluidPotion = FluidRegistry.getFluid("potion");
 	}

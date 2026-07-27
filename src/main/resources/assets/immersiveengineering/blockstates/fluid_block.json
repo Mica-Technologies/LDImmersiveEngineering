@@ -23,6 +23,9 @@
 		"natural_gas": [{
 			"custom": { "fluid": "natural_gas" }
 		}],
+		"ie_crude_oil": [{
+			"custom": { "fluid": "ie_crude_oil" }
+		}],
 		"concrete": [{
 			"custom": { "fluid": "concrete" }
 		}],

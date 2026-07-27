@@ -36,6 +36,7 @@ public class CommandHandler extends CommandTreeBase
 			addSubcommand(new CommandMineral());
 			addSubcommand(new CommandShaders());
 			addSubcommand(new CommandGrid());
+			addSubcommand(new CommandReservoir());
 			name = "ie";
 		}
 		addSubcommand(new CommandTreeHelp(this));

@@ -129,4 +129,28 @@ class CommandHandlerTest
 		assertEquals(5, command.getSubCommands().size(),
 				"list, get, set, setdepletion and help");
 	}
+
+	@Test
+	@DisplayName("the reservoir command keeps its name and its four sub-commands plus help")
+	void reservoirCommandMetadata()
+	{
+		CommandReservoir command = new CommandReservoir();
+
+		assertEquals("reservoir", command.getName());
+		assertEquals(4, command.getRequiredPermissionLevel(),
+				"deplete and refill rewrite world data and must stay op-only");
+		assertEquals(5, command.getSubCommands().size(),
+				"info, types, deplete, refill and help");
+	}
+
+	@Test
+	@DisplayName("the reservoir command is reachable from /ie")
+	void reservoirIsRegistered()
+	{
+		//Deposits are invisible -- computed from the seed rather than placed -- so without
+		//this command there is no way to tell an empty cell from a mis-wired pump.
+		assertTrue(new CommandHandler(false).getSubCommands().stream()
+						.anyMatch(sub -> "reservoir".equals(sub.getName())),
+				"/ie reservoir must be registered on the server handler");
+	}
 }

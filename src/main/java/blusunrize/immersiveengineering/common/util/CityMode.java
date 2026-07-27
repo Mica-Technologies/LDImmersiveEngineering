@@ -78,4 +78,14 @@ public final class CityMode
 	{
 		return IEConfig.cityMode&&IEConfig.cityModeVirtualGrid;
 	}
+
+	/**
+	 * Petroleum reservoirs stop depleting. A well still has to be prospected and drilled and
+	 * still holds the flavour of a finite field, but its remaining capacity is never decremented
+	 * and its flow rate never decays, so it delivers at peak, free-flowing rate forever.
+	 */
+	public static boolean petroleum()
+	{
+		return IEConfig.cityMode&&IEConfig.cityModePetroleum;
+	}
 }

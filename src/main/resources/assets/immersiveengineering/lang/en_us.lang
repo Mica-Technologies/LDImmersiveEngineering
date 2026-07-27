@@ -247,6 +247,7 @@ tile.immersiveengineering.fluidEthanol.name=Ethanol
 tile.immersiveengineering.fluidBiodiesel.name=Biodiesel
 tile.immersiveengineering.fluidPropane.name=Propane
 tile.immersiveengineering.fluidNaturalGas.name=Natural Gas
+tile.immersiveengineering.fluidCrudeOil.name=Crude Oil
 tile.immersiveengineering.fluidConcrete.name=Liquid Concrete
 
 fluid.creosote=Creosote Oil
@@ -255,6 +256,7 @@ fluid.ethanol=Ethanol
 fluid.biodiesel=Biodiesel
 fluid.propane=Propane
 fluid.natural_gas=Natural Gas
+fluid.ie_crude_oil=Crude Oil
 fluid.concrete=Liquid Concrete
 fluid.potion=Potion
 

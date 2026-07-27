@@ -13,6 +13,8 @@ import blusunrize.immersiveengineering.api.crafting.*;
 import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
+import blusunrize.immersiveengineering.api.petroleum.PetroleumConfig;
+import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
 import blusunrize.immersiveengineering.api.tool.BelljarHandler;
 import blusunrize.immersiveengineering.common.Config.IEConfig.Machines;
 import blusunrize.immersiveengineering.common.blocks.metal.TileEntityConnectorLV;
@@ -106,6 +108,11 @@ public class Config
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModeVirtualGrid = true;
 
+		@Comment({"City mode: petroleum. Reservoirs still exist, are still prospected and still drilled -- only the bookkeeping is dropped. A reservoir never depletes and a well holds constant pressure, so extraction rate never decays and free flow never lapses.",
+				"This removes the only per-tick cost the reservoir model has (tracking remaining capacity), which is cheap already, but the flag exists so a city build can have petroleum feel bottomless like everything else in city mode does.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModePetroleum = true;
+
 		@Comment({"By default all devices that accept cables have increased renderbounds to show cables even if the block itself is not in view.", "Disabling this reduces them to their minimum sizes, which might improve FPS on low-power PCs"})
 		//TODO this is for TESR wires. Remove?
 		public static boolean increasedRenderboxes = true;
@@ -159,6 +166,8 @@ public class Config
 		public static Tools tools;
 		@SubConfig
 		public static VirtualGrid virtualGrid;
+		@SubConfig
+		public static Petroleum petroleum;
 
 		/**
 		 * The virtual power grid: named segments of Feed and Service Units that move flux
@@ -214,6 +223,39 @@ public class Config
 			@Comment({"Seconds of continuous output saturation before a segment's breaker trips. Only applies when gridBreakersEnabled is true."})
 			@RangeInt(min = 1)
 			public static int gridBreakerTripSeconds = 5;
+		}
+
+		/**
+		 * Underground oil reservoirs: prospecting, drilling and depletion. Values are pushed into
+		 * {@link blusunrize.immersiveengineering.api.petroleum.PetroleumConfig} on load so the
+		 * model in {@code api} never has to reach back into {@code common}.
+		 */
+		public static class Petroleum
+		{
+			@Comment({"Master switch for petroleum reservoirs. When false no reservoir is ever generated and extraction blocks stay inert (they are still placeable, so turning this off cannot destroy an existing build)."})
+			public static boolean enablePetroleum = true;
+			@Comment({"Edge length, in chunks, of the square cell a single reservoir occupies. Deposits are rolled per cell rather than per chunk so that a field spans a believable area and neighbouring chunks agree about what is underneath them.",
+					"Raising this makes fields rarer but larger; the per-cell chance below is unaffected."})
+			@RangeInt(min = 1)
+			public static int petroleumCellChunkSize = 8;
+			@Comment({"Chance that any given cell contains a reservoir at all, 0.0 to 1.0."})
+			@RangeDouble(min = 0, max = 1)
+			public static double petroleumCellChance = 0.25;
+			@Comment({"Smallest and largest reservoir capacity in mB. Rolls are log-distributed between them, so modest fields are common and a giant is a genuine event."})
+			@RangeInt(min = 0)
+			public static int petroleumMinCapacity = 2000000;
+			@RangeInt(min = 0)
+			public static int petroleumMaxCapacity = 16000000;
+			@Comment({"Fraction of original capacity remaining above which a well flows without a pump, 0.0 to 1.0."})
+			@RangeDouble(min = 0, max = 1)
+			public static double petroleumFreeFlowThreshold = 0.6;
+			@Comment({"Peak extraction rate in mB/tick at full pressure, before any equipment multiplier."})
+			@RangeInt(min = 0)
+			public static int petroleumPeakFlowRate = 30;
+			@Comment({"Floor the flow rate decays to rather than reaching zero, in mB/tick. A depleted field becomes slow, never dead -- a pumpjack must not strand a base that was built around it."})
+			public static double petroleumResidualFlowRate = 0.025;
+			@Comment({"Dimensions in which reservoirs are never generated."})
+			public static int[] petroleumDimensionBlacklist = new int[]{1};
 		}
 
 
@@ -649,6 +691,22 @@ public class Config
 		GridConfig.breakerTripSeconds = IEConfig.VirtualGrid.gridBreakerTripSeconds;
 		//Existing segments may now sit outside a lowered ceiling; pull them back inside it.
 		VirtualGrid.INSTANCE.onConfigChanged();
+
+		//Push the petroleum settings into the api-side mirror. Same arrangement as the virtual
+		//grid above: the reservoir model in api never reaches back into common.
+		PetroleumConfig.enabled = IEConfig.Petroleum.enablePetroleum;
+		PetroleumConfig.cellChunkSize = IEConfig.Petroleum.petroleumCellChunkSize;
+		PetroleumConfig.cellChance = IEConfig.Petroleum.petroleumCellChance;
+		PetroleumConfig.minCapacity = IEConfig.Petroleum.petroleumMinCapacity;
+		PetroleumConfig.maxCapacity = IEConfig.Petroleum.petroleumMaxCapacity;
+		PetroleumConfig.freeFlowThreshold = IEConfig.Petroleum.petroleumFreeFlowThreshold;
+		PetroleumConfig.peakFlowRate = IEConfig.Petroleum.petroleumPeakFlowRate;
+		PetroleumConfig.residualFlowRate = IEConfig.Petroleum.petroleumResidualFlowRate;
+		PetroleumConfig.dimensionBlacklist = IEConfig.Petroleum.petroleumDimensionBlacklist;
+		//The capacity bounds are baked into each deposit type at registration, so the table has
+		//to be rebuilt or a changed ceiling would silently do nothing until the next restart.
+		//Deposits already rolled keep their size -- re-rolling would rewrite a player's field.
+		ReservoirHandler.registerDefaults();
 
 		WireType.wireLossRatio = IEConfig.wireLossRatio;
 		WireType.wireTransferRate = IEConfig.wireTransferRate;

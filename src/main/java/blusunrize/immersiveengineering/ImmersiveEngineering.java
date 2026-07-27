@@ -25,6 +25,7 @@ import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
 import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
+import blusunrize.immersiveengineering.common.util.petroleum.PetroleumSaveData;
 import blusunrize.immersiveengineering.common.util.network.*;
 import blusunrize.immersiveengineering.common.world.IEWorldGen;
 import com.google.gson.Gson;
@@ -242,6 +243,10 @@ public class ImmersiveEngineering
 				GridTickHandler.reset();
 				GridSaveData.load(world);
 				GridChunkLoader.refresh();
+
+				//Reservoirs likewise. Nothing is generated here -- deposits are rolled from the
+				//seed on demand -- so this only restores which ones have been drawn down.
+				PetroleumSaveData.load(world);
 			}
 		}
 		IEContent.refreshFluidReferences();
