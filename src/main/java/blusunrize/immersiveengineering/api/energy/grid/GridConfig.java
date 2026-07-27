@@ -42,8 +42,14 @@ public final class GridConfig
 	public static int defaultDeviceCap = 4096;
 	/**
 	 * Upper bound a segment's in/out cap may be raised to from the GUI.
+	 * <p>
+	 * Paired with {@link #bufferCapMax}: a segment's default buffer is
+	 * {@link #bufferTicks} ticks of its own output rate, so this value times
+	 * {@code bufferTicks} lands exactly on the buffer ceiling. Raising it further without
+	 * raising {@code bufferCapMax} too would silently clamp new segments to less than the
+	 * two ticks of smoothing the engine's collect-then-serve ordering assumes.
 	 */
-	public static int maxSegmentIO = 32768;
+	public static int maxSegmentIO = 131072;
 	/**
 	 * Default transmission loss, 0..1. Ships at 0 -- the grid is a convenience feature by
 	 * default and physical wire keeps no efficiency advantage unless a pack asks for it.
@@ -108,7 +114,7 @@ public final class GridConfig
 		enabled = true;
 		crossDimension = true;
 		defaultDeviceCap = 4096;
-		maxSegmentIO = 32768;
+		maxSegmentIO = 131072;
 		defaultLossPct = 0.0;
 		failoverTopUpDefault = true;
 		bufferCapMax = 262144;

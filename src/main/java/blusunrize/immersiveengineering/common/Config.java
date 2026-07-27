@@ -175,9 +175,10 @@ public class Config
 			@Comment({"Default throughput of a single Feed or Service Unit, in Flux/t. The default matches an HV connector."})
 			@RangeInt(min = 0)
 			public static int gridDefaultDeviceCap = 4096;
-			@Comment({"The highest per-segment input/output rate that may be set from the Grid Management Console, in Flux/t. Also the ceiling for a single device's transfer cap."})
+			@Comment({"The highest per-segment input/output rate that may be set from the Grid Management Console, in Flux/t. Also the ceiling for a single device's transfer cap.",
+					"Times gridBufferTicks this lands exactly on gridBufferCapMax, so a new segment gets its full smoothing buffer. Raise both together or new segments quietly get less."})
 			@RangeInt(min = 0)
-			public static int gridMaxSegmentIO = 32768;
+			public static int gridMaxSegmentIO = 131072;
 			@Comment({"Fraction of energy lost in transmission through a new segment, 0.0 to 1.0. Ships at 0: by default the grid is a convenience feature, not a lossy one. Raise it if you want physical wire to keep an efficiency advantage."})
 			@RangeDouble(min = 0, max = 1)
 			public static double gridDefaultLossPct = 0.0;

@@ -184,7 +184,7 @@ All under `Config → Immersive Engineering → VirtualGrid`, mirrored into `Gri
 | `enableVirtualGrid` | true | Master switch. Off = the tick engine does nothing and boxes stay inert (still placeable, so this cannot destroy a build). |
 | `gridCrossDimension` | true | Whether one segment may span dimensions. |
 | `gridDefaultDeviceCap` | 4096 | Default per-device throughput, HV-connector equivalent. |
-| `gridMaxSegmentIO` | 32768 | Ceiling for per-segment caps and device caps. |
+| `gridMaxSegmentIO` | 131072 | Ceiling for per-segment caps and device caps. Times `gridBufferTicks` this lands exactly on `gridBufferCapMax`; raise the two together. |
 | `gridDefaultLossPct` | 0.0 | Transmission loss for new segments. |
 | `gridFailoverTopUpDefault` | true | Default for the per-segment top-up toggle. |
 | `gridBufferTicks` | 2 | Ticks of throughput a segment buffers by default. |
