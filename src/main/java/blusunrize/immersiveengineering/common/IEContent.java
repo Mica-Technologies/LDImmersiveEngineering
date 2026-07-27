@@ -1024,6 +1024,8 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockMixer.instance);
 		MultiblockHandler.registerMultiblock(MultiblockFeedthrough.instance);
 		MultiblockHandler.registerMultiblock(MultiblockGridConsole.instance);
+		MultiblockHandler.registerMultiblock(MultiblockDerrick.instance);
+		MultiblockHandler.registerMultiblock(MultiblockPumpjack.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();
