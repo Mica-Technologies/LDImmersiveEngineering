@@ -1778,6 +1778,7 @@ chat.immersiveengineering.info.grid.consoleUnformed=Arrange four Console Housing
 #Petroleum
 tile.immersiveengineering.petroleum_device.wellhead.name=Wellhead
 tile.immersiveengineering.petroleum_device.flare_stack.name=Flare Stack
+tile.immersiveengineering.petroleum_device.lubrication_manifold.name=Lubrication Manifold
 tile.immersiveengineering.petroleum_multiblock.gas_scrubber.name=Gas Scrubber
 tile.immersiveengineering.petroleum_multiblock.gas_turbine.name=Gas Turbine
 fluid.ie_sour_gas=Sour Gas

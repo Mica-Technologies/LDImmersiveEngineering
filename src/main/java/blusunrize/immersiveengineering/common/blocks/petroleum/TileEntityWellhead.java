@@ -72,6 +72,12 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	}
 
 	public final FluidTank tank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate));
+	/**
+	 * Associated gas. Oil comes up with gas dissolved in it whether or not anything wants the
+	 * gas, so this fills on its own and, with nothing plumbed to it, backs up and stops the
+	 * well. That is the pressure a flare stack exists to relieve.
+	 */
+	public final FluidTank gasTank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate));
 
 	/**
 	 * Set by an attached Pumpjack. Without one a depleted well produces nothing at all.
@@ -186,6 +192,7 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 			if(drawn > 0)
 			{
 				tank.fill(new FluidStack(fluid, drawn), true);
+				produceAssociatedGas(drawn);
 				//Only a real draw dirties the save; a city-mode well changes nothing on disk.
 				if(!CityMode.petroleum())
 					PetroleumSaveData.setDirty();
@@ -198,7 +205,44 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 		pumped = false;
 	}
 
+	/**
+	 * Fills the gas tank alongside the oil.
+	 * <p>
+	 * Deliberately silent when the tank is full rather than voiding the excess: a well with
+	 * nowhere to put its gas should back up and stop, which is what makes a flare stack or a
+	 * scrubber worth building rather than optional scenery.
+	 */
+	private void produceAssociatedGas(int crude)
+	{
+		double ratio = PetroleumConfig.associatedGasRatio;
+		if(ratio <= 0||crude <= 0)
+			return;
+		int gas = (int)Math.floor(crude*ratio);
+		if(gas <= 0)
+			return;
+		Fluid sour = FluidRegistry.getFluid("ie_sour_gas");
+		if(sour==null)
+			return;
+		gasTank.fill(new FluidStack(sour, gas), true);
+	}
+
+	/**
+	 * @return true if either tank is full, which stops the well until something drains it
+	 */
+	public boolean isBackedUp()
+	{
+		return tank.getFluidAmount() >= tank.getCapacity()
+				||(PetroleumConfig.associatedGasRatio > 0
+				&&gasTank.getFluidAmount() >= gasTank.getCapacity());
+	}
+
 	private void pushOut()
+	{
+		pushTank(tank);
+		pushTank(gasTank);
+	}
+
+	private void pushTank(FluidTank tank)
 	{
 		if(tank.getFluidAmount() <= 0)
 			return;
@@ -321,11 +365,13 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		nbt.setTag("tank", tank.writeToNBT(new NBTTagCompound()));
+		nbt.setTag("gasTank", gasTank.writeToNBT(new NBTTagCompound()));
 	}
 
 	@Override
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		tank.readFromNBT(nbt.getCompoundTag("tank"));
+		gasTank.readFromNBT(nbt.getCompoundTag("gasTank"));
 	}
 }

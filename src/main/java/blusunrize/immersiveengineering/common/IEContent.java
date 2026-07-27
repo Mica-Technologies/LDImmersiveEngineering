@@ -809,6 +809,7 @@ public class IEContent
 		registerTile(TileEntityGasScrubber.class);
 		registerTile(TileEntityGasTurbine.class);
 		registerTile(TileEntityFlareStack.class);
+		registerTile(TileEntityLubricationManifold.class);
 
 
 

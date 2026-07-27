@@ -62,6 +62,13 @@ public final class PetroleumConfig
 	 */
 	public static double residualFlowRate = 0.025;
 	/**
+	 * Millibuckets of associated gas produced per millibucket of crude.
+	 * <p>
+	 * Oil comes up with gas dissolved in it whether anyone wants the gas or not, which is the
+	 * whole reason a flare exists. Set to zero to switch the gas branch off entirely.
+	 */
+	public static double associatedGasRatio = 0.25;
+	/**
 	 * Dimensions in which reservoirs are never generated.
 	 */
 	public static int[] dimensionBlacklist = {1};
@@ -80,6 +87,7 @@ public final class PetroleumConfig
 		freeFlowThreshold = 0.6;
 		peakFlowRate = 30;
 		residualFlowRate = 0.025;
+		associatedGasRatio = 0.25;
 		dimensionBlacklist = new int[]{1};
 	}
 }

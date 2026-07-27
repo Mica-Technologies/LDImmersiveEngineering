@@ -254,6 +254,10 @@ public class Config
 			public static int petroleumPeakFlowRate = 30;
 			@Comment({"Floor the flow rate decays to rather than reaching zero, in mB/tick. A depleted field becomes slow, never dead -- a pumpjack must not strand a base that was built around it."})
 			public static double petroleumResidualFlowRate = 0.025;
+			@Comment({"Millibuckets of associated (sour) gas a wellhead produces per millibucket of crude. Oil comes up with gas dissolved in it whether or not there is a use for it, which is what a flare stack is for.",
+					"Set to 0 to switch the gas branch off entirely."})
+			@RangeDouble(min = 0, max = 10)
+			public static double petroleumAssociatedGasRatio = 0.25;
 			@Comment({"Dimensions in which reservoirs are never generated."})
 			public static int[] petroleumDimensionBlacklist = new int[]{1};
 		}
@@ -702,6 +706,7 @@ public class Config
 		PetroleumConfig.freeFlowThreshold = IEConfig.Petroleum.petroleumFreeFlowThreshold;
 		PetroleumConfig.peakFlowRate = IEConfig.Petroleum.petroleumPeakFlowRate;
 		PetroleumConfig.residualFlowRate = IEConfig.Petroleum.petroleumResidualFlowRate;
+		PetroleumConfig.associatedGasRatio = IEConfig.Petroleum.petroleumAssociatedGasRatio;
 		PetroleumConfig.dimensionBlacklist = IEConfig.Petroleum.petroleumDimensionBlacklist;
 		//The capacity bounds are baked into each deposit type at registration, so the table has
 		//to be rebuilt or a changed ceiling would silently do nothing until the next restart.

@@ -33,7 +33,11 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * Burns off gas nobody has anywhere better to put.
 	 */
-	FLARE_STACK;
+	FLARE_STACK,
+	/**
+	 * Keeps an adjacent machine greased, so lubricant has somewhere to go.
+	 */
+	LUBRICATION_MANIFOLD;
 
 	@Override
 	public String getName()

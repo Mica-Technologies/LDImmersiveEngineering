@@ -358,10 +358,27 @@ def turbine_body():
     return img
 
 
+def manifold():
+    """Grease distribution block: a valve body with radiating feed lines."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 2, 2, 13, 13, STEEL)
+    _rect(px, 2, 2, 13, 2, STEEL_LIT)
+    # Feed lines out to each face.
+    _rect(px, 7, 0, 8, 15, STEEL_DARK)
+    _rect(px, 0, 7, 15, 8, STEEL_DARK)
+    # Valve body.
+    _rect(px, 5, 5, 10, 10, ORANGE)
+    _rect(px, 6, 6, 9, 9, RUST)
+    _dots(px, [(3, 3), (12, 3), (3, 12), (12, 12)], BOLT)
+    return img
+
+
 EXTRA_BLOCKS = {
     "petroleum_flare_stack": flare_stack,
     "petroleum_vessel": vessel,
     "petroleum_turbine_body": turbine_body,
+    "petroleum_manifold": manifold,
 }
 
 

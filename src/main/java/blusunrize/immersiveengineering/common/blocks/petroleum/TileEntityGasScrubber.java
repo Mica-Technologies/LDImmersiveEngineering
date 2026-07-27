@@ -459,29 +459,35 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 			return;
 		}
 
-		TileEntityIndustrialBurner burner = heatSource();
-		if(burner==null)
+		//A conversion registered with no duty at all needs no firebox either, so the table stays
+		//meaningfully configurable rather than quietly requiring one whatever it says.
+		if(recipe.heatPerBucket > 0)
 		{
-			status = STATUS_NO_HEAT;
-			return;
-		}
-		if(CityMode.petroleum())
-			//City mode: the reboiler is a fact, not a simulation. A lit burner is still required and
-			//still has to be leaning on the machine, so the gesture and the plant layout survive --
-			//but the duty is not metered and the rate never sags. Same trade the tower makes.
-			burner.drawHeat(CITY_HEAT_SIP, false);
-		else
-		{
-			//Partial heat is honoured rather than refused, so an underfed scrubber visibly runs
-			//slowly instead of stalling on a threshold nothing tells the player about.
-			int granted = burner.drawHeat(recipe.heatFor(volume), true);
-			volume = Math.min(volume, recipe.volumeForHeat(granted));
-			if(volume <= 0)
+			TileEntityIndustrialBurner burner = heatSource();
+			if(burner==null)
 			{
 				status = STATUS_NO_HEAT;
 				return;
 			}
-			burner.drawHeat(recipe.heatFor(volume), false);
+			if(CityMode.petroleum())
+				//City mode: the reboiler is a fact, not a simulation. A lit burner is still required
+				//and still has to be leaning on the machine, so the gesture and the plant layout
+				//survive -- but the duty is not metered and the rate never sags. Same trade the
+				//tower makes with its flux.
+				burner.drawHeat(CITY_HEAT_SIP, false);
+			else
+			{
+				//Partial heat is honoured rather than refused, so an underfed scrubber visibly runs
+				//slowly instead of stalling on a threshold nothing tells the player about.
+				int granted = burner.drawHeat(recipe.heatFor(volume), true);
+				volume = Math.min(volume, recipe.volumeForHeat(granted));
+				if(volume <= 0)
+				{
+					status = STATUS_NO_HEAT;
+					return;
+				}
+				burner.drawHeat(recipe.heatFor(volume), false);
+			}
 		}
 
 		int sweet = recipe.sweetFrom(volume);

@@ -1291,6 +1291,8 @@ public class ClientProxy extends CommonProxy
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_lubricant_flow");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_bitumen_still");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_bitumen_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_sour_gas_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_sour_gas_flow");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/concrete_still");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/concrete_flow");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/potion_still");

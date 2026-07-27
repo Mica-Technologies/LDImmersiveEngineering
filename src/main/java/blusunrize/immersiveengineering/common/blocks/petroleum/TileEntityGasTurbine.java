@@ -447,10 +447,15 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 	@Override
 	public String[] getOverlayText(EntityPlayer player, RayTraceResult mop, boolean hammer)
 	{
-		if(!formed)
+		//Read off the master rather than off whatever block was looked at: only the master runs the
+		//spool, so a player pointing at the nacelle would otherwise be told a machine plainly
+		//throwing out a plume was cold.
+		TileEntityGasTurbine master = master();
+		if(!formed||master==null||!master.formed)
 			return null;
-		int percent = Math.min(spool, SPOOL_FULL)*100/SPOOL_FULL;
-		if(active)
+		int spool = Math.min(Math.max(master.spool, 0), SPOOL_FULL);
+		int percent = spool*100/SPOOL_FULL;
+		if(master.active)
 			return new String[]{
 					(spool >= SPOOL_FULL?TextFormatting.GREEN+"On line": TextFormatting.GOLD+"Spooling up")
 							+TextFormatting.RESET,

@@ -9,6 +9,9 @@
 	},
 	"variants": {
 		"inventory,type=oilfield_frame": [{}],
+		"inventory,type=lubrication_manifold": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_manifold"}
+		}],
 		"inventory,type=flare_stack": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
 		}],
@@ -21,6 +24,9 @@
 		}],
 		"type": {
 			"oilfield_frame": {},
+			"lubrication_manifold": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_manifold"}
+			},
 			"flare_stack": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
 			},
