@@ -12,6 +12,8 @@ import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.IEEnums.SideConfig;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.FluxStorage;
+import blusunrize.immersiveengineering.api.petroleum.PetroleumConfig;
+import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
 import blusunrize.immersiveengineering.api.tool.ExcavatorHandler;
 import blusunrize.immersiveengineering.api.tool.ExcavatorHandler.MineralWorldInfo;
 import blusunrize.immersiveengineering.common.Config.IEConfig;
@@ -23,6 +25,7 @@ import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
+import blusunrize.immersiveengineering.common.util.petroleum.ReservoirSurvey;
 import com.google.common.collect.Lists;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.resources.I18n;
@@ -129,6 +132,15 @@ public class TileEntitySampleDrill extends TileEntityIEBase implements ITickable
 		ItemStack stack = new ItemStack(IEContent.itemCoresample);
 		ItemNBTHelper.setLong(stack, "timestamp", world.getTotalWorldTime());
 		ItemNBTHelper.setIntArray(stack, "coords", new int[]{world.provider.getDimension(), chunkX, chunkZ});
+		//Before the mineral early-outs below: a chunk with no ore vein may still sit on oil, and
+		//a sample that stayed silent about that would be lying by omission.
+		//
+		//Only the server has the reservoir map, so this is the one moment the reading can be
+		//taken; from here it rides along in the stack's NBT to whoever holds the sample. Left off
+		//entirely when the feature is disabled, so packs without oil get no empty oil line.
+		if(!world.isRemote&&PetroleumConfig.enabled)
+			ReservoirSurvey.write(ItemNBTHelper.getTag(stack), ReservoirHandler.getReservoir(
+					world.getSeed(), world.provider.getDimension(), chunkX, chunkZ));
 		if(info==null)
 			return stack;
 		if(info.mineralOverride!=null)

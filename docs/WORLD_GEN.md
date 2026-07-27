@@ -186,7 +186,12 @@ dimension's save data dirty.
   `getComparatorInputOverride` (`:70-85`) also reads world info to report remaining vein
   percentage as a redstone signal.
 - **Core Sample Drill** — `TileEntitySampleDrill` reads `getMineralWorldInfo`
-  (`TileEntitySampleDrill.java:89`) to print the deposit name.
+  (`TileEntitySampleDrill.java:89`) to print the deposit name. The same `createCoreSample`
+  call also takes an oil reading via `ReservoirSurvey`
+  (`common/util/petroleum/ReservoirSurvey.java`) and bakes presence, a size band and a
+  pressure percentage into the sample's NBT, so the item tooltip and the placed sample's
+  block overlay can render it client-side without asking the server-only reservoir map.
+  Samples cut before this existed carry no survey marker and stay silent about oil.
 - **Treasure-map villager trade** — `IEVillagerHandler.OreveinMapForEmeralds`
   (`common/util/IEVillagerHandler.java:270-...`) searches up to 8 random nearby
   *uncached* chunks (`:279-286`), forces deposit generation with `guaranteed=true`

@@ -1,0 +1,26 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"transform": "forge:default-block",
+		"model": "cube_all",
+		"textures": {
+			"all": "immersiveengineering:blocks/petroleum_derrick_side"
+		}
+	},
+	"variants": {
+		"inventory,type=derrick": [{}],
+		"inventory,type=pumpjack": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_pumpjack_body"}
+		}],
+		"type": {
+			"derrick": {},
+			"pumpjack": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_pumpjack_body"}
+			}
+		},
+		"boolean0": {
+			"false": {},
+			"true": {}
+		}
+	}
+}

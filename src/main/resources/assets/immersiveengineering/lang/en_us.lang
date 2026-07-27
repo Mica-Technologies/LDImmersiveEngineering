@@ -695,6 +695,13 @@ desc.immersiveengineering.info.mineral.Lapis=Lapis
 desc.immersiveengineering.info.mineral.Coal=Coal
 desc.immersiveengineering.info.mineral.Wolframite=Wolframite
 
+desc.immersiveengineering.info.reservoir.crude_oil=Crude Oil
+desc.immersiveengineering.info.reservoirSize.marginal=Marginal
+desc.immersiveengineering.info.reservoirSize.small=Small
+desc.immersiveengineering.info.reservoirSize.moderate=Moderate
+desc.immersiveengineering.info.reservoirSize.large=Large
+desc.immersiveengineering.info.reservoirSize.giant=Giant
+
 chat.immersiveengineering.info.old_java=[Immersive Engineering] §4Warning: §rYour Java version is %1$s. This version causes crashes with the Engineer's manual. These crashes are close to impossible to fix for us. You can prevent the crashes by installing up-to-date Java (make sure to use Java 8, not Java 9) and forcing your launcher to use it.
 
 chat.immersiveengineering.info.coresample.pos=%1$s to %2$s
@@ -702,6 +709,11 @@ chat.immersiveengineering.info.coresample.mineral=%1$s-Vein
 chat.immersiveengineering.info.coresample.noMineral=No Mineral
 chat.immersiveengineering.info.coresample.yield=Expected Yield: %1$s Ores
 chat.immersiveengineering.info.coresample.infinite=Unlimited Yield
+chat.immersiveengineering.info.coresample.reservoir=%1$s Reservoir
+chat.immersiveengineering.info.coresample.noReservoir=No Reservoir
+chat.immersiveengineering.info.coresample.reservoirSize=Deposit Size: %1$s
+chat.immersiveengineering.info.coresample.reservoirPressureFree=Pressure: %1$s%% (flows unaided)
+chat.immersiveengineering.info.coresample.reservoirPressurePumped=Pressure: %1$s%% (a pump is required)
 chat.immersiveengineering.info.coresample.timestamp=Sample taken %1$s ago
 chat.immersiveengineering.info.coresample.noTimestamp=Sample taken at some unknown time
 chat.immersiveengineering.info.coresample.timezone=This sample was taken in a different timezone/dimension
@@ -1762,3 +1774,15 @@ gui.immersiveengineering.config.grid.inverted=Inverted
 gui.immersiveengineering.config.grid.normal=Normal
 desc.immersiveengineering.info.grid.heldSegment=Holding grid segment: %1$s
 chat.immersiveengineering.info.grid.consoleUnformed=Arrange four Console Housings in a 2x2 wall, then strike the front face with an Engineer's Hammer.
+
+#Petroleum
+tile.immersiveengineering.petroleum_device.wellhead.name=Wellhead
+tile.immersiveengineering.petroleum_device.oilfield_frame.name=Oilfield Frame
+tile.immersiveengineering.petroleum_multiblock.derrick.name=Drilling Derrick
+tile.immersiveengineering.petroleum_multiblock.pumpjack.name=Pumpjack
+desc.immersiveengineering.info.petroleum.dryHole=Dry hole -- no reservoir beneath this block.
+desc.immersiveengineering.info.petroleum.remaining=%1$s remaining
+desc.immersiveengineering.info.petroleum.freeFlowing=Free-flowing
+desc.immersiveengineering.info.petroleum.needsPump=Needs a pumpjack
+desc.immersiveengineering.info.petroleum.pumped=Pumped
+chat.immersiveengineering.info.petroleum.derrickUnformed=Build a 3x3 lattice nine blocks tall, then strike it with an Engineer's Hammer.

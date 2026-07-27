@@ -30,6 +30,7 @@ import blusunrize.immersiveengineering.common.blocks.*;
 import blusunrize.immersiveengineering.common.blocks.BlockFakeLight.TileEntityFakeLight;
 import blusunrize.immersiveengineering.common.blocks.cloth.*;
 import blusunrize.immersiveengineering.common.blocks.grid.*;
+import blusunrize.immersiveengineering.common.blocks.petroleum.*;
 import blusunrize.immersiveengineering.common.blocks.metal.*;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.*;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorChute.ConveyorChuteAluminum;
@@ -164,6 +165,8 @@ public class IEContent
 	public static BlockIEBase<BlockTypes_MetalMultiblock> blockMetalMultiblock;
 	public static BlockIEBase<BlockTypes_GridDevice> blockGridDevice;
 	public static BlockIEBase<BlockTypes_GridMultiblock> blockGridMultiblock;
+	public static BlockIEBase<BlockTypes_PetroleumDevice> blockPetroleumDevice;
+	public static BlockIEBase<BlockTypes_PetroleumMultiblock> blockPetroleumMultiblock;
 	public static BlockIEFluid blockFluidCreosote;
 	public static BlockIEFluid blockFluidPlantoil;
 	public static BlockIEFluid blockFluidEthanol;
@@ -299,6 +302,8 @@ public class IEContent
 		blockMetalMultiblock = new BlockMetalMultiblocks();
 		blockGridDevice = new BlockGridDevice();
 		blockGridMultiblock = new BlockGridMultiblock();
+		blockPetroleumDevice = new BlockPetroleumDevice();
+		blockPetroleumMultiblock = new BlockPetroleumMultiblock();
 
 		blockFluidCreosote = new BlockIEFluid("fluidCreosote", fluidCreosote, Material.WATER).setFlammability(40, 400);
 		blockFluidPlantoil = new BlockIEFluid("fluidPlantoil", fluidPlantoil, Material.WATER);
@@ -739,6 +744,9 @@ public class IEContent
 		registerTile(TileEntityGridService.class);
 		registerTile(TileEntityGridSignal.class);
 		registerTile(TileEntityGridConsole.class);
+		registerTile(TileEntityWellhead.class);
+		registerTile(TileEntityDerrick.class);
+		registerTile(TileEntityPumpjack.class);
 
 
 
@@ -932,6 +940,7 @@ public class IEContent
 		ChemthrowerHandler.registerFlammable(fluidEthanol);
 		ChemthrowerHandler.registerFlammable(fluidPropane);
 		ChemthrowerHandler.registerFlammable(fluidNaturalGas);
+		ChemthrowerHandler.registerFlammable(fluidCrudeOil);
 		ChemthrowerHandler.registerEffect("oil", new ChemthrowerEffect_Potion(null, 0, new PotionEffect(IEPotions.flammable, 140, 0), new PotionEffect(MobEffects.BLINDNESS, 80, 1)));
 		ChemthrowerHandler.registerFlammable("oil");
 		ChemthrowerHandler.registerEffect("fuel", new ChemthrowerEffect_Potion(null, 0, IEPotions.flammable, 100, 1));

@@ -1,0 +1,30 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"transform": "forge:default-block",
+		"model": "cube_all",
+		"textures": {
+			"all": "immersiveengineering:blocks/petroleum_oilfield_frame"
+		}
+	},
+	"variants": {
+		"inventory,type=oilfield_frame": [{}],
+		"inventory,type=wellhead": [{
+			"model": "immersiveengineering:petroleum/wellhead",
+			"textures": {
+				"stack": "immersiveengineering:blocks/petroleum_wellhead",
+				"particle": "immersiveengineering:blocks/petroleum_wellhead"
+			}
+		}],
+		"type": {
+			"oilfield_frame": {},
+			"wellhead": {
+				"model": "immersiveengineering:petroleum/wellhead",
+				"textures": {
+					"stack": "immersiveengineering:blocks/petroleum_wellhead",
+					"particle": "immersiveengineering:blocks/petroleum_wellhead"
+				}
+			}
+		}
+	}
+}

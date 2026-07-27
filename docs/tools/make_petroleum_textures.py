@@ -102,6 +102,124 @@ def main():
     for kind, ramp in (("still", CRUDE_STILL_RAMP), ("flow", (CRUDE_FLOW_TONE,))):
         size, alpha = load_motion(os.path.join(args.out, "%s_%s.png"%(args.source, kind)))
         write(tint(size, alpha, ramp), args.out, "ie_crude_oil_"+kind)
+    write_blocks(BLOCK_DIR)
+
+
+# ---------------------------------------------------------------------------
+# Block textures. Separate from the fluid sheets above: these are ordinary
+# 16x16 stills, and they follow the same palette discipline as the grid set in
+# make_grid_textures.py so the two features read as one mod.
+# ---------------------------------------------------------------------------
+OUTLINE = (28, 28, 31, 255)
+STEEL_DARK = (58, 58, 64, 255)
+STEEL = (78, 78, 85, 255)
+STEEL_LIT = (99, 99, 107, 255)
+BOLT = (150, 150, 158, 255)
+RUST = (122, 74, 43, 255)
+ORANGE = (233, 118, 43, 255)
+VALVE_RED = (176, 60, 48, 255)
+
+BLOCK_DIR = os.path.join("src", "main", "resources", "assets", "immersiveengineering",
+                         "textures", "blocks")
+
+
+def _blank(fill=STEEL):
+    from PIL import Image as _I
+    return _I.new("RGBA", (16, 16), fill)
+
+
+def _rect(px, x0, y0, x1, y1, colour):
+    for y in range(max(0, y0), min(16, y1+1)):
+        for x in range(max(0, x0), min(16, x1+1)):
+            px[x, y] = colour
+
+
+def _dots(px, coords, colour):
+    for x, y in coords:
+        if 0 <= x < 16 and 0 <= y < 16:
+            px[x, y] = colour
+
+
+def oilfield_frame():
+    """Lattice scaffold: the structural block both big rigs are built from."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    # Uprights and cross-bracing, so a wall of these reads as a truss.
+    _rect(px, 1, 0, 3, 15, STEEL)
+    _rect(px, 12, 0, 14, 15, STEEL)
+    for i in range(16):
+        x = 3+(i*9)//16
+        px[min(14, 3+i//2), i] = STEEL_LIT
+        px[max(1, 12-i//2), i] = STEEL_LIT
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _dots(px, [(2, 2), (13, 2), (2, 13), (13, 13)], BOLT)
+    return img
+
+
+def wellhead():
+    """The valve stack: flanged body, hand wheel, an outlet spool."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 5, 3, 10, 15, STEEL)
+    _rect(px, 5, 3, 10, 3, STEEL_LIT)
+    # Flanges.
+    for y in (5, 9, 13):
+        _rect(px, 4, y, 11, y, STEEL_LIT)
+        _rect(px, 4, y+1, 11, y+1, OUTLINE)
+    # Hand wheel on top.
+    _rect(px, 6, 1, 9, 1, VALVE_RED)
+    px[7, 2] = VALVE_RED
+    px[8, 2] = VALVE_RED
+    # Outlet spool to one side.
+    _rect(px, 11, 10, 14, 12, STEEL)
+    _rect(px, 14, 10, 14, 12, OUTLINE)
+    _dots(px, [(5, 7), (10, 7), (5, 11), (10, 11)], BOLT)
+    return img
+
+
+def derrick_side():
+    """Cladding for the derrick's lower housing."""
+    img = _blank(STEEL)
+    px = img.load()
+    _rect(px, 0, 0, 15, 15, STEEL)
+    for y in range(2, 15, 4):
+        _rect(px, 1, y, 14, y, STEEL_DARK)
+        _rect(px, 1, y+1, 14, y+1, OUTLINE)
+    _rect(px, 0, 0, 0, 15, OUTLINE)
+    _rect(px, 15, 0, 15, 15, OUTLINE)
+    _dots(px, [(3, 1), (12, 1), (3, 14), (12, 14)], BOLT)
+    return img
+
+
+def pumpjack_body():
+    """The pumpjack's painted machinery housing -- the one warm accent."""
+    img = _blank(STEEL)
+    px = img.load()
+    _rect(px, 0, 0, 15, 15, STEEL)
+    _rect(px, 2, 4, 13, 11, ORANGE)
+    _rect(px, 2, 4, 13, 4, (255, 150, 70, 255))
+    _rect(px, 2, 11, 13, 11, RUST)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _dots(px, [(1, 2), (14, 2), (1, 13), (14, 13)], BOLT)
+    return img
+
+
+BLOCK_TEXTURES = {
+    "petroleum_oilfield_frame": oilfield_frame,
+    "petroleum_wellhead": wellhead,
+    "petroleum_derrick_side": derrick_side,
+    "petroleum_pumpjack_body": pumpjack_body,
+}
+
+
+def write_blocks(out_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    for name, builder in sorted(BLOCK_TEXTURES.items()):
+        path = os.path.join(out_dir, name+".png")
+        builder().save(path, "PNG", optimize=True)
+        print("wrote", path)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.blocks.stone.BlockTypes_StoneDevices;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
+import blusunrize.immersiveengineering.common.util.petroleum.ReservoirSurvey;
 import net.minecraft.block.Block;
 import net.minecraft.block.SoundType;
 import net.minecraft.block.state.IBlockState;
@@ -23,6 +24,7 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -87,6 +89,8 @@ public class ItemCoresample extends ItemIEBase
 			else if(ItemNBTHelper.hasKey(stack, "depletion"))
 				list.add(I18n.format(Lib.CHAT_INFO+"coresample.yield", ExcavatorHandler.mineralVeinCapacity-ItemNBTHelper.getInt(stack, "depletion")));
 
+			addReservoirInformation(stack, list, "");
+
 			boolean hasStamp = ItemNBTHelper.hasKey(stack, "timestamp");
 			if(hasStamp&&world!=null)
 			{
@@ -102,6 +106,56 @@ public class ItemCoresample extends ItemIEBase
 			else
 				list.add(I18n.format(Lib.CHAT_INFO+"coresample.noTimestamp"));
 		}
+	}
+
+	/**
+	 * Appends what this sample found out about the oil under its chunk.
+	 * <p>
+	 * Shared with the placed sample's block overlay so the two can never drift apart, and
+	 * client-side because everything it needs is already on the stack -- the server took the
+	 * reading when the drill finished (see {@code ReservoirSurvey}) and the stack carried it
+	 * here. Nothing below asks the reservoir map anything, which is what makes it work in
+	 * multiplayer at all.
+	 * <p>
+	 * A sample cut before oil existed carries no survey and gets no lines, rather than being
+	 * reported as barren ground.
+	 *
+	 * @param heading formatting prefix for the headline, for callers that colour their text
+	 */
+	@SideOnly(Side.CLIENT)
+	public static void addReservoirInformation(ItemStack stack, List<String> list, String heading)
+	{
+		//Deliberately not ItemNBTHelper.getTag: that creates the tag it fails to find, and a
+		//tooltip has no business writing to the stack it is describing.
+		NBTTagCompound nbt = stack.getTagCompound();
+		if(!ReservoirSurvey.isSurveyed(nbt))
+			return;
+		if(!ReservoirSurvey.hasReservoir(nbt))
+		{
+			list.add(I18n.format(Lib.CHAT_INFO+"coresample.noReservoir"));
+			return;
+		}
+
+		String type = ReservoirSurvey.getType(nbt);
+		list.add(heading+I18n.format(Lib.CHAT_INFO+"coresample.reservoir",
+				translateOrRaw(Lib.DESC_INFO+"reservoir."+type, type)));
+		String size = ReservoirSurvey.getSizeBand(nbt);
+		list.add(I18n.format(Lib.CHAT_INFO+"coresample.reservoirSize",
+				translateOrRaw(Lib.DESC_INFO+"reservoirSize."+size, size)));
+		list.add(I18n.format(Lib.CHAT_INFO+(ReservoirSurvey.isFreeFlowing(nbt)
+						?"coresample.reservoirPressureFree": "coresample.reservoirPressurePumped"),
+				ReservoirSurvey.getPressure(nbt)));
+	}
+
+	/**
+	 * Falls back to the bare identifier for anything a resource pack has no line for, the same
+	 * way the mineral name does -- an addon's deposit type should read oddly, not blankly.
+	 */
+	@SideOnly(Side.CLIENT)
+	private static String translateOrRaw(String key, String raw)
+	{
+		String translated = I18n.format(key);
+		return key.equals(translated)?raw: translated;
 	}
 
 

@@ -14,6 +14,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectio
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.ITileDrop;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.items.ItemCoresample;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.resources.I18n;
@@ -38,6 +39,8 @@ import net.minecraft.world.storage.MapDecoration;
 import net.minecraftforge.common.DimensionManager;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class TileEntityCoresample extends TileEntityIEBase implements IDirectionalTile, ITileDrop, IPlayerInteraction, IBlockOverlayText
@@ -194,16 +197,19 @@ public class TileEntityCoresample extends TileEntityIEBase implements IDirection
 		{
 			if(overlay==null)
 			{
-				overlay = new String[3];
+				//A list rather than a fixed array: how much a sample has to say now depends on
+				//whether it was cut by a build that surveyed for oil.
+				List<String> lines = new ArrayList<>(3);
 				int[] coords = ItemNBTHelper.getIntArray(coresample, "coords");
-				overlay[0] = I18n.format(Lib.CHAT_INFO+"coresample.noMineral");
+				String mineralLine = I18n.format(Lib.CHAT_INFO+"coresample.noMineral");
 				if(ItemNBTHelper.hasKey(coresample, "mineral"))
 				{
 					String mineral = ItemNBTHelper.getString(coresample, "mineral");
 					String unloc = Lib.DESC_INFO+"mineral."+mineral;
 					String loc = I18n.format(unloc);
-					overlay[0] = TextFormatting.GOLD+I18n.format(Lib.CHAT_INFO+"coresample.mineral", (unloc.equals(loc)?mineral: loc));
+					mineralLine = TextFormatting.GOLD+I18n.format(Lib.CHAT_INFO+"coresample.mineral", (unloc.equals(loc)?mineral: loc));
 				}
+				lines.add(mineralLine);
 
 				World world = DimensionManager.getWorld(coords[0]);
 				String s0 = (coords[1]*16)+", "+(coords[2]*16);
@@ -213,11 +219,15 @@ public class TileEntityCoresample extends TileEntityIEBase implements IDirection
 					String name = world.provider.getDimensionType().getName();
 					if(name.toLowerCase(Locale.ENGLISH).startsWith("the "))
 						name = name.substring(4);
-					overlay[1] = name;
+					lines.add(name);
 				}
 				else
-					overlay[1] = "Dimension "+coords[0];
-				overlay[2] = I18n.format(Lib.CHAT_INFO+"coresample.pos", s0, s1);
+					lines.add("Dimension "+coords[0]);
+				lines.add(I18n.format(Lib.CHAT_INFO+"coresample.pos", s0, s1));
+				//Same reading, same wording as the item tooltip, and off the same stack NBT --
+				//the placed sample is only a different frame around the same piece of paper.
+				ItemCoresample.addReservoirInformation(coresample, lines, TextFormatting.GOLD.toString());
+				overlay = lines.toArray(new String[0]);
 			}
 			return overlay;
 		}
