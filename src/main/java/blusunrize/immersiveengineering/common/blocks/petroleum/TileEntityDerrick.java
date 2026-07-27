@@ -77,8 +77,8 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	 */
 	public static final int DRILL_INTERVAL = 10;
 	/**
-	 * Buffer, in FE. Roughly ten seconds of drilling, so a rig on a thin wire keeps turning
-	 * through the gaps instead of stuttering between stalled and running.
+	 * Buffer, in FE. Five seconds of drilling at {@link #ENERGY_PER_TICK}, so a rig on a thin
+	 * wire keeps turning through the gaps instead of stuttering between stalled and running.
 	 */
 	public static final int ENERGY_CAPACITY = 25600;
 	/**

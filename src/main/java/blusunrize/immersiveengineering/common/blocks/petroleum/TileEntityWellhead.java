@@ -59,12 +59,19 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 		IBlockOverlayText, IComparatorOverride, INeighbourChangeTile
 {
 	/**
-	 * Buffer between production passes. Two seconds of peak flow, so a well that nobody has
+	 * Buffer between production passes, sized to two of them at the configured peak rate: big
+	 * enough that a pass is never wasted for want of room, small enough that a well nobody has
 	 * plumbed yet does not quietly bank a tank's worth of oil.
+	 * <p>
+	 * Read from the config rather than hard-coded, or raising {@code peakFlowRate} would leave
+	 * the buffer behind and the well would throttle itself against a tank it had outgrown.
 	 */
-	public static final int CAPACITY = 2*PetroleumTickHandler.PRODUCTION_INTERVAL*30;
+	public static int capacityFor(int peakFlowRate)
+	{
+		return Math.max(1000, 2*PetroleumTickHandler.PRODUCTION_INTERVAL*Math.max(1, peakFlowRate));
+	}
 
-	public final FluidTank tank = new FluidTank(CAPACITY);
+	public final FluidTank tank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate));
 
 	/**
 	 * Set by an attached Pumpjack. Without one a depleted well produces nothing at all.

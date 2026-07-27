@@ -27,6 +27,9 @@ implements which system and how those systems behave. All entries cite real sour
 - **[VIRTUAL_GRID.md](VIRTUAL_GRID.md)** — this fork's virtual power grid: named segments of Feed
   and Service Units that move flux with no wire between them, failover chains, breakers, schedules,
   Signal Units, and the Grid Management Console.
+- **[PETROLEUM.md](PETROLEUM.md)** — this fork's petroleum system: deterministic, retrogen-free
+  oil reservoirs, the Wellhead/Drilling Derrick/Pumpjack progression, core-sample prospecting, the
+  crude-oil distillation recipe, and the still-stub Distillation Tower and Industrial Burner.
 - **[MULTIBLOCK_SYSTEM.md](MULTIBLOCK_SYSTEM.md)** — the multiblock structure framework
   (master/slave/mirror), formation/disassembly, and the machine catalog (crusher, blast
   furnace, arc furnace, assembler, refinery, etc.).

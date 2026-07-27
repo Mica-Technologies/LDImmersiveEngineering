@@ -797,6 +797,8 @@ public class IEContent
 		registerTile(TileEntityWellhead.class);
 		registerTile(TileEntityDerrick.class);
 		registerTile(TileEntityPumpjack.class);
+		registerTile(TileEntityDistillationTower.class);
+		registerTile(TileEntityIndustrialBurner.class);
 
 
 
@@ -1091,6 +1093,8 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockGridConsole.instance);
 		MultiblockHandler.registerMultiblock(MultiblockDerrick.instance);
 		MultiblockHandler.registerMultiblock(MultiblockPumpjack.instance);
+		MultiblockHandler.registerMultiblock(MultiblockDistillationTower.instance);
+		MultiblockHandler.registerMultiblock(MultiblockIndustrialBurner.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();
