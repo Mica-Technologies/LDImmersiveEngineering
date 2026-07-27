@@ -184,7 +184,14 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 		if(fluid==null)
 			return;
 
+		//Gas comes up with the oil whether or not there is anywhere to put it, so a full gas
+		//tank throttles the whole well. Without this the excess would be quietly destroyed and
+		//a flare stack or a scrubber would be decoration rather than a requirement.
 		int room = tank.getCapacity()-tank.getFluidAmount();
+		double gasRatio = PetroleumConfig.associatedGasRatio;
+		if(gasRatio > 0)
+			room = Math.min(room,
+					(int)Math.floor((gasTank.getCapacity()-gasTank.getFluidAmount())/gasRatio));
 		if(room > 0)
 		{
 			int drawn = ReservoirModel.extract(reservoir, room, elapsedTicks, pumped,
@@ -335,6 +342,9 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	@Override
 	public String[] getOverlayText(EntityPlayer player, RayTraceResult mop, boolean hammer)
 	{
+		if(isBackedUp())
+			return new String[]{TextFormatting.RED+"Backed up"+TextFormatting.RESET,
+					"Nothing is taking what it produces"};
 		if(tank.getFluidAmount() <= 0)
 			return null;
 		return new String[]{tank.getFluid().getLocalizedName()+": "+tank.getFluidAmount()+" mB"};

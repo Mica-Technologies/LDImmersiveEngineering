@@ -323,7 +323,6 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 		//array that is almost always empty.
 		if(heatTargets.length > 0&&heatBuffer > 0)
 			heatCrown();
-		heatAdjacentTower();
 	}
 
 	/**
@@ -352,6 +351,7 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 			}
 			else
 				heatRate = 0;
+			heatAdjacentTower();
 			finishPass(previousRate);
 			return;
 		}
@@ -367,6 +367,7 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 				heatBuffer = Math.min(HEAT_CAPACITY, heatBuffer+heatFromBurning(heatPerBucket, burnt));
 			}
 		}
+		heatAdjacentTower();
 		finishPass(previousRate);
 	}
 
@@ -438,10 +439,13 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 		//Do not spend fuel heating a tower with nothing to distil.
 		if(!towerTarget.isDistilling())
 			return;
-		int cost = heatRate;
+		//A whole interval's worth, charged in one go, matching how the fuel for it was burnt.
+		int cost = heatRate*BURN_INTERVAL;
 		if(heatBuffer < cost)
 			return;
-		if(towerTarget.supplyProcessHeat(BURN_INTERVAL))
+		//Grant longer than the interval so a pass that lands late does not let the column go
+		//cold for a tick; the tower clamps and decays this on its own, so overshooting is free.
+		if(towerTarget.supplyProcessHeat(BURN_INTERVAL*2))
 			heatBuffer -= cost;
 	}
 
