@@ -1777,6 +1777,18 @@ chat.immersiveengineering.info.grid.consoleUnformed=Arrange four Console Housing
 
 #Petroleum
 tile.immersiveengineering.petroleum_device.wellhead.name=Wellhead
+fluid.ie_naphtha=Naphtha
+tile.immersiveengineering.fluidNaphtha.name=Naphtha
+fluid.ie_gasoline=Gasoline
+tile.immersiveengineering.fluidGasoline.name=Gasoline
+fluid.ie_diesel=Diesel
+tile.immersiveengineering.fluidDiesel.name=Diesel
+fluid.ie_heavy_fuel_oil=Heavy Fuel Oil
+tile.immersiveengineering.fluidHeavyFuelOil.name=Heavy Fuel Oil
+fluid.ie_lubricant=Lubricant
+tile.immersiveengineering.fluidLubricant.name=Lubricant
+fluid.ie_bitumen=Bitumen
+tile.immersiveengineering.fluidBitumen.name=Bitumen
 tile.immersiveengineering.petroleum_device.oilfield_frame.name=Oilfield Frame
 tile.immersiveengineering.petroleum_multiblock.derrick.name=Drilling Derrick
 tile.immersiveengineering.petroleum_multiblock.pumpjack.name=Pumpjack

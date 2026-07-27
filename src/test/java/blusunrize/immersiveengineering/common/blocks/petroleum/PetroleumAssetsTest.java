@@ -325,7 +325,6 @@ class PetroleumAssetsTest
 		void recipesTargetCorrectMetas()
 		{
 			Object[][] expected = {
-					{"wellhead", BlockTypes_PetroleumDevice.WELLHEAD.getMeta()},
 					{"oilfield_frame", BlockTypes_PetroleumDevice.OILFIELD_FRAME.getMeta()}
 			};
 			for(Object[] row : expected)
@@ -339,10 +338,21 @@ class PetroleumAssetsTest
 		}
 
 		@Test
+		@DisplayName("the wellhead has no crafting recipe")
+		void wellheadIsNotCraftable()
+		{
+			//A wellhead is what drilling leaves behind. If it could simply be crafted the
+			//Drilling Derrick would have no purpose at all, since a wellhead works on any
+			//surveyed chunk on its own.
+			assertFalse(new File(ASSETS+"recipes/petroleum/wellhead.json").exists(),
+					"a craftable wellhead would make the derrick pointless");
+		}
+
+		@Test
 		@DisplayName("recipe keys and pattern symbols match exactly")
 		void recipeKeysMatchPattern()
 		{
-			for(String name : new String[]{"wellhead", "oilfield_frame"})
+			for(String name : new String[]{"oilfield_frame"})
 			{
 				JsonObject json = read("recipes/petroleum/"+name+".json");
 				Set<String> recipeKeys = keys(json.getAsJsonObject("key"));

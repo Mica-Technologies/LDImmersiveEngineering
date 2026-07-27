@@ -102,6 +102,7 @@ def main():
     for kind, ramp in (("still", CRUDE_STILL_RAMP), ("flow", (CRUDE_FLOW_TONE,))):
         size, alpha = load_motion(os.path.join(args.out, "%s_%s.png"%(args.source, kind)))
         write(tint(size, alpha, ramp), args.out, "ie_crude_oil_"+kind)
+    write_fractions(args.out, args.source)
     write_blocks(BLOCK_DIR)
 
 
@@ -220,6 +221,30 @@ def write_blocks(out_dir):
         path = os.path.join(out_dir, name+".png")
         builder().save(path, "PNG", optimize=True)
         print("wrote", path)
+
+
+# ---------------------------------------------------------------------------
+# The distillation cuts. Each is the same motion (see load_motion) under a
+# different tint, so the whole family reads as one set of fluids. Colours run
+# from pale straw at the top of the column to near-black at the bottom, which
+# is both roughly true and the fastest way to tell them apart in a tank.
+# ---------------------------------------------------------------------------
+FRACTION_RAMPS = {
+    # name: (still ramp light->dark, flow tone)
+    "ie_naphtha": (((236, 226, 178), (214, 200, 142), (186, 170, 108)), (206, 192, 136)),
+    "ie_gasoline": (((238, 206, 120), (222, 176, 74), (188, 140, 48)), (214, 172, 72)),
+    "ie_diesel": (((214, 176, 116), (184, 140, 80), (146, 104, 52)), (178, 136, 78)),
+    "ie_heavy_fuel_oil": (((104, 92, 80), (74, 64, 56), (48, 41, 36)), (70, 61, 53)),
+    "ie_lubricant": (((198, 166, 96), (168, 134, 66), (132, 100, 44)), (162, 130, 64)),
+    "ie_bitumen": (((72, 68, 66), (48, 45, 44), (28, 26, 26)), (44, 42, 41)),
+}
+
+
+def write_fractions(out_dir, source):
+    for name, (still_ramp, flow_tone) in sorted(FRACTION_RAMPS.items()):
+        for kind, ramp in (("still", still_ramp), ("flow", (flow_tone,))):
+            size, alpha = load_motion(os.path.join(out_dir, "%s_%s.png"%(source, kind)))
+            write(tint(size, alpha, ramp), out_dir, name+"_"+kind)
 
 
 if __name__ == "__main__":

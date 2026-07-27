@@ -83,20 +83,35 @@ public class TileEntityGridConsole extends TileEntityMultiblockPart<TileEntityGr
 			//City-mode parity with the feed units: presence, not consumption.
 			powered = energyStorage.getEnergyStored() > 0;
 			if(powered)
-				energyStorage.extractEnergy(GridConfig.sipAmount, false);
+				spend(GridConfig.sipAmount);
 		}
 		else
 		{
 			int cost = GridConfig.consoleStandbyDraw*10;
-			powered = energyStorage.extractEnergy(cost, true) >= cost;
+			powered = energyStorage.getEnergyStored() >= cost;
 			if(powered)
-				energyStorage.extractEnergy(cost, false);
+				spend(cost);
 		}
 		if(powered!=wasPowered)
 		{
 			markDirty();
 			markContainingBlockForUpdate(null);
 		}
+	}
+
+	/**
+	 * Burns the console's own standby draw.
+	 * <p>
+	 * Deliberately not {@code extractEnergy}: this storage is built with an extract limit of
+	 * zero so that nothing plugged into the console can siphon its buffer back out, and that
+	 * limit applies to every caller -- including this one. Going through it meant the console
+	 * could never spend a single flux, so it never drew its standby load and reported "NO
+	 * POWER" forever no matter how much energy it was fed.
+	 */
+	private void spend(int amount)
+	{
+		if(amount > 0)
+			energyStorage.modifyEnergyStored(-amount);
 	}
 
 	//	=================================

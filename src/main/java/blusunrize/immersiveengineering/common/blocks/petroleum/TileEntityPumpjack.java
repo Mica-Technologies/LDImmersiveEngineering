@@ -136,6 +136,9 @@ public class TileEntityPumpjack extends TileEntityMultiblockPart<TileEntityPumpj
 		//The flag decays at the end of every production pass by design, so this is not a switch
 		//being flipped once -- it is the machine proving each interval that it is still there.
 		well.setPumped(true);
+		//The buffer moved, and a chunk that saves without it comes back holding energy it already
+		//spent. Once a second, only while running.
+		markDirty();
 		return true;
 	}
 

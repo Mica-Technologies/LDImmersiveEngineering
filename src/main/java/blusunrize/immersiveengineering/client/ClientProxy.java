@@ -1279,6 +1279,18 @@ public class ClientProxy extends CommonProxy
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/natural_gas_flow");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_crude_oil_still");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_crude_oil_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_naphtha_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_naphtha_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_gasoline_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_gasoline_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_diesel_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_diesel_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_lubricant_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_lubricant_flow");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_bitumen_still");
+		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/ie_bitumen_flow");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/concrete_still");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/concrete_flow");
 		ApiUtils.getRegisterSprite(event.getMap(), "immersiveengineering:blocks/fluid/potion_still");

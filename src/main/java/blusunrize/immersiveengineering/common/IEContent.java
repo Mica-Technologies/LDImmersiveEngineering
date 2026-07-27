@@ -174,6 +174,12 @@ public class IEContent
 	public static BlockIEFluid blockFluidPropane;
 	public static BlockIEFluid blockFluidNaturalGas;
 	public static BlockIEFluid blockFluidCrudeOil;
+	public static BlockIEFluid blockFluidNaphtha;
+	public static BlockIEFluid blockFluidGasoline;
+	public static BlockIEFluid blockFluidDiesel;
+	public static BlockIEFluid blockFluidHeavyFuelOil;
+	public static BlockIEFluid blockFluidLubricant;
+	public static BlockIEFluid blockFluidBitumen;
 	public static BlockIEFluid blockFluidConcrete;
 
 	public static ItemIEBase itemMaterial;
@@ -221,6 +227,12 @@ public class IEContent
 	public static Fluid fluidPropane;
 	public static Fluid fluidNaturalGas;
 	public static Fluid fluidCrudeOil;
+	public static Fluid fluidNaphtha;
+	public static Fluid fluidGasoline;
+	public static Fluid fluidDiesel;
+	public static Fluid fluidHeavyFuelOil;
+	public static Fluid fluidLubricant;
+	public static Fluid fluidBitumen;
 	public static Fluid fluidConcrete;
 
 	public static Fluid fluidPotion;
@@ -237,6 +249,14 @@ public class IEContent
 		// Prefixed: setupFluid yields to whoever registered a name first, and the bare "crude_oil" is
 		// common enough that we would silently inherit another mod's density, viscosity and texture.
 		fluidCrudeOil = setupFluid(new Fluid("ie_crude_oil", new ResourceLocation("immersiveengineering:blocks/fluid/ie_crude_oil_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_crude_oil_flow")).setDensity(1050).setViscosity(3500));
+		// The distillation cuts, ordered as they leave the column: light and thin at the top,
+		// heavy and viscous at the bottom. All prefixed for the same reason crude is.
+		fluidNaphtha = setupFluid(new Fluid("ie_naphtha", new ResourceLocation("immersiveengineering:blocks/fluid/ie_naphtha_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_naphtha_flow")).setDensity(730).setViscosity(700));
+		fluidGasoline = setupFluid(new Fluid("ie_gasoline", new ResourceLocation("immersiveengineering:blocks/fluid/ie_gasoline_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_gasoline_flow")).setDensity(750).setViscosity(800));
+		fluidDiesel = setupFluid(new Fluid("ie_diesel", new ResourceLocation("immersiveengineering:blocks/fluid/ie_diesel_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_diesel_flow")).setDensity(840).setViscosity(1400));
+		fluidHeavyFuelOil = setupFluid(new Fluid("ie_heavy_fuel_oil", new ResourceLocation("immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_flow")).setDensity(980).setViscosity(4000));
+		fluidLubricant = setupFluid(new Fluid("ie_lubricant", new ResourceLocation("immersiveengineering:blocks/fluid/ie_lubricant_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_lubricant_flow")).setDensity(890).setViscosity(3000));
+		fluidBitumen = setupFluid(new Fluid("ie_bitumen", new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_flow")).setDensity(1250).setViscosity(6000));
 		fluidConcrete = setupFluid(new Fluid("concrete", new ResourceLocation("immersiveengineering:blocks/fluid/concrete_still"), new ResourceLocation("immersiveengineering:blocks/fluid/concrete_flow")).setDensity(2400).setViscosity(4000));
 		fluidPotion = setupFluid(new FluidPotion("potion", new ResourceLocation("immersiveengineering:blocks/fluid/potion_still"), new ResourceLocation("immersiveengineering:blocks/fluid/potion_flow")));
 
@@ -313,6 +333,12 @@ public class IEContent
 		blockFluidNaturalGas = new BlockIEFluid("fluidNaturalGas", fluidNaturalGas, Material.WATER).setFlammability(80, 500);
 		// Unrefined, so it takes a lot more to light than the distilled fuels, but it feeds a fire well once lit.
 		blockFluidCrudeOil = new BlockIEFluid("fluidCrudeOil", fluidCrudeOil, Material.WATER).setFlammability(30, 400);
+		blockFluidNaphtha = new BlockIEFluid("fluidNaphtha", fluidNaphtha, Material.WATER).setFlammability(80, 500);
+		blockFluidGasoline = new BlockIEFluid("fluidGasoline", fluidGasoline, Material.WATER).setFlammability(90, 600);
+		blockFluidDiesel = new BlockIEFluid("fluidDiesel", fluidDiesel, Material.WATER).setFlammability(50, 300);
+		blockFluidHeavyFuelOil = new BlockIEFluid("fluidHeavyFuelOil", fluidHeavyFuelOil, Material.WATER).setFlammability(20, 200);
+		blockFluidLubricant = new BlockIEFluid("fluidLubricant", fluidLubricant, Material.WATER);
+		blockFluidBitumen = new BlockIEFluid("fluidBitumen", fluidBitumen, Material.WATER);
 		blockFluidConcrete = new BlockIEFluidConcrete("fluidConcrete", fluidConcrete, Material.WATER);
 
 		itemMaterial = new ItemMaterial();
@@ -837,6 +863,17 @@ public class IEContent
 		// Deliberately awful: crude ships with a consumer from day one, but at well under half of
 		// biodiesel's yield, so burning it raw always reads as the wasteful option next to refining it.
 		DieselHandler.registerFuel(fluidCrudeOil, 50);
+		// The refined cuts. Diesel is the best thing a compression engine can burn; naphtha runs
+		// but is worth far more fed to a cracker than set on fire, which is the decision it
+		// exists to pose. Gasoline is deliberately absent: a diesel generator cannot burn it,
+		// and that engine-type split is what stops one fluid being strictly the best fuel.
+		DieselHandler.registerFuel(fluidDiesel, 162);
+		DieselHandler.registerFuel(fluidNaphtha, 112);
+		// Handheld tools are spark engines, so they take the opposite half of that split:
+		// gasoline and diesel both run them, and gasoline has nowhere else to go until the
+		// forecourt exists.
+		DieselHandler.registerDrillFuel(fluidGasoline);
+		DieselHandler.registerDrillFuel(fluidDiesel);
 		//What the world rolls underground. Nothing is generated at chunk-gen time -- deposits
 		//are computed from the seed on demand -- so this also applies to existing worlds.
 		ReservoirHandler.registerDefaults();
@@ -941,6 +978,10 @@ public class IEContent
 		ChemthrowerHandler.registerFlammable(fluidPropane);
 		ChemthrowerHandler.registerFlammable(fluidNaturalGas);
 		ChemthrowerHandler.registerFlammable(fluidCrudeOil);
+		ChemthrowerHandler.registerFlammable(fluidNaphtha);
+		ChemthrowerHandler.registerFlammable(fluidGasoline);
+		ChemthrowerHandler.registerFlammable(fluidDiesel);
+		ChemthrowerHandler.registerFlammable(fluidHeavyFuelOil);
 		ChemthrowerHandler.registerEffect("oil", new ChemthrowerEffect_Potion(null, 0, new PotionEffect(IEPotions.flammable, 140, 0), new PotionEffect(MobEffects.BLINDNESS, 80, 1)));
 		ChemthrowerHandler.registerFlammable("oil");
 		ChemthrowerHandler.registerEffect("fuel", new ChemthrowerEffect_Potion(null, 0, IEPotions.flammable, 100, 1));
@@ -1120,6 +1161,12 @@ public class IEContent
 		fluidPropane = FluidRegistry.getFluid("propane");
 		fluidNaturalGas = FluidRegistry.getFluid("natural_gas");
 		fluidCrudeOil = FluidRegistry.getFluid("ie_crude_oil");
+		fluidNaphtha = FluidRegistry.getFluid("ie_naphtha");
+		fluidGasoline = FluidRegistry.getFluid("ie_gasoline");
+		fluidDiesel = FluidRegistry.getFluid("ie_diesel");
+		fluidHeavyFuelOil = FluidRegistry.getFluid("ie_heavy_fuel_oil");
+		fluidLubricant = FluidRegistry.getFluid("ie_lubricant");
+		fluidBitumen = FluidRegistry.getFluid("ie_bitumen");
 		fluidConcrete = FluidRegistry.getFluid("concrete");
 		fluidPotion = FluidRegistry.getFluid("potion");
 	}

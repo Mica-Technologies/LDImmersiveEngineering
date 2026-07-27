@@ -26,6 +26,24 @@
 		"ie_crude_oil": [{
 			"custom": { "fluid": "ie_crude_oil" }
 		}],
+		"ie_naphtha": [{
+			"custom": { "fluid": "ie_naphtha" }
+		}],
+		"ie_gasoline": [{
+			"custom": { "fluid": "ie_gasoline" }
+		}],
+		"ie_diesel": [{
+			"custom": { "fluid": "ie_diesel" }
+		}],
+		"ie_heavy_fuel_oil": [{
+			"custom": { "fluid": "ie_heavy_fuel_oil" }
+		}],
+		"ie_lubricant": [{
+			"custom": { "fluid": "ie_lubricant" }
+		}],
+		"ie_bitumen": [{
+			"custom": { "fluid": "ie_bitumen" }
+		}],
 		"concrete": [{
 			"custom": { "fluid": "concrete" }
 		}],
