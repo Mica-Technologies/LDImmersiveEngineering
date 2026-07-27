@@ -1,0 +1,29 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"transform": "forge:default-block",
+		"model": "cube_all"
+	},
+	"variants": {
+		"inventory,type=asphalt": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt"}
+		}],
+		"inventory,type=asphalt_tile": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt_tile"}
+		}],
+		"inventory,type=asphalt_marked": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt_marked"}
+		}],
+		"type": {
+			"asphalt": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt"}
+			},
+			"asphalt_tile": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt_tile"}
+			},
+			"asphalt_marked": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt_marked"}
+			}
+		}
+	}
+}

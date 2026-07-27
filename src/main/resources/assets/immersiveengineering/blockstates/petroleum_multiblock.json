@@ -12,10 +12,22 @@
 		"inventory,type=pumpjack": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_pumpjack_body"}
 		}],
+		"inventory,type=distillation_tower": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_oilfield_frame"}
+		}],
+		"inventory,type=industrial_burner": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_derrick_side"}
+		}],
 		"type": {
 			"derrick": {},
 			"pumpjack": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_pumpjack_body"}
+			},
+			"distillation_tower": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_oilfield_frame"}
+			},
+			"industrial_burner": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_derrick_side"}
 			}
 		},
 		"boolean0": {

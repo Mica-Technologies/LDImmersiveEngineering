@@ -1777,6 +1777,13 @@ chat.immersiveengineering.info.grid.consoleUnformed=Arrange four Console Housing
 
 #Petroleum
 tile.immersiveengineering.petroleum_device.wellhead.name=Wellhead
+fluid.ie_asphalt=Wet Asphalt
+tile.immersiveengineering.fluidAsphalt.name=Wet Asphalt
+tile.immersiveengineering.petroleum_decoration.asphalt.name=Asphalt
+tile.immersiveengineering.petroleum_decoration.asphalt_tile.name=Asphalt Tile
+tile.immersiveengineering.petroleum_decoration.asphalt_marked.name=Asphalt with Markings
+tile.immersiveengineering.petroleum_multiblock.distillation_tower.name=Distillation Tower
+tile.immersiveengineering.petroleum_multiblock.industrial_burner.name=Industrial Burner
 fluid.ie_naphtha=Naphtha
 tile.immersiveengineering.fluidNaphtha.name=Naphtha
 fluid.ie_gasoline=Gasoline

@@ -38,7 +38,7 @@ class PetroleumAssetsTest
 {
 	private static final String ASSETS = "src/main/resources/assets/immersiveengineering/";
 
-	private static final String[] BLOCKSTATES = {"petroleum_device", "petroleum_multiblock"};
+	private static final String[] BLOCKSTATES = {"petroleum_device", "petroleum_multiblock", "petroleum_decoration"};
 
 	private static JsonObject read(String relativePath)
 	{
@@ -144,6 +144,18 @@ class PetroleumAssetsTest
 		}
 
 		@Test
+		@DisplayName("petroleum_decoration covers every meta it declares")
+		void decorationCoversItsMetas()
+		{
+			Set<String> expected = new HashSet<>();
+			for(BlockTypes_PetroleumDecoration type : BlockTypes_PetroleumDecoration.values())
+				expected.add(type.getName());
+			assertEquals(expected,
+					keys(blockstate("petroleum_decoration").getAsJsonObject("variants")
+							.getAsJsonObject("type")));
+		}
+
+		@Test
 		@DisplayName("petroleum_multiblock covers every meta it declares")
 		void multiblockCoversItsMetas()
 		{
@@ -164,6 +176,11 @@ class PetroleumAssetsTest
 			for(BlockTypes_PetroleumDevice type : BlockTypes_PetroleumDevice.values())
 				assertTrue(deviceVariants.contains("inventory,type="+type.getName()),
 						"petroleum_device has no inventory variant for "+type.getName());
+
+			Set<String> decoVariants = keys(blockstate("petroleum_decoration").getAsJsonObject("variants"));
+			for(BlockTypes_PetroleumDecoration type : BlockTypes_PetroleumDecoration.values())
+				assertTrue(decoVariants.contains("inventory,type="+type.getName()),
+						"petroleum_decoration has no inventory variant for "+type.getName());
 
 			Set<String> mbVariants = keys(blockstate("petroleum_multiblock").getAsJsonObject("variants"));
 			for(BlockTypes_PetroleumMultiblock type : BlockTypes_PetroleumMultiblock.values())

@@ -104,6 +104,7 @@ def main():
         write(tint(size, alpha, ramp), args.out, "ie_crude_oil_"+kind)
     write_fractions(args.out, args.source)
     write_blocks(BLOCK_DIR)
+    write_roads(BLOCK_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +238,7 @@ FRACTION_RAMPS = {
     "ie_heavy_fuel_oil": (((104, 92, 80), (74, 64, 56), (48, 41, 36)), (70, 61, 53)),
     "ie_lubricant": (((198, 166, 96), (168, 134, 66), (132, 100, 44)), (162, 130, 64)),
     "ie_bitumen": (((72, 68, 66), (48, 45, 44), (28, 26, 26)), (44, 42, 41)),
+    "ie_asphalt": (((88, 84, 82), (62, 59, 58), (40, 38, 38)), (58, 55, 54)),
 }
 
 
@@ -245,6 +247,71 @@ def write_fractions(out_dir, source):
         for kind, ramp in (("still", still_ramp), ("flow", (flow_tone,))):
             size, alpha = load_motion(os.path.join(out_dir, "%s_%s.png"%(source, kind)))
             write(tint(size, alpha, ramp), out_dir, name+"_"+kind)
+
+
+# ---------------------------------------------------------------------------
+# Laid asphalt. Aggregate speckle over a dark binder, which is what asphalt
+# actually looks like and reads clearly at a distance as a road surface.
+# ---------------------------------------------------------------------------
+ASPHALT_BASE = (46, 45, 47, 255)
+ASPHALT_GRIT = (66, 65, 68, 255)
+ASPHALT_GRIT2 = (84, 83, 87, 255)
+ASPHALT_SEAM = (34, 33, 35, 255)
+ROAD_PAINT = (214, 198, 96, 255)
+
+
+def _speckle(px, seed):
+    """Deterministic aggregate scatter -- same input, same road, every run."""
+    state = seed
+    for y in range(16):
+        for x in range(16):
+            state = (state*1103515245+12345) & 0x7FFFFFFF
+            roll = state % 100
+            px[x, y] = (ASPHALT_GRIT2 if roll < 6
+                        else ASPHALT_GRIT if roll < 22
+                        else ASPHALT_BASE)
+
+
+def asphalt():
+    img = _blank(ASPHALT_BASE)
+    _speckle(img.load(), 20260727)
+    return img
+
+
+def asphalt_tile():
+    img = _blank(ASPHALT_BASE)
+    px = img.load()
+    _speckle(px, 991)
+    # A single seam cross, so tiles read as laid rather than poured.
+    _rect(px, 0, 7, 15, 8, ASPHALT_SEAM)
+    _rect(px, 7, 0, 8, 15, ASPHALT_SEAM)
+    return img
+
+
+def asphalt_marked():
+    img = _blank(ASPHALT_BASE)
+    px = img.load()
+    _speckle(px, 5150)
+    # Dashed centre line down the block, so a run of them reads as a lane.
+    for y in range(1, 15):
+        if y % 6 != 0:
+            _rect(px, 7, y, 8, y, ROAD_PAINT)
+    return img
+
+
+ROAD_TEXTURES = {
+    "petroleum_asphalt": asphalt,
+    "petroleum_asphalt_tile": asphalt_tile,
+    "petroleum_asphalt_marked": asphalt_marked,
+}
+
+
+def write_roads(out_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    for name, builder in sorted(ROAD_TEXTURES.items()):
+        path = os.path.join(out_dir, name+".png")
+        builder().save(path, "PNG", optimize=True)
+        print("wrote", path)
 
 
 if __name__ == "__main__":

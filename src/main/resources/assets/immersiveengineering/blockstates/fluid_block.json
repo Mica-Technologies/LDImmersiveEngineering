@@ -44,6 +44,9 @@
 		"ie_bitumen": [{
 			"custom": { "fluid": "ie_bitumen" }
 		}],
+		"ie_asphalt": [{
+			"custom": { "fluid": "ie_asphalt" }
+		}],
 		"concrete": [{
 			"custom": { "fluid": "concrete" }
 		}],

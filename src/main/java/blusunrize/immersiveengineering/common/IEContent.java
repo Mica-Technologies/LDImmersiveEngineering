@@ -180,6 +180,8 @@ public class IEContent
 	public static BlockIEFluid blockFluidHeavyFuelOil;
 	public static BlockIEFluid blockFluidLubricant;
 	public static BlockIEFluid blockFluidBitumen;
+	public static BlockIEFluid blockFluidAsphalt;
+	public static BlockIEBase<BlockTypes_PetroleumDecoration> blockPetroleumDecoration;
 	public static BlockIEFluid blockFluidConcrete;
 
 	public static ItemIEBase itemMaterial;
@@ -233,6 +235,7 @@ public class IEContent
 	public static Fluid fluidHeavyFuelOil;
 	public static Fluid fluidLubricant;
 	public static Fluid fluidBitumen;
+	public static Fluid fluidAsphalt;
 	public static Fluid fluidConcrete;
 
 	public static Fluid fluidPotion;
@@ -256,6 +259,8 @@ public class IEContent
 		fluidDiesel = setupFluid(new Fluid("ie_diesel", new ResourceLocation("immersiveengineering:blocks/fluid/ie_diesel_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_diesel_flow")).setDensity(840).setViscosity(1400));
 		fluidHeavyFuelOil = setupFluid(new Fluid("ie_heavy_fuel_oil", new ResourceLocation("immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_flow")).setDensity(980).setViscosity(4000));
 		fluidLubricant = setupFluid(new Fluid("ie_lubricant", new ResourceLocation("immersiveengineering:blocks/fluid/ie_lubricant_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_lubricant_flow")).setDensity(890).setViscosity(3000));
+		// Wet asphalt: mixed from bitumen and aggregate, poured, and left to set.
+		fluidAsphalt = setupFluid(new Fluid("ie_asphalt", new ResourceLocation("immersiveengineering:blocks/fluid/ie_asphalt_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_asphalt_flow")).setDensity(2100).setViscosity(5000));
 		fluidBitumen = setupFluid(new Fluid("ie_bitumen", new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_flow")).setDensity(1250).setViscosity(6000));
 		fluidConcrete = setupFluid(new Fluid("concrete", new ResourceLocation("immersiveengineering:blocks/fluid/concrete_still"), new ResourceLocation("immersiveengineering:blocks/fluid/concrete_flow")).setDensity(2400).setViscosity(4000));
 		fluidPotion = setupFluid(new FluidPotion("potion", new ResourceLocation("immersiveengineering:blocks/fluid/potion_still"), new ResourceLocation("immersiveengineering:blocks/fluid/potion_flow")));
@@ -324,6 +329,7 @@ public class IEContent
 		blockGridMultiblock = new BlockGridMultiblock();
 		blockPetroleumDevice = new BlockPetroleumDevice();
 		blockPetroleumMultiblock = new BlockPetroleumMultiblock();
+		blockPetroleumDecoration = new BlockPetroleumDecoration();
 
 		blockFluidCreosote = new BlockIEFluid("fluidCreosote", fluidCreosote, Material.WATER).setFlammability(40, 400);
 		blockFluidPlantoil = new BlockIEFluid("fluidPlantoil", fluidPlantoil, Material.WATER);
@@ -339,6 +345,7 @@ public class IEContent
 		blockFluidHeavyFuelOil = new BlockIEFluid("fluidHeavyFuelOil", fluidHeavyFuelOil, Material.WATER).setFlammability(20, 200);
 		blockFluidLubricant = new BlockIEFluid("fluidLubricant", fluidLubricant, Material.WATER);
 		blockFluidBitumen = new BlockIEFluid("fluidBitumen", fluidBitumen, Material.WATER);
+		blockFluidAsphalt = new BlockIEFluidAsphalt("fluidAsphalt", fluidAsphalt, Material.WATER);
 		blockFluidConcrete = new BlockIEFluidConcrete("fluidConcrete", fluidConcrete, Material.WATER);
 
 		itemMaterial = new ItemMaterial();
@@ -530,6 +537,9 @@ public class IEContent
 		}, 2048, 40);
 
 		MixerRecipe.addRecipe(new FluidStack(fluidConcrete, 500), new FluidStack(FluidRegistry.WATER, 500), new Object[]{"sand", "sand", Items.CLAY_BALL, "gravel"}, 3200);
+		// Bitumen is the bottom of the barrel and the only cut with no fuel value at all.
+		// Paving is what stops it being a waste product the player has to dump.
+		MixerRecipe.addRecipe(new FluidStack(fluidAsphalt, 500), new FluidStack(fluidBitumen, 250), new Object[]{"sand", "gravel", "gravel"}, 3200);
 
 		BottlingMachineRecipe.addRecipe(new ItemStack(Blocks.SPONGE, 1, 1), new ItemStack(Blocks.SPONGE, 1, 0), new FluidStack(FluidRegistry.WATER, 1000));
 
@@ -1181,6 +1191,7 @@ public class IEContent
 		fluidHeavyFuelOil = FluidRegistry.getFluid("ie_heavy_fuel_oil");
 		fluidLubricant = FluidRegistry.getFluid("ie_lubricant");
 		fluidBitumen = FluidRegistry.getFluid("ie_bitumen");
+		fluidAsphalt = FluidRegistry.getFluid("ie_asphalt");
 		fluidConcrete = FluidRegistry.getFluid("concrete");
 		fluidPotion = FluidRegistry.getFluid("potion");
 	}
