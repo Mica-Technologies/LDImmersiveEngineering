@@ -227,6 +227,10 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	 * held in between. Scanning nine positions every tick to find a furnace that has not moved
 	 * would be exactly the sort of poll this machine is meant not to do.
 	 */
+	/**
+	 * The tower this firebox is fuelling, if any. Cached on the stoking interval.
+	 */
+	private TileEntityDistillationTower towerTarget;
 	private TileEntity[] heatTargets = new TileEntity[0];
 
 	public TileEntityIndustrialBurner()
@@ -319,6 +323,7 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 		//array that is almost always empty.
 		if(heatTargets.length > 0&&heatBuffer > 0)
 			heatCrown();
+		heatAdjacentTower();
 	}
 
 	/**
@@ -416,11 +421,37 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	}
 
 	/**
+	 * Fires the reboiler of any Distillation Tower stood against the firebox.
+	 * <p>
+	 * Deliberately from the side rather than the crown: the crown is where a furnace goes, and a
+	 * twelve-block column balanced on top of a firebox would be a silly thing to ask anyone to
+	 * build. Beside it is also how a real one is arranged.
+	 * <p>
+	 * The tower's contract is one-way and decays on its own, so this only has to keep saying
+	 * "there is fire under you" while the fire is lit. A burner that goes out or is torn down
+	 * needs to tell nobody -- the tower simply stops being heated a few seconds later.
+	 */
+	private void heatAdjacentTower()
+	{
+		if(towerTarget==null||towerTarget.isInvalid())
+			return;
+		//Do not spend fuel heating a tower with nothing to distil.
+		if(!towerTarget.isDistilling())
+			return;
+		int cost = heatRate;
+		if(heatBuffer < cost)
+			return;
+		if(towerTarget.supplyProcessHeat(BURN_INTERVAL))
+			heatBuffer -= cost;
+	}
+
+	/**
 	 * Re-reads what is standing on the crown. The crown is the working face of the machine, so
 	 * "set a furnace on top of the burner" is the whole instruction a player needs.
 	 */
 	private void refreshHeatTargets()
 	{
+		refreshTowerTarget();
 		List<TileEntity> found = null;
 		for(int l = 0; l < PetroleumGeometry.BURNER_DEPTH; l++)
 			for(int w = 0; w < PetroleumGeometry.BURNER_WIDTH; w++)
@@ -435,6 +466,31 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 				found.add(te);
 			}
 		heatTargets = found==null?new TileEntity[0]: found.toArray(new TileEntity[found.size()]);
+	}
+
+	/**
+	 * Looks around the firebox wall for a tower to fire. Resolved on the stoking interval and
+	 * cached, like the crown targets, so the per-tick path never touches the world.
+	 */
+	private void refreshTowerTarget()
+	{
+		towerTarget = null;
+		int chamber = PetroleumGeometry.BURNER_HEIGHT/2;
+		for(int l = 0; l < PetroleumGeometry.BURNER_DEPTH&&towerTarget==null; l++)
+			for(int w = 0; w < PetroleumGeometry.BURNER_WIDTH&&towerTarget==null; w++)
+			{
+				BlockPos cell = getBlockPosForPos(PetroleumGeometry.structureIndex(
+						PetroleumGeometry.BURNER_SIZE, chamber, l, w));
+				for(EnumFacing side : EnumFacing.HORIZONTALS)
+				{
+					TileEntity te = Utils.getExistingTileEntity(world, cell.offset(side));
+					if(te instanceof TileEntityDistillationTower)
+					{
+						towerTarget = (TileEntityDistillationTower)te;
+						break;
+					}
+				}
+			}
 	}
 
 	private static boolean isHeatable(TileEntity te)

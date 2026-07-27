@@ -29,7 +29,11 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * Structural block the Drilling Derrick and Pumpjack are built from.
 	 */
-	OILFIELD_FRAME;
+	OILFIELD_FRAME,
+	/**
+	 * Burns off gas nobody has anywhere better to put.
+	 */
+	FLARE_STACK;
 
 	@Override
 	public String getName()

@@ -53,6 +53,8 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 		{
 			case WELLHEAD:
 				return new TileEntityWellhead();
+			case FLARE_STACK:
+				return new TileEntityFlareStack();
 			case OILFIELD_FRAME:
 				//Inert on its own; it only matters as part of an assembled structure.
 				return null;
@@ -63,6 +65,7 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 	@Override
 	public boolean hasTileEntity(IBlockState state)
 	{
-		return state.getValue(property)==BlockTypes_PetroleumDevice.WELLHEAD;
+		BlockTypes_PetroleumDevice type = state.getValue(property);
+		return type==BlockTypes_PetroleumDevice.WELLHEAD||type==BlockTypes_PetroleumDevice.FLARE_STACK;
 	}
 }

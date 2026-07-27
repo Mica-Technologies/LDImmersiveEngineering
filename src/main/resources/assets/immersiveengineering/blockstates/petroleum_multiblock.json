@@ -18,6 +18,12 @@
 		"inventory,type=industrial_burner": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_derrick_side"}
 		}],
+		"inventory,type=gas_scrubber": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_vessel"}
+		}],
+		"inventory,type=gas_turbine": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_turbine_body"}
+		}],
 		"type": {
 			"derrick": {},
 			"pumpjack": {
@@ -28,6 +34,12 @@
 			},
 			"industrial_burner": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_derrick_side"}
+			},
+			"gas_scrubber": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_vessel"}
+			},
+			"gas_turbine": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_turbine_body"}
 			}
 		},
 		"boolean0": {

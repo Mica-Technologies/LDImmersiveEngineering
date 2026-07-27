@@ -39,7 +39,15 @@ public enum BlockTypes_PetroleumMultiblock implements IStringSerializable, Block
 	/**
 	 * Burns the fuels nothing else wants, for process heat rather than flux.
 	 */
-	INDUSTRIAL_BURNER;
+	INDUSTRIAL_BURNER,
+	/**
+	 * Cleans raw wellhead gas, dropping sulfur out of it.
+	 */
+	GAS_SCRUBBER,
+	/**
+	 * Burns gas for flux, with a spool-up that makes it a peaker rather than a base load.
+	 */
+	GAS_TURBINE;
 
 	@Override
 	public String getName()

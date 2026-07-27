@@ -181,6 +181,7 @@ public class IEContent
 	public static BlockIEFluid blockFluidLubricant;
 	public static BlockIEFluid blockFluidBitumen;
 	public static BlockIEFluid blockFluidAsphalt;
+	public static BlockIEFluid blockFluidSourGas;
 	public static BlockIEBase<BlockTypes_PetroleumDecoration> blockPetroleumDecoration;
 	public static BlockIEFluid blockFluidConcrete;
 
@@ -236,6 +237,7 @@ public class IEContent
 	public static Fluid fluidLubricant;
 	public static Fluid fluidBitumen;
 	public static Fluid fluidAsphalt;
+	public static Fluid fluidSourGas;
 	public static Fluid fluidConcrete;
 
 	public static Fluid fluidPotion;
@@ -259,6 +261,10 @@ public class IEContent
 		fluidDiesel = setupFluid(new Fluid("ie_diesel", new ResourceLocation("immersiveengineering:blocks/fluid/ie_diesel_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_diesel_flow")).setDensity(840).setViscosity(1400));
 		fluidHeavyFuelOil = setupFluid(new Fluid("ie_heavy_fuel_oil", new ResourceLocation("immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_heavy_fuel_oil_flow")).setDensity(980).setViscosity(4000));
 		fluidLubricant = setupFluid(new Fluid("ie_lubricant", new ResourceLocation("immersiveengineering:blocks/fluid/ie_lubricant_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_lubricant_flow")).setDensity(890).setViscosity(3000));
+		// Raw associated gas straight off a wellhead. Deliberately not a fuel and not accepted by
+		// anything but the scrubber: until it is cleaned it is a problem to be dealt with, which
+		// is what gives the gas branch its shape.
+		fluidSourGas = setupFluid(new Fluid("ie_sour_gas", new ResourceLocation("immersiveengineering:blocks/fluid/ie_sour_gas_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_sour_gas_flow")).setDensity(520).setViscosity(650));
 		// Wet asphalt: mixed from bitumen and aggregate, poured, and left to set.
 		fluidAsphalt = setupFluid(new Fluid("ie_asphalt", new ResourceLocation("immersiveengineering:blocks/fluid/ie_asphalt_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_asphalt_flow")).setDensity(2100).setViscosity(5000));
 		fluidBitumen = setupFluid(new Fluid("ie_bitumen", new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_still"), new ResourceLocation("immersiveengineering:blocks/fluid/ie_bitumen_flow")).setDensity(1250).setViscosity(6000));
@@ -346,6 +352,7 @@ public class IEContent
 		blockFluidLubricant = new BlockIEFluid("fluidLubricant", fluidLubricant, Material.WATER);
 		blockFluidBitumen = new BlockIEFluid("fluidBitumen", fluidBitumen, Material.WATER);
 		blockFluidAsphalt = new BlockIEFluidAsphalt("fluidAsphalt", fluidAsphalt, Material.WATER);
+		blockFluidSourGas = new BlockIEFluid("fluidSourGas", fluidSourGas, Material.WATER).setFlammability(60, 400);
 		blockFluidConcrete = new BlockIEFluidConcrete("fluidConcrete", fluidConcrete, Material.WATER);
 
 		itemMaterial = new ItemMaterial();
@@ -799,6 +806,9 @@ public class IEContent
 		registerTile(TileEntityPumpjack.class);
 		registerTile(TileEntityDistillationTower.class);
 		registerTile(TileEntityIndustrialBurner.class);
+		registerTile(TileEntityGasScrubber.class);
+		registerTile(TileEntityGasTurbine.class);
+		registerTile(TileEntityFlareStack.class);
 
 
 
@@ -1196,6 +1206,7 @@ public class IEContent
 		fluidLubricant = FluidRegistry.getFluid("ie_lubricant");
 		fluidBitumen = FluidRegistry.getFluid("ie_bitumen");
 		fluidAsphalt = FluidRegistry.getFluid("ie_asphalt");
+		fluidSourGas = FluidRegistry.getFluid("ie_sour_gas");
 		fluidConcrete = FluidRegistry.getFluid("concrete");
 		fluidPotion = FluidRegistry.getFluid("potion");
 	}

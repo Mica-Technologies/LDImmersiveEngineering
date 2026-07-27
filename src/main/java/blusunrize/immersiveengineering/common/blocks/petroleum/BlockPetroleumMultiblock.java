@@ -55,6 +55,10 @@ public class BlockPetroleumMultiblock extends BlockIEMultiblock<BlockTypes_Petro
 				return new TileEntityDistillationTower();
 			case INDUSTRIAL_BURNER:
 				return new TileEntityIndustrialBurner();
+			case GAS_SCRUBBER:
+				return new TileEntityGasScrubber();
+			case GAS_TURBINE:
+				return new TileEntityGasTurbine();
 		}
 		return null;
 	}

@@ -70,6 +70,28 @@ public final class PetroleumGeometry
 	public static final int BURNER_WIDTH = 3;
 	public static final int[] BURNER_SIZE = {BURNER_HEIGHT, BURNER_DEPTH, BURNER_WIDTH};
 
+	//	=================================
+	//		GAS SCRUBBER
+	//	=================================
+	/**
+	 * H, L, W. Twin vertical vessels, tall enough to read as pressure equipment.
+	 */
+	public static final int SCRUBBER_HEIGHT = 6;
+	public static final int SCRUBBER_DEPTH = 3;
+	public static final int SCRUBBER_WIDTH = 3;
+	public static final int[] SCRUBBER_SIZE = {SCRUBBER_HEIGHT, SCRUBBER_DEPTH, SCRUBBER_WIDTH};
+
+	//	=================================
+	//		GAS TURBINE
+	//	=================================
+	/**
+	 * H, L, W. Long and low: intake house, nacelle, exhaust stack in a line.
+	 */
+	public static final int TURBINE_HEIGHT = 3;
+	public static final int TURBINE_DEPTH = 6;
+	public static final int TURBINE_WIDTH = 3;
+	public static final int[] TURBINE_SIZE = {TURBINE_HEIGHT, TURBINE_DEPTH, TURBINE_WIDTH};
+
 	/**
 	 * Linear index into a structure, matching {@code TileEntityMultiblockPart.pos}.
 	 */

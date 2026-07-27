@@ -47,6 +47,9 @@
 		"ie_asphalt": [{
 			"custom": { "fluid": "ie_asphalt" }
 		}],
+		"ie_sour_gas": [{
+			"custom": { "fluid": "ie_sour_gas" }
+		}],
 		"concrete": [{
 			"custom": { "fluid": "concrete" }
 		}],

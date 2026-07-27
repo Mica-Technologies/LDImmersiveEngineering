@@ -105,6 +105,7 @@ def main():
     write_fractions(args.out, args.source)
     write_blocks(BLOCK_DIR)
     write_roads(BLOCK_DIR)
+    write_extra(BLOCK_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -239,6 +240,7 @@ FRACTION_RAMPS = {
     "ie_lubricant": (((198, 166, 96), (168, 134, 66), (132, 100, 44)), (162, 130, 64)),
     "ie_bitumen": (((72, 68, 66), (48, 45, 44), (28, 26, 26)), (44, 42, 41)),
     "ie_asphalt": (((88, 84, 82), (62, 59, 58), (40, 38, 38)), (58, 55, 54)),
+    "ie_sour_gas": (((198, 206, 150), (168, 178, 112), (132, 142, 78)), (162, 172, 108)),
 }
 
 
@@ -309,6 +311,62 @@ ROAD_TEXTURES = {
 def write_roads(out_dir):
     os.makedirs(out_dir, exist_ok=True)
     for name, builder in sorted(ROAD_TEXTURES.items()):
+        path = os.path.join(out_dir, name+".png")
+        builder().save(path, "PNG", optimize=True)
+        print("wrote", path)
+
+
+def flare_stack():
+    """Sooted stack: a rolled steel tube with a scorched tip band."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 5, 0, 10, 15, STEEL)
+    _rect(px, 5, 0, 5, 15, STEEL_LIT)
+    _rect(px, 10, 0, 10, 15, OUTLINE)
+    for y in range(1, 15, 4):
+        _rect(px, 5, y, 10, y, STEEL_DARK)
+    # Soot creeping up from the tip.
+    for y in range(0, 5):
+        _rect(px, 5, y, 10, y, (36, 33, 32, 255))
+    return img
+
+
+def vessel():
+    """Pressure vessel plate: riveted seams round a cylinder."""
+    img = _blank(STEEL)
+    px = img.load()
+    for x in range(16):
+        shade = STEEL_LIT if x < 4 else STEEL if x < 12 else STEEL_DARK
+        _rect(px, x, 0, x, 15, shade)
+    for y in (0, 7, 15):
+        _rect(px, 0, y, 15, y, OUTLINE)
+    _dots(px, [(2, 3), (8, 3), (13, 3), (2, 11), (8, 11), (13, 11)], BOLT)
+    return img
+
+
+def turbine_body():
+    """Nacelle cladding with a cooling louvre band."""
+    img = _blank(STEEL)
+    px = img.load()
+    _rect(px, 0, 0, 15, 15, STEEL)
+    _rect(px, 0, 5, 15, 10, STEEL_DARK)
+    for x in range(1, 15, 2):
+        _rect(px, x, 6, x, 9, STEEL_LIT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _dots(px, [(2, 2), (13, 2), (2, 13), (13, 13)], BOLT)
+    return img
+
+
+EXTRA_BLOCKS = {
+    "petroleum_flare_stack": flare_stack,
+    "petroleum_vessel": vessel,
+    "petroleum_turbine_body": turbine_body,
+}
+
+
+def write_extra(out_dir):
+    for name, builder in sorted(EXTRA_BLOCKS.items()):
         path = os.path.join(out_dir, name+".png")
         builder().save(path, "PNG", optimize=True)
         print("wrote", path)

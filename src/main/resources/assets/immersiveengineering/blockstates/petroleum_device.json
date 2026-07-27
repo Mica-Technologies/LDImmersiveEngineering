@@ -9,6 +9,9 @@
 	},
 	"variants": {
 		"inventory,type=oilfield_frame": [{}],
+		"inventory,type=flare_stack": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
+		}],
 		"inventory,type=wellhead": [{
 			"model": "immersiveengineering:petroleum/wellhead",
 			"textures": {
@@ -18,6 +21,9 @@
 		}],
 		"type": {
 			"oilfield_frame": {},
+			"flare_stack": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
+			},
 			"wellhead": {
 				"model": "immersiveengineering:petroleum/wellhead",
 				"textures": {
