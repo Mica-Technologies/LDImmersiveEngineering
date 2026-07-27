@@ -180,6 +180,33 @@ dependencies {
     compileOnly "de.ellpeck.actuallyadditions:ActuallyAdditions:1.12.2-r152.16"  // was 1.12.2+
     compileOnly 'baubles:Baubles:1.12:1.5.2'
     deobfCompile "albedo:albedo:0.1.3"
+
+    // Unit tests. JUnit 5.9.x is the last line that still supports Java 8, which this
+    // project is pinned to; Gradle 4.6+ can run the JUnit Platform, so 4.10.3 is fine.
+    // Only compileClasspath is dependency-locked (see above), so these do not affect
+    // gradle/dependency-locks/.
+    testCompile 'org.junit.jupiter:junit-jupiter:5.9.2'
+    testCompile 'org.hamcrest:hamcrest:2.2'
+    testRuntime 'org.junit.platform:junit-platform-launcher:1.9.2'
+}
+
+// Tests run against the deobfuscated Minecraft classes already on the compile
+// classpath, so plain data types (NBTTagCompound, BlockPos, EnumFacing, ...) work
+// without a Forge/FML bootstrap. Anything needing the registries or a real World is
+// deliberately kept out of the unit-testable layer -- see docs/VIRTUAL_GRID.md.
+test {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'failed', 'skipped'
+        exceptionFormat = 'full'
+        showStandardStreams = false
+    }
+    // Surface a one-line summary; without this a green run prints nothing at all.
+    afterSuite { desc, result ->
+        if (!desc.parent)
+            println "Tests: ${result.testCount} run, ${result.successfulTestCount} passed, " +
+                    "${result.failedTestCount} failed, ${result.skippedTestCount} skipped"
+    }
 }
 
 reobf {
