@@ -285,8 +285,8 @@ in one view.
 ## Distillation Tower
 
 Both halves of the registration are present: `registerTile(TileEntityDistillationTower.class)`
-(`IEContent.java:800`) and `MultiblockHandler.registerMultiblock(MultiblockDistillationTower.instance)`
-(`IEContent.java:1096`), immediately alongside the Derrick's and Pumpjack's own calls.
+(`IEContent.java:807`) and `MultiblockHandler.registerMultiblock(MultiblockDistillationTower.instance)`
+(`IEContent.java:1106`), immediately alongside the Derrick's and Pumpjack's own calls.
 
 `MultiblockDistillationTower` (`common/blocks/multiblocks/MultiblockDistillationTower.java`)
 defines the shape: a two-by-two steel shell that runs the full twelve-block height — the vessel —
@@ -374,8 +374,8 @@ fullness, floored at 1 rather than 0 so a tower holding any crude at all never r
 ## Industrial Burner
 
 Registration is likewise complete: `registerTile(TileEntityIndustrialBurner.class)`
-(`IEContent.java:801`) and `MultiblockHandler.registerMultiblock(MultiblockIndustrialBurner.instance)`
-(`IEContent.java:1097`).
+(`IEContent.java:808`) and `MultiblockHandler.registerMultiblock(MultiblockIndustrialBurner.instance)`
+(`IEContent.java:1107`).
 
 `MultiblockIndustrialBurner` (`common/blocks/multiblocks/MultiblockIndustrialBurner.java`) is a
 three-by-three-by-three firebox: a refractory hearth and lining of Blast Brick carrying the fire, a
@@ -464,14 +464,14 @@ whose constructor touches `FluidRegistry`, which cannot bootstrap outside a runn
 (`DistillationRecipe.java:36-39`); coverage is the server smoke run and `DistillationTowerTest`'s
 shape/mapping checks instead.
 
-One recipe is registered, at `IEContent.java:529-537`:
+One recipe is registered, at `IEContent.java:536-544`:
 
 | Input | Output |
 |---|---|
 | 100 mB crude oil | 10 mB natural gas, 15 mB naphtha, 25 mB gasoline, 30 mB diesel, 10 mB heavy fuel oil, 4 mB lubricant, 6 mB bitumen |
 
 Energy 2048, time 40 ticks. A comment at the registration site notes kerosene was deliberately cut
-from the design, its yield folded into diesel (`IEContent.java:528`). The Distillation Tower is now
+from the design, its yield folded into diesel (`IEContent.java:535`). The Distillation Tower is now
 what drives this: `DistillationRecipe.findRecipe` is called from the tower's `update()` once a
 batch slot is free (`TileEntityDistillationTower.java:221`), matched by `containsFluid` against
 whatever the feed tank holds, and `findIncompleteRecipes` gates what the feed tank accepts in the
@@ -482,7 +482,7 @@ recipe — `findRecipe` returns the first match — but only the crude-oil recip
 
 ## Fluids
 
-Registered in `IEContent.java:254-264`:
+Registered in `IEContent.java:256-270`:
 
 | Fluid | Registry name | Role |
 |---|---|---|
@@ -717,7 +717,6 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 | Distillation Tower tile entity / shape | `common/blocks/petroleum/TileEntityDistillationTower.java`, `common/blocks/multiblocks/MultiblockDistillationTower.java` |
 | Industrial Burner tile entity / shape | `common/blocks/petroleum/TileEntityIndustrialBurner.java`, `common/blocks/multiblocks/MultiblockIndustrialBurner.java` |
 | Wet asphalt fluid block / laid road blocks | `common/blocks/petroleum/BlockIEFluidAsphalt.java`, `BlockPetroleumDecoration.java`, `BlockTypes_PetroleumDecoration.java` |
-| Gas Scrubber / Gas Turbine (still stubs) | `common/blocks/petroleum/TileEntityGasScrubber.java`, `TileEntityGasTurbine.java` |
 | Placeable device / assembled-structure block metas | `common/blocks/petroleum/BlockPetroleumDevice.java`, `BlockTypes_PetroleumDevice.java`, `BlockPetroleumMultiblock.java`, `BlockTypes_PetroleumMultiblock.java` |
 | Shared structure geometry | `common/blocks/petroleum/PetroleumGeometry.java` |
 | Tick driver (why Wellheads are not `ITickable`) | `common/util/petroleum/PetroleumTickHandler.java` |

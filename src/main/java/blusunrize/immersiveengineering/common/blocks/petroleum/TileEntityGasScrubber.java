@@ -403,7 +403,7 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 		{
 			//Only the master knows whether the machine is working, and only its own position is
 			//needed to place the plume, so the other thirty-nine do nothing at all.
-			if(formed&&!isDummy()&&active&&world.getTotalWorldTime()%4==0)
+			if(formed&&!isDummy()&&status==STATUS_SCRUBBING&&world.getTotalWorldTime()%4==0)
 				spawnPlume();
 			return;
 		}
@@ -419,11 +419,14 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	 */
 	private void runPass()
 	{
-		boolean wasActive = active;
-		Scrubbing recipe = getScrubbing(tankSour.getFluid()==null?null: tankSour.getFluid().getFluid());
-		active = recipe!=null&&scrub(recipe) > 0;
+		int previous = status;
+		status = STATUS_IDLE;
+		FluidStack feed = tankSour.getFluid();
+		Scrubbing recipe = feed==null?null: getScrubbing(feed.getFluid());
+		if(recipe!=null)
+			scrub(recipe);
 		ejectSulfur();
-		if(active!=wasActive)
+		if(status!=previous)
 			markContainingBlockForUpdate(null);
 		//Both tanks and the sulfur buffer moved, and a chunk saved without them comes back holding
 		//gas it has already sweetened. Once a second, and only on the master.
@@ -431,26 +434,34 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	}
 
 	/**
-	 * @return how much sour gas was actually put through, in millibuckets
+	 * Puts through as much of a pass as the tanks, the sulfur buffer and the heat on offer allow,
+	 * and records why if that came to nothing.
 	 */
-	private int scrub(Scrubbing recipe)
+	private void scrub(Scrubbing recipe)
 	{
 		Fluid product = FluidRegistry.getFluid(recipe.output);
-		if(product==null)
-			return 0;
-		int volume = Math.min(CHARGE, tankSour.getFluidAmount());
-		volume = Math.min(volume, recipe.volumeForSweet(tankSweet.getCapacity()-tankSweet.getFluidAmount()));
+		int available = product==null?0: Math.min(CHARGE, tankSour.getFluidAmount());
+		if(available <= 0)
+			return;
+		int volume = Math.min(available,
+				recipe.volumeForSweet(tankSweet.getCapacity()-tankSweet.getFluidAmount()));
 		//Sulfur is a product, not a by-product: a machine with nowhere to put it backs up rather
 		//than quietly destroying it, exactly as the distillation tower refuses a run it cannot
 		//finish. A pack with no sulfur item at all skips this cap entirely.
-		int perSulfur = sulfur(1)==null?0: recipe.inputPerSulfur;
+		int perSulfur = hasSulfur()?recipe.inputPerSulfur: 0;
 		volume = Math.min(volume, volumeForSulfurRoom(sulfurProgress, perSulfur, SULFUR_BUFFER-sulfurBuffer));
 		if(volume <= 0)
-			return 0;
+		{
+			status = STATUS_BACKED_UP;
+			return;
+		}
 
 		TileEntityIndustrialBurner burner = heatSource();
 		if(burner==null)
-			return 0;
+		{
+			status = STATUS_NO_HEAT;
+			return;
+		}
 		if(CityMode.petroleum())
 			//City mode: the reboiler is a fact, not a simulation. A lit burner is still required and
 			//still has to be leaning on the machine, so the gesture and the plant layout survive --
@@ -458,10 +469,15 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 			burner.drawHeat(CITY_HEAT_SIP, false);
 		else
 		{
+			//Partial heat is honoured rather than refused, so an underfed scrubber visibly runs
+			//slowly instead of stalling on a threshold nothing tells the player about.
 			int granted = burner.drawHeat(recipe.heatFor(volume), true);
 			volume = Math.min(volume, recipe.volumeForHeat(granted));
 			if(volume <= 0)
-				return 0;
+			{
+				status = STATUS_NO_HEAT;
+				return;
+			}
 			burner.drawHeat(recipe.heatFor(volume), false);
 		}
 
@@ -479,7 +495,7 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 				sulfurBuffer += dust;
 			}
 		}
-		return volume;
+		status = STATUS_SCRUBBING;
 	}
 
 	/**
@@ -590,7 +606,7 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	public boolean isScrubbing()
 	{
 		TileEntityGasScrubber master = master();
-		return master!=null&&master.formed&&master.active;
+		return master!=null&&master.formed&&master.status==STATUS_SCRUBBING;
 	}
 
 	@Override
@@ -601,24 +617,29 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 		TileEntityGasScrubber master = master();
 		if(master==null)
 			return null;
+		//Which stream a face carries is static, so it needs no synced state -- and it is the one
+		//thing a player standing at the machine with a pipe in hand actually wants to know. The
+		//quantities are left to the fluid readout the tanks already give.
 		if(isFeedPort(pos))
-			return new String[]{"Sour gas: "+master.tankSour.getFluidAmount()+" mB", master.statusLine()};
+			return new String[]{"Sour gas in", statusLine(master.status)};
 		if(isProductPort(pos))
-			return new String[]{"Sweet gas: "+master.tankSweet.getFluidAmount()+" mB", master.statusLine()};
+			return new String[]{"Sweet gas out", statusLine(master.status)};
 		return null;
 	}
 
-	private String statusLine()
+	private static String statusLine(int status)
 	{
-		if(active)
-			return TextFormatting.GREEN+"Scrubbing"+TextFormatting.RESET;
-		//The three ways a scrubber stops are not interchangeable, and a player who cannot tell them
-		//apart will spend the evening re-plumbing a machine whose firebox has simply gone out.
-		if(heatSource==null||!heatSource.isBurning())
-			return TextFormatting.RED+"No heat"+TextFormatting.RESET;
-		if(sulfurBuffer >= SULFUR_BUFFER)
-			return TextFormatting.YELLOW+"Sulfur full"+TextFormatting.RESET;
-		return TextFormatting.YELLOW+"Idle"+TextFormatting.RESET;
+		switch(status)
+		{
+			case STATUS_SCRUBBING:
+				return TextFormatting.GREEN+"Scrubbing"+TextFormatting.RESET;
+			case STATUS_NO_HEAT:
+				return TextFormatting.RED+"No heat"+TextFormatting.RESET;
+			case STATUS_BACKED_UP:
+				return TextFormatting.GOLD+"Backed up"+TextFormatting.RESET;
+			default:
+				return TextFormatting.YELLOW+"Idle"+TextFormatting.RESET;
+		}
 	}
 
 	@Override
@@ -737,7 +758,7 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		super.readCustomNBT(nbt, descPacket);
-		active = nbt.getBoolean("active");
+		status = nbt.getInteger("status");
 		if(!descPacket)
 		{
 			tankSour.readFromNBT(nbt.getCompoundTag("tankSour"));
@@ -751,10 +772,10 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		super.writeCustomNBT(nbt, descPacket);
-		nbt.setBoolean("active", active);
+		nbt.setInteger("status", status);
 		//The tanks and the buffer are kept out of the description packet on purpose: nothing on the
-		//client reads them, and the overlay that shows them is server-side text. Only the running
-		//flag, which drives the plume, is worth a packet.
+		//client reads them, and a packet a second carrying two tanks that nobody can see is not
+		//worth it. Only the status, which drives the plume and the overlay, is sent.
 		if(!descPacket)
 		{
 			nbt.setTag("tankSour", tankSour.writeToNBT(new NBTTagCompound()));
