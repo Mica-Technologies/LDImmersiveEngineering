@@ -18,14 +18,10 @@ actually drives them now: `DistillationRecipe.findRecipe` is called from the tow
 (`TileEntityDistillationTower.java:221`) and `findIncompleteRecipes` gates what the feed tank will
 even accept (`TileEntityDistillationTower.java:148`).
 
-Two more machines share the block-meta enum the tower and burner used to sit in alone: the Gas
-Scrubber and the Gas Turbine (`BlockTypes_PetroleumMultiblock.GAS_SCRUBBER`, `.GAS_TURBINE`,
-`BlockTypes_PetroleumMultiblock.java:46,50`). Both have a registered tile entity and a reserved
-footprint in `PetroleumGeometry` (`SCRUBBER_SIZE`, `TURBINE_SIZE`,
-`PetroleumGeometry.java:79-82,90-93`) and nothing else — an empty `update()`, no accessible tanks,
-no shape class, no `MultiblockHandler.registerMultiblock` call
-(`TileEntityGasScrubber.java`, `TileEntityGasTurbine.java`). That is exactly the state the Tower
-and Burner used to be in; this document does not otherwise cover them.
+Work on the rest of the gas side (a Gas Scrubber and a Gas Turbine, both already present as block
+metas on `BlockTypes_PetroleumMultiblock`) is in progress in the tree but not yet in a state this
+document covers; see those classes directly for the current state rather than trusting a snapshot
+here.
 
 ---
 
@@ -38,8 +34,10 @@ and Burner used to be in; this document does not otherwise cover them.
 | **Pumpjack** | Complete | A 3×6×5 machine that drives a Wellhead whose deposit has fallen below free-flow pressure. Carries no fluid of its own. |
 | **Distillation Tower** | Complete | A 4×4×12 column that splits crude into its seven cuts, drawn off at heights matching the column order. |
 | **Industrial Burner** | Complete | A 3×3×3 firebox that burns the fuels nothing else wants for process heat, never Flux. |
-| **Gas Scrubber** | Stub | Block meta, tile entity and reserved footprint exist; no shape class, no `MultiblockHandler` registration, no logic. Cannot currently be formed. |
-| **Gas Turbine** | Stub | Same: block meta and an empty `TileEntityGasTurbine`, otherwise unimplemented. |
+
+The Gas Scrubber and the Gas Turbine (`BlockTypes_PetroleumMultiblock.GAS_SCRUBBER`, `.GAS_TURBINE`)
+are under active development in the tree and not yet at a fixed enough state for this document to
+describe; not covered below.
 
 Oilfield Frame (`BlockTypes_PetroleumDevice.OILFIELD_FRAME`,
 `src/main/java/blusunrize/immersiveengineering/common/blocks/petroleum/BlockTypes_PetroleumDevice.java:32`)
