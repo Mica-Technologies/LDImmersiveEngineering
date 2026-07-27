@@ -9,12 +9,23 @@ from a hash of the world seed and the cell's coordinates. That makes world gener
 gives existing worlds oil retroactively with no retrogen pass, and means only cells somebody has
 actually drawn from are worth persisting.
 
-**Status: partially built.** The reservoir model, prospecting, the Wellhead, the Drilling Derrick
-and the Pumpjack are complete and tested. The Distillation Tower and Industrial Burner exist only
-as block metas and empty tile-entity stubs with no shape, no recipe wiring and no GUI — see
-[Distillation Tower and Industrial Burner](#distillation-tower-and-industrial-burner-stub). The
-`DistillationRecipe` type and one crude-oil recipe are registered and ready for a machine to use
-them, but nothing currently calls `DistillationRecipe.findRecipe`.
+**Status: complete through the Distillation Tower and Industrial Burner.** The reservoir model,
+prospecting, the Wellhead, the Drilling Derrick, the Pumpjack, the Distillation Tower and the
+Industrial Burner are all implemented, hammer-formable and tested — see
+[Distillation Tower](#distillation-tower) and [Industrial Burner](#industrial-burner). The
+`DistillationRecipe` type and the shipped crude-oil recipe are registered, and the tower is what
+actually drives them now: `DistillationRecipe.findRecipe` is called from the tower's own `update()`
+(`TileEntityDistillationTower.java:221`) and `findIncompleteRecipes` gates what the feed tank will
+even accept (`TileEntityDistillationTower.java:148`).
+
+Two more machines share the block-meta enum the tower and burner used to sit in alone: the Gas
+Scrubber and the Gas Turbine (`BlockTypes_PetroleumMultiblock.GAS_SCRUBBER`, `.GAS_TURBINE`,
+`BlockTypes_PetroleumMultiblock.java:46,50`). Both have a registered tile entity and a reserved
+footprint in `PetroleumGeometry` (`SCRUBBER_SIZE`, `TURBINE_SIZE`,
+`PetroleumGeometry.java:79-82,90-93`) and nothing else — an empty `update()`, no accessible tanks,
+no shape class, no `MultiblockHandler.registerMultiblock` call
+(`TileEntityGasScrubber.java`, `TileEntityGasTurbine.java`). That is exactly the state the Tower
+and Burner used to be in; this document does not otherwise cover them.
 
 ---
 
@@ -25,8 +36,10 @@ them, but nothing currently calls `DistillationRecipe.findRecipe`.
 | **Wellhead** | Complete | Caps a drilled bore. Collects whatever the deposit gives up and pushes it into any adjacent fluid handler. |
 | **Drilling Derrick** | Complete | A 3×3×9 lattice tower, hammered together from Oilfield Frame. Sinks a bore over one minute of powered drilling, then hands over a Wellhead and packs itself back into frame. |
 | **Pumpjack** | Complete | A 3×6×5 machine that drives a Wellhead whose deposit has fallen below free-flow pressure. Carries no fluid of its own. |
-| **Distillation Tower** | Stub | Block meta and an empty `TileEntityDistillationTower` exist; no shape class, no `MultiblockHandler` registration, no logic. Cannot currently be formed. |
-| **Industrial Burner** | Stub | Same: block meta and an empty `TileEntityIndustrialBurner`, otherwise unimplemented. |
+| **Distillation Tower** | Complete | A 4×4×12 column that splits crude into its seven cuts, drawn off at heights matching the column order. |
+| **Industrial Burner** | Complete | A 3×3×3 firebox that burns the fuels nothing else wants for process heat, never Flux. |
+| **Gas Scrubber** | Stub | Block meta, tile entity and reserved footprint exist; no shape class, no `MultiblockHandler` registration, no logic. Cannot currently be formed. |
+| **Gas Turbine** | Stub | Same: block meta and an empty `TileEntityGasTurbine`, otherwise unimplemented. |
 
 Oilfield Frame (`BlockTypes_PetroleumDevice.OILFIELD_FRAME`,
 `src/main/java/blusunrize/immersiveengineering/common/blocks/petroleum/BlockTypes_PetroleumDevice.java:32`)
@@ -271,23 +284,160 @@ in one view.
 
 ---
 
-## Distillation Tower and Industrial Burner (stub)
+## Distillation Tower
 
-Both `TileEntityDistillationTower` and `TileEntityIndustrialBurner`
-(`common/blocks/petroleum/TileEntityDistillationTower.java`,
-`.../TileEntityIndustrialBurner.java`) are, in full, an empty `update()` override, `getBlockBounds`
-returning `null`, no accessible fluid tanks, and `getOriginalBlock()` returning an Oilfield Frame.
-Their block metas exist (`BlockTypes_PetroleumMultiblock.DISTILLATION_TOWER`,
-`.INDUSTRIAL_BURNER`, `common/blocks/petroleum/BlockTypes_PetroleumMultiblock.java:37-41`) and
-`BlockPetroleumMultiblock.createBasicTE` constructs the stub tile entities for them
-(`BlockPetroleumMultiblock.java:54-57`), but **there is no `MultiblockDistillationTower` or
-`MultiblockIndustrialBurner` shape class**, nothing is registered with
-`MultiblockHandler.registerMultiblock` for either (compare `IEContent.java:1082-1083`, which
-registers only the Derrick and the Pumpjack), and neither name appears in `en_us.lang`. They
-cannot currently be formed by a hammer, have no GUI, and do nothing. `PetroleumGeometry` already
-reserves their footprints (`TOWER_SIZE` 4×4×12, `BURNER_SIZE` 3×3×3,
-`PetroleumGeometry.java:53-71`), which is the only committed design fact about either machine
-today. Other agents are actively building these; document what is in the tree, not the plan.
+`MultiblockDistillationTower` (`common/blocks/multiblocks/MultiblockDistillationTower.java`)
+defines the shape: a two-by-two steel shell that runs the full twelve-block height — the vessel —
+ringed at its foot by a scaffolding deck where crude goes in and where power and redstone connect,
+with four pairs of Oilfield Frame nozzles sticking out of the shell at each of seven draw heights,
+one pair per face (class doc, `MultiblockDistillationTower.java:38-57`). The footprint is
+`PetroleumGeometry.TOWER_SIZE`, four by four by twelve (`PetroleumGeometry.java:57-60`). As with
+the Derrick, the shape is a pure predicate (`isPart`, `MultiblockDistillationTower.java:155-164`)
+and the manual `ItemStack[][][]` template is built lazily rather than in a static initialiser, so
+the shape math stays loadable — and testable — outside a running game (`getStructureManual`,
+`MultiblockDistillationTower.java:195-209`; pinned by `DistillationTowerTest`).
+
+**The height-to-cut mapping is the whole machine.** `drawHeight(cut)`
+(`MultiblockDistillationTower.java:106-115`) spreads the column's seven draw ports as evenly as
+whole blocks allow between `BOTTOM_PORT` (one block above the feed deck) and `TOP_PORT` (the top of
+the shell), lightest cut at the top and heaviest at the bottom, exactly as a real fractionating
+column runs. The visible nozzles are placed from the same function the tile entity uses to decide
+which tank a face can be drained from (`cutAtHeight`, `MultiblockDistillationTower.java:120-126`),
+so a finished tower is legible from across the map: the pipe leaving a given height can only be
+carrying one thing, and getting the plumbing right is a spatial puzzle rather than a GUI to read.
+For the shipped seven-cut crude recipe (see [Distillation recipes](#distillation-recipes) below),
+the mapping is:
+
+| Cut | Fluid (shipped recipe) | Height | Port |
+|---|---|---|---|
+| 0 | Natural gas | 11 | `TOP_PORT` |
+| 1 | Naphtha | 9 | |
+| 2 | Gasoline | 8 | |
+| 3 | Diesel | 6 | |
+| 4 | Heavy fuel oil | 4 | |
+| 5 | Lubricant | 3 | |
+| 6 | Bitumen | 1 | `BOTTOM_PORT` |
+
+`DistillationTowerTest` pins this table by value (`theMapping`,
+`DistillationTowerTest.java:66-76`), specifically because every tower already built in a save is
+plumbed to these heights — changing the formula is allowed, changing it by accident is not.
+
+`TileEntityDistillationTower` (`common/blocks/petroleum/TileEntityDistillationTower.java`) keeps
+one crude tank at the foot of the column (`TANK_FEED`, `FEED_CAPACITY = 24000` mB,
+`TileEntityDistillationTower.java:59,64`) and one tank per cut (`TANK_FIRST_CUT`,
+`CUT_CAPACITY = 8000` mB each, `TileEntityDistillationTower.java:63,70`). Every tank knows what
+belongs in it: the feed tank accepts anything at least one incomplete recipe could use
+(`buildTanks`, `TileEntityDistillationTower.java:138-150`, via
+`DistillationRecipe.findIncompleteRecipes`), and each cut tank is a `CutTank` that refuses
+everything except its own cut (`isCutOf`, `TileEntityDistillationTower.java:176-187`). That is what
+lets the shared multiblock output plumbing route seven different fluids without a line of
+special-case code, and it is also what makes "is there room for this batch" an exact check rather
+than an approximate one.
+
+**A batch only starts when every cut it will produce has somewhere to go.** `hasRoomForEveryCut`
+(`TileEntityDistillationTower.java:241-254`) simulates filling every output tank before the tower
+commits to a run, and a recipe declaring more cuts than the column has ports for is refused
+outright rather than quietly losing the extra ones. That is deliberate: a column that produced its
+light ends and then found nowhere to put the residue would have to either destroy fluid or wedge
+itself, and both are worse than simply not starting. Once a batch is running, the same guarantee
+holds every tick — the process queue's own throttle refuses to advance a batch whose outputs have
+since filled up, so a tower that runs out of room stalls with its crude intact rather than jamming
+with a partial run made (`update`, `TileEntityDistillationTower.java:201-232`).
+
+**Process heat.** A tower can run on its own energy buffer alone (`ENERGY_CAPACITY = 32000`,
+`TileEntityDistillationTower.java:71`), but distillation is mostly heat and only incidentally work,
+so an outside heat source — the Industrial Burner, below — is worth having. `supplyProcessHeat`
+(`TileEntityDistillationTower.java:304-313`) is the one-way, stateless contract a heater uses: it
+says "there is fire under this thing for the next `ticks` ticks" and the column banks that against
+`MAX_HEAT_TICKS = 200` (`TileEntityDistillationTower.java:82`), the same decay pattern as the
+Pumpjack's `setPumped` flag. While heat is in hand, `rebateOperatingCost`
+(`TileEntityDistillationTower.java:265-282`) hands back `HEATED_ENERGY_REBATE` — 60% — of whatever
+the process queue just spent that tick (`TileEntityDistillationTower.java:77`), because there is no
+hook to lower the queue's own per-tick cost, only to refund part of it afterwards. In city mode the
+same method instead refunds down to a flat `CITY_SIP` of 1 (`TileEntityDistillationTower.java:86`)
+— presence, not consumption, the same trade the Pumpjack and the virtual grid make; an unpowered
+tower still stops, because the queue will not tick without the full cost in the buffer, it just
+does not stay spent once it has.
+
+**Readout.** The tower has no GUI, in keeping with the rest of the petroleum equipment: right-
+clicking or hammering it shows an overlay naming the layer — "Crude feed" at the deck, the cut's
+localized fluid name at a nozzle height, "Draw port" for a nozzle whose recipe has no name for that
+cut — plus whether the tower is distilling or idle (`getOverlayText`,
+`TileEntityDistillationTower.java:339-353`). Its comparator output reports the feed tank's
+fullness, floored at 1 rather than 0 so a tower holding any crude at all never reads as empty
+(`getComparatorInputOverride`, `TileEntityDistillationTower.java:380-392`).
+
+---
+
+## Industrial Burner
+
+`MultiblockIndustrialBurner` (`common/blocks/multiblocks/MultiblockIndustrialBurner.java`) is a
+three-by-three-by-three firebox: a refractory hearth and lining of Blast Brick carrying the fire, a
+steel sheetmetal crown over the top, an Oilfield Frame burner head let into the front face of the
+combustion chamber where the fuel line lands, and a second frame in the middle of the crown for the
+flue (class doc and `SHAPE` table, `MultiblockIndustrialBurner.java:38-55,86-94`). The crown is the
+working face — anything the burner heats directly sits on top of it — which is why it is the one
+course that is not brick. The burner head is the machine's only asymmetry, so formation trusts the
+shape over the click: it tries all four facings in turn and takes whichever one the player actually
+built (`createStructure`, `orderedFacings`, `MultiblockIndustrialBurner.java:246-274`), rather than
+refusing a correctly-built burner just because it was approached from the "wrong" side.
+
+`TileEntityIndustrialBurner` (`common/blocks/petroleum/TileEntityIndustrialBurner.java`) makes no
+Flux at all, and that is the point: Heavy Fuel Oil is deliberately not a Diesel Generator fuel — it
+is the cheap, dirty residue at the bottom of the distillation column — and a firebox is what makes
+owning a barrel of it better than owning nothing (class doc,
+`TileEntityIndustrialBurner.java:44-50`). Fuels are keyed by registry name rather than by `Fluid`
+reference, the same reasoning as `DieselHandler` and `ReservoirType` (`FUELS`,
+`TileEntityIndustrialBurner.java:92-116`), and ranked by volumetric energy density — heat per
+millibucket, not per fuel type — so Heavy Fuel Oil (`HEAT_PER_BUCKET_HEAVY_FUEL_OIL = 20000`) beats
+Diesel (`18000`), Propane (`12500`) and Natural Gas (`11000`) by a clear margin
+(`TileEntityIndustrialBurner.java:87-90`). That ordering has to hold for the machine to mean
+anything: every other fuel on the list is worth more somewhere else, and only Heavy Fuel Oil has no
+other consumer at all.
+
+**The heat contract a neighbouring machine reads** is four methods, and deliberately mentions
+neither fluids nor multiblocks, so a consumer that finds a `TileEntityIndustrialBurner` against one
+of its own faces needs no knowledge of where the master is
+(`TileEntityIndustrialBurner.java:52-57`):
+
+- `isBurning()` (`TileEntityIndustrialBurner.java:244-248`) — whether the fire is lit and has heat
+  to give.
+- `getHeatRate()` (`TileEntityIndustrialBurner.java:258-262`) — heat units per tick the current
+  fuel sustains; what a consumer should size itself against to run continuously.
+- `getStoredHeat()` (`TileEntityIndustrialBurner.java:267-271`) — heat units available to take
+  right now, which can be spent faster than `getHeatRate()` for a while before the store runs down.
+- `drawHeat(max, simulate)` (`TileEntityIndustrialBurner.java:280-289`) — takes heat out of the
+  firebox, never more than `max` and never more than is stored.
+
+Heat is measured in heat units (HU): one HU is one tick of fire at one unit of intensity, and the
+scale only matters relative to `getHeatRate()`. `HEAT_CAPACITY` — two passes of the best fuel,
+3,200 HU (`TileEntityIndustrialBurner.java:181-189`) — is what makes the machine demand-driven
+without any demand tracking: a full store has nothing to gain from stoking, so a burner nobody is
+drawing from simply stops burning fuel, and nothing has to tell it whether a consumer is attached
+at all (`runPass`, `TileEntityIndustrialBurner.java:327-366`).
+
+Once per `BURN_INTERVAL` (20 ticks, `TileEntityIndustrialBurner.java:170`), staggered by position
+like the Wellhead and the Derrick (`getStagger`, `TileEntityIndustrialBurner.java:450-455`), a
+stoking pass works out a whole interval's fuel and heat in one go — a bucket lasts 250 ticks
+whatever fuel it is, only the heat it carries differs (`FIRING_RATE = 4`, `CHARGE = 80`,
+`TileEntityIndustrialBurner.java:165,174`). The burner also feeds whatever is standing on its crown
+every tick a target exists and heat is available — vanilla furnaces are the case this is for, fed
+through `ExternalHeaterHandler`'s adapter at a fixed one HU per unit of Flux requested (`heatCrown`,
+`TileEntityIndustrialBurner.java:386-416`; targets re-scanned on the stoking interval by
+`refreshHeatTargets`, `TileEntityIndustrialBurner.java:422-438`) — so the burner has a job the
+moment it is built, before anything that speaks its own heat contract exists to plug into it.
+
+City mode keeps the fire a fact rather than a simulation: fuel is still required and the tank still
+empties, so a burner nobody refuels still goes dark, but nothing is metered against demand and the
+store is simply held full (`runPass`, `TileEntityIndustrialBurner.java:337-352`) — the same "keep
+the gesture, drop the accounting" trade as everywhere else in this feature.
+
+**Readout.** No GUI here either: the overlay reports "Firing" and the current HU/t, or "Cold"
+(`getOverlayText`, `TileEntityIndustrialBurner.java:462-472`), and the comparator output reports
+fuel-tank fullness 0–15 (`getComparatorInputOverride`, `TileEntityIndustrialBurner.java:480-488`).
+Fuel goes in at the hearth course and the burner head; nothing ever drains back out, so the tank
+cannot double as a free fluid store that happens to also be a machine (`isFuelPort`,
+`canDrainTankFrom`, `TileEntityIndustrialBurner.java:504-513,531-537`).
 
 ---
 
@@ -298,30 +448,35 @@ with **multiple fluid outputs from one input**, because nothing else needs it: e
 machine yields at most one fluid, and a distillation column that could only emit one cut at a time
 would either have to run once per fraction or throw the rest away (class doc,
 `DistillationRecipe.java:19-25`). Outputs are declared in column order, lightest first, matching
-the tower's intended draw-off heights. Recipes are batched in small discrete amounts rather than
-modelled as continuous flow, reusing the existing process-queue machinery that JEI and the other
-multiblocks already understand (`DistillationRecipe.java:31-34`).
+the heights `MultiblockDistillationTower.drawHeight` actually draws them off at (see
+[Distillation Tower](#distillation-tower) above). Recipes are batched in small discrete amounts
+rather than modelled as continuous flow, reusing the existing process-queue machinery that JEI and
+the other multiblocks already understand (`DistillationRecipe.java:31-34`).
 
 It is explicitly **not unit-tested and cannot be**: every method takes or returns a `FluidStack`,
 whose constructor touches `FluidRegistry`, which cannot bootstrap outside a running game
-(`DistillationRecipe.java:36-39`); coverage is the server smoke run instead.
+(`DistillationRecipe.java:36-39`); coverage is the server smoke run and `DistillationTowerTest`'s
+shape/mapping checks instead.
 
-One recipe is registered, at `IEContent.java:522-530`:
+One recipe is registered, at `IEContent.java:529-537`:
 
 | Input | Output |
 |---|---|
 | 100 mB crude oil | 10 mB natural gas, 15 mB naphtha, 25 mB gasoline, 30 mB diesel, 10 mB heavy fuel oil, 4 mB lubricant, 6 mB bitumen |
 
 Energy 2048, time 40 ticks. A comment at the registration site notes kerosene was deliberately cut
-from the design, its yield folded into diesel (`IEContent.java:521`). No code currently calls
-`DistillationRecipe.findRecipe` or `findIncompleteRecipes` — the recipe exists and is queryable,
-but nothing drives it yet, consistent with the Distillation Tower being a stub.
+from the design, its yield folded into diesel (`IEContent.java:528`). The Distillation Tower is now
+what drives this: `DistillationRecipe.findRecipe` is called from the tower's `update()` once a
+batch slot is free (`TileEntityDistillationTower.java:221`), matched by `containsFluid` against
+whatever the feed tank holds, and `findIncompleteRecipes` gates what the feed tank accepts in the
+first place (`TileEntityDistillationTower.java:148`). The recipe list can hold more than one
+recipe — `findRecipe` returns the first match — but only the crude-oil recipe above ships.
 
 ---
 
 ## Fluids
 
-Registered in `IEContent.java:251-259`:
+The seven distillation cuts (plus crude itself) are registered at `IEContent.java:254-264`:
 
 | Fluid | Registry name | Role |
 |---|---|---|
@@ -329,29 +484,65 @@ Registered in `IEContent.java:251-259`:
 | Naphtha | `ie_naphtha` | Lightest cut; better fed to a cracker than burned. |
 | Gasoline | `ie_gasoline` | Drill fuel only — see below. |
 | Diesel | `ie_diesel` | The best fuel a compression engine can burn. |
-| Heavy Fuel Oil | `ie_heavy_fuel_oil` | Distillation residue. |
+| Heavy Fuel Oil | `ie_heavy_fuel_oil` | Distillation residue; the Industrial Burner's best fuel. |
 | Lubricant | `ie_lubricant` | Distillation residue. |
-| Bitumen | `ie_bitumen` | Heaviest cut. |
+| Bitumen | `ie_bitumen` | Heaviest cut; the Mixer's feedstock for wet asphalt. |
 
 All seven are prefixed `ie_`. The comment at the crude oil registration explains why
-(`IEContent.java:249-250`): `setupFluid` yields to whoever registered a fluid name first, and a
+(`IEContent.java:252-253`): `setupFluid` yields to whoever registered a fluid name first, and a
 bare name as common as `crude_oil` risks silently inheriting another mod's density, viscosity and
-texture rather than this fork's own.
+texture rather than this fork's own. `ie_asphalt` — the wet, pourable form of asphalt, registered
+between lubricant and bitumen (`IEContent.java:263`) — is prefixed for the same reason but is not
+itself a distillation cut; see [Asphalt and roads](#asphalt-and-roads) below.
 
-**The engine-type split**, registered at `IEContent.java:871-896`:
+**The engine-type split**, registered at `IEContent.java:883-902`:
 
 - `DieselHandler.registerFuel` — burnable in the Diesel Generator. Crude oil is registered but
   deliberately awful (`50`, well under half of biodiesel's `125`), so burning it raw always reads
-  as the wasteful choice next to refining it first (`IEContent.java:877-879`). Diesel (`162`) and
+  as the wasteful choice next to refining it first (`IEContent.java:889-891`). Diesel (`162`) and
   naphtha (`112`) are the refined cuts registered here; **gasoline is absent** — a diesel
-  generator cannot burn it at all (`IEContent.java:880-884`).
+  generator cannot burn it at all (`IEContent.java:892-897`).
 - `DieselHandler.registerDrillFuel` — burnable by handheld drills (spark engines, not compression
-  engines). Gasoline and diesel are both registered here (`IEContent.java:889-890`), so gasoline
+  engines). Gasoline and diesel are both registered here (`IEContent.java:901-902`), so gasoline
   has a use even though nothing else in the current tree consumes it, and diesel is deliberately
   on both lists.
 
 The split — gasoline works in tools but never in a generator, diesel works in both — is what stops
-one fluid being strictly the best fuel in every situation (`IEContent.java:880-888`).
+one fluid being strictly the best fuel in every situation (`IEContent.java:892-900`).
+
+---
+
+## Asphalt and roads
+
+Wet asphalt is downstream of distillation, not a cut of it: the Mixer turns bitumen — the heaviest,
+least useful cut — into something a base can actually use, the same story lubricant and diesel
+tell for the lighter ones. `MixerRecipe.addRecipe(new FluidStack(fluidAsphalt, 500), new
+FluidStack(fluidBitumen, 250), new Object[]{"sand", "gravel", "gravel"}, 3200)`
+(`IEContent.java:542`) turns 250 mB of bitumen and a shovelful of aggregate (one `sand`, two
+`gravel`, by ore dictionary tag) into 500 mB of `ie_asphalt` (registered `IEContent.java:263`) —
+bitumen is the bottleneck, not the aggregate, so paving is what stops the bottom of the barrel
+being a waste product the player has to dump (comment at the registration site,
+`IEContent.java:540-541`).
+
+`BlockIEFluidAsphalt` (`common/blocks/petroleum/BlockIEFluidAsphalt.java`) is the poured, flowing
+form — modelled on the concrete this fork already ships, and deliberately simpler than it. Concrete
+sets into five different shapes depending on how deep the pour was, which suits a structural
+material poured into forms; a road is flat by definition, so asphalt always sets into a full block
+regardless of how sloppily it was poured — the mess is in the paving, not the result (class doc,
+`BlockIEFluidAsphalt.java:24-31`). `updateTick` (`BlockIEFluidAsphalt.java:58-70`) counts
+`SET_TICKS = 12` ticks (`BlockIEFluidAsphalt.java:41`) on an `IEProperties.INT_16` timer while
+letting the pour keep flowing and find its own level, then replaces the block outright with
+`BlockPetroleumDecoration.ASPHALT`.
+
+`BlockPetroleumDecoration` (`common/blocks/petroleum/BlockPetroleumDecoration.java`) is the set
+road surface, with a lowered `getSlipperiness` of `0.68` — enough that a road reads as faster than
+the mud beside it without turning into an ice rink (`BlockPetroleumDecoration.java:36-44`).
+`BlockTypes_PetroleumDecoration` (`common/blocks/petroleum/BlockTypes_PetroleumDecoration.java`)
+carries three metas — `ASPHALT` (`:32`), `ASPHALT_TILE` (`:36`) and `ASPHALT_MARKED` (`:40`), all
+three `listForCreative` (`:54-58`) — but **only `ASPHALT` is currently reachable through normal
+play**: the wet-asphalt fluid always sets into it, and nothing in the tree — no recipe, no world
+generation — produces `ASPHALT_TILE` or `ASPHALT_MARKED`. They exist as block metas and nothing
+else today; worth a second look if the intent was for them to be craftable, not fixed here.
 
 ---
 
@@ -424,6 +615,12 @@ IEConfig.cityModePetroleum` (both default `true`). Per its doc comment
   (`TileEntityPumpjack.java:146-165`).
 - The Derrick still takes the full minute and still needs power, but a flat 10 FE per pass rather
   than 2560 (`TileEntityDerrick.java:210-229`).
+- The Distillation Tower still needs its full energy cost banked before a batch advances, but every
+  tick after that refunds down to a flat `CITY_SIP` of 1 FE instead of the real per-tick queue cost
+  (`TileEntityDistillationTower.java:265-282,86`).
+- The Industrial Burner still needs fuel in its tank and still empties it, but at a flat
+  `CITY_FUEL_SIP` of 1 mB per stoking pass, with the heat store simply held full rather than
+  metered against what has actually been drawn (`TileEntityIndustrialBurner.java:337-352,195`).
 
 This is the same trade city mode makes for the wire network and the virtual grid: keep every
 gesture and every piece of equipment meaningful to place, drop only the per-tick accounting.
@@ -488,6 +685,11 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 - The Derrick and Pumpjack still tick as multiblock parts but gate real work behind their own
   interval checks, and `ApiUtils.checkForNeedlessTicking` drops non-master parts out of the
   ticking list entirely for the structure's lifetime.
+- The Industrial Burner stokes once per `BURN_INTERVAL` (20 ticks), staggered by position the same
+  way the Wellhead is, and only re-scans its crown for heatable neighbours on that same interval —
+  not the furnace-feeding pass, which has to run every tick to keep a lit furnace lit
+  (`TileEntityIndustrialBurner.java:314-321`). The Distillation Tower throttles its own recipe
+  search rather than re-evaluating the recipe list every tick while idle.
 - Reservoir cells are rolled once and cached in memory (`ReservoirHandler.CACHE`); repeat lookups
   of the same cell are a hash-map hit, not a re-roll.
 
