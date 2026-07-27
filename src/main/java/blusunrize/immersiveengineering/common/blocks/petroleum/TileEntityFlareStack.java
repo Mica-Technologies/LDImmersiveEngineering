@@ -12,6 +12,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOve
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.ILightValue;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
@@ -54,6 +55,11 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 	 * as it arrives and the well never backs up behind the flare.
 	 */
 	public static final int BURN_RATE = 200;
+	/**
+	 * How long one delivery keeps the flame alight. Longer than a wellhead's production
+	 * interval, so a steady feed reads as a steady flame rather than a stutter.
+	 */
+	public static final int FLAME_TICKS = 40;
 
 	private final FluidTank tank = new FluidTank(CAPACITY)
 	{
@@ -99,15 +105,24 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 	{
 		if(world==null||world.isRemote)
 			return;
-		FluidStack drained = tank.drainInternal(BURN_RATE, true);
+		//City mode keeps the spectacle and drops the accounting: the gas is not consumed and the
+		//flame does not expire, so a flare in a city build burns forever off one delivery. Being
+		//a skyline is the entire job there.
+		FluidStack drained = CityMode.petroleum()
+				?tank.drainInternal(1, true): tank.drainInternal(BURN_RATE, true);
 		if(drained==null||drained.amount <= 0)
 			return;
 		lifetimeBurned += drained.amount;
 		boolean wasLit = isLit();
-		flameTicks = 40;
+		flameTicks = FLAME_TICKS;
 		markDirty();
 		if(!wasLit)
 			markContainingBlockForUpdate(null);
+		//Ask the block to wake us when the flame should go out. This is the whole reason the
+		//flare needs no ticking: it is only ever interesting on delivery and on expiry, and a
+		//scheduled update covers the second without putting it in a tick list.
+		if(!CityMode.petroleum())
+			world.scheduleUpdate(pos, getBlockType(), FLAME_TICKS);
 	}
 
 	public boolean isLit()
@@ -121,18 +136,16 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 	}
 
 	/**
-	 * Ages the flame out once deliveries stop.
+	 * Puts the flame out. Called by the block when the update the last delivery scheduled comes
+	 * due; a fresh delivery in the meantime schedules a later one, so a steady feed never gaps.
 	 */
 	public void ageFlame()
 	{
-		if(flameTicks <= 0)
+		if(flameTicks <= 0||CityMode.petroleum())
 			return;
-		flameTicks -= Math.min(flameTicks, 20);
-		if(flameTicks <= 0)
-		{
-			markDirty();
-			markContainingBlockForUpdate(null);
-		}
+		flameTicks = 0;
+		markDirty();
+		markContainingBlockForUpdate(null);
 	}
 
 	@Override

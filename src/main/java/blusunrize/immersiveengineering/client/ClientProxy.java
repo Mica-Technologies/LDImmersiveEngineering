@@ -61,6 +61,8 @@ import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorSpl
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorVertical;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorChute;
 import blusunrize.immersiveengineering.common.blocks.multiblocks.*;
+import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDecoration;
+import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDevice;
 import blusunrize.immersiveengineering.common.blocks.stone.*;
 import blusunrize.immersiveengineering.common.blocks.wooden.*;
 import blusunrize.immersiveengineering.common.entities.*;
@@ -797,6 +799,35 @@ public class ClientProxy extends CommonProxy
 						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid9"),
 				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"));
+		//Petroleum. In CAT_ENERGY because the whole chain ends in fuel: everything a player builds
+		//out here is on the way to a diesel generator, a turbine or a firebox, and the chapter only
+		//makes sense read next to those.
+		ManualHelper.getManual().addEntry("petroleum", ManualHelper.CAT_ENERGY,
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum0"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum1",
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.OILFIELD_FRAME.getMeta())),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum2", MultiblockDerrick.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum3"),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum4"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum5", MultiblockPumpjack.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum6"),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum7"),
+				//The flare stack has no recipe of its own, so it is described rather than crafted.
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum8"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum9", MultiblockGasScrubber.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum10"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum11", MultiblockDistillationTower.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum12"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum13", MultiblockIndustrialBurner.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum14"),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum15"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum16", MultiblockGasTurbine.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum17"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum18",
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.LUBRICATION_MANIFOLD.getMeta())),
+				new ManualPages.CraftingMulti(ManualHelper.getManual(), "petroleum19",
+						new ItemStack(IEContent.blockPetroleumDecoration, 1, BlockTypes_PetroleumDecoration.ASPHALT_TILE.getMeta()),
+						new ItemStack(IEContent.blockPetroleumDecoration, 1, BlockTypes_PetroleumDecoration.ASPHALT_MARKED.getMeta())));
 
 		Map<String, Integer> sortedMap = ThermoelectricHandler.getThermalValuesSorted(true);
 		String[][] table = formatToTable_ItemIntHashmap(sortedMap, "K");

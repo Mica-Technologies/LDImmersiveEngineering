@@ -15,6 +15,7 @@ import net.minecraft.block.properties.PropertyEnum;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.BlockRenderLayer;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
 /**
@@ -38,6 +39,20 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 		//The wellhead is a valve stack, not a solid cube.
 		this.setNotNormalBlock(BlockTypes_PetroleumDevice.WELLHEAD.getMeta());
 		this.setMetaBlockLayer(BlockTypes_PetroleumDevice.WELLHEAD.getMeta(), BlockRenderLayer.CUTOUT);
+	}
+
+	/**
+	 * Wakes a Flare Stack when its flame should go out.
+	 * <p>
+	 * The flare schedules this itself on delivery instead of being ticked, so a cold flare --
+	 * which is nearly all of them, nearly all of the time -- is in no tick list at all.
+	 */
+	@Override
+	public void updateTick(World world, BlockPos pos, IBlockState state, java.util.Random rand)
+	{
+		TileEntity te = world.getTileEntity(pos);
+		if(te instanceof TileEntityFlareStack)
+			((TileEntityFlareStack)te).ageFlame();
 	}
 
 	@Override
