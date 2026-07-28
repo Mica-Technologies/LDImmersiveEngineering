@@ -65,14 +65,28 @@ class ConduitAssetsTest
 		return out;
 	}
 
+	/**
+	 * Where a blockstate's model reference actually resolves to.
+	 * <p>
+	 * <strong>The {@code models/block/} prefix is implied.</strong> A blockstate saying
+	 * {@code immersiveengineering:conduit/conduit_down_hub} loads
+	 * {@code models/block/conduit/conduit_down_hub.json}. Writing the {@code block/} out is the
+	 * mistake this whole file exists to catch and originally shipped with: every reference
+	 * resolved to {@code models/block/block/conduit/...}, every model was missing, and every
+	 * conduit was purple with nothing in the log. The test passed, because it was applying the
+	 * same wrong rule as the code.
+	 */
 	private static String modelPath(String reference)
 	{
-		//"immersiveengineering:block/conduit/conduit_down_hub" -> "models/block/conduit/...json"
 		int colon = reference.indexOf(':');
 		assertTrue(colon > 0, "model reference is not namespaced: "+reference);
 		assertEquals("immersiveengineering", reference.substring(0, colon),
 				"a conduit model points outside the mod: "+reference);
-		return "models/"+reference.substring(colon+1)+".json";
+		String path = reference.substring(colon+1);
+		assertFalse(path.startsWith("block/"),
+				"\""+reference+"\" writes out the models/block/ prefix the loader adds itself, so it "
+						+"resolves to models/block/block/... -- a purple block with nothing logged");
+		return "models/block/"+path+".json";
 	}
 
 	@Nested
@@ -310,11 +324,27 @@ class ConduitAssetsTest
 		}
 
 		@Test
+		@DisplayName("it is multipart, so it does not have to resolve the property string")
+		void isMultipart()
+		{
+			//BlockConduit declares facing and six sideconnection flags for *every* meta, so the
+			//state mapper hands the box the whole string. A `variants` file would need a submap per
+			//property or the variant silently fails to resolve; multipart reads the state instead
+			//and ignores the string.
+			JsonObject state = read("blockstates/conduit_junction_box.json");
+			assertTrue(state.has("multipart"),
+					"the box uses a variants blockstate but BlockConduit gives it seven properties "
+							+"to resolve, and it declares a submap for none of them");
+		}
+
+		@Test
 		@DisplayName("its model and texture exist")
 		void modelAndTextureExist()
 		{
-			JsonObject state = read("blockstates/conduit_junction_box.json");
-			String model = state.getAsJsonObject("defaults").get("model").getAsString();
+			JsonArray parts = read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
+			assertEquals(1, parts.size(), "the box should be one unconditional part");
+			String model = parts.get(0).getAsJsonObject().getAsJsonObject("apply")
+					.get("model").getAsString();
 			assertTrue(new File(ASSETS+modelPath(model)).isFile(),
 					"the box blockstate names a model nobody wrote: "+model);
 			assertTrue(new File(ASSETS+"textures/blocks/conduit_junction_box.png").isFile());
@@ -328,6 +358,17 @@ class ConduitAssetsTest
 			JsonObject variants = read("blockstates/conduit.json").getAsJsonObject("variants");
 			assertTrue(keys(variants).contains("inventory,type=junction_box"),
 					"no inventory variant for the junction box; found "+keys(variants));
+		}
+
+		@Test
+		@DisplayName("its item model exists too")
+		void itemModelExists()
+		{
+			JsonObject variants = read("blockstates/conduit.json").getAsJsonObject("variants");
+			String model = variants.getAsJsonArray("inventory,type=junction_box").get(0)
+					.getAsJsonObject().get("model").getAsString();
+			assertTrue(new File(ASSETS+modelPath(model)).isFile(),
+					"the box item names a model nobody wrote: "+model);
 		}
 
 		@Test

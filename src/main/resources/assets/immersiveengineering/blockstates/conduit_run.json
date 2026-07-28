@@ -5,7 +5,7 @@
 				"facing": "down"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_down_hub"
+				"model": "immersiveengineering:conduit/conduit_down_hub"
 			}
 		},
 		{
@@ -14,7 +14,7 @@
 				"sideconnection_north": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_down_north"
+				"model": "immersiveengineering:conduit/conduit_down_north"
 			}
 		},
 		{
@@ -23,7 +23,7 @@
 				"sideconnection_south": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_down_south"
+				"model": "immersiveengineering:conduit/conduit_down_south"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 				"sideconnection_west": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_down_west"
+				"model": "immersiveengineering:conduit/conduit_down_west"
 			}
 		},
 		{
@@ -41,7 +41,7 @@
 				"sideconnection_east": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_down_east"
+				"model": "immersiveengineering:conduit/conduit_down_east"
 			}
 		},
 		{
@@ -49,7 +49,7 @@
 				"facing": "up"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_up_hub"
+				"model": "immersiveengineering:conduit/conduit_up_hub"
 			}
 		},
 		{
@@ -58,7 +58,7 @@
 				"sideconnection_north": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_up_north"
+				"model": "immersiveengineering:conduit/conduit_up_north"
 			}
 		},
 		{
@@ -67,7 +67,7 @@
 				"sideconnection_south": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_up_south"
+				"model": "immersiveengineering:conduit/conduit_up_south"
 			}
 		},
 		{
@@ -76,7 +76,7 @@
 				"sideconnection_west": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_up_west"
+				"model": "immersiveengineering:conduit/conduit_up_west"
 			}
 		},
 		{
@@ -85,7 +85,7 @@
 				"sideconnection_east": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_up_east"
+				"model": "immersiveengineering:conduit/conduit_up_east"
 			}
 		},
 		{
@@ -93,7 +93,7 @@
 				"facing": "north"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_north_hub"
+				"model": "immersiveengineering:conduit/conduit_north_hub"
 			}
 		},
 		{
@@ -102,7 +102,7 @@
 				"sideconnection_down": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_north_down"
+				"model": "immersiveengineering:conduit/conduit_north_down"
 			}
 		},
 		{
@@ -111,7 +111,7 @@
 				"sideconnection_up": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_north_up"
+				"model": "immersiveengineering:conduit/conduit_north_up"
 			}
 		},
 		{
@@ -120,7 +120,7 @@
 				"sideconnection_west": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_north_west"
+				"model": "immersiveengineering:conduit/conduit_north_west"
 			}
 		},
 		{
@@ -129,7 +129,7 @@
 				"sideconnection_east": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_north_east"
+				"model": "immersiveengineering:conduit/conduit_north_east"
 			}
 		},
 		{
@@ -137,7 +137,7 @@
 				"facing": "south"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_south_hub"
+				"model": "immersiveengineering:conduit/conduit_south_hub"
 			}
 		},
 		{
@@ -146,7 +146,7 @@
 				"sideconnection_down": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_south_down"
+				"model": "immersiveengineering:conduit/conduit_south_down"
 			}
 		},
 		{
@@ -155,7 +155,7 @@
 				"sideconnection_up": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_south_up"
+				"model": "immersiveengineering:conduit/conduit_south_up"
 			}
 		},
 		{
@@ -164,7 +164,7 @@
 				"sideconnection_west": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_south_west"
+				"model": "immersiveengineering:conduit/conduit_south_west"
 			}
 		},
 		{
@@ -173,7 +173,7 @@
 				"sideconnection_east": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_south_east"
+				"model": "immersiveengineering:conduit/conduit_south_east"
 			}
 		},
 		{
@@ -181,7 +181,7 @@
 				"facing": "west"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_west_hub"
+				"model": "immersiveengineering:conduit/conduit_west_hub"
 			}
 		},
 		{
@@ -190,7 +190,7 @@
 				"sideconnection_down": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_west_down"
+				"model": "immersiveengineering:conduit/conduit_west_down"
 			}
 		},
 		{
@@ -199,7 +199,7 @@
 				"sideconnection_up": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_west_up"
+				"model": "immersiveengineering:conduit/conduit_west_up"
 			}
 		},
 		{
@@ -208,7 +208,7 @@
 				"sideconnection_north": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_west_north"
+				"model": "immersiveengineering:conduit/conduit_west_north"
 			}
 		},
 		{
@@ -217,7 +217,7 @@
 				"sideconnection_south": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_west_south"
+				"model": "immersiveengineering:conduit/conduit_west_south"
 			}
 		},
 		{
@@ -225,7 +225,7 @@
 				"facing": "east"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_east_hub"
+				"model": "immersiveengineering:conduit/conduit_east_hub"
 			}
 		},
 		{
@@ -234,7 +234,7 @@
 				"sideconnection_down": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_east_down"
+				"model": "immersiveengineering:conduit/conduit_east_down"
 			}
 		},
 		{
@@ -243,7 +243,7 @@
 				"sideconnection_up": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_east_up"
+				"model": "immersiveengineering:conduit/conduit_east_up"
 			}
 		},
 		{
@@ -252,7 +252,7 @@
 				"sideconnection_north": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_east_north"
+				"model": "immersiveengineering:conduit/conduit_east_north"
 			}
 		},
 		{
@@ -261,7 +261,7 @@
 				"sideconnection_south": "true"
 			},
 			"apply": {
-				"model": "immersiveengineering:block/conduit/conduit_east_south"
+				"model": "immersiveengineering:conduit/conduit_east_south"
 			}
 		}
 	]

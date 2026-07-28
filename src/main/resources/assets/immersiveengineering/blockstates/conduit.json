@@ -2,7 +2,7 @@
 	"forge_marker": 1,
 	"defaults": {
 		"transform": "forge:default-block",
-		"model": "immersiveengineering:block/conduit/conduit_item"
+		"model": "immersiveengineering:conduit/conduit_item"
 	},
 	"variants": {
 		"inventory,type=conduit_run": [
@@ -10,7 +10,7 @@
 		],
 		"inventory,type=junction_box": [
 			{
-				"model": "immersiveengineering:block/conduit/junction_box"
+				"model": "immersiveengineering:conduit/junction_box"
 			}
 		],
 		"type": {

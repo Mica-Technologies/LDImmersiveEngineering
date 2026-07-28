@@ -44,6 +44,15 @@ FACINGS = ["down", "up", "north", "south", "west", "east"]
 AXIS_OF = {"down": "y", "up": "y", "north": "z", "south": "z", "west": "x", "east": "x"}
 NEGATIVE = {"down", "north", "west"}
 
+# How a blockstate refers to one of the models above.
+#
+# **The `models/block/` prefix is implied and must not be written out.**  A blockstate saying
+# `immersiveengineering:block/conduit/x` resolves to `models/block/block/conduit/x.json`, which
+# does not exist -- and a missing model is a purple block with nothing in the log.  IE's own files
+# say `immersiveengineering:grid/utility_box` for `models/block/grid/utility_box.json`; this
+# follows them.
+MODEL_REF = "immersiveengineering:conduit/%s"
+
 
 def read_bounds_constants(repo):
     """Take DEPTH and HALF_WIDTH from the Java rather than restating them here.
@@ -182,12 +191,12 @@ def build_blockstate(assets):
     for mount in FACINGS:
         parts.append({
             "when": {"facing": mount},
-            "apply": {"model": "immersiveengineering:block/conduit/conduit_%s_hub" % mount},
+            "apply": {"model": MODEL_REF % ("conduit_%s_hub" % mount)},
         })
         for arm in in_plane(mount):
             parts.append({
                 "when": {"facing": mount, "sideconnection_%s" % arm: "true"},
-                "apply": {"model": "immersiveengineering:block/conduit/conduit_%s_%s" % (mount, arm)},
+                "apply": {"model": MODEL_REF % ("conduit_%s_%s" % (mount, arm))},
             })
     write_json(os.path.join(assets, "blockstates", "conduit_run.json"), {"multipart": parts})
     return parts
@@ -214,15 +223,15 @@ def build_junction_box(assets, depth, half):
         },
         "elements": [{"from": frm, "to": to, "faces": faces}],
     })
-    # An ordinary variants file: the box has no connection state to react to, so multipart
-    # would only be ceremony.  BlockConduit's state mapper points the box's meta here.
+    # Multipart with a single unconditional part, even though the box has no connection state.
+    #
+    # A `variants` file would have to resolve the *whole* property string the state mapper hands
+    # it -- type, facing and all six sideconnection flags, because BlockConduit declares them for
+    # every meta -- which in the Forge format means a submap per property or the variant simply
+    # does not resolve.  Multipart ignores the variant string entirely and reads the state, so one
+    # part with no `when` is both correct and the shorter thing to write.
     write_json(os.path.join(assets, "blockstates", "conduit_junction_box.json"), {
-        "forge_marker": 1,
-        "defaults": {
-            "transform": "forge:default-block",
-            "model": "immersiveengineering:block/conduit/junction_box",
-        },
-        "variants": {"type": {"junction_box": {}}},
+        "multipart": [{"apply": {"model": MODEL_REF % "junction_box"}}],
     })
 
 
@@ -261,12 +270,12 @@ def build_item_blockstate(assets):
         "forge_marker": 1,
         "defaults": {
             "transform": "forge:default-block",
-            "model": "immersiveengineering:block/conduit/conduit_item",
+            "model": MODEL_REF % "conduit_item",
         },
         "variants": {
             "inventory,type=conduit_run": [{}],
             "inventory,type=junction_box": [{
-                "model": "immersiveengineering:block/conduit/junction_box",
+                "model": MODEL_REF % "junction_box",
             }],
             "type": {"conduit_run": {}, "junction_box": {}},
         },

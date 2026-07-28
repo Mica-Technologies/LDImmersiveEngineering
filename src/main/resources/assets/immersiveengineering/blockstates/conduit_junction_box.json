@@ -1,12 +1,9 @@
 {
-	"forge_marker": 1,
-	"defaults": {
-		"transform": "forge:default-block",
-		"model": "immersiveengineering:block/conduit/junction_box"
-	},
-	"variants": {
-		"type": {
-			"junction_box": {}
+	"multipart": [
+		{
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_box"
+			}
 		}
-	}
+	]
 }
