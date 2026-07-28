@@ -1,0 +1,27 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:fluidnet_device",
+		"data": 1
+	},
+	"pattern": [
+		"SSS",
+		"BTP",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"P": {
+			"item": "immersiveengineering:metal_device1",
+			"data": 6
+		},
+		"T": {
+			"item": "#elecTube"
+		},
+		"B": {
+			"item": "#componentSteel"
+		}
+	}
+}

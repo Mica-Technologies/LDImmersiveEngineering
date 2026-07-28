@@ -1,0 +1,55 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"transform": "forge:default-block",
+		"model": "immersiveengineering:grid/utility_box",
+		"textures": {
+			"side": "immersiveengineering:blocks/fluidnet_device_side",
+			"top": "immersiveengineering:blocks/fluidnet_device_top",
+			"back": "immersiveengineering:blocks/fluidnet_device_side",
+			"front": "immersiveengineering:blocks/fluidnet_device_inlet_front"
+		}
+	},
+	"variants": {
+		"inventory,type=fluid_inlet": [{
+			"y": 180
+		}],
+		"inventory,type=fluid_outlet": [{
+			"y": 180,
+			"textures": {"front": "immersiveengineering:blocks/fluidnet_device_outlet_front"}
+		}],
+		"inventory,type=main_valve": [{
+			"y": 180,
+			"textures": {"front": "immersiveengineering:blocks/fluidnet_device_valve_front"}
+		}],
+		"inventory,type=console_housing": [{
+			"model": "cube_all",
+			"textures": {"all": "immersiveengineering:blocks/fluidnet_console_housing"}
+		}],
+		"type": {
+			"fluid_inlet": {},
+			"fluid_outlet": {
+				"textures": {"front": "immersiveengineering:blocks/fluidnet_device_outlet_front"}
+			},
+			"main_valve": {
+				"textures": {"front": "immersiveengineering:blocks/fluidnet_device_valve_front"}
+			},
+			"console_housing": {
+				"model": "cube_all",
+				"textures": {"all": "immersiveengineering:blocks/fluidnet_console_housing"}
+			}
+		},
+		"facing": {
+			"north": {},
+			"east": {"y": 90},
+			"south": {"y": 180},
+			"west": {"y": 270},
+			"up": {"x": 270},
+			"down": {"x": 90}
+		},
+		"boolean0": {
+			"false": {},
+			"true": {}
+		}
+	}
+}

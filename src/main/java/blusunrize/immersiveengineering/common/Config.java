@@ -12,6 +12,8 @@ import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.crafting.*;
 import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
+import blusunrize.immersiveengineering.api.fluid.network.FluidNetConfig;
+import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.petroleum.PetroleumConfig;
 import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
@@ -167,6 +169,8 @@ public class Config
 		@SubConfig
 		public static VirtualGrid virtualGrid;
 		@SubConfig
+		public static FluidNetwork fluidNetwork;
+		@SubConfig
 		public static Petroleum petroleum;
 
 		/**
@@ -223,6 +227,66 @@ public class Config
 			@Comment({"Seconds of continuous output saturation before a segment's breaker trips. Only applies when gridBreakersEnabled is true."})
 			@RangeInt(min = 1)
 			public static int gridBreakerTripSeconds = 5;
+		}
+
+		/**
+		 * The virtual fluid network: named mains of Inlets and Outlets that move fluid without
+		 * physical pipe between them. Values are pushed into
+		 * {@link blusunrize.immersiveengineering.api.fluid.network.FluidNetConfig} on load, for the
+		 * same reason the grid's are.
+		 * <p>
+		 * Deliberately a separate group from {@code VirtualGrid} rather than shared knobs: the two
+		 * networks carry very different quantities, and a pack that wants a generous power grid and
+		 * a stingy gas main should be able to say so.
+		 */
+		public static class FluidNetwork
+		{
+			@Comment({"Master switch for the virtual fluid network. When false the tick engine does no work at all and Inlets/Outlets stay inert (they are still placeable, so turning this off cannot destroy an existing build)."})
+			public static boolean enableFluidNetwork = true;
+			@Comment({"Whether a single main may contain fittings in more than one dimension. When false, a main is pinned to the dimension of the first fitting assigned to it."})
+			public static boolean fluidNetCrossDimension = true;
+			@Comment({"Default throughput of a single Inlet or Outlet, in mB/t. The default is comfortably a pressurised Fluid Pipe's worth, and feeds three Steam Turbine Halls."})
+			@RangeInt(min = 0)
+			public static int fluidNetDefaultDeviceCap = 1000;
+			@Comment({"The highest per-main input/output rate that may be set from the Fluid Control Console, in mB/t. Also the ceiling for a single fitting's transfer cap.",
+					"Times fluidNetPackTicks this lands exactly on fluidNetPackCapMax, so a new main gets its full smoothing pack. Raise both together or new mains quietly get less."})
+			@RangeInt(min = 0)
+			public static int fluidNetMaxMainIO = 32768;
+			@Comment({"Fraction of fluid lost in transit through a new main, 0.0 to 1.0. Ships at 0: by default the network is a convenience feature, not a lossy one. Raise it if you want physical pipe to keep an efficiency advantage."})
+			@RangeDouble(min = 0, max = 1)
+			public static double fluidNetDefaultLeakPct = 0.0;
+			@Comment({"Default state of a new main's 'backups also cover shortfalls' toggle. When false, linked backup mains only step in if the main is closed or has tripped."})
+			public static boolean fluidNetFailoverTopUpDefault = true;
+			@Comment({"How many ticks of its own output rate a main holds as line pack. This only exists so fluid collected this tick can be delivered this tick; it is deliberately far too small to be used as a tank."})
+			@RangeInt(min = 1, max = 20)
+			public static int fluidNetPackTicks = 2;
+			@Comment({"Hard ceiling on a main's line pack, in mB. This is the anti-tank clamp -- a main is a conduit, and the buried tanks are what storage is for."})
+			@RangeInt(min = 0)
+			public static int fluidNetPackCapMax = 65536;
+			@Comment({"Whether the Fluid Control Console needs standby power to light its screen. The GUI still opens without power, in read-only mode, so losing power can never lock you out of your own network."})
+			public static boolean fluidNetConsoleRequiresPower = true;
+			@Comment({"Standby draw of a Fluid Control Console, in Flux/t."})
+			@RangeInt(min = 0)
+			public static int fluidNetConsoleStandbyDraw = 8;
+			@Comment({"Master switch for the per-fitting chunk loading toggle. When false, the toggle is ignored and no fluid network fitting keeps chunks loaded."})
+			public static boolean fluidNetAllowChunkloading = true;
+			@Comment({"Server-wide maximum number of chunks that fluid network fittings may hold loaded between them."})
+			@RangeInt(min = 0)
+			public static int fluidNetChunkloadBudget = 25;
+			@Comment({"City mode only: how often, in ticks, an Inlet checks that its source is still live. 100 ticks is once every five seconds."})
+			@RangeInt(min = 1)
+			public static int fluidNetSipIntervalTicks = 100;
+			@Comment({"City mode only: how much fluid an Inlet consumes per liveness check, in mB. This is the entire running cost of a city-mode network."})
+			@RangeInt(min = 0)
+			public static int fluidNetSipAmount = 1;
+			@Comment({"How many failover links a shortfall may travel along before giving up. Cycles are always broken regardless of this value."})
+			@RangeInt(min = 1, max = 32)
+			public static int fluidNetMaxFailoverDepth = 4;
+			@Comment({"Set to true to make mains trip on overpressure: a main held at its output ceiling for fluidNetTripSeconds latches closed and must be opened by hand.", "Off by default -- with it off, demand above the ceiling is simply clamped."})
+			public static boolean fluidNetTripsEnabled = false;
+			@Comment({"Seconds of continuous output saturation before a main's overpressure cut-out trips. Only applies when fluidNetTripsEnabled is true."})
+			@RangeInt(min = 1)
+			public static int fluidNetTripSeconds = 5;
 		}
 
 		/**
@@ -695,6 +759,26 @@ public class Config
 		GridConfig.breakerTripSeconds = IEConfig.VirtualGrid.gridBreakerTripSeconds;
 		//Existing segments may now sit outside a lowered ceiling; pull them back inside it.
 		VirtualGrid.INSTANCE.onConfigChanged();
+
+		//And the fluid network's mirror, which is the grid's sibling in every respect.
+		FluidNetConfig.enabled = IEConfig.FluidNetwork.enableFluidNetwork;
+		FluidNetConfig.crossDimension = IEConfig.FluidNetwork.fluidNetCrossDimension;
+		FluidNetConfig.defaultDeviceCap = IEConfig.FluidNetwork.fluidNetDefaultDeviceCap;
+		FluidNetConfig.maxMainIO = IEConfig.FluidNetwork.fluidNetMaxMainIO;
+		FluidNetConfig.defaultLeakPct = IEConfig.FluidNetwork.fluidNetDefaultLeakPct;
+		FluidNetConfig.failoverTopUpDefault = IEConfig.FluidNetwork.fluidNetFailoverTopUpDefault;
+		FluidNetConfig.packTicks = IEConfig.FluidNetwork.fluidNetPackTicks;
+		FluidNetConfig.packCapMax = IEConfig.FluidNetwork.fluidNetPackCapMax;
+		FluidNetConfig.consoleRequiresPower = IEConfig.FluidNetwork.fluidNetConsoleRequiresPower;
+		FluidNetConfig.consoleStandbyDraw = IEConfig.FluidNetwork.fluidNetConsoleStandbyDraw;
+		FluidNetConfig.allowChunkloading = IEConfig.FluidNetwork.fluidNetAllowChunkloading;
+		FluidNetConfig.chunkloadBudget = IEConfig.FluidNetwork.fluidNetChunkloadBudget;
+		FluidNetConfig.sipIntervalTicks = IEConfig.FluidNetwork.fluidNetSipIntervalTicks;
+		FluidNetConfig.sipAmount = IEConfig.FluidNetwork.fluidNetSipAmount;
+		FluidNetConfig.maxFailoverDepth = IEConfig.FluidNetwork.fluidNetMaxFailoverDepth;
+		FluidNetConfig.tripsEnabled = IEConfig.FluidNetwork.fluidNetTripsEnabled;
+		FluidNetConfig.tripSeconds = IEConfig.FluidNetwork.fluidNetTripSeconds;
+		VirtualFluidNet.INSTANCE.onConfigChanged();
 
 		//Push the petroleum settings into the api-side mirror. Same arrangement as the virtual
 		//grid above: the reservoir model in api never reaches back into common.

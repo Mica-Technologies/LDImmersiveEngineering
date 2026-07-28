@@ -22,6 +22,9 @@ import blusunrize.immersiveengineering.common.util.IESounds;
 import blusunrize.immersiveengineering.common.util.advancements.IEAdvancements;
 import blusunrize.immersiveengineering.common.util.commands.CommandHandler;
 import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
+import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
+import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetSaveData;
+import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetTickHandler;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
 import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
@@ -204,6 +207,7 @@ public class ImmersiveEngineering
 		//the same session does not inherit either.
 		GridChunkLoader.releaseAll();
 		VirtualGrid.INSTANCE.detachAll();
+		VirtualFluidNet.INSTANCE.detachAll();
 	}
 
 	@Mod.EventHandler
@@ -244,6 +248,12 @@ public class ImmersiveEngineering
 				GridTickHandler.reset();
 				GridSaveData.load(world);
 				GridChunkLoader.refresh();
+
+				//The virtual fluid network is the grid's sibling and keeps its own save file for
+				//the same reasons -- see FluidNetSaveData. Same reset-then-load order, so a second
+				//world in one session cannot inherit the previous one's mains.
+				FluidNetTickHandler.reset();
+				FluidNetSaveData.load(world);
 
 				//Reservoirs likewise. Nothing is generated here -- deposits are rolled from the
 				//seed on demand -- so this only restores which ones have been drawn down. The

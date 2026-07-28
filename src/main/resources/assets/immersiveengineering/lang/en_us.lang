@@ -1850,3 +1850,10 @@ tile.immersiveengineering.petroleum_multiblock.domestic_tank.name=Domestic Tank
 tile.immersiveengineering.petroleum_multiblock.commercial_tank.name=Commercial Tank
 tile.immersiveengineering.petroleum_multiblock.bulk_depot.name=Bulk Depot
 chat.immersiveengineering.info.petroleum.tankNotBuried=This tank is not buried. Every block of its roof except the fill cap needs something on top of it.
+
+#Virtual fluid network
+tile.immersiveengineering.fluidnet_device.fluid_inlet.name=Fluid Inlet
+tile.immersiveengineering.fluidnet_device.fluid_outlet.name=Fluid Outlet
+tile.immersiveengineering.fluidnet_device.main_valve.name=Main Valve
+tile.immersiveengineering.fluidnet_device.console_housing.name=Fluid Console Housing
+chat.immersiveengineering.info.fluidnet.consoleUnformed=Arrange four Fluid Console Housings in a 2x2 wall, then strike the front face with an Engineer's Hammer.
