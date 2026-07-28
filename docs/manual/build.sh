@@ -15,6 +15,23 @@ repo="$(cd "$here/../.." && pwd)"
 echo "== regenerating tables from source"
 python "$repo/docs/tools/make_manual_data.py" --repo "$repo"
 
+# MiKTeX installs per-user and does not always land on PATH -- especially in a shell that was
+# already open when it was installed. Look where it actually puts itself before giving up.
+for candidate in \
+	"${LOCALAPPDATA:-}/Programs/MiKTeX/miktex/bin/x64" \
+	"$HOME/AppData/Local/Programs/MiKTeX/miktex/bin/x64" \
+	"/c/Program Files/MiKTeX/miktex/bin/x64"; do
+	if [ -x "$candidate/pdflatex.exe" ]; then
+		PATH="$candidate:$PATH"
+		break
+	fi
+done
+
+if ! command -v pdflatex >/dev/null 2>&1 && ! command -v latexmk >/dev/null 2>&1; then
+	echo "no LaTeX toolchain found. Install MiKTeX, or put pdflatex on PATH." >&2
+	exit 1
+fi
+
 echo "== building PDF"
 cd "$here"
 if command -v latexmk >/dev/null 2>&1; then

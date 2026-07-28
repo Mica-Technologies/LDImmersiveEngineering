@@ -1,0 +1,78 @@
+% ---------------------------------------------------------------------------
+% Layer plans for multiblocks.
+%
+% A multiblock is built one layer at a time, from the bottom up, and that is how these draw it:
+% a row of square grids, lowest on the left, each cell carrying a one-letter code for the block
+% that goes there. It is how somebody actually builds -- lay a layer, step up, lay the next --
+% rather than an isometric picture that looks better and is harder to follow with a stack of
+% bricks in your hand.
+%
+% Drawn rather than screenshotted on purpose. A screenshot of a structure is wrong the moment
+% the structure changes and nobody can tell by looking; a plan built from the same letters as
+% its own key is at least internally consistent, and is a diff when it changes.
+% ---------------------------------------------------------------------------
+
+% ifthen supplies \ifthenelse, which the cell loops below use to test for an empty cell.
+\usepackage{ifthen}
+\usepackage{tikz}
+\usetikzlibrary{positioning,fit,backgrounds}
+
+\definecolor{mbcell}{RGB}{236,236,238}
+\definecolor{mbedge}{RGB}{120,120,128}
+\definecolor{mbmark}{RGB}{233,118,43}
+
+% \mblayer{caption}{rows}
+%
+% `rows` is a semicolon-separated list of rows, top row first, each row a comma-separated list
+% of cell letters. A dot means "nothing here"; a letter in braces is highlighted, which is how
+% the block you strike with the hammer is marked.
+%
+% Rows are given top-first because that is how you read a plan on paper, and drawn with y
+% decreasing so the first row ends up at the top.
+\newcommand{\mblayer}[2]{%
+  \begin{tikzpicture}[baseline=(current bounding box.north),
+      cell/.style={draw=mbedge,fill=mbcell,minimum size=6.5mm,inner sep=0pt,
+                   font=\sffamily\scriptsize},
+      hot/.style={cell,fill=mbmark!30,draw=mbmark,very thick},
+      gap/.style={minimum size=6.5mm,inner sep=0pt}]
+    \foreach \row [count=\y] in {#2} {%
+      \foreach \c [count=\x] in \row {%
+        \ifthenelse{\equal{\c}{.}}
+          {\node[gap] at (\x*6.7mm,-\y*6.7mm) {};}
+          {\node[cell] at (\x*6.7mm,-\y*6.7mm) {\c};}%
+      }%
+    }
+    \node[font=\sffamily\tiny,anchor=north] at (current bounding box.south) {#1};
+  \end{tikzpicture}%
+}
+
+% The same, with one cell highlighted: \mblayerhot{caption}{rows}{col}{row}
+\newcommand{\mblayerhot}[4]{%
+  \begin{tikzpicture}[baseline=(current bounding box.north),
+      cell/.style={draw=mbedge,fill=mbcell,minimum size=6.5mm,inner sep=0pt,
+                   font=\sffamily\scriptsize},
+      hot/.style={draw=mbmark,fill=mbmark!30,very thick,minimum size=6.5mm,inner sep=0pt,
+                  font=\sffamily\bfseries\scriptsize},
+      gap/.style={minimum size=6.5mm,inner sep=0pt}]
+    \foreach \row [count=\y] in {#2} {%
+      \foreach \c [count=\x] in \row {%
+        \ifthenelse{\equal{\c}{.}}
+          {\node[gap] at (\x*6.7mm,-\y*6.7mm) {};}
+          {\ifthenelse{\x=#3 \AND \y=#4}
+             {\node[hot] at (\x*6.7mm,-\y*6.7mm) {\c};}
+             {\node[cell] at (\x*6.7mm,-\y*6.7mm) {\c};}}%
+      }%
+    }
+    \node[font=\sffamily\tiny,anchor=north] at (current bounding box.south) {#1};
+  \end{tikzpicture}%
+}
+
+% A row of layers with a shared key underneath.
+%
+% \begin{mbplan}{Coke Oven}{B = Coke Brick}
+%   \mblayer{Layer 1}{B,B,B;B,B,B;B,B,B} \hfill ...
+% \end{mbplan}
+\newenvironment{mbplan}[2]
+  {\par\vspace{6pt}\noindent\textbf{\sffamily\small #1}\\[2pt]%
+   \def\mbplankey{#2}\noindent}
+  {\\[2pt]{\footnotesize\itshape\mbplankey}\par\vspace{8pt}}

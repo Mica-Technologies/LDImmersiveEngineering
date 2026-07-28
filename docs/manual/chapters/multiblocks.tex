@@ -10,6 +10,23 @@ Build multiblocks with the hammer already in your hand and the manual page open.
 assembly is one block in the wrong place, and the diagram will show you which.
 \end{ietip}
 
+\section{Reading a layer plan}
+
+Every plan in this chapter is drawn bottom layer first, left to right, as you would build it. A
+dot is empty space. The highlighted cell is where you strike with the hammer.
+
+\begin{mbplan}{Coke Oven and Blast Furnace --- both are a solid $3\times3\times3$}{B = Coke Bricks
+for the oven, Blast Bricks for the furnace. Strike any face.}
+\mblayer{Layer 1 (bottom)}{B,B,B;B,B,B;B,B,B}\hspace{6mm}
+\mblayerhot{Layer 2}{B,B,B;B,B,B;B,B,B}{2}{2}\hspace{6mm}
+\mblayer{Layer 3 (top)}{B,B,B;B,B,B;B,B,B}
+\end{mbplan}
+
+\begin{ietip}
+The two simplest structures in the mod are the same shape, which is why they are shown together.
+Once you can build one you can build the other, and both need no power at all.
+\end{ietip}
+
 \section{Processing}
 
 \begin{description}
@@ -41,6 +58,34 @@ assembly is one block in the wrong place, and the diagram will show you which.
 \item[Bucket Wheel] The visible half of the Excavator, and the reason it is worth building where
       people can see it.
 \end{description}
+
+\section{Plans for the fork's structures}
+
+\begin{mbplan}{Grid Management Console --- a $2\times2$ panel on a wall}{H = Console Housing.
+Strike the front face, not the top.}
+\mblayer{Upper row}{H,H}\hspace{8mm}
+\mblayerhot{Lower row}{H,H}{1}{1}
+\end{mbplan}
+
+\begin{mbplan}{Substation --- three wide, two deep, two tall}{F = Substation Frame. Strike a side
+face. The front rank is where power enters and leaves.}
+\mblayerhot{Bottom, front rank}{F,F,F}{1}{1}\hspace{5mm}
+\mblayer{Bottom, back rank}{F,F,F}\hspace{5mm}
+\mblayer{Top, front rank}{F,F,F}\hspace{5mm}
+\mblayer{Top, back rank}{F,F,F}
+\end{mbplan}
+
+\begin{mbplan}{Storage Tank --- any hollow box from $3^3$ to $16^3$, shown at $5\times5\times3$}{W
+= Storage Tank Wall. The inside must be empty. Strike any wall block.}
+\mblayer{Bottom: solid}{W,W,W,W,W;W,W,W,W,W;W,W,W,W,W}\hspace{5mm}
+\mblayerhot{Middle: walls only}{W,W,W,W,W;W,.,.,.,W;W,W,W,W,W}{1}{2}\hspace{5mm}
+\mblayer{Top: solid}{W,W,W,W,W;W,W,W,W,W;W,W,W,W,W}
+\end{mbplan}
+
+\begin{iewarning}
+A Storage Tank with anything inside the shell will not form. That is deliberate --- a solid cube
+would otherwise be given the capacity of a box it does not actually enclose.
+\end{iewarning}
 
 \section{Storage and power}
 
