@@ -73,6 +73,8 @@ public class BlockPetroleumMultiblock extends BlockIEMultiblock<BlockTypes_Petro
 				return new TileEntityCommercialTank();
 			case BULK_DEPOT:
 				return new TileEntityBulkDepot();
+			case LOADING_GANTRY:
+				return new TileEntityLoadingGantry();
 		}
 		return null;
 	}

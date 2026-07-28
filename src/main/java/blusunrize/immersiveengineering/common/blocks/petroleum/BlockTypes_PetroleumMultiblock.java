@@ -75,7 +75,11 @@ public enum BlockTypes_PetroleumMultiblock implements IStringSerializable, Block
 	/**
 	 * A refinery's or a town's stock, under the ground it stands on.
 	 */
-	BULK_DEPOT;
+	BULK_DEPOT,
+	/**
+	 * Fills portable containers in bulk: the refinery's truck bay.
+	 */
+	LOADING_GANTRY;
 
 	@Override
 	public String getName()

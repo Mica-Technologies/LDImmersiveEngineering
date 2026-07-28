@@ -148,6 +148,19 @@ public final class PetroleumGeometry
 	public static final int ENGINE_WIDTH = 5;
 	public static final int[] ENGINE_SIZE = {ENGINE_HEIGHT, ENGINE_DEPTH, ENGINE_WIDTH};
 
+	//	=================================
+	//		FLUID LOADING GANTRY
+	//	=================================
+	/**
+	 * H, L, W. Two legs and a beam over a one-block bay: the smallest shape that reads as a gantry
+	 * rather than as a frame, and the only one whose bay is wide enough to stand a chest in either
+	 * side of.
+	 */
+	public static final int GANTRY_HEIGHT = 4;
+	public static final int GANTRY_DEPTH = 1;
+	public static final int GANTRY_WIDTH = 3;
+	public static final int[] GANTRY_SIZE = {GANTRY_HEIGHT, GANTRY_DEPTH, GANTRY_WIDTH};
+
 	/**
 	 * Linear index into a structure, matching {@code TileEntityMultiblockPart.pos}.
 	 */

@@ -45,6 +45,9 @@
 		"inventory,type=bulk_depot": [{
 			"textures": {"all": "immersiveengineering:blocks/sheetmetal_steel"}
 		}],
+		"inventory,type=loading_gantry": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_oilfield_frame"}
+		}],
 		"type": {
 			"derrick": {},
 			"pumpjack": {
@@ -82,6 +85,9 @@
 			},
 			"bulk_depot": {
 				"textures": {"all": "immersiveengineering:blocks/sheetmetal_steel"}
+			},
+			"loading_gantry": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_oilfield_frame"}
 			}
 		},
 		"boolean0": {

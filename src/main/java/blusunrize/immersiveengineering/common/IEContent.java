@@ -840,6 +840,7 @@ public class IEContent
 		registerTile(TileEntityGasPump.class);
 		registerTile(TileEntityForecourtSign.class);
 		registerTile(TileEntityPortableGenerator.class);
+		registerTile(TileEntityLoadingGantry.class);
 
 
 
@@ -1150,6 +1151,7 @@ public class IEContent
 		//the tiers is data, so they share a shape, a formation routine and a burial check.
 		for(MultiblockBuriedTank tank : MultiblockBuriedTank.ALL)
 			MultiblockHandler.registerMultiblock(tank);
+		MultiblockHandler.registerMultiblock(MultiblockLoadingGantry.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();
