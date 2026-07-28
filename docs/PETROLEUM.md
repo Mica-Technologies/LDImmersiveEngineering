@@ -9,18 +9,18 @@ from a hash of the world seed and the cell's coordinates. That makes world gener
 gives existing worlds oil retroactively with no retrogen pass, and means only cells somebody has
 actually drawn from are worth persisting.
 
-**Status: the extraction, refining and gas branches are complete.** The reservoir model,
-prospecting, the Wellhead, the Drilling Derrick, the Pumpjack, the Distillation Tower, the
-Industrial Burner, the Flare Stack, the Gas Scrubber, the Gas Turbine, the Lubrication Manifold
-and the Propane Cylinder are all implemented, hammer-formable where they are multiblocks, and
-tested. The `DistillationRecipe` type and the shipped crude-oil recipe are registered, and the
-tower is what actually drives them: `DistillationRecipe.findRecipe` is called from the tower's own
-`update()` and `findIncompleteRecipes` gates what the feed tank will even accept.
+**Status: the whole feature is implemented.** Extraction, refining, the gas branch, large-scale
+power generation, buried storage, the virtual fluid network, the forecourt, deep refining and
+enhanced recovery are all in the tree, hammer-formable where they are multiblocks, covered by the
+manual and tested where the logic is world-free.
 
-Large-scale power generation — the Fuel Oil Boiler, the Heat Recovery Steam Generator, the Steam
-Turbine Hall and the Reciprocating Engine Bank, plus the `ie_steam` fluid that ties them together
-— is being built now and is not covered below. Storage, pipes and the virtual fluid network come
-after it. See `docs/agent-plans/FUELS.md` for the roadmap.
+**Not playtested.** Everything from the power plants onward has been built without a play session
+behind it. The arithmetic is unit-tested and the server smoke run is clean, but no number in the
+back half of this document has been judged in a game.
+
+The only thing from the plan deliberately left out is **vehicles**, whose decision was always
+deferred: the Gas Station Pump and the Fuel Nozzle already target any entity with a fluid
+capability, so one could be added with no change to anything here.
 
 Line numbers in this document are a reading aid, not a contract; the tree moves under them.
 
@@ -40,6 +40,17 @@ Line numbers in this document are a reading aid, not a contract; the tree moves 
 | **Gas Turbine** | Complete | A 3×6×3 machine that burns natural gas for Flux, with a spool-up curve that makes it a peaker rather than a base load. |
 | **Lubrication Manifold** | Complete | A single block that bolts onto a working machine and rebates part of its running cost while it has lubricant. |
 | **Propane Cylinder** | Complete | A portable four-bucket bottle that keeps its contents when broken. The domestic-scale answer to "I have propane, now what". |
+| **Fuel Oil Boiler** | Untested | A 5×5×7 furnace that makes steam rather than Flux. What finally gives heavy fuel oil a job at scale. |
+| **Heat Recovery Steam Generator** | Untested | A 3×5×3 tube bank that makes steam from a Gas Turbine's exhaust and burns nothing of its own. |
+| **Steam Turbine Hall** | Untested | 5×9×5, the largest structure here and the most efficient thing in the mod at turning fuel into Flux. |
+| **Reciprocating Engine Bank** | Untested | 4×5×5 of cylinders. Instant response, mediocre efficiency, and the only plant that scales by building another one. |
+| **Domestic / Commercial / Bulk buried tanks** | Untested | 2×2×2, 5×5×4 and 9×9×6 shells in the ground, showing only a fill cap. Storage that is not an eyesore. |
+| **Gas Station Pump** | Untested | The block that hands fuel to a person rather than a machine, with a price it reports through an event. |
+| **Fluid Loading Gantry** | Untested | Two legs and a bay that fills portable containers out of one chest and into another. |
+| **Portable Generator** | Untested | One block, 256 Flux/t, gasoline or ethanol. The consumer gasoline never had. |
+| **Cracking Unit** | Untested | 5×3×6. Breaks heavy cuts into light ones, at whatever severity its firebox pays for. |
+| **Re-injection Well** | Untested | Puts water or gas back downhole for a bounded second tranche out of a tiring field. |
+| **Fluid Inlet / Outlet / Main Valve / Fluid Control Console** | Untested | The virtual fluid network — see `docs/FLUID_NETWORK.md`. |
 
 Oilfield Frame (`BlockTypes_PetroleumDevice.OILFIELD_FRAME`,
 `src/main/java/blusunrize/immersiveengineering/common/blocks/petroleum/BlockTypes_PetroleumDevice.java:32`)
@@ -549,6 +560,274 @@ is a complete loop with no plumbing at all. It takes propane and nothing else, d
 letting it hold anything would quietly make it the cheapest portable tank in the mod for every
 fluid at once.
 
+## Fuel Oil Boiler
+
+`common/blocks/petroleum/TileEntityFuelOilBoiler.java`, shape in
+`common/blocks/multiblocks/MultiblockFuelOilBoiler.java`.
+
+A 5×5×7 furnace that makes **steam, not Flux**. This is what finally gives heavy fuel oil a job at
+scale: crude and diesel burn in it too, and both are worse trades, which is the point — the boiler
+is where the cut nothing else wants becomes the base load of a power station.
+
+Water and fuel go in along the base course; steam leaves from the crown. Splitting the boiler from
+the turbine hall rather than making one enormous machine is the whole reason `ie_steam` is a
+registered fluid: a boiler house and a hall are two buildings you plumb together across a yard.
+
+Fuel values are keyed by fluid registry name, so the table is readable — and testable — without a
+fluid registry, the same arrangement the Industrial Burner and the Gas Scrubber use.
+
+---
+
+## Heat Recovery Steam Generator
+
+`common/blocks/petroleum/TileEntityHRSG.java`, shape in
+`common/blocks/multiblocks/MultiblockHRSG.java`.
+
+A 3×5×3 bank of finned tubes that **burns nothing**. Butted against a Gas Turbine's exhaust end it
+makes steam out of heat that was going up the stack anyway.
+
+Two details carry it:
+
+- **The exhaust is claimed.** `TileEntityGasTurbine.claimExhaust(BlockPos, int leaseTicks)` grants
+  one HRSG a lease on a turbine's exhaust; a second HRSG on the same machine gets nothing. Without
+  that, stacking HRSGs would multiply a fixed quantity of waste heat.
+- **The face has to match.** The HRSG is three wide and three tall because that is exactly the
+  turbine's exhaust face. If it will not sit flush, it is not in line — which is a legible failure
+  rather than a silent one.
+
+---
+
+## Steam Turbine Hall
+
+`common/blocks/petroleum/TileEntitySteamTurbineHall.java`, shape in
+`common/blocks/multiblocks/MultiblockSteamTurbineHall.java`.
+
+5×9×5, the largest structure in the expansion, and the most efficient thing in the mod at turning
+fuel into Flux. Steam in at the condenser end, Flux out at the switchyard.
+
+It is deliberately slow to start and punished for cycling. Fed steadily it beats everything;
+switched on and off against a wobbling demand it spends most of its life spinning up. That is the
+axis the whole power-generation tier is built on — **response against efficiency** — and the hall
+is the efficient extreme.
+
+---
+
+## Reciprocating Engine Bank
+
+`common/blocks/petroleum/TileEntityEngineBank.java`, shape in
+`common/blocks/multiblocks/MultiblockEngineBank.java`.
+
+4×5×5 of cylinder banks burning diesel, biodiesel or natural gas. Instant response, mediocre
+efficiency, and the only plant that **scales by building another one**: place a second bank
+alongside the first and they run as a set, with no single bank changing.
+
+The word in the plan was "extensible"; the honest word is **modular**. Nothing grows — you simply
+have two.
+
+---
+
+## The combined cycle
+
+Gas Turbine → HRSG → Steam Turbine Hall. The turbine's waste heat becomes steam, the steam becomes
+more Flux, and a millibucket of gas does considerably more work than it does alone.
+
+It is also the least forgiving thing in the expansion to build: three structures in a line, one
+fuel line, one steam line, and any of the three idle makes the other two worse. That is the reward
+structure the tier was designed around, and the reason the HRSG consumes no fuel of its own.
+
+> **Balance, still open.** Heavy fuel oil in a boiler feeding a hall currently beats the combined
+> cycle on FE per millibucket. That may be correct — HFO has no other use and gas has several — or
+> it may make the combined cycle decorative. **It is not a spreadsheet question.** Judge it after
+> building both.
+
+---
+
+## Buried tanks
+
+`common/blocks/petroleum/TileEntityBuriedTank.java` and its three subclasses, geometry in
+`common/blocks/petroleum/BuriedTankGeometry.java`, shape in
+`common/blocks/multiblocks/MultiblockBuriedTank.java`.
+
+| Tier | Box | Blocks | Capacity | Metal |
+|---|---|---|---|---|
+| **Domestic Tank** | 2×2×2 | 8 | 32,000 mB | Iron sheetmetal |
+| **Commercial Tank** | 5×5×4 | 82 | 512,000 mB | Steel sheetmetal |
+| **Bulk Depot** | 9×9×6 | 290 | 4,000,000 mB | Steel sheetmetal |
+
+Three instances of **one parameterised multiblock**, not three classes: everything that differs
+between the tiers is data, so there is one copy of the shape arithmetic to get right rather than
+three to keep in step.
+
+Four decisions worth knowing:
+
+- **The middle is hollow.** A solid depot would be 486 blocks and 486 tile entities; a shell is
+  290, and it is also what a tank actually is. The hollow interior doubles as the guard that keeps
+  the tiers apart — a smaller tank's footprint laid over a bigger one's roof always lands on a void
+  cell, so hammering a depot can never form the wrong structure.
+- **The fill cap is the master**, not the origin corner. Nothing in `TileEntityMultiblockPart`
+  requires the two to be the same block, and putting the state on the cap keeps the readout, the
+  comparator level and the client sync local to the one block a player can see. On the origin
+  corner they would be a cross-chunk lookup from a buried block.
+- **Burial is enforced and explained.** The structure forms only when every roof block but the cap
+  is covered, and when the shape is right and only the cover is missing the player is told so. A
+  silent refusal there would be unusually cruel, because the tank looks completely correct.
+- **The gauge syncs in 64 bands**, not on every change, and the arithmetic is in longs — four
+  million millibuckets times sixty-four overflows an int, and the negative reads as a level falling
+  while the tank fills.
+
+Capacity per block rises with the tier, which is the reason to dig the bigger hole.
+
+---
+
+## The forecourt
+
+`common/blocks/petroleum/TileEntityGasPump.java`, `TileEntityForecourtSign.java`,
+`TileEntityPortableGenerator.java`, and the nozzle in `common/items/ItemPetroleum.java`.
+
+Everything else in this feature moves fuel between machines. The **Gas Station Pump** hands it to a
+person.
+
+- A held container is filled directly — a bucket, a jerrycan, a Mining Drill — because making a
+  player fetch the nozzle for the common case would be ceremony rather than immersion.
+- The **Fuel Nozzle** is for the rest: take it off a pump and it remembers which pump, then fill
+  anything within eight blocks that accepts fluid, **including entities**, so a vehicle would need
+  no change here at all. The rendered hose is not built; the range check does the job its length
+  would have done.
+- The pump **does not tick**. It spends nearly all its life doing nothing and a forecourt is
+  several of them, so dispensing happens on the interaction that asks for it.
+- The **Forecourt Price Sign** has no price of its own. It finds the nearest pump and shows that
+  one's — the only arrangement that cannot go stale.
+
+### `FuelDispensedEvent`
+
+`api/petroleum/FuelDispensedEvent.java`. Cancellable, fired on the server **before anything moves**,
+carrying the player, the pump, the fluid name, the amount and the forecourt's price. The amount is
+mutable, so a listener may shorten a sale rather than refusing it.
+
+**This fork implements no currency, and that event is the reason it does not have to.** A city
+server with an economy plugin subscribes and charges whatever its own money system charges. Half an
+economy inside a tech mod would be worse than none.
+
+### Portable Generator
+
+Gasoline runs handheld tools and is explicitly refused by the Diesel Generator, which is correct —
+a compression engine cannot burn it — and until now that left the cut with no consumer that scales.
+The Portable Generator burns the **spark-ignition** fuels (gasoline, ethanol) and refuses diesel,
+at 256 Flux/t from a four-bucket tank. It is deliberately small: a thing you carry to a build site
+and walk back to the pump to refill.
+
+---
+
+## Fluid Loading Gantry
+
+`common/blocks/petroleum/TileEntityLoadingGantry.java`, shape in
+`common/blocks/multiblocks/MultiblockLoadingGantry.java`.
+
+Two legs, a beam and a one-block bay. It takes empties out of the inventory on one side, fills them,
+and puts them into the inventory on the other.
+
+**No GUI, deliberately**: a machine whose whole job is to sit between two chests should be
+configured by where the chests are, and that also means there is no internal inventory to spill
+when the structure comes apart. The insert is simulated before the empty is taken — the other way
+round destroys a jerrycan the moment the output chest fills up, and a machine that eats containers
+is a far worse failure than one that stops.
+
+---
+
+## Cracking Unit
+
+`common/blocks/petroleum/TileEntityCrackingUnit.java`, shape in
+`common/blocks/multiblocks/MultiblockCrackingUnit.java`.
+
+5×3×6: two reactor columns straddling a coke drum on a scaffolding deck. Heavy fuel oil or naphtha
+in at the deck, gasoline out of the front of the head, diesel out of the back, petcoke out of the
+bottom of the drum.
+
+**The severity dial is the burner.** The plan called for a temperature slider in a GUI; there is
+none, and it is better for it. The cracker always asks for the heat of a maximum-severity run and
+cracks at whatever severity the heat it actually receives pays for:
+
+| Firebox | Severity | Yield |
+|---|---|---|
+| Cool (natural gas) | low | favours diesel |
+| Hot (heavy fuel oil) | high | favours gasoline |
+
+That makes the Industrial Burner's fuel table matter twice and turns the knob into a thing built
+out of blocks. Below the cold threshold the machine refuses to run at all rather than cracking
+badly — a machine producing a trickle of the wrong thing is harder to diagnose than one that has
+stopped.
+
+The two products leave on **opposite rows of the head**, with the row between them connected to
+nothing. Two fluids on one face makes the split unenforceable, which this expansion has already
+shipped once on the Wellhead.
+
+Petcoke burns half again as long as coal, which is what stops the byproduct being a nuisance.
+
+---
+
+## Blowouts and the Blowout Preventer
+
+A field that still has its own pressure will **blow out** if drilled without a Blowout Preventer:
+a fountain of crude, a spill of ordinary flammable fluid blocks around the wellhead, and a tenth of
+the field's remaining pressure gone up the bore.
+
+The mechanic teaches itself. Only a field with pressure left can blow out, which is exactly when
+the preventer is worth fitting — and it stops being worth fitting at the same moment the pumpjack
+starts being worth building. The rig warns on its overlay while there is still time to act, because
+a blowout with no notice at all would be a gotcha rather than a lesson.
+
+The spill only lands on ground that is already open; a gusher that carved through a player's floor
+would be a grief mechanic. **Absorbent Pads** lift spilt petroleum fluids three blocks at a time,
+and only this mod's own — a pad that deleted water would be the answer to terraforming rather than
+to a blowout.
+
+Config-gated on `petroleumGushers`, default on.
+
+---
+
+## Re-injection Well
+
+`common/blocks/petroleum/TileEntityReinjectionWell.java`.
+
+A single block that puts water or gas back downhole and gets a second tranche out of a tiring
+field — the thinking player's alternative to the flare.
+
+| Injectant | Recovered per mB |
+|---|---|
+| Water | 0.35 |
+| Sour gas (straight off the wellhead) | 0.55 |
+| Natural gas (scrubbed) | 0.70 |
+
+The ranking is the decision, and the middle row is the one that matters: a field can drive its own
+enhanced recovery on the waste stream it was already producing. That turns "I have sour gas and
+nowhere to put it" from a disposal problem into a third genuine option.
+
+**Bounded by a permanent per-deposit allowance**, `PetroleumConfig.reinjectionCapFraction`, default
+20% of the field's original capacity. `Reservoir.restore` on its own only stops at the original
+capacity and says nothing about how many times you may refill to it; without the allowance this is
+a water-to-crude converter. `Reservoir.restoredTotal` is persisted, so a server restart does not
+hand every field its allowance back.
+
+---
+
+## Seismic Survey Kit
+
+`api/petroleum/SeismicSurvey.java` (arithmetic), behaviour in `common/items/ItemPetroleum.java`.
+
+The Core Sample Drill answers "is there oil *here*", one cell at a time, and a cell is 128 blocks
+across. The survey kit answers "which way do I walk": it reads the nine cells around the player and
+reports each deposit by **bearing and rough range** — never a coordinate, because that is still the
+sample drill's job and a sharper reading would make it pointless.
+
+Costs one gunpowder per shot. An item with subtypes cannot carry durability — metadata is already
+spoken for — so the running cost is a consumable, which is thematically a seismic charge anyway.
+
+The bearings are unit-tested rather than trusted: Minecraft's north is negative Z, which is exactly
+the sort of thing that gets mirrored by accident, and a survey pointing the wrong way sends a player
+four hundred blocks to nothing with no way to tell that the kit was what was wrong.
+
+---
+
 ## Distillation recipes
 
 `DistillationRecipe` (`api/crafting/DistillationRecipe.java`) is the only recipe type in the mod
@@ -829,6 +1108,16 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 | Fluids, distillation recipe, asphalt Mixer recipe, `DieselHandler` fuel/drill-fuel registration | `common/IEContent.java` (fluid block ~L256-270, distillation recipe ~L536-544, asphalt Mixer recipe ~L549, `DieselHandler` calls ~L893-918) |
 | City mode gate | `common/util/CityMode.java` |
 | Commands | `common/util/commands/CommandReservoir.java` |
+| Power plants | `common/blocks/petroleum/TileEntityFuelOilBoiler.java`, `TileEntityHRSG.java`, `TileEntitySteamTurbineHall.java`, `TileEntityEngineBank.java` and their `Multiblock*` shapes |
+| Buried tanks | `common/blocks/petroleum/BuriedTankGeometry.java`, `TileEntityBuriedTank.java` (+ three tier subclasses), `common/blocks/multiblocks/MultiblockBuriedTank.java` |
+| Forecourt | `common/blocks/petroleum/TileEntityGasPump.java`, `TileEntityForecourtSign.java`, `TileEntityPortableGenerator.java`, `client/gui/GuiGasPump.java`, `common/gui/ContainerGasPump.java`, `common/util/network/MessagePumpSettings.java` |
+| Economy hook | `api/petroleum/FuelDispensedEvent.java` |
+| Loose items (nozzle, drill pipe, preventer, pad, petcoke, survey kit) | `common/items/ItemPetroleum.java`, `common/items/PetroleumItemNames.java` |
+| Loading gantry | `common/blocks/petroleum/TileEntityLoadingGantry.java`, `common/blocks/multiblocks/MultiblockLoadingGantry.java` |
+| Cracking unit | `common/blocks/petroleum/TileEntityCrackingUnit.java`, `common/blocks/multiblocks/MultiblockCrackingUnit.java` |
+| Enhanced recovery | `common/blocks/petroleum/TileEntityReinjectionWell.java`, allowance tracking in `api/petroleum/Reservoir.java` |
+| Seismic survey arithmetic (world-free, unit-tested) | `api/petroleum/SeismicSurvey.java` |
+| Virtual fluid network | `api/fluid/network/`, `common/blocks/fluidnet/`, `common/util/fluidnet/` — see `docs/FLUID_NETWORK.md` |
 | Tests | `src/test/java/blusunrize/immersiveengineering/api/petroleum/` (`ReservoirHandlerTest`, `ReservoirModelTest`), `src/test/java/.../common/util/petroleum/ReservoirSurveyTest.java`, `src/test/java/.../common/blocks/petroleum/` (`DerrickTest`, `PumpjackTest`, `DistillationTowerTest`, `IndustrialBurnerTest`, `PetroleumAssetsTest`) |
 
 The reservoir model (`ReservoirHandler`, `ReservoirModel`, `Reservoir`, `ReservoirType`) and
