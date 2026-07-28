@@ -76,11 +76,103 @@ public class ItemPetroleum extends ItemIEBase
 	private static final String TAG_POS = "pumpPos";
 	private static final String TAG_DIM = "pumpDim";
 
+	//	=================================
+	//		THE SURVEY KIT
+	//	=================================
+	//
+	// Fires a charge and reads the cells around it. The Core Sample Drill answers "is there oil
+	// here"; this answers "which way do I walk", which is the question a player actually has when
+	// they are standing in an empty field with no idea where to start.
+
+	/**
+	 * The charge each survey burns. Gunpowder, because a seismic survey is a controlled explosion
+	 * and because it gives the kit a running cost without an inventory or a durability bar -- an
+	 * item with subtypes cannot carry damage, since metadata is already spoken for.
+	 */
+	private static boolean consumeCharge(EntityPlayer player)
+	{
+		if(player.capabilities.isCreativeMode)
+			return true;
+		for(int slot = 0; slot < player.inventory.getSizeInventory(); slot++)
+		{
+			ItemStack candidate = player.inventory.getStackInSlot(slot);
+			if(!candidate.isEmpty()&&candidate.getItem()==net.minecraft.init.Items.GUNPOWDER)
+			{
+				candidate.shrink(1);
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private EnumActionResult survey(EntityPlayer player, World world, BlockPos pos)
+	{
+		if(world.isRemote)
+			return EnumActionResult.SUCCESS;
+		if(!blusunrize.immersiveengineering.api.petroleum.PetroleumConfig.enabled)
+		{
+			say(player, TextFormatting.GRAY+"Nothing to survey for."+TextFormatting.RESET);
+			return EnumActionResult.SUCCESS;
+		}
+		if(!consumeCharge(player))
+		{
+			say(player, TextFormatting.YELLOW
+					+"A survey needs a charge -- carry some gunpowder."+TextFormatting.RESET);
+			return EnumActionResult.SUCCESS;
+		}
+		world.playSound(null, pos, net.minecraft.init.SoundEvents.ENTITY_GENERIC_EXPLODE,
+				net.minecraft.util.SoundCategory.PLAYERS, 1.2F, 1.8F);
+
+		int dimension = world.provider.getDimension();
+		int cellSize = blusunrize.immersiveengineering.api.petroleum.PetroleumConfig.cellChunkSize;
+		int originCellX = blusunrize.immersiveengineering.api.petroleum.ReservoirHandler.toCell(pos.getX() >> 4);
+		int originCellZ = blusunrize.immersiveengineering.api.petroleum.ReservoirHandler.toCell(pos.getZ() >> 4);
+		int radius = blusunrize.immersiveengineering.api.petroleum.SeismicSurvey.CELL_RADIUS;
+
+		int found = 0;
+		for(int dx = -radius; dx <= radius; dx++)
+			for(int dz = -radius; dz <= radius; dz++)
+			{
+				int cellX = originCellX+dx;
+				int cellZ = originCellZ+dz;
+				//Asked at the centre chunk of the cell, because getReservoir works in chunk
+				//coordinates and any chunk of a cell answers for the whole of it.
+				blusunrize.immersiveengineering.api.petroleum.Reservoir reservoir =
+						blusunrize.immersiveengineering.api.petroleum.ReservoirHandler.getReservoir(
+								world.getSeed(), dimension, cellX*cellSize+cellSize/2,
+								cellZ*cellSize+cellSize/2);
+				if(reservoir==null||reservoir.getOriginalCapacity() <= 0)
+					continue;
+				found++;
+				int targetX = blusunrize.immersiveengineering.api.petroleum.SeismicSurvey
+						.cellCentreBlock(cellX, cellSize);
+				int targetZ = blusunrize.immersiveengineering.api.petroleum.SeismicSurvey
+						.cellCentreBlock(cellZ, cellSize);
+				int offX = targetX-pos.getX();
+				int offZ = targetZ-pos.getZ();
+				String where = dx==0&&dz==0?TextFormatting.GREEN+"beneath you"+TextFormatting.RESET
+						: blusunrize.immersiveengineering.api.petroleum.SeismicSurvey.bearing(offX, offZ)
+						+", about "+blusunrize.immersiveengineering.api.petroleum.SeismicSurvey
+						.roundedDistance(offX, offZ)+" blocks";
+				say(player, TextFormatting.GOLD+"Reflection"+TextFormatting.RESET+": "
+						+blusunrize.immersiveengineering.common.util.petroleum.ReservoirSurvey.sizeBand(reservoir)
+						+" deposit "+where+"  ("
+						+blusunrize.immersiveengineering.common.util.petroleum.ReservoirSurvey
+						.pressurePercent(reservoir)+"% pressure)");
+			}
+		if(found==0)
+			say(player, TextFormatting.GRAY
+					+"No reflections. Nothing within range of this shot."+TextFormatting.RESET);
+		return EnumActionResult.SUCCESS;
+	}
+
 	@Override
 	public EnumActionResult onItemUse(EntityPlayer player, World world, BlockPos pos, EnumHand hand,
 									  EnumFacing side, float hitX, float hitY, float hitZ)
 	{
 		ItemStack stack = player.getHeldItem(hand);
+		if(stack.getMetadata()==SURVEY_KIT)
+			return survey(player, world, pos);
 		if(stack.getMetadata()!=NOZZLE)
 			return EnumActionResult.PASS;
 
