@@ -215,14 +215,22 @@ public class TileEntityEngineBank extends TileEntityMultiblockPart<TileEntityEng
 	 * <p>
 	 * The ordering is the whole design. Diesel is refined, dense and worth the column that made it.
 	 * Biodiesel is the same idea grown in a field and is a fifth worse, which is exactly the margin
-	 * it already carries against diesel elsewhere in the mod. Natural gas is half of diesel, and
-	 * that is not a punishment -- gas comes off a wellhead in quantities nothing else can absorb,
-	 * so the machine that will burn it badly and in bulk is the one that makes it worth capturing
-	 * at all rather than flaring it.
+	 * it already carries against diesel elsewhere in the mod. Natural gas is deliberately the worst
+	 * of the three here and comfortably beaten by the Gas Turbine, because gas is the turbine's
+	 * home fuel and this machine should not be the answer to everything.
+	 * <p>
+	 * The absolute level is set against the <em>Diesel Generator</em>, which gets 664 flux from a
+	 * millibucket of diesel and 512 from biodiesel. These numbers were first pinned well below
+	 * that, which made this machine strictly dominated: bigger, costlier, and worse per
+	 * millibucket than a starter machine burning the same fuel, so there was no reason to ever
+	 * build one. It now beats the generator on the liquids, by roughly the margin its size and
+	 * cost deserve, while a combined-cycle plant still runs three to five times cleaner than it
+	 * does. Mediocre efficiency means mediocre next to a power station, not worse than the box it
+	 * replaces.
 	 */
-	public static final int FLUX_PER_MB_DIESEL = 300;
-	public static final int FLUX_PER_MB_BIODIESEL = 240;
-	public static final int FLUX_PER_MB_NATURAL_GAS = 150;
+	public static final int FLUX_PER_MB_DIESEL = 750;
+	public static final int FLUX_PER_MB_BIODIESEL = 600;
+	public static final int FLUX_PER_MB_NATURAL_GAS = 500;
 
 	private static final Map<String, Integer> FUELS = new HashMap<String, Integer>();
 

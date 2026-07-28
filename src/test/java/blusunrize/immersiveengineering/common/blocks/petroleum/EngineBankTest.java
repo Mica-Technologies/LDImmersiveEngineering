@@ -183,9 +183,9 @@ class EngineBankTest
 		@DisplayName("refined beats grown beats gas, and by the margins the section was balanced on")
 		void ordering()
 		{
-			assertEquals(300, getFluxPerMillibucket("ie_diesel"));
-			assertEquals(240, getFluxPerMillibucket("biodiesel"));
-			assertEquals(150, getFluxPerMillibucket("natural_gas"));
+			assertEquals(750, getFluxPerMillibucket("ie_diesel"));
+			assertEquals(600, getFluxPerMillibucket("biodiesel"));
+			assertEquals(500, getFluxPerMillibucket("natural_gas"));
 			assertTrue(getFluxPerMillibucket("ie_diesel") > getFluxPerMillibucket("biodiesel"));
 			assertTrue(getFluxPerMillibucket("biodiesel") > getFluxPerMillibucket("natural_gas"));
 		}
@@ -198,21 +198,39 @@ class EngineBankTest
 		@DisplayName("even its best fuel is worse than the combined-cycle plant's five hundred")
 		void deliberatelyInefficient()
 		{
-			int combinedCycle = 500;
-			assertTrue(getFluxPerMillibucket("ie_diesel") < combinedCycle);
-			assertTrue(getFluxPerMillibucket("biodiesel") < combinedCycle);
-			assertTrue(getFluxPerMillibucket("natural_gas") < combinedCycle);
+			//A combined-cycle plant gets 2,524 flux from a millibucket of gas and the Boiler and
+			//Hall together get 4,000 from heavy fuel oil. The engine bank has to stay well under
+			//both or there is no reason to build a power station.
+			int combinedCycleOnGas = 2524;
+			assertTrue(getFluxPerMillibucket("ie_diesel") < combinedCycleOnGas);
+			assertTrue(getFluxPerMillibucket("biodiesel") < combinedCycleOnGas);
+			assertTrue(getFluxPerMillibucket("natural_gas") < combinedCycleOnGas);
+
+			//...but it must NOT be beaten by the Diesel Generator, which is smaller, cheaper and
+			//burns the same liquids. It was, on the first pinning: 300 against the generator's 664,
+			//which made this machine strictly dominated and therefore pointless to build.
+			int dieselGeneratorOnDiesel = 162*4096/1000;
+			int dieselGeneratorOnBiodiesel = 125*4096/1000;
+			assertTrue(getFluxPerMillibucket("ie_diesel") > dieselGeneratorOnDiesel,
+					"a bigger, costlier machine losing to the starter box on its own fuel");
+			assertTrue(getFluxPerMillibucket("biodiesel") > dieselGeneratorOnBiodiesel,
+					"a bigger, costlier machine losing to the starter box on its own fuel");
+
+			//Gas is the exception, and deliberately so: it is the Gas Turbine's home fuel at 1,024
+			//and this machine should not be the answer to everything.
+			assertTrue(getFluxPerMillibucket("natural_gas") < 3*4096/12,
+					"the turbine has to stay the right machine for gas");
 		}
 
 		@Test
 		@DisplayName("a pass costs what the fuel table says it does")
 		void costPerPass()
 		{
-			assertEquals(200, fuelPerBankPass(getFluxPerMillibucket("ie_diesel")));
-			assertEquals(250, fuelPerBankPass(getFluxPerMillibucket("biodiesel")));
-			assertEquals(400, fuelPerBankPass(getFluxPerMillibucket("natural_gas")));
-			//Which is twenty, twenty-five and forty millibuckets a tick.
-			assertEquals(20, fuelPerBankPass(getFluxPerMillibucket("ie_diesel"))/WORK_INTERVAL);
+			assertEquals(80, fuelPerBankPass(getFluxPerMillibucket("ie_diesel")));
+			assertEquals(100, fuelPerBankPass(getFluxPerMillibucket("biodiesel")));
+			assertEquals(120, fuelPerBankPass(getFluxPerMillibucket("natural_gas")));
+			//Which is eight, ten and twelve millibuckets a tick.
+			assertEquals(8, fuelPerBankPass(getFluxPerMillibucket("ie_diesel"))/WORK_INTERVAL);
 		}
 
 		/**

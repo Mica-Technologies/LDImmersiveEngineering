@@ -79,17 +79,22 @@ public class TileEntityFuelOilBoiler extends TileEntityMultiblockPart<TileEntity
 	/**
 	 * Millibuckets of steam yielded per millibucket of fuel burned, keyed by fluid registry name.
 	 * <p>
-	 * Heavy fuel oil sits on top by design: it has no other consumer at all, so the boiler has to
-	 * make it clearly the best thing to shovel in or the machine would just be a worse Diesel
-	 * Generator wearing a bigger silhouette. Crude burns raw here at a punitive rate for the same
-	 * reason {@code DieselHandler} charges it one -- refining it into something else is obviously
-	 * better -- and diesel is deliberately the most steam-efficient of the three, because burning
-	 * away a fuel three other machines want is the one genuinely wasteful thing a player can do
-	 * with it, and the boiler should not soften that.
+	 * Heavy fuel oil sits on top, and that is the entire point of the machine: HFO has no other
+	 * consumer at all, so if the boiler does not make it clearly the best thing to shovel in then
+	 * the heaviest useful cut off the column still has nowhere to go and this is just a Diesel
+	 * Generator wearing a bigger silhouette.
+	 * <p>
+	 * It briefly did not. Diesel was pinned at 50 against HFO's 40, which made feeding a boiler
+	 * refined diesel strictly better than feeding it the residue -- exactly backwards for a machine
+	 * whose stated job is burning what nothing else wants. Diesel and crude were cut rather than
+	 * HFO raised, so nothing's absolute output moved: burning a fuel that three other machines want
+	 * is the one genuinely wasteful thing a player can do with it, and the boiler should charge for
+	 * that rather than reward it. Crude is worst for the same reason {@code DieselHandler} charges
+	 * it one -- refining it is obviously the better move.
 	 */
-	public static final int STEAM_YIELD_CRUDE_OIL = 24;
+	public static final int STEAM_YIELD_CRUDE_OIL = 20;
 	public static final int STEAM_YIELD_HEAVY_FUEL_OIL = 40;
-	public static final int STEAM_YIELD_DIESEL = 50;
+	public static final int STEAM_YIELD_DIESEL = 28;
 
 	private static final Map<String, Integer> FUELS = new HashMap<String, Integer>();
 

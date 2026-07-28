@@ -70,8 +70,8 @@ class FuelOilBoilerTest
 		void flatMultiplier()
 		{
 			assertEquals(4000, steamFromFuel(100, TileEntityFuelOilBoiler.STEAM_YIELD_HEAVY_FUEL_OIL));
-			assertEquals(2400, steamFromFuel(100, TileEntityFuelOilBoiler.STEAM_YIELD_CRUDE_OIL));
-			assertEquals(5000, steamFromFuel(100, TileEntityFuelOilBoiler.STEAM_YIELD_DIESEL));
+			assertEquals(2000, steamFromFuel(100, TileEntityFuelOilBoiler.STEAM_YIELD_CRUDE_OIL));
+			assertEquals(2800, steamFromFuel(100, TileEntityFuelOilBoiler.STEAM_YIELD_DIESEL));
 		}
 
 		@Test
@@ -212,13 +212,14 @@ class FuelOilBoilerTest
 			int crude = TileEntityFuelOilBoiler.getSteamYield("ie_crude_oil");
 			int diesel = TileEntityFuelOilBoiler.getSteamYield("ie_diesel");
 			assertEquals(40, hfo);
-			assertEquals(24, crude);
-			assertEquals(50, diesel);
-			//Diesel edges out heavy fuel oil on this one machine -- three other machines already
-			//want diesel, so burning it away here must never be the free lunch, even though it
-			//still out-yields crude. Heavy fuel oil only has to beat crude, the other fuel with no
-			//better use once refining exists, to make its case.
-			assertTrue(hfo > crude, "heavy fuel oil has to clearly beat raw crude");
+			assertEquals(20, crude);
+			assertEquals(28, diesel);
+			//The regression this test is named after. Diesel was briefly pinned above heavy fuel
+			//oil, which made feeding a boiler refined diesel strictly better than feeding it the
+			//residue -- backwards for the one machine whose stated job is burning what nothing
+			//else wants, and it would have quietly left HFO with no consumer worth the name.
+			assertTrue(hfo > diesel, "heavy fuel oil has to beat diesel: that is the machine");
+			assertTrue(diesel > crude, "diesel still has to beat raw crude");
 		}
 
 		@Test
