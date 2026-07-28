@@ -17,10 +17,14 @@ python "$repo/docs/tools/make_manual_data.py" --repo "$repo"
 
 # MiKTeX installs per-user and does not always land on PATH -- especially in a shell that was
 # already open when it was installed. Look where it actually puts itself before giving up.
+#
+# Deliberately not $LOCALAPPDATA: it holds a Windows path (C:\Users\...), which passes the -x
+# test here and is then useless once prepended to PATH -- so the search would stop on an
+# entry that cannot resolve anything. POSIX-style paths only.
 for candidate in \
-	"${LOCALAPPDATA:-}/Programs/MiKTeX/miktex/bin/x64" \
 	"$HOME/AppData/Local/Programs/MiKTeX/miktex/bin/x64" \
-	"/c/Program Files/MiKTeX/miktex/bin/x64"; do
+	"/c/Program Files/MiKTeX/miktex/bin/x64" \
+	"/c/texlive/2025/bin/windows"; do
 	if [ -x "$candidate/pdflatex.exe" ]; then
 		PATH="$candidate:$PATH"
 		break
