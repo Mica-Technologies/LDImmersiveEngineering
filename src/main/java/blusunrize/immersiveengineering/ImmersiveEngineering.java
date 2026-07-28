@@ -206,11 +206,33 @@ public class ImmersiveEngineering
 	@Mod.EventHandler
 	public void serverStopped(FMLServerStoppedEvent event)
 	{
-		//Drop chunk-loading tickets and live tile attachments so a second world started in
-		//the same session does not inherit either.
-		GridChunkLoader.releaseAll();
-		VirtualGrid.INSTANCE.detachAll();
-		VirtualFluidNet.INSTANCE.detachAll();
+		//	=================================
+		//	Nothing may escape this method.
+		//	=================================
+		//
+		// FML turns an exception from a mod's FMLServerStoppedEvent handler into a
+		// LoaderExceptionModCrash on the Server thread, part-way through MinecraftServer.run's
+		// shutdown. The thread dies before it can signal that the server has stopped, and the
+		// integrated client then waits for it forever -- so a bug here does not present as a crash,
+		// it presents as "leaving a world hangs the game", with the stack trace only in
+		// run/logs/latest.log because the dev log config has no console appender.
+		//
+		// Everything below is cleanup whose whole purpose is that a second world in the same
+		// session starts clean. Failing to do it costs a little staleness; throwing costs the
+		// player their client.
+		try
+		{
+			//Drop chunk-loading tickets and live tile attachments so a second world started in
+			//the same session does not inherit either.
+			GridChunkLoader.releaseAll();
+			VirtualGrid.INSTANCE.detachAll();
+			VirtualFluidNet.INSTANCE.detachAll();
+		} catch(RuntimeException e)
+		{
+			IELogger.error("Immersive Engineering failed to clean up at server stop. This is not "
+					+"fatal, but a second world in this session may inherit stale state: "+e);
+			e.printStackTrace();
+		}
 	}
 
 	@Mod.EventHandler

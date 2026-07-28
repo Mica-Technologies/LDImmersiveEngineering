@@ -146,18 +146,51 @@ public class GridChunkLoader
 	private static void release(int dimension)
 	{
 		Ticket ticket = tickets.remove(dimension);
-		if(ticket!=null)
-			ForgeChunkManager.releaseTicket(ticket);
 		forced.remove(dimension);
+		if(ticket==null)
+			return;
+		try
+		{
+			ForgeChunkManager.releaseTicket(ticket);
+		} catch(RuntimeException e)
+		{
+			//	=================================
+			//	Why this is caught rather than prevented
+			//	=================================
+			//
+			// ForgeChunkManager.releaseTicket does `tickets.get(ticket.world).containsEntry(...)`
+			// with no null check. Once a world has been unloaded its row is gone from that map, so
+			// releasing a ticket against it throws NPE -- and there is no public way to ask whether
+			// a ticket is still releasable.
+			//
+			// That mattered a great deal. releaseAll() runs from the FMLServerStoppedEvent handler,
+			// by which point the worlds are already gone; the NPE propagated out of the mod's event
+			// handler as a LoaderExceptionModCrash, killed the Server thread partway through
+			// shutdown, and the integrated server never signalled that it had stopped. The symptom
+			// was the client hanging forever on world exit -- with the real cause invisible, because
+			// the dev-environment log config cannot build a console appender and the stack trace
+			// only ever reached run/logs/latest.log.
+			//
+			// Dropping the ticket is all that actually matters here: Forge discards every ticket it
+			// holds when the server stops, so a failure to hand one back has no consequence beyond
+			// this log line.
+			IELogger.warn("Virtual grid could not hand back its chunk ticket for dimension "
+					+dimension+" (the dimension is already gone). Harmless at shutdown: "+e);
+		}
 	}
 
 	/**
 	 * Drops every ticket. Called on server stop so a second world starts clean.
+	 * <p>
+	 * Must not throw. It runs inside {@code FMLServerStoppedEvent}, and anything escaping from
+	 * there takes the Server thread down mid-shutdown and hangs the client.
 	 */
 	public static void releaseAll()
 	{
 		for(Integer dim : new ArrayList<>(tickets.keySet()))
 			release(dim);
+		tickets.clear();
+		forced.clear();
 		lastDroppedCount = 0;
 	}
 
