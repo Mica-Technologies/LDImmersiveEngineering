@@ -24,6 +24,7 @@ Everything meaningful lives inside that window.
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -100,6 +101,24 @@ def console_housing():
     return img
 
 
+def console_screen():
+    """The lit screen half, borrowed frame for frame from the grid's animated
+    sheet. The only warm pixels on that screen are the one orange status LED
+    (ORANGE) and its unused shade (ORANGE_DARK) -- everything else is already
+    grey or teal glass -- so recolouring those two is enough to turn the
+    grid's console into the fluid console's without redrawing anything.
+    """
+    img = grid.console_screen()
+    px = img.load()
+    for y in range(img.height):
+        for x in range(grid.SIZE):
+            if px[x, y]==grid.ORANGE:
+                px[x, y] = FLUID
+            elif px[x, y]==grid.ORANGE_DARK:
+                px[x, y] = FLUID_DARK
+    return img
+
+
 TEXTURES = {
     "fluidnet_device_side": device_side,
     "fluidnet_device_top": device_top,
@@ -107,6 +126,7 @@ TEXTURES = {
     "fluidnet_device_outlet_front": outlet_front,
     "fluidnet_device_valve_front": valve_front,
     "fluidnet_console_housing": console_housing,
+    "fluidnet_console_screen": console_screen,
 }
 
 
@@ -119,8 +139,18 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     for name, builder in sorted(TEXTURES.items()):
         path = os.path.join(args.out, name+".png")
-        builder().save(path, "PNG", optimize=True)
+        image = builder()
+        image.save(path, "PNG", optimize=True)
         print("wrote", path)
+        # Same rule as the grid script, and it has to be: this console_screen
+        # is the grid's animation sheet with two pixels recoloured, so if it
+        # ends up taller than it is wide it needs the exact same .mcmeta or it
+        # squashes in-game just like the grid one would.
+        if image.height!=image.width:
+            meta_path = path+".mcmeta"
+            with open(meta_path, "w") as f:
+                f.write(json.dumps({"animation": {"frametime": grid.ANIMATION_FRAMETIME}}, indent=2)+"\n")
+            print("wrote", meta_path)
 
 
 if __name__ == "__main__":

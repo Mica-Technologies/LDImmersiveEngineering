@@ -259,15 +259,41 @@ class FluidNetAssetsTest
 			}
 		}
 
+		/**
+		 * Width is always 16 -- these are block faces -- but height is allowed to be
+		 * any whole multiple of that: MC's animated sprite format stacks square frames
+		 * top to bottom in one PNG, so a taller texture is only wrong if its height does
+		 * not divide evenly into 16px frames, which is the one shape MC cannot slice.
+		 */
 		@Test
-		@DisplayName("every texture is 16x16")
+		@DisplayName("every texture is 16 wide and a whole number of 16px frames tall")
 		void texturesAreBlockSized()
 		{
 			for(File file : netTextures())
 			{
 				BufferedImage image = load(file);
 				assertEquals(16, image.getWidth(), file.getName());
-				assertEquals(16, image.getHeight(), file.getName());
+				assertEquals(0, image.getHeight()%16,
+						file.getName()+": height "+image.getHeight()+" is not a whole number of 16px frames");
+			}
+		}
+
+		/**
+		 * Regression: an animated sheet MC finds with no .mcmeta next to it does not
+		 * fail to load -- it just squashes every stacked frame into one texture, which
+		 * reads in-game as a mangled export, not a missing asset.
+		 */
+		@Test
+		@DisplayName("every animated texture has a matching .mcmeta")
+		void animatedTexturesHaveMcmeta()
+		{
+			for(File file : netTextures())
+			{
+				BufferedImage image = load(file);
+				if(image.getHeight()!=image.getWidth())
+					assertTrue(new File(file.getPath()+".mcmeta").isFile(),
+							file.getName()+" is "+image.getWidth()+"x"+image.getHeight()
+									+" but has no .mcmeta to tell MC how to slice it into frames");
 			}
 		}
 

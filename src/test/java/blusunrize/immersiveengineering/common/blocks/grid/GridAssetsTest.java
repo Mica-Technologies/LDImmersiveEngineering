@@ -331,15 +331,42 @@ class GridAssetsTest
 			return files;
 		}
 
+		/**
+		 * Block faces are always 16 wide, but height can be a multiple of that: MC's
+		 * animated sprite format is just square frames stacked top to bottom in one PNG,
+		 * so a texture taller than 16 is not a mistake by itself -- only a height that
+		 * is not an exact multiple of the width is, because that leaves a partial frame
+		 * with no sensible way to render it.
+		 */
 		@Test
-		@DisplayName("every grid texture is 16x16")
+		@DisplayName("every grid texture is 16 wide and a whole number of 16px frames tall")
 		void texturesAreSixteenSquare()
 		{
 			for(File file : gridTextures())
 			{
 				java.awt.image.BufferedImage image = load(file);
 				assertEquals(16, image.getWidth(), file.getName());
-				assertEquals(16, image.getHeight(), file.getName());
+				assertEquals(0, image.getHeight()%16,
+						file.getName()+": height "+image.getHeight()+" is not a whole number of 16px frames");
+			}
+		}
+
+		/**
+		 * Regression: an animated sheet with no sibling .mcmeta is not an error MC
+		 * reports -- it is a block that renders as every frame squashed into one
+		 * smeared texture, which looks like a broken export rather than a missing file.
+		 */
+		@Test
+		@DisplayName("every animated grid texture has a matching .mcmeta")
+		void animatedTexturesHaveMcmeta()
+		{
+			for(File file : gridTextures())
+			{
+				java.awt.image.BufferedImage image = load(file);
+				if(image.getHeight()!=image.getWidth())
+					assertTrue(new File(file.getPath()+".mcmeta").isFile(),
+							file.getName()+" is "+image.getWidth()+"x"+image.getHeight()
+									+" but has no .mcmeta to tell MC how to slice it into frames");
 			}
 		}
 
