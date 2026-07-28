@@ -186,6 +186,50 @@ class RenderAndCompatGuardsTest
 							+"dummy half throws on the server every time somebody looks at it");
 		}
 
+		/**
+		 * {@code JEIHelper.addInfo} skips a key the lang file does not have, so a page that was
+		 * never written is invisible rather than broken -- which is the right behaviour at runtime
+		 * and the wrong one to rely on. This is the half that notices.
+		 */
+		@Test
+		@DisplayName("every network block registered with JEI has a description to show")
+		void jeiInfoPagesExist()
+		{
+			String jei = source("common/util/compat/jei/JEIHelper.java");
+			String lang;
+			try
+			{
+				lang = new String(Files.readAllBytes(Paths.get(
+						"src/main/resources/assets/immersiveengineering/lang/en_us.lang")),
+						StandardCharsets.UTF_8);
+			} catch(IOException e)
+			{
+				throw new UncheckedIOException("could not read en_us.lang", e);
+			}
+
+			//Pairs of (what JEIHelper must register, what the lang file must define for it).
+			String[][] pages = {
+					{"BlockTypes_GridDevice.FEED_UNIT", "tile.immersiveengineering.grid_device.feed_unit.info"},
+					{"BlockTypes_GridDevice.SERVICE_UNIT", "tile.immersiveengineering.grid_device.service_unit.info"},
+					{"BlockTypes_GridDevice.SIGNAL_UNIT", "tile.immersiveengineering.grid_device.signal_unit.info"},
+					{"BlockTypes_GridDevice.CONSOLE_HOUSING", "tile.immersiveengineering.grid_device.console_housing.info"},
+					{"BlockTypes_GridMultiblock.GRID_CONSOLE", "tile.immersiveengineering.grid_multiblock.grid_console.info"},
+					{"BlockTypes_FluidNetDevice.FLUID_INLET", "tile.immersiveengineering.fluidnet_device.fluid_inlet.info"},
+					{"BlockTypes_FluidNetDevice.FLUID_OUTLET", "tile.immersiveengineering.fluidnet_device.fluid_outlet.info"},
+					{"BlockTypes_FluidNetDevice.MAIN_VALVE", "tile.immersiveengineering.fluidnet_device.main_valve.info"},
+					{"BlockTypes_FluidNetDevice.CONSOLE_HOUSING", "tile.immersiveengineering.fluidnet_device.console_housing.info"},
+					{"BlockTypes_FluidNetMultiblock.FLUID_CONSOLE", "tile.immersiveengineering.fluidnet_multiblock.fluid_console.info"},
+					{"IEContent.itemNetworkTerminal", "item.immersiveengineering.network_terminal.info"},
+			};
+			for(String[] page : pages)
+			{
+				assertTrue(jei.contains("addInfo(")&&jei.contains(page[0]),
+						page[0]+" is no longer registered with JEI");
+				assertTrue(lang.contains(page[1]+"="),
+						page[1]+" is registered with JEI but has no text, so the page renders blank");
+			}
+		}
+
 		@Test
 		@DisplayName("the shader tooltip cannot dereference null")
 		void shaderTooltipIsEmptyNotNull()

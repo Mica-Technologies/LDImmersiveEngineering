@@ -11,6 +11,7 @@ package blusunrize.immersiveengineering.common.blocks.fluidnet;
 import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.fluid.network.*;
+import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
@@ -50,8 +51,16 @@ import java.util.UUID;
  * @author LDImmersiveEngineering -- virtual fluid network
  */
 public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implements IDirectionalTile,
-		IBlockBounds, IPlayerInteraction, IFluidEndpoint, IComparatorOverride, IBlockOverlayText
+		IBlockBounds, IPlayerInteraction, IFluidEndpoint, IComparatorOverride, IBlockOverlayText,
+		IStatusLineProvider
 {
+	@Override
+	public List<String> getStatusLines()
+	{
+		//The same paragraph the hammer prints, so the overlay and the hammer cannot disagree.
+		return buildStatusLines();
+	}
+
 	public EnumFacing facing = EnumFacing.NORTH;
 
 	/**

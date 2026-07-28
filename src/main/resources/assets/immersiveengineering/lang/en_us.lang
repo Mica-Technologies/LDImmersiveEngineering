@@ -1909,3 +1909,17 @@ ie.manual.entry.fluidNetwork6=A §6Main Valve§r is a shut-off one way round and
 
 #Network terminal
 item.immersiveengineering.network_terminal.name=Engineer's Network Terminal
+
+#JEI description pages for the virtual networks. These are the "what is this for" paragraphs --
+#the fine detail lives in the manual, and the tooltip on the block itself carries the live state.
+tile.immersiveengineering.grid_device.feed_unit.info=Hands Immersive Flux to a grid segment. Wire a connector into the block behind it -- the unit itself does not accept wires -- and assign it to a segment from a Grid Management Console. Everything a segment can spend comes in through its feed units.
+tile.immersiveengineering.grid_device.service_unit.info=Draws Immersive Flux out of a grid segment and pushes it into whatever sits against it. Assign it to a segment from a Grid Management Console. A service unit marked critical keeps its supply when the segment sheds load.
+tile.immersiveengineering.grid_device.signal_unit.info=Reads a redstone signal and holds its segment off while the signal is present, or reports the segment's state as a signal of its own. Which of the two it does is set at the console.
+tile.immersiveengineering.grid_device.console_housing.info=The wall of a Grid Management Console. It does nothing on its own.
+tile.immersiveengineering.grid_multiblock.grid_console.info=Where the power grid is managed: segments are created, named, coloured and priced here, feed and service units are assigned to them, and schedules and failover are set up. Every change to the grid is made from one of these, which is why it is a structure you walk to rather than something you carry.
+tile.immersiveengineering.fluidnet_device.fluid_inlet.info=Feeds a fluid main. It takes fluid from an adjacent tank or pipe and puts it into the main it is assigned to. The first inlet to deliver decides what the main carries; after that the main refuses anything else until it drains.
+tile.immersiveengineering.fluidnet_device.fluid_outlet.info=Draws from a fluid main and fills whatever sits against it. Assign it to a main from a Fluid Control Console. An outlet marked critical keeps its supply when the main runs short.
+tile.immersiveengineering.fluidnet_device.main_valve.info=Shuts a main by hand or on a redstone signal, and reports whether the main is pressurised. The console can drive one instead of a player.
+tile.immersiveengineering.fluidnet_device.console_housing.info=The wall of a Fluid Control Console. It does nothing on its own.
+tile.immersiveengineering.fluidnet_multiblock.fluid_console.info=Where the fluid network is managed: mains are created, named and typed here, inlets and outlets are assigned to them, and schedules and failover are set up. The power grid's console is a separate structure -- the two networks are managed apart because they fail apart.
+item.immersiveengineering.network_terminal.info=Shows the power grid and the fluid network from anywhere, and changes neither. Every segment and every main, with what it is doing this tick. Changes are still made at a console.

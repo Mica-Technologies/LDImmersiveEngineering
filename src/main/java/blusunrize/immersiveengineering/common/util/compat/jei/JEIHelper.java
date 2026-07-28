@@ -12,6 +12,12 @@ import blusunrize.immersiveengineering.api.crafting.*;
 import blusunrize.immersiveengineering.api.crafting.BlastFurnaceRecipe.BlastFurnaceFuel;
 import blusunrize.immersiveengineering.client.gui.*;
 import blusunrize.immersiveengineering.common.IEContent;
+import mezz.jei.api.ingredients.VanillaTypes;
+import net.minecraft.client.resources.I18n;
+import blusunrize.immersiveengineering.common.blocks.fluidnet.BlockTypes_FluidNetMultiblock;
+import blusunrize.immersiveengineering.common.blocks.fluidnet.BlockTypes_FluidNetDevice;
+import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridMultiblock;
+import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
 import blusunrize.immersiveengineering.common.blocks.metal.BlockTypes_MetalMultiblock;
 import blusunrize.immersiveengineering.common.crafting.ArcRecyclingRecipe;
 import blusunrize.immersiveengineering.common.util.IELogger;
@@ -142,6 +148,23 @@ public class JEIHelper implements IModPlugin
     modRegistry.addRecipes(new ArrayList(Collections2.filter(BottlingMachineRecipe.recipeList, input -> input.listInJEI())), "ie.bottlingMachine");
 		modRegistry.addRecipes(new ArrayList(Collections2.filter(MixerRecipe.recipeList, input -> input.listInJEI())), "ie.mixer");
 
+
+		//The virtual grid and fluid network have no recipes to browse -- they are infrastructure,
+		//not a process -- so what JEI can usefully carry for them is the one paragraph that says
+		//what the block is for. Every one of these is a block a player will find in the creative
+		//tab or a recipe output with no idea what it plugs into.
+		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.FEED_UNIT.getMeta()));
+		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SERVICE_UNIT.getMeta()));
+		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta()));
+		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta()));
+		addInfo(new ItemStack(IEContent.blockGridMultiblock, 1, BlockTypes_GridMultiblock.GRID_CONSOLE.getMeta()));
+		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.FLUID_INLET.getMeta()));
+		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.FLUID_OUTLET.getMeta()));
+		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.MAIN_VALVE.getMeta()));
+		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.CONSOLE_HOUSING.getMeta()));
+		addInfo(new ItemStack(IEContent.blockFluidNetMultiblock, 1, BlockTypes_FluidNetMultiblock.FLUID_CONSOLE.getMeta()));
+		addInfo(new ItemStack(IEContent.itemNetworkTerminal));
+
 		// Allow jumping to recipies from the block GUIs.
 		modRegistry.addRecipeClickArea(GuiCokeOven.class, 58, 36, 11, 13, "ie.cokeoven");
 		modRegistry.addRecipeClickArea(GuiAlloySmelter.class, 84, 35, 22, 16, "ie.alloysmelter");
@@ -155,6 +178,21 @@ public class JEIHelper implements IModPlugin
 
 		modRegistry.addRecipeClickArea(GuiModWorkbench.class, 4, 41, 53, 18, "ie.workbench");
 		modRegistry.addRecipeClickArea(GuiAutoWorkbench.class, 90, 12, 39, 37, "ie.workbench");
+	}
+
+	/**
+	 * A description page keyed off the stack's own unlocalised name, so adding a block and adding
+	 * its page cannot drift apart -- the lang file is the single place either lives.
+	 * <p>
+	 * Missing keys are skipped rather than shown: JEI renders an unresolved key verbatim, and a
+	 * page reading "desc.immersiveengineering.info.grid_feed_unit" is worse than no page.
+	 */
+	private void addInfo(ItemStack stack)
+	{
+		String key = stack.getItem().getUnlocalizedNameInefficiently(stack)+".info";
+		if(!I18n.hasKey(key))
+			return;
+		modRegistry.addIngredientInfo(stack, VanillaTypes.ITEM, key);
 	}
 
 	@Override

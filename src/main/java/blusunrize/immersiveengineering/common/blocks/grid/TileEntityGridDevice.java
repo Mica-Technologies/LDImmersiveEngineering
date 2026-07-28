@@ -11,6 +11,7 @@ package blusunrize.immersiveengineering.common.blocks.grid;
 import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.energy.grid.*;
+import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
@@ -48,8 +49,16 @@ import java.util.UUID;
  * @author LDImmersiveEngineering -- virtual grid
  */
 public abstract class TileEntityGridDevice extends TileEntityIEBase implements IDirectionalTile,
-		IBlockBounds, IPlayerInteraction, IGuiTile, IGridEndpoint, IComparatorOverride, IBlockOverlayText
+		IBlockBounds, IPlayerInteraction, IGuiTile, IGridEndpoint, IComparatorOverride, IBlockOverlayText,
+		IStatusLineProvider
 {
+	@Override
+	public List<String> getStatusLines()
+	{
+		//The same paragraph the hammer prints, so the overlay and the hammer cannot disagree.
+		return buildStatusLines();
+	}
+
 	public EnumFacing facing = EnumFacing.NORTH;
 
 	/**

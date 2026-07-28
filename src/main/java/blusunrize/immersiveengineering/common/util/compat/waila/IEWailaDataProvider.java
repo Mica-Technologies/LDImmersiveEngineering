@@ -11,6 +11,7 @@ package blusunrize.immersiveengineering.common.util.compat.waila;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.IFluxProvider;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.IFluxReceiver;
+import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
 import blusunrize.immersiveengineering.common.blocks.metal.TileEntityTeslaCoil;
 import blusunrize.immersiveengineering.common.blocks.plant.BlockIECrop;
@@ -21,6 +22,8 @@ import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
+import net.minecraft.nbt.NBTTagString;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
@@ -30,6 +33,8 @@ import java.util.List;
 
 public class IEWailaDataProvider implements IWailaDataProvider
 {
+	private static final String NBT_STATUS_LINES = "ldieStatusLines";
+
 	public static void callbackRegister(IWailaRegistrar registrar)
 	{
 		IEWailaDataProvider dataProvider = new IEWailaDataProvider();
@@ -42,6 +47,12 @@ public class IEWailaDataProvider implements IWailaDataProvider
 		registrar.registerNBTProvider(dataProvider, IFluxReceiver.class);
 		registrar.registerBodyProvider(dataProvider, IFluxProvider.class);
 		registrar.registerNBTProvider(dataProvider, IFluxProvider.class);
+
+		//The grid and fluid network fittings. Registered by interface rather than by class so that
+		//anything else that grows a status paragraph later -- conduits, most likely -- gets the
+		//overlay for free.
+		registrar.registerBodyProvider(dataProvider, IStatusLineProvider.class);
+		registrar.registerNBTProvider(dataProvider, IStatusLineProvider.class);
 	}
 
 
@@ -64,6 +75,13 @@ public class IEWailaDataProvider implements IWailaDataProvider
 	{
 		Block b = accessor.getBlock();
 		TileEntity tile = accessor.getTileEntity();
+		if(tile instanceof IStatusLineProvider)
+		{
+			NBTTagList lines = accessor.getNBTData().getTagList(NBT_STATUS_LINES, 8);
+			for(int i = 0; i < lines.tagCount(); i++)
+				currenttip.add(lines.getStringTagAt(i));
+			return currenttip;
+		}
 		if(b instanceof BlockIECrop)
 		{
 			int meta = accessor.getMetadata();
@@ -134,6 +152,16 @@ public class IEWailaDataProvider implements IWailaDataProvider
 		{
 			tag.setInteger("Energy", cur);
 			tag.setInteger("MaxStorage", max);
+		}
+		if(te instanceof IStatusLineProvider)
+		{
+			//Sent from the server on every look, because the client only knows anything about a
+			//segment while a console window is open -- a tooltip built client-side would go blank
+			//the moment you closed the console, which is exactly when you want to read it.
+			NBTTagList lines = new NBTTagList();
+			for(String line : ((IStatusLineProvider)te).getStatusLines())
+				lines.appendTag(new NBTTagString(line));
+			tag.setTag(NBT_STATUS_LINES, lines);
 		}
 		if(te instanceof TileEntityTeslaCoil)
 		{
