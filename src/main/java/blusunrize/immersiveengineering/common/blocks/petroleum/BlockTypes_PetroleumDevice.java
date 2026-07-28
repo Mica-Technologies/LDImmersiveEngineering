@@ -58,7 +58,11 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * A generator you carry to the job and refuel at the pump.
 	 */
-	PORTABLE_GENERATOR;
+	PORTABLE_GENERATOR,
+	/**
+	 * Puts water or gas back downhole to get a second tranche out of a tiring field.
+	 */
+	REINJECTION_WELL;
 
 	@Override
 	public String getName()

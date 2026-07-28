@@ -79,7 +79,11 @@ public enum BlockTypes_PetroleumMultiblock implements IStringSerializable, Block
 	/**
 	 * Fills portable containers in bulk: the refinery's truck bay.
 	 */
-	LOADING_GANTRY;
+	LOADING_GANTRY,
+	/**
+	 * Breaks the heavy cuts into the light ones, at whatever severity its firebox pays for.
+	 */
+	CRACKING_UNIT;
 
 	@Override
 	public String getName()

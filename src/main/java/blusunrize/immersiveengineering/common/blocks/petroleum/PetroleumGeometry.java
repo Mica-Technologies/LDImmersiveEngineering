@@ -149,6 +149,18 @@ public final class PetroleumGeometry
 	public static final int[] ENGINE_SIZE = {ENGINE_HEIGHT, ENGINE_DEPTH, ENGINE_WIDTH};
 
 	//	=================================
+	//		CRACKING UNIT
+	//	=================================
+	/**
+	 * H, L, W. Two reactor columns with a coke drum between them: wide rather than tall, so it
+	 * reads as a different kind of object from the Distillation Tower it stands beside.
+	 */
+	public static final int CRACKER_HEIGHT = 6;
+	public static final int CRACKER_DEPTH = 3;
+	public static final int CRACKER_WIDTH = 5;
+	public static final int[] CRACKER_SIZE = {CRACKER_HEIGHT, CRACKER_DEPTH, CRACKER_WIDTH};
+
+	//	=================================
 	//		FLUID LOADING GANTRY
 	//	=================================
 	/**

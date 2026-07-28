@@ -318,6 +318,13 @@ public class Config
 			public static int petroleumPeakFlowRate = 30;
 			@Comment({"Floor the flow rate decays to rather than reaching zero, in mB/tick. A depleted field becomes slow, never dead -- a pumpjack must not strand a base that was built around it."})
 			public static double petroleumResidualFlowRate = 0.025;
+			@Comment({"Fraction of a deposit's original capacity that a Re-injection Well may ever put back, 0.0 to 1.0. A lifetime allowance per field, not a rate: enhanced recovery is meant to be the thinking player's alternative to flaring, not a way to farm one field forever.",
+					"Set to 0 to switch enhanced recovery off entirely."})
+			@RangeDouble(min = 0, max = 1)
+			public static double petroleumReinjectionCap = 0.2;
+			@Comment({"Whether drilling a still-pressurised field without a Blowout Preventer causes a gusher: a fountain of crude, a spill around the wellhead and a slice of the field's pressure gone.",
+					"On by default. Only a field that still has its own pressure can blow out, which is exactly when the preventer is worth fitting -- the mechanic teaches itself."})
+			public static boolean petroleumGushers = true;
 			@Comment({"Millibuckets of associated (sour) gas a wellhead produces per millibucket of crude. Oil comes up with gas dissolved in it whether or not there is a use for it, which is what a flare stack is for.",
 					"Set to 0 to switch the gas branch off entirely."})
 			@RangeDouble(min = 0, max = 10)
@@ -792,6 +799,8 @@ public class Config
 		PetroleumConfig.residualFlowRate = IEConfig.Petroleum.petroleumResidualFlowRate;
 		PetroleumConfig.associatedGasRatio = IEConfig.Petroleum.petroleumAssociatedGasRatio;
 		PetroleumConfig.dimensionBlacklist = IEConfig.Petroleum.petroleumDimensionBlacklist;
+		PetroleumConfig.reinjectionCapFraction = IEConfig.Petroleum.petroleumReinjectionCap;
+		PetroleumConfig.gushersEnabled = IEConfig.Petroleum.petroleumGushers;
 		//The capacity bounds are baked into each deposit type at registration, so the table has
 		//to be rebuilt or a changed ceiling would silently do nothing until the next restart.
 		//Deposits already rolled keep their size -- re-rolling would rewrite a player's field.

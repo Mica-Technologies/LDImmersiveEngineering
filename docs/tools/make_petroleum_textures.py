@@ -598,7 +598,52 @@ def forecourt_canopy():
     return img
 
 
+def cracker_wall():
+    """Reactor casing: insulated shell with a banded seam and a hot inspection port.
+
+    Warmer than the distillation tower's plain sheetmetal on purpose -- a cracker runs
+    hotter than a column, and the one thing the texture has to say from across a yard is
+    which of the two tall machines you are looking at.
+    """
+    img = _blank(STEEL)
+    px = img.load()
+    for y in range(1, 15, 4):
+        _rect(px, 1, y, 14, y, STEEL_DARK)
+        _rect(px, 1, y+1, 14, y+1, STEEL_LIT)
+    _rect(px, 6, 5, 9, 10, STEEL_DARK)
+    _rect(px, 7, 6, 8, 9, EMBER)
+    _dots(px, [(6, 5), (9, 5), (6, 10), (9, 10)], BOLT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _rect(px, 0, 0, 0, 15, OUTLINE)
+    _rect(px, 15, 0, 15, 15, OUTLINE)
+    return img
+
+
+def reinjection_well():
+    """Injection head: a wellhead run backwards -- a downward arrow over a valve body."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 4, 2, 11, 13, STEEL)
+    _rect(px, 4, 2, 11, 2, STEEL_LIT)
+    for y in (5, 9):
+        _rect(px, 3, y, 12, y, STEEL_LIT)
+        _rect(px, 3, y+1, 12, y+1, OUTLINE)
+    # The arrow, pointing into the ground. The wellhead's hand wheel is red; this is blue,
+    # because the whole point of the block is that it runs the other way.
+    _rect(px, 7, 3, 8, 8, (58, 150, 190, 255))
+    _rect(px, 5, 8, 10, 8, (58, 150, 190, 255))
+    _rect(px, 6, 9, 9, 9, (58, 150, 190, 255))
+    _rect(px, 7, 10, 8, 10, (58, 150, 190, 255))
+    _dots(px, [(4, 12), (11, 12)], BOLT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    return img
+
+
 STATION_BLOCKS = {
+    "petroleum_cracker_wall": cracker_wall,
+    "petroleum_reinjection": reinjection_well,
     "petroleum_gas_pump": gas_pump,
     "petroleum_forecourt_sign": forecourt_sign,
     "petroleum_portable_generator": portable_generator,

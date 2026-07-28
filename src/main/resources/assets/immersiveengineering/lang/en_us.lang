@@ -1871,3 +1871,5 @@ item.immersiveengineering.petroleum.absorbent_pad.name=Absorbent Pad
 item.immersiveengineering.petroleum.petcoke.name=Petroleum Coke
 item.immersiveengineering.petroleum.survey_kit.name=Seismic Survey Kit
 tile.immersiveengineering.petroleum_multiblock.loading_gantry.name=Fluid Loading Gantry
+tile.immersiveengineering.petroleum_multiblock.cracking_unit.name=Cracking Unit
+tile.immersiveengineering.petroleum_device.reinjection_well.name=Re-injection Well

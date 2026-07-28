@@ -126,10 +126,83 @@ public class ItemPetroleum extends ItemIEBase
 		return moved > 0;
 	}
 
+	//	=================================
+	//		THE ABSORBENT PAD
+	//	=================================
+	//
+	// A gusher, or a broken tank, leaves flowing crude on the ground. It is the ordinary flammable
+	// fluid block, so it spreads, it catches, and a bucket will only pick up the source. The pad is
+	// the tidy-up tool: right-click any spilt petroleum fluid and a square of it goes away.
+
+	/**
+	 * Blocks a pad will lift per use, counted outward from the one clicked.
+	 * <p>
+	 * A three-by-three, not one block: a spill is dozens of blocks and a pad that took them one at
+	 * a time would be a punishment rather than a tool.
+	 */
+	public static final int PAD_RADIUS = 1;
+
+	/**
+	 * @return whether this block is a spill a pad should lift. Only the mod's own petroleum fluids
+	 * -- a pad is not a universal fluid remover, and letting it delete water would make it the
+	 * answer to terraforming rather than to a blowout.
+	 */
+	private static boolean isSpill(net.minecraft.block.state.IBlockState state)
+	{
+		net.minecraft.block.Block block = state.getBlock();
+		return block==blusunrize.immersiveengineering.common.IEContent.blockFluidCrudeOil
+				||block==blusunrize.immersiveengineering.common.IEContent.blockFluidDiesel
+				||block==blusunrize.immersiveengineering.common.IEContent.blockFluidHeavyFuelOil
+				||block==blusunrize.immersiveengineering.common.IEContent.blockFluidGasoline
+				||block==blusunrize.immersiveengineering.common.IEContent.blockFluidNaphtha
+				||block==blusunrize.immersiveengineering.common.IEContent.blockFluidLubricant;
+	}
+
+	/**
+	 * Lifts a patch of spill.
+	 *
+	 * @return how many blocks were removed
+	 */
+	private static int soakUp(World world, BlockPos centre)
+	{
+		int removed = 0;
+		for(int dx = -PAD_RADIUS; dx <= PAD_RADIUS; dx++)
+			for(int dy = -PAD_RADIUS; dy <= PAD_RADIUS; dy++)
+				for(int dz = -PAD_RADIUS; dz <= PAD_RADIUS; dz++)
+				{
+					BlockPos at = centre.add(dx, dy, dz);
+					if(!isSpill(world.getBlockState(at)))
+						continue;
+					world.setBlockToAir(at);
+					removed++;
+				}
+		return removed;
+	}
+
 	@Override
 	public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand)
 	{
 		ItemStack stack = player.getHeldItem(hand);
+		if(stack.getMetadata()==ABSORBENT_PAD)
+		{
+			//Fluid blocks are not solid, so onItemUse never fires on them -- the ray trace has to
+			//be done here, asking for liquids explicitly.
+			net.minecraft.util.math.RayTraceResult hit = rayTrace(world, player, true);
+			if(hit!=null&&hit.typeOfHit==net.minecraft.util.math.RayTraceResult.Type.BLOCK
+					&&isSpill(world.getBlockState(hit.getBlockPos())))
+			{
+				if(!world.isRemote)
+				{
+					if(soakUp(world, hit.getBlockPos()) > 0&&!player.capabilities.isCreativeMode)
+						stack.shrink(1);
+					world.playSound(null, hit.getBlockPos(),
+							net.minecraft.init.SoundEvents.ITEM_BUCKET_EMPTY,
+							net.minecraft.util.SoundCategory.BLOCKS, 0.6F, 1.6F);
+				}
+				return new ActionResult<>(EnumActionResult.SUCCESS, stack);
+			}
+			return new ActionResult<>(EnumActionResult.PASS, stack);
+		}
 		if(stack.getMetadata()==NOZZLE&&player.isSneaking())
 		{
 			if(!world.isRemote&&isBound(stack))

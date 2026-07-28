@@ -11,6 +11,7 @@ package blusunrize.immersiveengineering.common.blocks.petroleum;
 import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.IEEnums.SideConfig;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.FluxStorage;
+import blusunrize.immersiveengineering.api.petroleum.PetroleumConfig;
 import blusunrize.immersiveengineering.api.petroleum.Reservoir;
 import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
 import blusunrize.immersiveengineering.common.IEContent;
@@ -22,14 +23,18 @@ import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
+import blusunrize.immersiveengineering.common.items.ItemPetroleum;
 import blusunrize.immersiveengineering.common.util.Utils;
+import blusunrize.immersiveengineering.common.util.petroleum.PetroleumSaveData;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
@@ -111,6 +116,15 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	 * Whether this site rolled no deposit at all. Synced for the same reason.
 	 */
 	public boolean dryHole;
+
+	/**
+	 * Whether a Blowout Preventer has been fitted to the wellhead.
+	 * <p>
+	 * Master only, synced, and persisted: a rig that has been fitted must stay fitted across a
+	 * reload, and the overlay has to be able to say so on the client -- "did I remember to fit it"
+	 * is precisely the question a player asks while the drill is running.
+	 */
+	public boolean preventerFitted;
 
 	private boolean siteChecked;
 	private int stagger = -1;
@@ -240,6 +254,9 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	private void completeWell()
 	{
 		BlockPos bore = getBlockPosForPos(BORE_INDEX);
+		//Decided before the rig comes down, because the gusher happens at the bore and the rig is
+		//what was standing over it.
+		boolean gusher = shouldGush();
 		List<BlockPos> parts = collectParts();
 		//Clearing `formed` first is load-bearing: removing a part's block runs
 		//BlockIEMultiblock's break handling, and a part that still believes it is formed would
@@ -259,6 +276,102 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 			world.spawnEntity(new EntityItem(world, bore.getX()+.5, bore.getY()+1.5, bore.getZ()+.5,
 					new ItemStack(IEContent.blockPetroleumDevice, parts.size(),
 							BlockTypes_PetroleumDevice.OILFIELD_FRAME.getMeta())));
+		if(gusher)
+			blowOut(bore);
+	}
+
+	/**
+	 * @return whether the player should be told to fit a preventer. Distinct from
+	 * {@link #shouldGush()}: the warning is about the risk, and it has to appear while there is
+	 * still time to act on it rather than at the moment the well comes in.
+	 */
+	private static boolean warnsAboutPressure(TileEntityDerrick master)
+	{
+		if(!PetroleumConfig.gushersEnabled||master.preventerFitted||CityMode.petroleum())
+			return false;
+		Reservoir reservoir = master.getReservoir();
+		return reservoir!=null&&!reservoir.isEmpty()
+				&&reservoir.getFraction() > PetroleumConfig.freeFlowThreshold;
+	}
+
+	/**
+	 * @return whether this well is about to come in uncontrolled
+	 * <p>
+	 * Only a field that still has its own pressure can gush -- a tired deposit has nothing left to
+	 * push with, which is why the Blowout Preventer stops being worth fitting exactly when the
+	 * pumpjack starts being worth building. That is the lesson the mechanic exists to teach, and
+	 * it teaches itself.
+	 */
+	private boolean shouldGush()
+	{
+		if(!PetroleumConfig.gushersEnabled||preventerFitted||CityMode.petroleum())
+			return false;
+		Reservoir reservoir = getReservoir();
+		return reservoir!=null&&!reservoir.isEmpty()
+				&&reservoir.getFraction() > PetroleumConfig.freeFlowThreshold;
+	}
+
+	/**
+	 * The well comes in: a fountain of crude over the wellhead, a spill around it, and a chunk of
+	 * the field's pressure gone up the bore.
+	 * <p>
+	 * Deliberately survivable and cleanable. The spill is a handful of source blocks in a small
+	 * radius, the crude is the ordinary flammable fluid block that already ships, and an Absorbent
+	 * Pad picks it up. A blowout should cost a player an afternoon of tidying and a slice of their
+	 * field, not their base.
+	 */
+	private void blowOut(BlockPos bore)
+	{
+		Reservoir reservoir = getReservoir();
+		if(reservoir!=null)
+		{
+			//A tenth of what is left, straight up the bore and onto the ground. Enough to hurt,
+			//far short of ruining the site.
+			int lost = Math.max(1, reservoir.getRemaining()/10);
+			if(reservoir.deplete(lost) > 0)
+				PetroleumSaveData.setDirty();
+		}
+		world.playSound(null, bore, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.BLOCKS, 2F, 0.4F);
+		for(int dx = -GUSHER_RADIUS; dx <= GUSHER_RADIUS; dx++)
+			for(int dz = -GUSHER_RADIUS; dz <= GUSHER_RADIUS; dz++)
+			{
+				if(dx*dx+dz*dz > GUSHER_RADIUS*GUSHER_RADIUS)
+					continue;
+				//Only onto ground that is already open. A gusher that carved through a player's
+				//floor would be a grief mechanic rather than a consequence.
+				BlockPos at = world.getHeight(bore.add(dx, 0, dz));
+				if(at.getY() <= 0||!world.isAirBlock(at)||!world.getBlockState(at.down()).isFullBlock())
+					continue;
+				world.setBlockState(at, IEContent.blockFluidCrudeOil.getDefaultState());
+			}
+	}
+
+	/**
+	 * How far the spill spreads from the bore. Small: the crude flows on its own from there, and a
+	 * wide ring of source blocks would be a chore rather than a mess.
+	 */
+	public static final int GUSHER_RADIUS = 3;
+
+	/**
+	 * Fits a Blowout Preventer, consuming the item.
+	 *
+	 * @return true if it was fitted by this call
+	 */
+	public boolean fitPreventer()
+	{
+		TileEntityDerrick master = master();
+		if(master==null||master.preventerFitted)
+			return false;
+		master.preventerFitted = true;
+		master.markDirty();
+		master.markContainingBlockForUpdate(null);
+		return true;
+	}
+
+	public boolean isPreventerFitted()
+	{
+		TileEntityDerrick master = master();
+		return master!=null&&master.preventerFitted;
 	}
 
 	/**
@@ -333,6 +446,25 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	{
 		if(!formed||Utils.isHammer(heldItem))
 			return false;
+		//Fitting the preventer is the one thing you can do to a running rig, so it is checked
+		//before the readout -- otherwise holding the part would just print the progress at you.
+		if(!heldItem.isEmpty()&&heldItem.getItem()==IEContent.itemPetroleum
+				&&heldItem.getMetadata()==ItemPetroleum.BLOWOUT_PREVENTER)
+		{
+			if(world.isRemote)
+				return true;
+			if(fitPreventer())
+			{
+				heldItem.shrink(1);
+				world.playSound(null, getPos(), SoundEvents.BLOCK_ANVIL_USE, SoundCategory.BLOCKS, 0.7F, 1.2F);
+				ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
+						TextFormatting.GREEN+"Blowout preventer fitted."+TextFormatting.RESET));
+			}
+			else
+				ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
+						TextFormatting.GRAY+"This rig already has one."+TextFormatting.RESET));
+			return true;
+		}
 		if(world.isRemote)
 			return true;
 		TileEntityDerrick master = master();
@@ -353,6 +485,10 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 			ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
 					TextFormatting.RED+"No power"+TextFormatting.RESET+" -- the rig draws "
 							+ENERGY_PER_TICK+" FE/t"));
+		if(warnsAboutPressure(master))
+			ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
+					TextFormatting.GOLD+"High pressure"+TextFormatting.RESET
+							+" -- fit a Blowout Preventer before this well comes in."));
 		return true;
 	}
 
@@ -369,6 +505,15 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 		if(master.stalled)
 			return new String[]{progress,
 					TextFormatting.RED+"No power"+TextFormatting.RESET+" ("+ENERGY_PER_TICK+" FE/t)"};
+		//The warning is on the overlay rather than only in chat because the moment it matters is
+		//while the rig is running and the player is looking at it, and a blowout that arrives with
+		//no notice at all would be a gotcha rather than a lesson.
+		if(warnsAboutPressure(master))
+			return new String[]{progress,
+					TextFormatting.GOLD+"High pressure"+TextFormatting.RESET+" -- no preventer fitted"};
+		if(master.preventerFitted)
+			return new String[]{progress,
+					TextFormatting.GRAY+"Preventer fitted"+TextFormatting.RESET};
 		return new String[]{progress};
 	}
 
@@ -486,6 +631,7 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		super.readCustomNBT(nbt, descPacket);
+		preventerFitted = nbt.getBoolean("preventer");
 		drillProgress = nbt.getInteger("drillProgress");
 		stalled = nbt.getBoolean("stalled");
 		dryHole = nbt.getBoolean("dryHole");
@@ -497,6 +643,7 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		super.writeCustomNBT(nbt, descPacket);
+		nbt.setBoolean("preventer", preventerFitted);
 		nbt.setInteger("drillProgress", drillProgress);
 		nbt.setBoolean("stalled", stalled);
 		nbt.setBoolean("dryHole", dryHole);

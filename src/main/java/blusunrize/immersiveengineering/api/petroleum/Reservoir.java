@@ -42,6 +42,16 @@ public class Reservoir
 	 */
 	private transient double pending;
 
+	/**
+	 * How much has ever been put back into this deposit by enhanced recovery.
+	 * <p>
+	 * Persisted, and the only thing standing between a re-injection well and infinite oil: without
+	 * it a player could cycle water in and crude out forever, because {@link #restore} on its own
+	 * only stops at the original capacity and says nothing about how many times you may refill to
+	 * it. The cap this is checked against lives in {@code PetroleumConfig}.
+	 */
+	private int restoredTotal;
+
 	public Reservoir(String type, int originalCapacity)
 	{
 		this(type, originalCapacity, originalCapacity);
@@ -110,7 +120,29 @@ public class Reservoir
 		int room = originalCapacity-remaining;
 		int stored = Math.min(room, amount);
 		remaining += stored;
+		restoredTotal += stored;
 		return stored;
+	}
+
+	/**
+	 * @return how much enhanced recovery has ever put back into this deposit
+	 */
+	public int getRestoredTotal()
+	{
+		return restoredTotal;
+	}
+
+	/**
+	 * @return how much more enhanced recovery this deposit will accept before its lifetime
+	 * allowance is used up. Zero for a deposit with no original capacity, so a dry hole cannot be
+	 * turned into a well by pumping water at it.
+	 */
+	public int getRestoreAllowance(double capFraction)
+	{
+		if(originalCapacity <= 0||capFraction <= 0)
+			return 0;
+		long allowed = (long)(originalCapacity*Math.min(1.0, capFraction));
+		return (int)Math.max(0, Math.min(Integer.MAX_VALUE, allowed-restoredTotal));
 	}
 
 	/**
@@ -147,6 +179,8 @@ public class Reservoir
 		nbt.setString("type", type);
 		nbt.setInteger("capacity", originalCapacity);
 		nbt.setInteger("remaining", remaining);
+		if(restoredTotal > 0)
+			nbt.setInteger("restored", restoredTotal);
 		return nbt;
 	}
 
@@ -155,8 +189,12 @@ public class Reservoir
 	{
 		if(nbt==null||!nbt.hasKey("capacity"))
 			return null;
-		return new Reservoir(nbt.getString("type"), nbt.getInteger("capacity"),
+		Reservoir reservoir = new Reservoir(nbt.getString("type"), nbt.getInteger("capacity"),
 				nbt.getInteger("remaining"));
+		//Absent on a save written before enhanced recovery existed, which reads as "none used yet"
+		//-- the generous default, and the only one that does not retroactively punish a field.
+		reservoir.restoredTotal = Math.max(0, nbt.getInteger("restored"));
+		return reservoir;
 	}
 
 	@Override

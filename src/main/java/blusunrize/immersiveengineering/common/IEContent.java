@@ -841,6 +841,8 @@ public class IEContent
 		registerTile(TileEntityForecourtSign.class);
 		registerTile(TileEntityPortableGenerator.class);
 		registerTile(TileEntityLoadingGantry.class);
+		registerTile(TileEntityCrackingUnit.class);
+		registerTile(TileEntityReinjectionWell.class);
 
 
 
@@ -1152,6 +1154,7 @@ public class IEContent
 		for(MultiblockBuriedTank tank : MultiblockBuriedTank.ALL)
 			MultiblockHandler.registerMultiblock(tank);
 		MultiblockHandler.registerMultiblock(MultiblockLoadingGantry.instance);
+		MultiblockHandler.registerMultiblock(MultiblockCrackingUnit.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();

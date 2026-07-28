@@ -48,6 +48,9 @@
 		"inventory,type=loading_gantry": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_oilfield_frame"}
 		}],
+		"inventory,type=cracking_unit": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_cracker_wall"}
+		}],
 		"type": {
 			"derrick": {},
 			"pumpjack": {
@@ -88,6 +91,9 @@
 			},
 			"loading_gantry": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_oilfield_frame"}
+			},
+			"cracking_unit": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_cracker_wall"}
 			}
 		},
 		"boolean0": {

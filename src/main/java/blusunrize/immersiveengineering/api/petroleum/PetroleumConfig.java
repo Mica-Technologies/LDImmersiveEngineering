@@ -77,8 +77,28 @@ public final class PetroleumConfig
 	 * Restores every field to its shipped default. Used by tests; also a safe reset if a config
 	 * reload ever fails half-way.
 	 */
+	/**
+	 * Fraction of a deposit's original capacity that enhanced recovery may ever put back, 0..1.
+	 * <p>
+	 * A lifetime allowance rather than a rate: the Re-injection Well is meant to be the thinking
+	 * player's alternative to flaring, not a way to farm a single field forever.
+	 */
+	public static double reinjectionCapFraction = 0.2;
+
+	/**
+	 * Whether drilling a still-pressurised field without a Blowout Preventer causes a gusher.
+	 * <p>
+	 * On by default, and cheap to switch off for a pack that does not want the mess. The failure it
+	 * models is the one thing about drilling that a player can genuinely get wrong, and it teaches
+	 * itself: only a field with pressure left can blow out, which is exactly when the preventer is
+	 * worth fitting.
+	 */
+	public static boolean gushersEnabled = true;
+
 	public static void resetToDefaults()
 	{
+		reinjectionCapFraction = 0.2;
+		gushersEnabled = true;
 		enabled = true;
 		cellChunkSize = 8;
 		cellChance = 0.25;

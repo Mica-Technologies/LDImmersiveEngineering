@@ -32,6 +32,9 @@
 		"inventory,type=portable_generator": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_portable_generator"}
 		}],
+		"inventory,type=reinjection_well": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_reinjection"}
+		}],
 		"inventory,type=wellhead": [{
 			"model": "immersiveengineering:petroleum/wellhead",
 			"textures": {
@@ -63,6 +66,9 @@
 			},
 			"portable_generator": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_portable_generator"}
+			},
+			"reinjection_well": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_reinjection"}
 			},
 			"wellhead": {
 				"model": "immersiveengineering:petroleum/wellhead",
