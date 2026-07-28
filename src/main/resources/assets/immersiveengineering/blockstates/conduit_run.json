@@ -1,0 +1,268 @@
+{
+	"multipart": [
+		{
+			"when": {
+				"facing": "down"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_down_hub"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_down_north"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_down_south"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_down_west"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_down_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "up"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_up_hub"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_up_north"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_up_south"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_up_west"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_up_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "north"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_north_hub"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_north_down"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_north_up"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_north_west"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_north_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "south"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_south_hub"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_south_down"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_south_up"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_south_west"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_south_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "west"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_west_hub"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_west_down"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_west_up"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_west_north"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_west_south"
+			}
+		},
+		{
+			"when": {
+				"facing": "east"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_east_hub"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_east_down"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_east_up"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_east_north"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:block/conduit/conduit_east_south"
+			}
+		}
+	]
+}

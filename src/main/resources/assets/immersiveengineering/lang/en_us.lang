@@ -1923,3 +1923,7 @@ tile.immersiveengineering.fluidnet_device.main_valve.info=Shuts a main by hand o
 tile.immersiveengineering.fluidnet_device.console_housing.info=The wall of a Fluid Control Console. It does nothing on its own.
 tile.immersiveengineering.fluidnet_multiblock.fluid_console.info=Where the fluid network is managed: mains are created, named and typed here, inlets and outlets are assigned to them, and schedules and failover are set up. The power grid's console is a separate structure -- the two networks are managed apart because they fail apart.
 item.immersiveengineering.network_terminal.info=Shows the power grid and the fluid network from anywhere, and changes neither. Every segment and every main, with what it is doing this tick. Changes are still made at a console.
+
+#Conduits
+tile.immersiveengineering.conduit.conduit_run.name=Conduit
+tile.immersiveengineering.conduit.conduit_run.info=Surface-mounted tubing. It clips flat to whatever face you place it against and runs in that face, turning in right angles -- the indoor counterpart to a wire, which sags. A run stays on one surface; a junction box is how a run leaves it.

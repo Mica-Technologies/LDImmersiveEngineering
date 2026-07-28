@@ -29,6 +29,7 @@ import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.blocks.*;
 import blusunrize.immersiveengineering.common.blocks.BlockFakeLight.TileEntityFakeLight;
 import blusunrize.immersiveengineering.common.blocks.cloth.*;
+import blusunrize.immersiveengineering.common.blocks.conduit.*;
 import blusunrize.immersiveengineering.common.blocks.fluidnet.*;
 import blusunrize.immersiveengineering.common.blocks.grid.*;
 import blusunrize.immersiveengineering.common.blocks.petroleum.*;
@@ -168,6 +169,7 @@ public class IEContent
 	public static BlockIEBase<BlockTypes_GridMultiblock> blockGridMultiblock;
 	public static BlockIEBase<BlockTypes_FluidNetDevice> blockFluidNetDevice;
 	public static BlockIEBase<BlockTypes_FluidNetMultiblock> blockFluidNetMultiblock;
+	public static BlockIEBase<BlockTypes_Conduit> blockConduit;
 	public static BlockIEBase<BlockTypes_PetroleumDevice> blockPetroleumDevice;
 	public static BlockIEBase<BlockTypes_PetroleumMultiblock> blockPetroleumMultiblock;
 	public static BlockIEFluid blockFluidCreosote;
@@ -345,6 +347,7 @@ public class IEContent
 		blockGridMultiblock = new BlockGridMultiblock();
 		blockFluidNetDevice = new BlockFluidNetDevice();
 		blockFluidNetMultiblock = new BlockFluidNetMultiblock();
+		blockConduit = new BlockConduit();
 		blockPetroleumDevice = new BlockPetroleumDevice();
 		blockPetroleumMultiblock = new BlockPetroleumMultiblock();
 		blockPetroleumDecoration = new BlockPetroleumDecoration();
@@ -822,6 +825,7 @@ public class IEContent
 		registerTile(TileEntityFluidOutlet.class);
 		registerTile(TileEntityFluidValve.class);
 		registerTile(TileEntityFluidConsole.class);
+		registerTile(TileEntityConduit.class);
 		registerTile(TileEntityWellhead.class);
 		registerTile(TileEntityDerrick.class);
 		registerTile(TileEntityPumpjack.class);
