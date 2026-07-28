@@ -21,6 +21,8 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbou
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import net.minecraft.block.state.IBlockState;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IRedstoneOutput;
 import blusunrize.immersiveengineering.common.util.CityMode;
 import net.minecraft.util.ITickable;
 import blusunrize.immersiveengineering.common.util.Utils;
@@ -45,6 +47,8 @@ import net.minecraftforge.oredict.OreDictionary;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +75,7 @@ import java.util.Set;
  */
 public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiveConnectable,
 		INeighbourChangeTile, IPlayerInteraction, IBlockOverlayText, IStatusLineProvider,
-		IFluxReceiver, IFluxProvider, IComparatorOverride, ITickable
+		IFluxReceiver, IFluxProvider, IComparatorOverride, IRedstoneOutput, ITickable
 {
 	/**
 	 * The most one channel may hold. One tick's worth of its own wire: a box is a relay, not a
@@ -112,6 +116,21 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
+
+	/**
+	 * What each conductor is carrying as a redstone signal, 0-15.
+	 * <p>
+	 * A conductor carries power or a signal, never both -- that is a property of how its faces are
+	 * patched rather than of the conductor, so nothing here enforces it. Somebody who patches a
+	 * power breakout and a redstone breakout onto the same colour gets both, independently, which
+	 * is odd but not wrong.
+	 * <p>
+	 * <strong>Recomputed on change rather than per tick.</strong> Redstone is an edge-driven thing:
+	 * a lever is thrown perhaps once a minute, and a run that re-derived its signals sixty times a
+	 * second to discover nothing had happened would be the same mistake this mod has already paid
+	 * for once.
+	 */
+	private final int[] signal = new int[WireChannel.VALUES.length];
 
 	public ConduitPatch getPatch()
 	{
@@ -235,6 +254,21 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			}
 			return true;
 		}
+		//Redstone dust cycles what a patched face does. A face is power, an input or an output and
+		//never two at once: reading and emitting on the same face is how a redstone network latches
+		//itself on and never lets go.
+		if(patch.isPatched(side)&&isRedstoneDust(heldItem))
+		{
+			if(!world.isRemote)
+			{
+				patch.setMode(side, patch.modeOf(side).next());
+				markDirty();
+				markContainingBlockForUpdate(null);
+				propagateSignals();
+				world.notifyNeighborsOfStateChange(getPos().offset(side), getBlockType(), false);
+			}
+			return true;
+		}
 		if(heldItem.isEmpty()&&player.isSneaking())
 		{
 			if(!patch.isPatched(side))
@@ -247,6 +281,17 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			}
 			return true;
 		}
+		return false;
+	}
+
+	public static boolean isRedstoneDust(ItemStack stack)
+	{
+		if(stack==null||stack.isEmpty())
+			return false;
+		//By ore dictionary, so dust from any mod works, exactly as the dyes do.
+		for(int id : OreDictionary.getOreIDs(stack))
+			if("dustRedstone".equals(OreDictionary.getOreName(id)))
+				return true;
 		return false;
 	}
 
@@ -554,15 +599,152 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	public void onLoad()
 	{
 		super.onLoad();
-		if(world!=null&&!world.isRemote)
-			rebuildRuns();
+		if(world==null||world.isRemote)
+			return;
+		rebuildRuns();
+		//A lever thrown while the chunk was unloaded left no trace, so the run has to re-derive
+		//itself once on the way back rather than trusting what it saved.
+		if(patch.hasRedstone())
+			propagateSignals();
 	}
 
 	@Override
 	public void onNeighborBlockChange(BlockPos other)
 	{
-		if(world!=null&&!world.isRemote)
-			rebuildRuns();
+		if(world==null||world.isRemote)
+			return;
+		rebuildRuns();
+		//A neighbour changing is the only thing that can move a redstone input, so it is the only
+		//thing that has to re-derive the run's signals.
+		if(patch.hasRedstone())
+			propagateSignals();
+	}
+
+	// ------------------------------------------------------------------
+	// Redstone
+	// ------------------------------------------------------------------
+
+	/**
+	 * Re-derive every redstone conductor on this run, from every input on it.
+	 * <p>
+	 * The whole run at once, from scratch, rather than pushing a change outward: a signal that is
+	 * only ever raised propagates beautifully and then never falls, which is the classic way a
+	 * redstone network latches itself on. Recomputing the maximum over all inputs means switching
+	 * the last lever off drops the run to zero with no special case for it.
+	 * <p>
+	 * Costs a walk over the boxes on a run -- never over the conduit blocks -- and only when
+	 * something actually changed next to one of them.
+	 */
+	public void propagateSignals()
+	{
+		if(world==null||world.isRemote)
+			return;
+		List<TileEntityJunctionBox> run = boxesOnRun();
+		int[] strongest = new int[WireChannel.VALUES.length];
+		for(TileEntityJunctionBox box : run)
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				WireChannel channel = box.patch.get(face);
+				if(channel==null||box.patch.modeOf(face)!=ConduitPatch.Mode.REDSTONE_IN)
+					continue;
+				int index = channel.ordinal();
+				strongest[index] = Math.max(strongest[index], box.readInput(face));
+			}
+		for(TileEntityJunctionBox box : run)
+			box.applySignals(strongest);
+	}
+
+	/**
+	 * @return what the block against that face is putting into it, 0-15
+	 */
+	private int readInput(EnumFacing face)
+	{
+		BlockPos from = getPos().offset(face);
+		if(!world.isBlockLoaded(from))
+			return 0;
+		//getRedstonePower rather than isBlockPowered: this asks what the neighbour offers toward
+		//us, so a box cannot read the signal it is emitting on some other face of itself.
+		return world.getRedstonePower(from, face);
+	}
+
+	private void applySignals(int[] strongest)
+	{
+		boolean changed = false;
+		for(int i = 0; i < signal.length; i++)
+			if(signal[i]!=strongest[i])
+			{
+				signal[i] = strongest[i];
+				changed = true;
+			}
+		if(!changed)
+			return;
+		markDirty();
+		markContainingBlockForUpdate(null);
+		//Only the faces that emit need to tell the world, and only if this box has any. A run of
+		//twenty boxes with one output on it should cause one neighbour notification, not twenty.
+		for(EnumFacing face : EnumFacing.VALUES)
+			if(patch.isPatched(face)&&patch.modeOf(face)==ConduitPatch.Mode.REDSTONE_OUT)
+				world.notifyNeighborsOfStateChange(getPos().offset(face), getBlockType(), false);
+	}
+
+	/**
+	 * Every box reachable along conduit from this one, including this one.
+	 * <p>
+	 * Breadth-first over bundle connections. The conduit blocks are not walked -- they are not
+	 * nodes -- so this is a walk over the handful of boxes on a run rather than over its length.
+	 */
+	private List<TileEntityJunctionBox> boxesOnRun()
+	{
+		List<TileEntityJunctionBox> found = new ArrayList<>();
+		Set<BlockPos> seen = new HashSet<>();
+		Deque<BlockPos> open = new ArrayDeque<>();
+		seen.add(getPos());
+		open.add(getPos());
+		while(!open.isEmpty()&&found.size() < MAX_BOXES_PER_RUN)
+		{
+			BlockPos here = open.poll();
+			TileEntity te = world.isBlockLoaded(here)?world.getTileEntity(here): null;
+			if(!(te instanceof TileEntityJunctionBox))
+				continue;
+			found.add((TileEntityJunctionBox)te);
+			Set<Connection> links = ImmersiveNetHandler.INSTANCE.getConnections(world, here);
+			if(links==null)
+				continue;
+			for(Connection link : links)
+				if(link.isBundle()&&seen.add(link.end))
+					open.add(link.end);
+		}
+		return found;
+	}
+
+	/**
+	 * A ceiling on one run's box count, so a pathological build cannot turn a lever into an
+	 * unbounded walk. Far above any real installation.
+	 */
+	private static final int MAX_BOXES_PER_RUN = 512;
+
+	public int getSignal(WireChannel channel)
+	{
+		return channel==null?0: signal[channel.ordinal()];
+	}
+
+	@Override
+	public int getStrongRSOutput(IBlockState state, EnumFacing side)
+	{
+		//side is the face of *this* block that the asking block is on the other side of, so it
+		//arrives already reversed relative to how the patch table is keyed.
+		EnumFacing face = side.getOpposite();
+		if(patch.modeOf(face)!=ConduitPatch.Mode.REDSTONE_OUT)
+			return 0;
+		return getSignal(patch.get(face));
+	}
+
+	@Override
+	public boolean canConnectRedstone(IBlockState state, EnumFacing side)
+	{
+		if(side==null)
+			return patch.hasRedstone();
+		return patch.modeOf(side.getOpposite()).isRedstone();
 	}
 
 	public void onBlockBroken()
@@ -580,12 +762,20 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//and a box holding a tick's worth is holding a tick's worth of somebody's coal.
 		if(!descPacket)
 			nbt.setIntArray("held", held);
+		//Saved so a run comes back up in the state its levers left it, rather than dark until
+		//somebody happens to change a block next to one of its inputs.
+		nbt.setIntArray("signal", signal);
 	}
 
 	@Override
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		patch.readFromNBT(nbt.getCompoundTag("patch"));
+		int[] signals = nbt.getIntArray("signal");
+		for(int i = 0; i < signal.length; i++)
+			//Clamped: the array came off disk, and a redstone strength outside 0-15 would either be
+			//invisible or would drive comparators into nonsense.
+			signal[i] = i < signals.length?Math.max(0, Math.min(15, signals[i])): 0;
 		if(descPacket)
 			return;
 		int[] stored = nbt.getIntArray("held");
@@ -611,7 +801,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		WireChannel here = patch.get(side);
 		return new String[]{
 				here!=null?"Breakout: "+here.getName(): "No breakout on this face",
-				here!=null?getLastMoved(here)+" IF/t"
+				here!=null?describeFace(side, here)
 						: patch.count()+" of "+WireChannel.VALUES.length+" patched"
 		};
 	}
@@ -620,6 +810,28 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	public boolean useNixieFont(EntityPlayer player, RayTraceResult mop)
 	{
 		return false;
+	}
+
+	/**
+	 * One line's worth of what a face is doing. The mode decides the units, because "0 IF/t" on a
+	 * face wired to a lever is a true statement that answers the wrong question.
+	 */
+	private String describeFace(EnumFacing face, WireChannel channel)
+	{
+		switch(patch.modeOf(face))
+		{
+			case REDSTONE_IN:
+				return "reads redstone ("+readInputSafely(face)+")";
+			case REDSTONE_OUT:
+				return "emits redstone ("+getSignal(channel)+")";
+			default:
+				return getLastMoved(channel)+" IF/t";
+		}
+	}
+
+	private int readInputSafely(EnumFacing face)
+	{
+		return world==null||world.isRemote?0: readInput(face);
 	}
 
 	@Override
@@ -638,8 +850,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			{
 				WireChannel channel = patch.get(face);
 				if(channel!=null)
-					lines.add("  "+face.getName()+": "+channel.getName()
-							+" -- "+getLastMoved(channel)+" IF/t");
+					lines.add("  "+face.getName()+": "+channel.getName()+" -- "+describeFace(face, channel));
 			}
 		return lines;
 	}

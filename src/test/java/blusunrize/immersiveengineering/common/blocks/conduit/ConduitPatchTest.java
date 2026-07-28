@@ -163,6 +163,93 @@ class ConduitPatchTest
 	}
 
 	@Nested
+	@DisplayName("what a face does")
+	class Modes
+	{
+		@Test
+		@DisplayName("a face is a power breakout until told otherwise")
+		void defaultsToPower()
+		{
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			assertSame(ConduitPatch.Mode.POWER, patch.modeOf(EnumFacing.NORTH));
+			assertFalse(patch.hasRedstone());
+		}
+
+		@Test
+		@DisplayName("an unpatched face reports power rather than nothing")
+		void barefaceReportsPower()
+		{
+			//Nothing reads the mode of a bare face, and returning null would only give every caller
+			//a branch to forget.
+			assertSame(ConduitPatch.Mode.POWER, patch.modeOf(EnumFacing.NORTH));
+			assertSame(ConduitPatch.Mode.POWER, patch.modeOf(null));
+		}
+
+		@Test
+		@DisplayName("the modes cycle and come back round")
+		void modesCycle()
+		{
+			//One right-click with dust moves a face on by one, so the cycle has to close.
+			ConduitPatch.Mode mode = ConduitPatch.Mode.POWER;
+			for(int i = 0; i < ConduitPatch.Mode.VALUES.length; i++)
+				mode = mode.next();
+			assertSame(ConduitPatch.Mode.POWER, mode);
+		}
+
+		@Test
+		@DisplayName("a face is never both an input and an output")
+		void modesAreExclusive()
+		{
+			//Reading and emitting on one face is how a redstone network latches itself on and never
+			//lets go. The type system is what forbids it -- there is one mode, not two flags.
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			patch.setMode(EnumFacing.NORTH, ConduitPatch.Mode.REDSTONE_IN);
+			assertSame(ConduitPatch.Mode.REDSTONE_IN, patch.modeOf(EnumFacing.NORTH));
+			patch.setMode(EnumFacing.NORTH, ConduitPatch.Mode.REDSTONE_OUT);
+			assertSame(ConduitPatch.Mode.REDSTONE_OUT, patch.modeOf(EnumFacing.NORTH));
+		}
+
+		@Test
+		@DisplayName("hasRedstone answers for the whole box")
+		void hasRedstoneScansEveryFace()
+		{
+			//This is what lets a box of ordinary power breakouts skip the signal walk entirely.
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			patch.set(EnumFacing.SOUTH, WireChannel.RED);
+			assertFalse(patch.hasRedstone());
+			patch.setMode(EnumFacing.SOUTH, ConduitPatch.Mode.REDSTONE_OUT);
+			assertTrue(patch.hasRedstone());
+		}
+
+		@Test
+		@DisplayName("clearing a face forgets what it was doing")
+		void clearingForgetsTheMode()
+		{
+			//Otherwise re-patching that face later silently inherits a mode from a circuit somebody
+			//removed weeks ago.
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			patch.setMode(EnumFacing.NORTH, ConduitPatch.Mode.REDSTONE_OUT);
+			patch.set(EnumFacing.NORTH, null);
+			patch.set(EnumFacing.NORTH, WireChannel.GREEN);
+			assertSame(ConduitPatch.Mode.POWER, patch.modeOf(EnumFacing.NORTH));
+		}
+
+		@Test
+		@DisplayName("moving a channel takes its mode with it")
+		void modeTravelsWithTheChannel()
+		{
+			//Somebody who set a face to emit and then moved that colour elsewhere meant to move the
+			//arrangement, not to reset it.
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			patch.setMode(EnumFacing.NORTH, ConduitPatch.Mode.REDSTONE_OUT);
+			patch.moveTo(EnumFacing.EAST, WireChannel.BLUE);
+			assertSame(ConduitPatch.Mode.REDSTONE_OUT, patch.modeOf(EnumFacing.EAST));
+			assertSame(ConduitPatch.Mode.POWER, patch.modeOf(EnumFacing.NORTH),
+					"the face it left kept the mode as well");
+		}
+	}
+
+	@Nested
 	@DisplayName("persistence")
 	class Persistence
 	{
@@ -210,6 +297,42 @@ class ConduitPatchTest
 			patch.readFromNBT(tag);
 			assertNull(patch.get(EnumFacing.NORTH));
 			assertSame(WireChannel.LIME, patch.get(EnumFacing.SOUTH));
+		}
+
+		@Test
+		@DisplayName("modes round-trip")
+		void modesRoundTrip()
+		{
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			patch.setMode(EnumFacing.NORTH, ConduitPatch.Mode.REDSTONE_IN);
+			patch.set(EnumFacing.UP, WireChannel.RED);
+			patch.setMode(EnumFacing.UP, ConduitPatch.Mode.REDSTONE_OUT);
+
+			ConduitPatch loaded = new ConduitPatch();
+			loaded.readFromNBT(patch.writeToNBT());
+			assertSame(ConduitPatch.Mode.REDSTONE_IN, loaded.modeOf(EnumFacing.NORTH));
+			assertSame(ConduitPatch.Mode.REDSTONE_OUT, loaded.modeOf(EnumFacing.UP));
+		}
+
+		@Test
+		@DisplayName("a box of power breakouts saves what it always did")
+		void powerOnlyBoxWritesNoModeKeys()
+		{
+			//Written only when it is not the default, so a save made before redstone channels
+			//existed and one made after are the same bytes for the same box.
+			patch.set(EnumFacing.NORTH, WireChannel.BLUE);
+			assertFalse(patch.writeToNBT().hasKey("north_mode"));
+		}
+
+		@Test
+		@DisplayName("an unreadable mode falls back to power rather than guessing redstone")
+		void unknownModeIsInert()
+		{
+			NBTTagCompound tag = new NBTTagCompound();
+			tag.setString(EnumFacing.NORTH.getName(), WireChannel.BLUE.getName());
+			tag.setString("north_mode", "TELEPATHY");
+			patch.readFromNBT(tag);
+			assertSame(ConduitPatch.Mode.POWER, patch.modeOf(EnumFacing.NORTH));
 		}
 
 		@Test

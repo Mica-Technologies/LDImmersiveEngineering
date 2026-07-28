@@ -39,7 +39,45 @@ import javax.annotation.Nullable;
  */
 public class ConduitPatch
 {
+	/**
+	 * What a patched face does with its conductor.
+	 * <p>
+	 * A face is one of these, never two. Reading and emitting redstone on the same face is the
+	 * classic way to build a loop that latches itself on and never lets go, and the cost of
+	 * forbidding it is one extra right-click when somebody wants both directions on one box.
+	 */
+	public enum Mode
+	{
+		/** Exchanges flux with whatever is against the face -- ordinarily an IE connector. */
+		POWER,
+		/** Reads the redstone signal arriving at the face and puts it on the conductor. */
+		REDSTONE_IN,
+		/** Emits the conductor's signal as redstone. */
+		REDSTONE_OUT;
+
+		public Mode next()
+		{
+			return VALUES[(ordinal()+1)%VALUES.length];
+		}
+
+		public boolean isRedstone()
+		{
+			return this!=POWER;
+		}
+
+		public static final Mode[] VALUES = values();
+
+		public static Mode byName(String name)
+		{
+			for(Mode mode : VALUES)
+				if(mode.name().equalsIgnoreCase(name))
+					return mode;
+			return POWER;
+		}
+	}
+
 	private final WireChannel[] faces = new WireChannel[6];
+	private final Mode[] modes = new Mode[6];
 
 	@Nullable
 	public WireChannel get(@Nullable EnumFacing face)
@@ -50,6 +88,37 @@ public class ConduitPatch
 	public boolean isPatched(@Nullable EnumFacing face)
 	{
 		return get(face)!=null;
+	}
+
+	/**
+	 * @return what a patched face does. {@link Mode#POWER} for an unpatched one, since that is what
+	 * a face becomes the moment it is patched and nothing reads the mode of a bare face.
+	 */
+	public Mode modeOf(@Nullable EnumFacing face)
+	{
+		if(face==null||modes[face.ordinal()]==null)
+			return Mode.POWER;
+		return modes[face.ordinal()];
+	}
+
+	public boolean setMode(EnumFacing face, Mode mode)
+	{
+		if(face==null||mode==null||modeOf(face)==mode)
+			return false;
+		modes[face.ordinal()] = mode;
+		return true;
+	}
+
+	/**
+	 * @return true if any face on this box does redstone, which is what lets a box skip the signal
+	 * walk entirely when nobody has asked for one
+	 */
+	public boolean hasRedstone()
+	{
+		for(EnumFacing face : EnumFacing.VALUES)
+			if(faces[face.ordinal()]!=null&&modeOf(face).isRedstone())
+				return true;
+		return false;
 	}
 
 	/**
@@ -64,6 +133,10 @@ public class ConduitPatch
 		if(faces[face.ordinal()]==channel)
 			return false;
 		faces[face.ordinal()] = channel;
+		//A face that has just been cleared forgets what it was doing. Otherwise re-patching it
+		//later silently inherits a mode from a circuit somebody removed weeks ago.
+		if(channel==null)
+			modes[face.ordinal()] = null;
 		return true;
 	}
 
@@ -95,7 +168,13 @@ public class ConduitPatch
 		if(previous==face)
 			return null;
 		if(previous!=null)
+		{
+			//The mode travels with the conductor: somebody who set a face to emit and then moved
+			//that colour to a different face meant to move the whole arrangement, not to reset it.
+			modes[face.ordinal()] = modes[previous.ordinal()];
 			faces[previous.ordinal()] = null;
+			modes[previous.ordinal()] = null;
+		}
 		faces[face.ordinal()] = channel;
 		return previous;
 	}
@@ -117,7 +196,10 @@ public class ConduitPatch
 	public void clear()
 	{
 		for(int i = 0; i < faces.length; i++)
+		{
 			faces[i] = null;
+			modes[i] = null;
+		}
 	}
 
 	public NBTTagCompound writeToNBT()
@@ -125,7 +207,13 @@ public class ConduitPatch
 		NBTTagCompound tag = new NBTTagCompound();
 		for(EnumFacing face : EnumFacing.VALUES)
 			if(faces[face.ordinal()]!=null)
+			{
 				tag.setString(face.getName(), faces[face.ordinal()].getName());
+				//Written only when it is not the default, so a box full of ordinary power
+				//breakouts saves exactly what it did before redstone channels existed.
+				if(modeOf(face)!=Mode.POWER)
+					tag.setString(face.getName()+"_mode", modeOf(face).name());
+			}
 		return tag;
 	}
 
@@ -141,6 +229,10 @@ public class ConduitPatch
 			//An unrecognised colour clears the face rather than guessing one. A channel renamed by
 			//a future version should cost the player a visible blank, not a silent rewire.
 			faces[face.ordinal()] = WireChannel.byName(tag.getString(face.getName()));
+			if(faces[face.ordinal()]!=null&&tag.hasKey(face.getName()+"_mode"))
+				//An unrecognised mode falls back to POWER, which is what an absent key means too.
+				//A face whose mode will not parse should be inert, not guessing at redstone.
+				modes[face.ordinal()] = Mode.byName(tag.getString(face.getName()+"_mode"));
 		}
 	}
 }
