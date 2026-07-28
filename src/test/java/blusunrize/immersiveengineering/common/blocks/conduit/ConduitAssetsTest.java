@@ -297,6 +297,78 @@ class ConduitAssetsTest
 	}
 
 	@Nested
+	@DisplayName("the junction box")
+	class JunctionBox
+	{
+		@Test
+		@DisplayName("its blockstate is where the state mapper points")
+		void blockstateExists()
+		{
+			//A second meta means a second custom mapping, and a mapping with no file is silent.
+			assertTrue(new File(ASSETS+"blockstates/conduit_junction_box.json").isFile(),
+					"BlockConduit maps the box's meta to conduit_junction_box, which does not exist");
+		}
+
+		@Test
+		@DisplayName("its model and texture exist")
+		void modelAndTextureExist()
+		{
+			JsonObject state = read("blockstates/conduit_junction_box.json");
+			String model = state.getAsJsonObject("defaults").get("model").getAsString();
+			assertTrue(new File(ASSETS+modelPath(model)).isFile(),
+					"the box blockstate names a model nobody wrote: "+model);
+			assertTrue(new File(ASSETS+"textures/blocks/conduit_junction_box.png").isFile());
+		}
+
+		@Test
+		@DisplayName("it has its own item variant")
+		void itemVariantExists()
+		{
+			//The item lives in conduit.json alongside the run's, since both are metas of one block.
+			JsonObject variants = read("blockstates/conduit.json").getAsJsonObject("variants");
+			assertTrue(keys(variants).contains("inventory,type=junction_box"),
+					"no inventory variant for the junction box; found "+keys(variants));
+		}
+
+		@Test
+		@DisplayName("it looks different from a length of conduit")
+		void hasItsOwnTexture()
+		{
+			//A player scanning a wall has to be able to pick the box out, because it is the only
+			//part they can interact with.
+			JsonObject model = read("models/block/conduit/junction_box.json");
+			String texture = model.getAsJsonObject("textures").get("box").getAsString();
+			assertNotEquals("immersiveengineering:blocks/conduit", texture,
+					"the box reuses the tube texture and would vanish into a run");
+		}
+
+		@Test
+		@DisplayName("it has a recipe, a name and a description")
+		void resourcesExist()
+		{
+			JsonObject recipe = read("recipes/conduit/junction_box.json");
+			JsonObject result = recipe.getAsJsonObject("result");
+			assertEquals("immersiveengineering:conduit", result.get("item").getAsString());
+			assertEquals(1, result.get("data").getAsInt(), "the recipe makes a run, not a box");
+			assertTrue(lang().contains("tile.immersiveengineering.conduit.junction_box.name="));
+			assertTrue(lang().contains("tile.immersiveengineering.conduit.junction_box.info="));
+		}
+	}
+
+	private static String lang()
+	{
+		try
+		{
+			return new String(java.nio.file.Files.readAllBytes(
+					java.nio.file.Paths.get(ASSETS+"lang/en_us.lang")),
+					java.nio.charset.StandardCharsets.UTF_8);
+		} catch(IOException e)
+		{
+			throw new AssertionError("could not read en_us.lang", e);
+		}
+	}
+
+	@Nested
 	@DisplayName("the rest of the block's resources")
 	class Rest
 	{
@@ -310,19 +382,25 @@ class ConduitAssetsTest
 		}
 
 		@Test
+		@DisplayName("every conduit recipe says which meta it means")
+		void everyRecipeStatesItsMeta()
+		{
+			//Forge refuses a recipe naming a multi-meta item without `data`, and it refuses it by
+			//logging a parse error and carrying on -- so the only symptom is a recipe that is
+			//simply not in the game. Both conduit recipes were written without it once.
+			for(String name : new String[]{"conduit", "junction_box"})
+			{
+				JsonObject result = read("recipes/conduit/"+name+".json").getAsJsonObject("result");
+				assertTrue(result.has("data"),
+						name+"'s result does not state a meta, so Forge will drop the recipe");
+			}
+		}
+
+		@Test
 		@DisplayName("it has a name and a description")
 		void langEntriesExist()
 		{
-			String lang;
-			try
-			{
-				lang = new String(java.nio.file.Files.readAllBytes(
-						java.nio.file.Paths.get(ASSETS+"lang/en_us.lang")),
-						java.nio.charset.StandardCharsets.UTF_8);
-			} catch(IOException e)
-			{
-				throw new AssertionError("could not read en_us.lang", e);
-			}
+			String lang = lang();
 			assertTrue(lang.contains("tile.immersiveengineering.conduit.conduit_run.name="),
 					"an unnamed block shows its translation key in the creative tab");
 			assertTrue(lang.contains("tile.immersiveengineering.conduit.conduit_run.info="),

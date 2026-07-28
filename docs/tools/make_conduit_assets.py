@@ -193,6 +193,63 @@ def build_blockstate(assets):
     return parts
 
 
+def build_junction_box(assets, depth, half):
+    """The junction box: a squat surface box, and the blockstate that draws it.
+
+    Plainer than the conduit on purpose.  It is a thing you walk up to and right-click with
+    a dye, so it wants to read as a box with a lid rather than as more tubing, and it wants
+    to be visible from across a room.  A cube inset on every side, drawn with its own
+    texture, does both and costs one model.
+    """
+    size = 5  # half-width in pixels; 6..10 would be lost against a run
+    frm = [8 - size, 0, 8 - size]
+    to = [8 + size, 2 * depth + 2, 8 + size]
+    faces = {}
+    for face in ("down", "up", "north", "south", "west", "east"):
+        faces[face] = {"texture": "#box"}
+    write_json(os.path.join(assets, "models", "block", "conduit", "junction_box.json"), {
+        "textures": {
+            "box": "immersiveengineering:blocks/conduit_junction_box",
+            "particle": "immersiveengineering:blocks/conduit_junction_box",
+        },
+        "elements": [{"from": frm, "to": to, "faces": faces}],
+    })
+    # An ordinary variants file: the box has no connection state to react to, so multipart
+    # would only be ceremony.  BlockConduit's state mapper points the box's meta here.
+    write_json(os.path.join(assets, "blockstates", "conduit_junction_box.json"), {
+        "forge_marker": 1,
+        "defaults": {
+            "transform": "forge:default-block",
+            "model": "immersiveengineering:block/conduit/junction_box",
+        },
+        "variants": {"type": {"junction_box": {}}},
+    })
+
+
+def build_junction_texture(assets):
+    """The box's face: a steel lid with four corner bolts and a dark seam.
+
+    Deliberately unlike the tube texture.  A player scanning a wall has to be able to tell a
+    box from a straight run at a glance, because the box is the only part they can interact
+    with.
+    """
+    img = Image.new("RGBA", (16, 16), CLIP)
+    px = img.load()
+    rect(px, 0, 0, 15, 15, CLIP)
+    rect(px, 1, 1, 14, 14, CLIP_LIT)
+    rect(px, 0, 0, 15, 0, TUBE_SHADE)
+    rect(px, 0, 15, 15, 15, OUTLINE)
+    rect(px, 0, 0, 0, 15, TUBE_SHADE)
+    rect(px, 15, 0, 15, 15, OUTLINE)
+    # The seam where a lid would come off, and the bolts holding it on.
+    rect(px, 2, 7, 13, 8, CLIP)
+    for bx, by in ((2, 2), (13, 2), (2, 13), (13, 13)):
+        px[bx, by] = TUBE_LIT
+    out = os.path.join(assets, "textures", "blocks", "conduit_junction_box.png")
+    img.save(out, "PNG", optimize=True)
+    return out
+
+
 def build_item_blockstate(assets):
     """The item form, in the Forge blockstate format IE looks the item model up through.
 
@@ -208,7 +265,10 @@ def build_item_blockstate(assets):
         },
         "variants": {
             "inventory,type=conduit_run": [{}],
-            "type": {"conduit_run": {}},
+            "inventory,type=junction_box": [{
+                "model": "immersiveengineering:block/conduit/junction_box",
+            }],
+            "type": {"conduit_run": {}, "junction_box": {}},
         },
     })
 
@@ -256,8 +316,10 @@ def main():
     depth, half = read_bounds_constants(repo)
     models = build_models(args.assets, depth, half)
     parts = build_blockstate(args.assets)
+    build_junction_box(args.assets, depth, half)
     build_item_blockstate(args.assets)
     texture = build_texture(args.assets, depth)
+    build_junction_texture(args.assets)
 
     print("depth=%d half_width=%d (read from ConduitBounds.java)" % (depth, half))
     print("wrote %d models, %d blockstate parts" % (len(models), len(parts)))

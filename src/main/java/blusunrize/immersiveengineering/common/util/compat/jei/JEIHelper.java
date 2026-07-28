@@ -165,6 +165,7 @@ public class JEIHelper implements IModPlugin
 		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.CONSOLE_HOUSING.getMeta()));
 		addInfo(new ItemStack(IEContent.blockFluidNetMultiblock, 1, BlockTypes_FluidNetMultiblock.FLUID_CONSOLE.getMeta()));
 		addInfo(new ItemStack(IEContent.blockConduit, 1, BlockTypes_Conduit.CONDUIT_RUN.getMeta()));
+		addInfo(new ItemStack(IEContent.blockConduit, 1, BlockTypes_Conduit.JUNCTION_BOX.getMeta()));
 		addInfo(new ItemStack(IEContent.itemNetworkTerminal));
 
 		// Allow jumping to recipies from the block GUIs.

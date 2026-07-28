@@ -46,8 +46,11 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit>
 		this.setHardness(2.0F);
 		this.setResistance(10.0F);
 		this.lightOpacity = 0;
-		this.setNotNormalBlock(BlockTypes_Conduit.CONDUIT_RUN.getMeta());
-		this.setMetaBlockLayer(BlockTypes_Conduit.CONDUIT_RUN.getMeta(), BlockRenderLayer.CUTOUT);
+		for(BlockTypes_Conduit type : BlockTypes_Conduit.values())
+		{
+			this.setNotNormalBlock(type.getMeta());
+			this.setMetaBlockLayer(type.getMeta(), BlockRenderLayer.CUTOUT);
+		}
 	}
 
 	@Override
@@ -65,7 +68,10 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit>
 		//null for the item leaves it resolving against conduit.json, exactly as IE's fences do.
 		//Both files have to exist: a custom mapping with no matching file is one of the two
 		//silent causes of a purple block in 1.12, and neither reports an error.
-		return itemBlock?null: "run";
+		if(itemBlock)
+			return null;
+		//The box has an ordinary variants blockstate of its own; only the run needs multipart.
+		return meta==BlockTypes_Conduit.JUNCTION_BOX.getMeta()?"junction_box": "run";
 	}
 
 	@Override
@@ -100,7 +106,18 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit>
 	@Override
 	public TileEntity createBasicTE(World world, BlockTypes_Conduit type)
 	{
-		return new TileEntityConduit();
+		return type==BlockTypes_Conduit.JUNCTION_BOX?new TileEntityJunctionBox(): new TileEntityConduit();
+	}
+
+	@Override
+	public void breakBlock(World world, BlockPos pos, IBlockState state)
+	{
+		//Drop the runs with the box. Without this the wire graph keeps edges to a block that is no
+		//longer there, and the next thing to walk them finds nothing at the far end.
+		TileEntity te = world.getTileEntity(pos);
+		if(te instanceof TileEntityJunctionBox)
+			((TileEntityJunctionBox)te).onBlockBroken();
+		super.breakBlock(world, pos, state);
 	}
 
 	@Override

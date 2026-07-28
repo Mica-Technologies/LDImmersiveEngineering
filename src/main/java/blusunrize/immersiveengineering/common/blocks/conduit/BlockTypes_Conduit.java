@@ -28,7 +28,11 @@ public enum BlockTypes_Conduit implements IStringSerializable, BlockIEBase.IBloc
 	/**
 	 * A length of surface-mounted tubing. Carries a bundle; splits nothing.
 	 */
-	CONDUIT_RUN;
+	CONDUIT_RUN,
+	/**
+	 * Where a bundle splits. Dye a face and that conductor leaves by it.
+	 */
+	JUNCTION_BOX;
 
 	@Override
 	public String getName()

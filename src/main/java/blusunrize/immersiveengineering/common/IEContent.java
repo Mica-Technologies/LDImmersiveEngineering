@@ -15,6 +15,7 @@ import blusunrize.immersiveengineering.api.energy.DieselHandler;
 import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
 import blusunrize.immersiveengineering.api.energy.ThermoelectricHandler;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
+import blusunrize.immersiveengineering.api.energy.wires.conduit.ConduitWireType;
 import blusunrize.immersiveengineering.api.shader.CapabilityShader;
 import blusunrize.immersiveengineering.api.shader.ShaderRegistry;
 import blusunrize.immersiveengineering.api.tool.*;
@@ -594,6 +595,9 @@ public class IEContent
 	public static void preInit()
 	{
 		WireType.init();
+		//Registered alongside IE's own wires: a bundle is still a Connection, and a Connection needs
+		//a wire type. There is no coil for it -- runs are made by laying conduit.
+		ConduitWireType.init();
 		/*CONVEYORS*/
 		ConveyorHandler.registerMagnetSupression((entity, iConveyorTile) -> {
 			NBTTagCompound data = entity.getEntityData();
@@ -826,6 +830,7 @@ public class IEContent
 		registerTile(TileEntityFluidValve.class);
 		registerTile(TileEntityFluidConsole.class);
 		registerTile(TileEntityConduit.class);
+		registerTile(TileEntityJunctionBox.class);
 		registerTile(TileEntityWellhead.class);
 		registerTile(TileEntityDerrick.class);
 		registerTile(TileEntityPumpjack.class);

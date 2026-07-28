@@ -97,6 +97,11 @@ public class ClientUtils
 	{
 		if(connection==null||start==null||end==null)
 			return;
+		//A bundle's visible form is the conduit blocks it runs through, so there is no catenary to
+		//draw. Skipped outright rather than drawn at zero width: zero-width geometry is still
+		//geometry, submitted once per run in view per frame.
+		if(connection.isBundle())
+			return;
 		int col = connection.cableType.getColour(connection);
 		double r = connection.cableType.getRenderDiameter()/2;
 		int[] rgba = new int[]{col >> 16&255, col >> 8&255, col&255, 255};
@@ -1412,6 +1417,11 @@ public class ClientUtils
 		BlockPos pos = null;
 		for(Connection conn : conns)
 		{
+		//A bundle's visible form is the conduit blocks it runs through, so there is no catenary to
+		//draw. Skipped outright rather than drawn at zero width: zero-width geometry is still
+		//geometry, submitted once per run in view per frame.
+			if(conn.isBundle())
+				continue;
 			if(pos==null)
 				pos = conn.start;
 			Vec3d[] f = conn.catenaryVertices;

@@ -2,20 +2,21 @@
 	"type": "forge:ore_shaped",
 	"result": {
 		"item": "immersiveengineering:conduit",
-		"data": 0,
-		"count": 8
+		"data": 1,
+		"count": 1
 	},
 	"pattern": [
-		"PPP",
-		"WWW",
-		"PPP"
+		" P ",
+		"PCP",
+		" P "
 	],
 	"key": {
 		"P": {
 			"item": "#plateAluminum"
 		},
-		"W": {
-			"item": "#wireCopper"
+		"C": {
+			"item": "immersiveengineering:conduit",
+			"data": 0
 		}
 	}
 }

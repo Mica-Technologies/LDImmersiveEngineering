@@ -220,6 +220,7 @@ class RenderAndCompatGuardsTest
 					{"BlockTypes_FluidNetDevice.CONSOLE_HOUSING", "tile.immersiveengineering.fluidnet_device.console_housing.info"},
 					{"BlockTypes_FluidNetMultiblock.FLUID_CONSOLE", "tile.immersiveengineering.fluidnet_multiblock.fluid_console.info"},
 					{"BlockTypes_Conduit.CONDUIT_RUN", "tile.immersiveengineering.conduit.conduit_run.info"},
+					{"BlockTypes_Conduit.JUNCTION_BOX", "tile.immersiveengineering.conduit.junction_box.info"},
 					{"IEContent.itemNetworkTerminal", "item.immersiveengineering.network_terminal.info"},
 			};
 			for(String[] page : pages)

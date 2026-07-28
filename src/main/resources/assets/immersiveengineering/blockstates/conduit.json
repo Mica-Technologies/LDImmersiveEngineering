@@ -8,8 +8,14 @@
 		"inventory,type=conduit_run": [
 			{}
 		],
+		"inventory,type=junction_box": [
+			{
+				"model": "immersiveengineering:block/conduit/junction_box"
+			}
+		],
 		"type": {
-			"conduit_run": {}
+			"conduit_run": {},
+			"junction_box": {}
 		}
 	}
 }
