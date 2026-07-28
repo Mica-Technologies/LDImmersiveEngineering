@@ -64,6 +64,18 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 	}
 
 	@Override
+	public void breakBlock(World world, BlockPos pos, IBlockState state)
+	{
+		//Breaking any wall takes the whole tank apart. Leaving the rest formed would give a tank
+		//with a hole in it that still reported its full capacity, and the block that vanished is
+		//exactly the one nobody would think to look at.
+		TileEntity te = world.getTileEntity(pos);
+		if(te instanceof TileEntityStorageTank)
+			((TileEntityStorageTank)te).disassemble();
+		super.breakBlock(world, pos, state);
+	}
+
+	@Override
 	public TileEntity createBasicTE(World world, BlockTypes_PetroleumDevice type)
 	{
 		switch(type)
@@ -84,6 +96,8 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 				return new TileEntityPortableGenerator();
 			case REINJECTION_WELL:
 				return new TileEntityReinjectionWell();
+			case STORAGE_TANK_WALL:
+				return new TileEntityStorageTank();
 			case OILFIELD_FRAME:
 			case TANK_FILL_CAP:
 				//Inert on its own; it only matters as part of an assembled structure.

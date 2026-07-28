@@ -62,7 +62,11 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * Puts water or gas back downhole to get a second tranche out of a tiring field.
 	 */
-	REINJECTION_WELL;
+	REINJECTION_WELL,
+	/**
+	 * Loose steel until a hollow box of it is hammered into a Storage Tank.
+	 */
+	STORAGE_TANK_WALL;
 
 	@Override
 	public String getName()

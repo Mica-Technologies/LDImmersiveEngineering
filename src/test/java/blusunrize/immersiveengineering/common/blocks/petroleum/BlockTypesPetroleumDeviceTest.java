@@ -52,8 +52,13 @@ class BlockTypesPetroleumDeviceTest
 	@DisplayName("the constant count is frozen")
 	void constantCountIsFrozen()
 	{
-		assertEquals(10, values().length,
+		//Appended to on 2026-07-28 for the Storage Tank wall. Appending is safe -- every existing
+		//meta keeps its number -- which is exactly what orderIsFrozen below is here to prove.
+		assertEquals(11, values().length,
 				"a constant was added or removed -- confirm the metadata remap is intentional");
+		assertTrue(values().length <= 16,
+				"block metadata is four bits; a seventeenth constant cannot be stored in a "
+						+"blockstate at all and the block would break silently");
 	}
 
 	@Test
@@ -69,7 +74,7 @@ class BlockTypesPetroleumDeviceTest
 	{
 		//Named one by one on purpose. A count check alone passes when two constants are swapped,
 		//which is the edit most likely to be made by accident and the one that does the most damage.
-		String[] expected = {"wellhead", "oilfield_frame", "flare_stack", "lubrication_manifold", "propane_cylinder", "tank_fill_cap", "gas_pump", "forecourt_sign", "portable_generator", "reinjection_well"};
+		String[] expected = {"wellhead", "oilfield_frame", "flare_stack", "lubrication_manifold", "propane_cylinder", "tank_fill_cap", "gas_pump", "forecourt_sign", "portable_generator", "reinjection_well", "storage_tank_wall"};
 		for(int meta = 0; meta < expected.length; meta++)
 			assertEquals(expected[meta], values()[meta].getName(),
 					"metadata "+meta+" no longer means what it used to");

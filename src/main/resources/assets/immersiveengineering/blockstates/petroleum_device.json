@@ -8,67 +8,119 @@
 		}
 	},
 	"variants": {
-		"inventory,type=oilfield_frame": [{}],
-		"inventory,type=propane_cylinder": [{
-			"model": "immersiveengineering:petroleum/propane_cylinder",
-			"textures": {"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
-				"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"}
-		}],
-		"inventory,type=lubrication_manifold": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_manifold"}
-		}],
-		"inventory,type=flare_stack": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
-		}],
-		"inventory,type=tank_fill_cap": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
-		}],
-		"inventory,type=gas_pump": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_gas_pump"}
-		}],
-		"inventory,type=forecourt_sign": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_forecourt_sign"}
-		}],
-		"inventory,type=portable_generator": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_portable_generator"}
-		}],
-		"inventory,type=reinjection_well": [{
-			"textures": {"all": "immersiveengineering:blocks/petroleum_reinjection"}
-		}],
-		"inventory,type=wellhead": [{
-			"model": "immersiveengineering:petroleum/wellhead",
-			"textures": {
-				"stack": "immersiveengineering:blocks/petroleum_wellhead",
-				"particle": "immersiveengineering:blocks/petroleum_wellhead"
+		"inventory,type=oilfield_frame": [
+			{}
+		],
+		"inventory,type=propane_cylinder": [
+			{
+				"model": "immersiveengineering:petroleum/propane_cylinder",
+				"textures": {
+					"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"
+				}
 			}
-		}],
+		],
+		"inventory,type=lubrication_manifold": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_manifold"
+				}
+			}
+		],
+		"inventory,type=flare_stack": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_flare_stack"
+				}
+			}
+		],
+		"inventory,type=tank_fill_cap": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_tank_cap"
+				}
+			}
+		],
+		"inventory,type=gas_pump": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_gas_pump"
+				}
+			}
+		],
+		"inventory,type=forecourt_sign": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_forecourt_sign"
+				}
+			}
+		],
+		"inventory,type=portable_generator": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_portable_generator"
+				}
+			}
+		],
+		"inventory,type=reinjection_well": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_reinjection"
+				}
+			}
+		],
+		"inventory,type=wellhead": [
+			{
+				"model": "immersiveengineering:petroleum/wellhead",
+				"textures": {
+					"stack": "immersiveengineering:blocks/petroleum_wellhead",
+					"particle": "immersiveengineering:blocks/petroleum_wellhead"
+				}
+			}
+		],
 		"type": {
 			"oilfield_frame": {},
 			"propane_cylinder": {
 				"model": "immersiveengineering:petroleum/propane_cylinder",
-				"textures": {"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
-					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"}
+				"textures": {
+					"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"
+				}
 			},
 			"lubrication_manifold": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_manifold"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_manifold"
+				}
 			},
 			"flare_stack": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_flare_stack"
+				}
 			},
 			"tank_fill_cap": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_tank_cap"
+				}
 			},
 			"gas_pump": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_gas_pump"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_gas_pump"
+				}
 			},
 			"forecourt_sign": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_forecourt_sign"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_forecourt_sign"
+				}
 			},
 			"portable_generator": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_portable_generator"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_portable_generator"
+				}
 			},
 			"reinjection_well": {
-				"textures": {"all": "immersiveengineering:blocks/petroleum_reinjection"}
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_reinjection"
+				}
 			},
 			"wellhead": {
 				"model": "immersiveengineering:petroleum/wellhead",
@@ -76,7 +128,19 @@
 					"stack": "immersiveengineering:blocks/petroleum_wellhead",
 					"particle": "immersiveengineering:blocks/petroleum_wellhead"
 				}
+			},
+			"storage_tank_wall": {
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_storage_tank"
+				}
 			}
-		}
+		},
+		"inventory,type=storage_tank_wall": [
+			{
+				"textures": {
+					"all": "immersiveengineering:blocks/petroleum_storage_tank"
+				}
+			}
+		]
 	}
 }
