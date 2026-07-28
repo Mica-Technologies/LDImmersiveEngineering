@@ -154,6 +154,8 @@ public class ImmersiveEngineering
 		packetHandler.registerMessage(MessageRevolverRotate.Handler.class, MessageRevolverRotate.class, messageId++, Side.SERVER);
 		packetHandler.registerMessage(MessageGridSync.Handler.class, MessageGridSync.class, messageId++, Side.CLIENT);
 		packetHandler.registerMessage(MessageGridAction.Handler.class, MessageGridAction.class, messageId++, Side.SERVER);
+		packetHandler.registerMessage(MessageFluidNetSync.Handler.class, MessageFluidNetSync.class, messageId++, Side.CLIENT);
+		packetHandler.registerMessage(MessageFluidNetAction.Handler.class, MessageFluidNetAction.class, messageId++, Side.SERVER);
 
 		IEIMCHandler.init();
 		IEIMCHandler.handleIMCMessages(FMLInterModComms.fetchRuntimeMessages(instance));

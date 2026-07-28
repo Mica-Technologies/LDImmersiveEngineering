@@ -1856,4 +1856,5 @@ tile.immersiveengineering.fluidnet_device.fluid_inlet.name=Fluid Inlet
 tile.immersiveengineering.fluidnet_device.fluid_outlet.name=Fluid Outlet
 tile.immersiveengineering.fluidnet_device.main_valve.name=Main Valve
 tile.immersiveengineering.fluidnet_device.console_housing.name=Fluid Console Housing
+tile.immersiveengineering.fluidnet_multiblock.fluid_console.name=Fluid Control Console
 chat.immersiveengineering.info.fluidnet.consoleUnformed=Arrange four Fluid Console Housings in a 2x2 wall, then strike the front face with an Engineer's Hammer.

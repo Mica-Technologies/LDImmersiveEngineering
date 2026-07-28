@@ -51,6 +51,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IIEMetaBlock;
 import blusunrize.immersiveengineering.common.blocks.cloth.BlockTypes_ClothDevice;
 import blusunrize.immersiveengineering.common.blocks.cloth.TileEntityShaderBanner;
+import blusunrize.immersiveengineering.common.blocks.fluidnet.TileEntityFluidConsole;
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridConsole;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
@@ -1419,6 +1420,8 @@ public class ClientProxy extends CommonProxy
 					gui = new GuiGridConsole(player.inventory, (TileEntityGridConsole)te);
 				if(ID==Lib.GUIID_GridDevice&&te instanceof TileEntityGridDevice)
 					gui = new GuiGridDevice(player.inventory, (TileEntityGridDevice)te);
+				if(ID==Lib.GUIID_FluidConsole&&te instanceof TileEntityFluidConsole)
+					gui = new GuiFluidConsole(player.inventory, (TileEntityFluidConsole)te);
 				if(gui!=null)
 					((IGuiTile)te).onGuiOpened(player, true);
 				return gui;

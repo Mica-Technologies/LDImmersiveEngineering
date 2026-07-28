@@ -167,6 +167,7 @@ public class IEContent
 	public static BlockIEBase<BlockTypes_GridDevice> blockGridDevice;
 	public static BlockIEBase<BlockTypes_GridMultiblock> blockGridMultiblock;
 	public static BlockIEBase<BlockTypes_FluidNetDevice> blockFluidNetDevice;
+	public static BlockIEBase<BlockTypes_FluidNetMultiblock> blockFluidNetMultiblock;
 	public static BlockIEBase<BlockTypes_PetroleumDevice> blockPetroleumDevice;
 	public static BlockIEBase<BlockTypes_PetroleumMultiblock> blockPetroleumMultiblock;
 	public static BlockIEFluid blockFluidCreosote;
@@ -341,6 +342,7 @@ public class IEContent
 		blockGridDevice = new BlockGridDevice();
 		blockGridMultiblock = new BlockGridMultiblock();
 		blockFluidNetDevice = new BlockFluidNetDevice();
+		blockFluidNetMultiblock = new BlockFluidNetMultiblock();
 		blockPetroleumDevice = new BlockPetroleumDevice();
 		blockPetroleumMultiblock = new BlockPetroleumMultiblock();
 		blockPetroleumDecoration = new BlockPetroleumDecoration();
@@ -815,6 +817,7 @@ public class IEContent
 		registerTile(TileEntityFluidInlet.class);
 		registerTile(TileEntityFluidOutlet.class);
 		registerTile(TileEntityFluidValve.class);
+		registerTile(TileEntityFluidConsole.class);
 		registerTile(TileEntityWellhead.class);
 		registerTile(TileEntityDerrick.class);
 		registerTile(TileEntityPumpjack.class);
@@ -1127,6 +1130,7 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockMixer.instance);
 		MultiblockHandler.registerMultiblock(MultiblockFeedthrough.instance);
 		MultiblockHandler.registerMultiblock(MultiblockGridConsole.instance);
+		MultiblockHandler.registerMultiblock(MultiblockFluidConsole.instance);
 		MultiblockHandler.registerMultiblock(MultiblockDerrick.instance);
 		MultiblockHandler.registerMultiblock(MultiblockPumpjack.instance);
 		MultiblockHandler.registerMultiblock(MultiblockDistillationTower.instance);

@@ -1,0 +1,37 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"transform": "forge:default-block",
+		"model": "immersiveengineering:grid/console_panel",
+		"textures": {
+			"side": "immersiveengineering:blocks/fluidnet_console_side",
+			"top": "immersiveengineering:blocks/fluidnet_console_top",
+			"front": "immersiveengineering:blocks/fluidnet_console_panel"
+		}
+	},
+	"variants": {
+		"inventory,type=fluid_console": [{
+			"model": "cube_all",
+			"textures": {"all": "immersiveengineering:blocks/fluidnet_console_screen"}
+		}],
+		"type": {
+			"fluid_console": {}
+		},
+		"boolean0": {
+			"false": {},
+			"true": {
+				"textures": {"front": "immersiveengineering:blocks/fluidnet_console_screen"}
+			}
+		},
+		"facing": {
+			"north": {},
+			"east": {"y": 90},
+			"south": {"y": 180},
+			"west": {"y": 270}
+		},
+		"_0multiblockslave": {
+			"false": {},
+			"true": {}
+		}
+	}
+}
