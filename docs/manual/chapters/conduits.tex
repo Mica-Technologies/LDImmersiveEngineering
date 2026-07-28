@@ -1,0 +1,75 @@
+\chapter{Conduits}
+\label{ch:conduits}
+
+Wire sags. Strung across a valley that is exactly right; strung along a ceiling it is exactly wrong.
+\textbf{Conduit} is the indoor answer: thin tubing that clips flat against whatever face you place
+it on and runs in that face, turning in right angles.
+
+\begin{iefork}
+Not in stock Immersive Engineering. It takes the bundled-cable idea from SimpleLogic and puts it in
+IE's idiom --- surface conduit, junction boxes, and ordinary IE connectors at the breakouts.
+\end{iefork}
+
+One length of conduit carries \textbf{sixteen} independent conductors, named after the sixteen dyes.
+
+\section{Runs}
+
+Place conduit against a wall, floor or ceiling and it clips to whatever you clicked. Lengths joined
+along the same surface make a \textbf{run}.
+
+\textbf{A run stays on one surface.} Conduit on a floor does not climb the wall by itself. That is
+deliberate: a plane change goes through a junction box, which is a real block and what you would put
+at a corner anyway.
+
+Runs are discovered, not drawn. Laying conduit between two boxes creates the connection; pulling a
+length out of the middle breaks it. There is no coil and no linking tool --- the run is the thing
+you built.
+
+\section{The Junction Box}
+
+A patch panel with six faces. Each face is one of three things:
+
+\begin{itemize}
+\item Right-click with a \textbf{dye}: that face breaks out the conductor of that colour.
+\item Right-click a patched face with \textbf{redstone dust}: cycles it between power, reading
+      redstone, and emitting redstone.
+\item Sneak and right-click empty-handed: unpatches the face.
+\end{itemize}
+
+Put an LV, MV or HV Connector against a power breakout and it picks up that conductor and nothing
+else. One bundle down a corridor can feed a lighting circuit, a workshop and a furnace, each on its
+own colour.
+
+\begin{ietip}
+There is no tier setting. The tier of a circuit is whichever connector you hang on its breakout,
+because IE's connectors already cap throughput by tier. Mixed tiers in one bundle are fine.
+\end{ietip}
+
+A colour lives on one face at a time --- patching it somewhere new takes it off wherever it was,
+because the same conductor arriving at two connectors is a short.
+
+A box passes the whole bundle through whatever is patched, so one dropped in to turn a corner or
+change surface needs no configuration at all.
+
+\section{Redstone channels}
+
+A face set to \textbf{read} puts the signal arriving at it onto its conductor; a face set to
+\textbf{emit} puts its conductor's signal back out. The signal reaches every box on the run, so a
+lever at one end of a corridor throws a lamp at the other along the same bundle already carrying the
+lighting.
+
+A face does one of the three and never two. Reading and emitting on one face is how a redstone
+network latches itself on and never lets go.
+
+\section{Capacity and cost}
+
+Each conductor carries what a conductor carries. A bundle is not a shared pipe with an allowance to
+divide up: sixteen circuits down one corridor get sixteen circuits' worth of throughput.
+
+Sixteen conductors are \emph{one} connection in the wire graph rather than sixteen, and a junction
+box carrying nothing costs one integer comparison per tick. Replacing sixteen catenaries with one
+conduit costs nothing but the crafting.
+
+Energy moves as a bucket brigade: each box hands half the difference to whichever neighbour holds
+less, and drains in full into any connector on the matching breakout. The honest cost of that is one
+tick per hop, and boxes exist only at corners and ends.

@@ -57,3 +57,12 @@ docs/agent-plans/
 # Python bytecode from the texture generators
 __pycache__/
 *.pyc
+# The manual builds into these; regenerate with docs/manual/build.sh
+docs/manual/generated/
+docs/manual/*.aux
+docs/manual/*.log
+docs/manual/*.out
+docs/manual/*.toc
+docs/manual/*.fls
+docs/manual/*.fdb_latexmk
+docs/manual/*.synctex.gz

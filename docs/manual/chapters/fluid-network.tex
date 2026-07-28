@@ -1,0 +1,42 @@
+\chapter{The Virtual Fluid Network}
+\label{ch:fluidnet}
+
+What the virtual grid is for power, this is for fluid: it moves a fluid between places with no pipe
+between them.
+
+\begin{iefork}
+Not in stock Immersive Engineering. It is deliberately built as a mirror of the power grid rather
+than as a generalisation of it --- the two have separate save data, so a mistake in one cannot cost
+you the other.
+\end{iefork}
+
+\section{Mains}
+
+The fluid network is divided into \textbf{mains}, which are what segments are to the grid: named
+groups of fittings with their own switch, limits and statistics.
+
+A main carries \textbf{one fluid}. The first inlet to deliver decides which; after that the main
+refuses anything else until it drains. That is not a limitation to work around --- it is what makes
+a main something you can name ``diesel'' and trust.
+
+\section{Fittings}
+
+\begin{description}
+\item[Fluid Inlet] Takes fluid from an adjacent tank or pipe and puts it into its main.
+\item[Fluid Outlet] Draws from its main and fills whatever sits against it. One marked
+      \textbf{critical} keeps its supply when the main runs short.
+\item[Main Valve] Shuts a main by hand or on a redstone signal, and reports whether it is
+      pressurised.
+\item[Fluid Control Console] Where the network is managed. A separate structure from the power
+      console, because the two networks fail apart.
+\end{description}
+
+\section{Failover and schedules}
+
+As the grid: a main may name a backup, and may carry a schedule that can hold it closed but never
+open one somebody shut.
+
+\section{City mode}
+
+Mains stop accounting for millibuckets and switch to presence --- a main is pressurised or it is
+not.

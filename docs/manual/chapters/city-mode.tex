@@ -1,0 +1,47 @@
+\chapter{City mode}
+\label{ch:citymode}
+
+City mode trades Immersive Engineering's simulation detail for server tick time. It is aimed at city
+and roleplay packs where the mod's machinery is set dressing rather than an engineering puzzle: you
+keep the entire look of the build and give up the physics behind it.
+
+\begin{iefork}
+Entirely this fork. \textbf{It is off by default}, and off means byte-identical to stock.
+\end{iefork}
+
+It covers eight subsystems, each with its own switch. A subsystem is simplified only when the master
+switch is on \emph{and} that subsystem has not been individually turned back off, so switching the
+master off is always sufficient to restore stock behaviour.
+
+\begin{description}
+\item[Wires] One lossless push per connector instead of loss, distance weighting, a proportional
+      split and a network-wide broadcast.
+\item[Fluid pipes] A pipe hands its fluid to the endpoints in order rather than simulating a fill
+      against each and splitting in proportion. Which of several tanks fills first is the only
+      observable difference.
+\item[Floodlights] Beams re-trace only when the light switches or a neighbour changes, never on a
+      timer, and the light blocks one lamp may place are capped.
+\item[Generators] Fuel becomes cosmetic --- a presence check and a token sip.
+\item[Machines] Idle multiblocks stop re-scanning the recipe list every tick.
+\item[Virtual grid] Segments switch from accounting to presence.
+\item[Conduits] Bundles switch from accounting to presence.
+\item[Tanks] A tank holding any fluid at all becomes an unlimited source of it. Empty is still
+      empty, and filling is untouched.
+\end{description}
+
+\section{What you give up}
+
+The numbers stop being conservation. A segment can deliver more than its feeds collected, because
+nothing is being collected --- the feed is only being checked. The console's Stats tab says so
+directly rather than letting the graphs be misread.
+
+\begin{iewarning}
+City mode is a decision about what your server is for. If you want the arithmetic to be honest,
+leave the individual subsystem off while the master switch is on; they are independent.
+\end{iewarning}
+
+\section{The performance history}
+
+Roughly half of everything the mod did on a profiled server turned out to be a single per-tick
+network broadcast feeding wire-shock damage. That is fixed for everyone, in both modes. The full
+account, with measurements, is in \texttt{docs/CITY\_MODE\_AND\_PERF.md}.

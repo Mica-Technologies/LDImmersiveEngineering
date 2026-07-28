@@ -1,0 +1,101 @@
+% ===========================================================================
+% LDImmersiveEngineering -- the complete manual
+%
+% Build:  docs/manual/build.sh      (or: python docs/tools/make_manual_data.py
+%                                        && latexmk -pdf -cd docs/manual/MANUAL.tex)
+% Output: docs/manual/MANUAL.pdf
+%
+% Two kinds of content live here, and the split is deliberate:
+%
+%   chapters/   hand-written prose -- what a system is for, how it behaves, why it works the
+%               way it does. Written once, revised when the design changes.
+%
+%   generated/  every table -- blocks, recipes, config, the in-game book -- produced from the
+%               source tree by docs/tools/make_manual_data.py. Never edited by hand. A
+%               hand-maintained list of blocks is stale the first time somebody adds one, and
+%               nobody notices until a player goes looking for something the manual promised.
+%
+% Regenerating before every build is what "kept in sync with mod updates" actually means here.
+% ===========================================================================
+\documentclass[11pt,openany]{report}
+
+\input{preamble}
+
+\title{\Huge\sffamily\bfseries LDImmersiveEngineering\\[6pt]
+       \Large\mdseries The Complete Manual}
+\author{\sffamily A private fork of Immersive Engineering for Minecraft 1.12.2}
+\date{\sffamily\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This is the whole of Immersive Engineering as this fork ships it: every block, every machine,
+every system, and the four large additions that are not in the mod upstream --- the virtual power
+grid, the petroleum chain, the virtual fluid network, and conduits --- together with the city-mode
+performance work that runs underneath all of it.
+
+Where this fork differs from stock Immersive Engineering, the difference is called out in an
+orange box. Where a number appears, it was read out of the source rather than remembered.
+\end{abstract}
+
+\tableofcontents
+
+% ---------------------------------------------------------------------------
+% Part I -- getting started, and the mod's own idea of itself
+% ---------------------------------------------------------------------------
+\part{The mod}
+\input{chapters/introduction}
+\input{chapters/getting-started}
+
+% ---------------------------------------------------------------------------
+% Part II -- stock Immersive Engineering
+% ---------------------------------------------------------------------------
+\part{Immersive Engineering}
+\input{chapters/materials}
+\input{chapters/wiring}
+\input{chapters/generators}
+\input{chapters/machines}
+\input{chapters/multiblocks}
+\input{chapters/logistics}
+\input{chapters/tools}
+
+% ---------------------------------------------------------------------------
+% Part III -- what this fork adds
+% ---------------------------------------------------------------------------
+\part{This fork}
+\input{chapters/virtual-grid}
+\input{chapters/petroleum}
+\input{chapters/fluid-network}
+\input{chapters/conduits}
+\input{chapters/city-mode}
+
+% ---------------------------------------------------------------------------
+% Part IV -- reference, all of it generated
+% ---------------------------------------------------------------------------
+\part{Reference}
+
+\chapter{Every block}
+\label{ch:blocks}
+Generated from the block metadata enums in the source tree. Metadata order is save-file order:
+a block's number here is the number in the world.
+\input{generated/blocks}
+
+\chapter{Every recipe}
+\label{ch:recipes}
+Generated from the recipe JSON. Entries beginning with a lower-case word rather than an item name
+are ore-dictionary entries, which accept any mod's equivalent.
+\input{generated/recipes}
+
+\chapter{Every configuration option}
+\label{ch:config}
+Generated from \texttt{Config.java}, including the comment each option ships with.
+\input{generated/config}
+
+\chapter{The in-game manual, in full}
+\label{ch:ingame}
+The Engineer's Manual as the book itself presents it, transcribed so the two cannot disagree.
+\input{generated/ingame}
+
+\end{document}

@@ -1,0 +1,92 @@
+\chapter{The Virtual Power Grid}
+\label{ch:grid}
+
+Running catenary wire across a city is honest work and is not always practical. The
+\textbf{virtual power grid} moves Immersive Flux between places that are not connected by any wire
+at all --- across a mountain, across a chunk border, across dimensions.
+
+\begin{iefork}
+Not in stock Immersive Engineering. It takes the idea Flux Networks made popular and rebuilds it in
+IE's idiom: sheet-metal service boxes, a console you walk to, and named segments rather than
+per-player networks.
+\end{iefork}
+
+\section{Feed Units and Service Units}
+
+Power still has to enter and leave somewhere. It enters at a \textbf{Grid Feed Unit} and leaves at a
+\textbf{Grid Service Unit}. Both bolt to any solid surface, including engineering posts.
+
+These boxes exchange power with the block they are bolted to, exactly as a machine does. They do
+\emph{not} accept wires directly --- put a connector against one if you want it to feed a wire
+network. A Feed Unit takes power out of the world; a Service Unit puts it back.
+
+\section{Segments}
+
+The grid is not one pool. It is divided into \textbf{segments}: named groups of boxes, each with its
+own switch, its own transfer limits and its own statistics. A segment is the thing you switch off
+when you want the east side of town dark; the boxes on it are the sockets.
+
+A box that has not been assigned to a segment sits with an unlit lamp doing nothing. Assigning it is
+the whole configuration step.
+
+Each segment carries a \textbf{priority} order and a \textbf{transfer cap} per device, so you decide
+what is served first when there is not enough to go round. Anything marked \textbf{critical} is
+served before everything else --- the pumps, the blast furnace, the hospital.
+
+\section{The Grid Management Console}
+
+Four Console Housings in a $2\times2$ wall, struck on the front face with an Engineer's Hammer. Six
+tabs: an overview of every segment, the segment editor, the device list, the failover editor, live
+statistics, and settings. Right-clicking any box also opens its own small panel, so a freshly placed
+unit can be assigned without walking back.
+
+\section{Failover}
+
+A segment may name another as its \textbf{backup}. If the first cannot meet its load, the second
+covers it. With \emph{top-up} enabled a backup also covers ordinary shortfalls, not only outages;
+with it off, backups engage on outage or trip alone.
+
+\section{Breakers and schedules}
+
+If breakers are enabled, a segment held at its output ceiling long enough will \textbf{trip} and
+latch off until somebody flips it back on. That is a real switch on the Segments tab.
+
+A segment may also carry a \textbf{schedule}: two times of day between which it may run. The
+schedule is a gate, never a second switch --- it can hold a segment down but never raise one a
+player switched off, because otherwise the console toggle and the clock fight every dusk and
+whichever ran last wins.
+
+\section{The Grid Signal Unit}
+
+Bridges a segment to redstone in either direction. In \emph{input} mode a signal holds its segment
+off, which makes any lever, daylight sensor or logic circuit an external kill switch; inverted, it
+demands a keep-alive signal instead, which is a dead-man's switch. In \emph{output} mode it reports
+whether its segment is up --- or, inverted, whether it is down, which is a fault lamp.
+
+\section{The Substation}
+
+Twelve Substation Frames in a yard three wide, two deep and two tall, struck on a side face. A
+Substation is a Feed Unit and a Service Unit at once, at four times a wall box's transfer cap.
+
+Both halves appear separately in the console's device list and are assigned to segments like any
+other device. It is a bigger fitting, not a second system. It exchanges power across its
+\textbf{front} face, so put connectors against the front rank.
+
+\section{The Engineer's Network Terminal}
+
+A held item showing every segment and every fluid main, from anywhere, and changing neither.
+
+\begin{ietip}
+The terminal is read-only by construction rather than by convention --- there is no path from it to
+a change, whatever the client sends. Changes are made at a console.
+\end{ietip}
+
+\section{Chunk loading}
+
+A device may be marked to keep its chunk loaded, within a server-wide budget. Fittings sharing a
+chunk cost one between them. A disabled device stops holding its chunk.
+
+\section{City mode}
+
+See \autoref{ch:citymode}. In short: segments stop accounting for flux and switch to presence. A
+segment is energised or it is not, and its Service Units deliver freely.

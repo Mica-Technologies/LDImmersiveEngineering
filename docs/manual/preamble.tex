@@ -1,0 +1,95 @@
+% ---------------------------------------------------------------------------
+% Style for the LDImmersiveEngineering manual.
+%
+% Everything here is in the MiKTeX base install or its default package set, so a fresh MiKTeX
+% will fetch what it needs on the first build and nothing has to be installed by hand.
+% ---------------------------------------------------------------------------
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+
+\usepackage[a4paper,margin=25mm,headheight=15pt]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{microtype}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------------
+% Palette. Taken from the mod's own texture scripts so the book and the blocks agree:
+% desaturated gunmetal with one warm accent, which is what IE looks like.
+% ---------------------------------------------------------------------------
+\definecolor{iesteel}{RGB}{78,78,85}
+\definecolor{iesteeldark}{RGB}{40,40,45}
+\definecolor{ieorange}{RGB}{233,118,43}
+\definecolor{ierule}{RGB}{190,190,196}
+\definecolor{iepanel}{RGB}{243,243,244}
+
+% ---------------------------------------------------------------------------
+% Headings
+% ---------------------------------------------------------------------------
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\huge\bfseries\color{iesteeldark}}
+  {\color{ieorange}\MakeUppercase{\chaptertitlename}\ \thechapter}{16pt}{\Huge}
+\titleformat{\section}
+  {\normalfont\sffamily\Large\bfseries\color{iesteeldark}}{\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\sffamily\large\bfseries\color{iesteel}}{\thesubsection}{1em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\sffamily\small\nouppercase{\leftmark}}
+\fancyhead[R]{\sffamily\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------------------------------------------------------------------------
+% Callouts. Three kinds, and the distinction matters:
+%   ietip      -- something that makes the mod easier
+%   iewarning  -- something that will cost you a build if you get it wrong
+%   iefork     -- behaviour that differs from stock Immersive Engineering
+% The third is the one this manual exists for; it is coloured to stand out on a flick-through.
+% ---------------------------------------------------------------------------
+\newtcolorbox{ietip}[1][]{colback=iepanel,colframe=iesteel,fonttitle=\bfseries\sffamily,
+  title={Tip},sharp corners,boxrule=0.6pt,#1}
+\newtcolorbox{iewarning}[1][]{colback=red!4,colframe=red!55!black,fonttitle=\bfseries\sffamily,
+  title={Careful},sharp corners,boxrule=0.6pt,#1}
+\newtcolorbox{iefork}[1][]{colback=orange!6,colframe=ieorange,fonttitle=\bfseries\sffamily,
+  title={This fork},sharp corners,boxrule=0.6pt,#1}
+
+% ---------------------------------------------------------------------------
+% Generated tables.
+%
+% longtable throughout, because several of these run to many pages and a tabular that cannot
+% break would simply be dropped off the bottom of one.
+% ---------------------------------------------------------------------------
+\newenvironment{blocktable}
+  {\small\begin{longtable}{@{}r>{\ttfamily}l p{0.26\textwidth} p{0.40\textwidth}@{}}
+   \toprule Meta & \normalfont Registry & Name & Notes \\ \midrule \endhead}
+  {\bottomrule\end{longtable}}
+
+\newenvironment{recipetable}
+  {\small\begin{longtable}{@{}>{\ttfamily}l r p{0.55\textwidth}@{}}
+   \toprule \normalfont Output & Qty & Recipe \\ \midrule \endhead}
+  {\bottomrule\end{longtable}}
+
+% One config option: name, type, default, and the comment the mod ships with it.
+\newcommand{\configentry}[4]{%
+  \noindent\textbf{\ttfamily #1}\hfill{\small\itshape #2, default \texttt{#3}}\\*
+  \nopagebreak\small #4\par\vspace{4pt}}
+
+% A block's texture, if the file is there. Missing art must not fail the build -- the manual is
+% generated from a tree that is still growing, and a missing PNG is a gap, not an error.
+\newcommand{\blockart}[1]{%
+  \IfFileExists{../../src/main/resources/assets/immersiveengineering/textures/blocks/#1.png}
+    {\includegraphics[width=18mm,height=18mm]{../../src/main/resources/assets/immersiveengineering/textures/blocks/#1.png}}
+    {\fbox{\parbox[c][16mm][c]{16mm}{\centering\tiny no art}}}}
+
+\setlist{noitemsep,topsep=4pt}
+\graphicspath{{figures/}}
