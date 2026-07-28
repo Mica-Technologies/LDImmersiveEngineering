@@ -21,6 +21,14 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbou
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import net.minecraft.util.ITickable;
+import blusunrize.immersiveengineering.common.util.Utils;
+import blusunrize.immersiveengineering.common.util.EnergyHelper;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
+import blusunrize.immersiveengineering.api.energy.wires.conduit.ConduitTransfer;
+import blusunrize.immersiveengineering.api.energy.wires.conduit.ChannelSpec;
+import blusunrize.immersiveengineering.api.energy.immersiveflux.IFluxReceiver;
+import blusunrize.immersiveengineering.api.energy.immersiveflux.IFluxProvider;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.EnumDyeColor;
 import net.minecraft.item.ItemStack;
@@ -61,9 +69,39 @@ import java.util.Set;
  * @author LDImmersiveEngineering -- conduits
  */
 public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiveConnectable,
-		INeighbourChangeTile, IPlayerInteraction, IBlockOverlayText, IStatusLineProvider
+		INeighbourChangeTile, IPlayerInteraction, IBlockOverlayText, IStatusLineProvider,
+		IFluxReceiver, IFluxProvider, IComparatorOverride, ITickable
 {
+	/**
+	 * The most one channel may hold. One tick's worth of its own wire: a box is a relay, not a
+	 * battery, and a larger buffer would only mean a longer wait before a run notices a load being
+	 * switched off.
+	 */
+	public static final int CHANNEL_CAPACITY = ConduitWireType.TRANSFER_RATE;
+
 	private final ConduitPatch patch = new ConduitPatch();
+
+	/**
+	 * What each conductor is holding, one entry per channel.
+	 * <p>
+	 * A plain array rather than sixteen {@code FluxStorage} objects: this is touched every tick for
+	 * every box carrying anything, and sixteen objects per box is a lot of pointer chasing for what
+	 * amounts to one number each.
+	 */
+	private final int[] held = new int[WireChannel.VALUES.length];
+
+	/**
+	 * Which channels are holding something, one bit each.
+	 * <p>
+	 * The entire point of this field is the first line of {@link #update()}. A base with two
+	 * hundred boxes in it, three of which are carrying anything, should cost two hundred integer
+	 * comparisons per tick rather than two hundred loops over sixteen channels and their
+	 * neighbours.
+	 */
+	private int liveMask;
+
+	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
+	private final int[] lastMoved = new int[WireChannel.VALUES.length];
 
 	public ConduitPatch getPatch()
 	{
@@ -237,8 +275,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	@Override
 	public boolean isEnergyOutput()
 	{
-		//P5's job. A box that claimed to be an output before it could deliver anything would show
-		//up as a machine that is powered and does nothing.
+		//Not on the catenary graph's terms. Energy leaves a box through a connector hung on a
+		//breakout face, which is an ordinary block-to-block handover; the bundle connection exists
+		//to record the topology, not to route power along.
 		return false;
 	}
 
@@ -246,6 +285,168 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	public int outputEnergy(int amount, boolean simulate, int energyType)
 	{
 		return 0;
+	}
+
+	// ------------------------------------------------------------------
+	// Energy
+	// ------------------------------------------------------------------
+
+	@Override
+	public void update()
+	{
+		//The cheap exit, and the reason a base full of idle conduit costs nothing: one comparison.
+		if(world==null||world.isRemote||liveMask==0)
+			return;
+
+		//Out to the connectors first: a box that can get rid of energy should, because the gradient
+		//that opens is what pulls more down the run behind it.
+		for(WireChannel channel : WireChannel.VALUES)
+		{
+			if((liveMask&channel.getMask())!=0)
+			{
+				lastMoved[channel.ordinal()] = 0;
+				drainToBreakout(channel);
+			}
+		}
+
+		//Then along the runs. Connections outside, channels inside, and the handler's own set used
+		//in place rather than copied: this is the one loop in the feature that runs every tick, and
+		//a set allocated per live box per tick is exactly the shape of thing this mod's profiling
+		//history is about.
+		Set<Connection> runs = ImmersiveNetHandler.INSTANCE.getConnections(world, getPos());
+		if(runs!=null)
+			for(Connection run : runs)
+			{
+				if(!run.isBundle())
+					continue;
+				for(WireChannel channel : WireChannel.VALUES)
+					if((liveMask&channel.getMask())!=0)
+						passAlong(run, channel);
+			}
+
+		for(WireChannel channel : WireChannel.VALUES)
+			if(held[channel.ordinal()] <= 0)
+			{
+				held[channel.ordinal()] = 0;
+				liveMask &= ~channel.getMask();
+			}
+	}
+
+	private void drainToBreakout(WireChannel channel)
+	{
+		EnumFacing face = patch.faceOf(channel);
+		if(face==null)
+			return;
+		int index = channel.ordinal();
+		int offered = ConduitTransfer.drain(held[index], ConduitWireType.TRANSFER_RATE);
+		if(offered <= 0)
+			return;
+		TileEntity target = Utils.getExistingTileEntity(world, getPos().offset(face));
+		if(target==null)
+			return;
+		int accepted = EnergyHelper.insertFlux(target, face.getOpposite(), offered, false);
+		held[index] -= accepted;
+		lastMoved[index] += accepted;
+	}
+
+	private void passAlong(Connection run, WireChannel channel)
+	{
+		ChannelSpec spec = run.channels==null?null: run.channels.getSpec(channel);
+		if(spec==null)
+			return;
+		TileEntity te = world.isBlockLoaded(run.end)?world.getTileEntity(run.end): null;
+		if(!(te instanceof TileEntityJunctionBox))
+			return;
+		TileEntityJunctionBox peer = (TileEntityJunctionBox)te;
+		int index = channel.ordinal();
+		ConduitTransfer.Moved moved = ConduitTransfer.hop(held[index], peer.held[index],
+				CHANNEL_CAPACITY, spec.getTransferRate(), spec.getLossRatio());
+		if(moved.isNothing())
+			return;
+		held[index] -= moved.taken;
+		lastMoved[index] += moved.taken;
+		peer.credit(channel, moved.delivered);
+	}
+
+	/**
+	 * Take energy onto a channel, from a neighbour along the run or from a connector at the door.
+	 *
+	 * @return how much was actually taken
+	 */
+	private int credit(WireChannel channel, int amount)
+	{
+		int index = channel.ordinal();
+		int taken = Math.max(0, Math.min(CHANNEL_CAPACITY-held[index], amount));
+		if(taken <= 0)
+			return 0;
+		held[index] += taken;
+		liveMask |= channel.getMask();
+		return taken;
+	}
+
+	public int getHeld(WireChannel channel)
+	{
+		return channel==null?0: held[channel.ordinal()];
+	}
+
+	public int getLastMoved(WireChannel channel)
+	{
+		return channel==null?0: lastMoved[channel.ordinal()];
+	}
+
+	// -- The face a connector hangs on ---------------------------------
+
+	@Override
+	public boolean canConnectEnergy(EnumFacing side)
+	{
+		//Only a patched face takes or gives power, and only on its own conductor. A bare face is
+		//the side of a box, and a connector hung on one should visibly do nothing rather than
+		//quietly work on whichever channel happened to come first.
+		return patch.isPatched(side);
+	}
+
+	@Override
+	public int receiveEnergy(EnumFacing side, int amount, boolean simulate)
+	{
+		WireChannel channel = patch.get(side);
+		if(channel==null||world==null||world.isRemote)
+			return 0;
+		if(simulate)
+			return Math.max(0, Math.min(CHANNEL_CAPACITY-held[channel.ordinal()], amount));
+		return credit(channel, amount);
+	}
+
+	@Override
+	public int extractEnergy(EnumFacing side, int amount, boolean simulate)
+	{
+		//Pushed rather than pulled: update() hands each breakout to its connector. Leaving this
+		//open as well would let a machine take the same energy a second time in the same tick.
+		return 0;
+	}
+
+	@Override
+	public int getEnergyStored(EnumFacing side)
+	{
+		return getHeld(patch.get(side));
+	}
+
+	@Override
+	public int getMaxEnergyStored(EnumFacing side)
+	{
+		return patch.isPatched(side)?CHANNEL_CAPACITY: 0;
+	}
+
+	@Override
+	public int getComparatorInputOverride()
+	{
+		//The busiest conductor, not the total: a bundle where one channel is saturated and fifteen
+		//are idle is a bundle with a problem, and an average would hide it.
+		int busiest = 0;
+		for(int value : held)
+			busiest = Math.max(busiest, value);
+		if(busiest <= 0)
+			return 0;
+		return Math.max(1, Math.min(15, busiest*15/CHANNEL_CAPACITY));
 	}
 
 	@Override
@@ -324,12 +525,28 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		nbt.setTag("patch", patch.writeToNBT());
+		//Saved because a run that emptied itself on every reload would leak whatever was in flight,
+		//and a box holding a tick's worth is holding a tick's worth of somebody's coal.
+		if(!descPacket)
+			nbt.setIntArray("held", held);
 	}
 
 	@Override
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		patch.readFromNBT(nbt.getCompoundTag("patch"));
+		if(descPacket)
+			return;
+		int[] stored = nbt.getIntArray("held");
+		liveMask = 0;
+		for(int i = 0; i < held.length; i++)
+		{
+			//Bounds-checked and clamped: the array came off disk, and a box that loaded a negative
+			//or an enormous figure would either eat energy or mint it.
+			held[i] = i < stored.length?Math.max(0, Math.min(CHANNEL_CAPACITY, stored[i])): 0;
+			if(held[i] > 0)
+				liveMask |= 1 << i;
+		}
 	}
 
 	// ------------------------------------------------------------------
@@ -343,7 +560,8 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		WireChannel here = patch.get(side);
 		return new String[]{
 				here!=null?"Breakout: "+here.getName(): "No breakout on this face",
-				patch.count()+" of "+WireChannel.VALUES.length+" patched"
+				here!=null?getLastMoved(here)+" IF/t"
+						: patch.count()+" of "+WireChannel.VALUES.length+" patched"
 		};
 	}
 
@@ -369,7 +587,8 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			{
 				WireChannel channel = patch.get(face);
 				if(channel!=null)
-					lines.add("  "+face.getName()+": "+channel.getName());
+					lines.add("  "+face.getName()+": "+channel.getName()
+							+" -- "+getLastMoved(channel)+" IF/t");
 			}
 		return lines;
 	}
