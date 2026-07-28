@@ -45,12 +45,18 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("deprecation")
 public class ModelConveyor implements IBakedModel
 {
 	static List<BakedQuad> emptyQuads = Lists.newArrayList();
-	public static HashMap<String, List<BakedQuad>> modelCache = new HashMap<>();
+	//Concurrent, not plain: `getQuads` is what vanilla's chunk-render worker pool calls, one
+	//thread per chunk being compiled, so two chunks baking the same model race on this map.
+	//ConnModelReal and cachedBakedItemModels already use thread-safe caches for exactly this
+	//reason; these three were the ones that got missed.
+	public static Map<String, List<BakedQuad>> modelCache = new ConcurrentHashMap<>();
 	public static ResourceLocation[] rl_casing = {new ResourceLocation(ImmersiveEngineering.MODID, "blocks/conveyor_casing_top"), new ResourceLocation(ImmersiveEngineering.MODID, "blocks/conveyor_casing_side"), new ResourceLocation(ImmersiveEngineering.MODID, "blocks/conveyor_casing_walls")};
 
 	@Nullable

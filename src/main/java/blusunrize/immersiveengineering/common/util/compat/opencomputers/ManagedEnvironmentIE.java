@@ -29,8 +29,28 @@ public abstract class ManagedEnvironmentIE<T extends TileEntityIEBase> extends A
 		setNode(Network.newNode(this, Visibility.Network).withComponent(preferredName(), Visibility.Network).create());
 	}
 
-	@SuppressWarnings("unchecked")
+	/**
+	 * The machine this environment speaks for, never null.
+	 * <p>
+	 * A computer's connection outlives the block by a tick or two -- break the machine while a
+	 * program is polling it and the next callback runs against a position that no longer holds
+	 * anything. Every one of the ninety-odd call sites in this package dereferenced the old
+	 * nullable result immediately, so that window produced a bare NPE from inside the callback.
+	 * Throwing here turns it into an ordinary Lua-side error naming the block that went away,
+	 * which a program can catch with pcall. Use {@link #getTileEntityOrNull()} where absence is
+	 * expected rather than exceptional.
+	 */
 	protected T getTileEntity()
+	{
+		T te = getTileEntityOrNull();
+		if(te==null)
+			throw new IllegalStateException("There is no "+myClass.getSimpleName()+" at "+pos
+					+" any more -- the block was removed while this component was connected.");
+		return te;
+	}
+
+	@SuppressWarnings("unchecked")
+	protected T getTileEntityOrNull()
 	{
 		TileEntity te = w.getTileEntity(pos);
 		if(te!=null&&myClass.isAssignableFrom(te.getClass()))

@@ -139,8 +139,14 @@ public class IEWailaDataProvider implements IWailaDataProvider
 		{
 			if(((TileEntityTeslaCoil)te).dummy)
 				te = te.getWorld().getTileEntity(te.getPos().offset(((TileEntityTeslaCoil)te).facing, -1));
-			tag.setBoolean("redstoneInverted", ((TileEntityTeslaCoil)te).redstoneControlInverted);
-			tag.setBoolean("lowPower", ((TileEntityTeslaCoil)te).lowPower);
+			//Guarded the way TileEntityTeslaCoil guards its own version of this lookup: an orphaned
+			//dummy half points at a position that need not still hold a coil, and an unguarded cast
+			//there threw on the server every time somebody looked at the block.
+			if(te instanceof TileEntityTeslaCoil)
+			{
+				tag.setBoolean("redstoneInverted", ((TileEntityTeslaCoil)te).redstoneControlInverted);
+				tag.setBoolean("lowPower", ((TileEntityTeslaCoil)te).lowPower);
+			}
 		}
 		else if(te instanceof TileEntityWoodenBarrel)
 			tag.setTag("tank", ((TileEntityWoodenBarrel)te).tank.writeToNBT(new NBTTagCompound()));

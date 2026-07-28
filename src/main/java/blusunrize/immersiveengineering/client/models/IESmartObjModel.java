@@ -54,6 +54,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import javax.vecmath.Matrix4f;
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -62,7 +63,11 @@ public class IESmartObjModel extends OBJBakedModel
 {
 	public static Cache<ComparableItemStack, IBakedModel> cachedBakedItemModels = CacheBuilder.newBuilder()
 			.maximumSize(100).expireAfterAccess(60, TimeUnit.SECONDS).build();
-	public static HashMap<ExtBlockstateAdapter, List<BakedQuad>> modelCache = new HashMap<>();
+	//Concurrent, not plain: `getQuads` is what vanilla's chunk-render worker pool calls, one
+	//thread per chunk being compiled, so two chunks baking the same model race on this map.
+	//ConnModelReal and cachedBakedItemModels already use thread-safe caches for exactly this
+	//reason; these three were the ones that got missed.
+	public static Map<ExtBlockstateAdapter, List<BakedQuad>> modelCache = new ConcurrentHashMap<>();
 	IBakedModel baseModel;
 	HashMap<TransformType, Matrix4> transformationMap = new HashMap<TransformType, Matrix4>();
 	ImmutableList<BakedQuad> bakedQuads;

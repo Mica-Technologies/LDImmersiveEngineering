@@ -222,7 +222,7 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 		if(event.getItemStack().hasCapability(CapabilityShader.SHADER_CAPABILITY, null))
 		{
 			ShaderWrapper wrapper = event.getItemStack().getCapability(CapabilityShader.SHADER_CAPABILITY, null);
-			ItemStack shader = wrapper!=null?wrapper.getShaderItem(): null;
+			ItemStack shader = wrapper!=null?wrapper.getShaderItem(): ItemStack.EMPTY;
 			if(!shader.isEmpty())
 				event.getToolTip().add(TextFormatting.DARK_GRAY+shader.getDisplayName());
 		}

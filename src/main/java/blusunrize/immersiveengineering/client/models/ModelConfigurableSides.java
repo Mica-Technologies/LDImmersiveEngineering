@@ -36,7 +36,9 @@ import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public class ModelConfigurableSides implements IBakedModel
@@ -105,7 +107,11 @@ public class ModelConfigurableSides implements IBakedModel
 		});
 	}
 
-	public static HashMap<String, List<BakedQuad>> modelCache = new HashMap<>();
+	//Concurrent, not plain: `getQuads` is what vanilla's chunk-render worker pool calls, one
+	//thread per chunk being compiled, so two chunks baking the same model race on this map.
+	//ConnModelReal and cachedBakedItemModels already use thread-safe caches for exactly this
+	//reason; these three were the ones that got missed.
+	public static Map<String, List<BakedQuad>> modelCache = new ConcurrentHashMap<>();
 
 	final String name;
 	public TextureAtlasSprite[][] textures;

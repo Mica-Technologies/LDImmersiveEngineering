@@ -63,7 +63,9 @@ public class FloodlightDriver extends DriverSidedTileEntity
 		@Override
 		public void onDisconnect(Node node)
 		{
-			TileEntityFloodlight te = getTileEntity();
+			//Disconnect legitimately runs after the block is gone, so this one asks for the
+			//nullable form rather than the throwing one.
+			TileEntityFloodlight te = getTileEntityOrNull();
 			if(te!=null)
 				te.controllingComputers--;
 		}

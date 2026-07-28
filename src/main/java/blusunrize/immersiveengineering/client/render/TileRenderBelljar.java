@@ -87,9 +87,11 @@ public class TileRenderBelljar extends TileEntitySpecialRenderer<TileEntityBellj
 			if(!plantHandler.overrideRender(inventory.get(1), inventory.get(0), tile.renderGrowth, tile, blockRenderer))
 			{
 				IBlockState[] states = plantHandler.getRenderedPlant(inventory.get(1), inventory.get(0), tile.renderGrowth, tile);
-				if(states==null||states.length < 1)
-					return;
-				for(IBlockState s : states)
+				//A plant with nothing to draw skips the plant loop and nothing else. This used to
+				//`return`, two pushMatrix calls deep and with item lighting still disabled -- every
+				//frame such a belljar was on screen leaked two matrix stack entries, and a bounded
+				//stack overflows within a second of that.
+				for(IBlockState s : states!=null?states: new IBlockState[0])
 				{
 					List<BakedQuad> plantQuadList = plantQuads.get(s);
 					if(plantQuadList==null)

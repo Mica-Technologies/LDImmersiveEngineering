@@ -40,6 +40,16 @@ public class TileRenderBucketWheel extends TileEntitySpecialRenderer<TileEntityB
 {
 	private static IBakedModel model = null;
 
+	/**
+	 * Every other static render cache in this package is registered with
+	 * {@code IEApi.renderCacheClearers}; this one was not, so a resource reload left the bucket
+	 * wheel drawing pre-reload UVs until the game restarted.
+	 */
+	public static void reset()
+	{
+		model = null;
+	}
+
 	@Override
 	public void render(TileEntityBucketWheel tile, double x, double y, double z, float partialTicks, int destroyStage, float alpha)
 	{
