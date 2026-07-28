@@ -816,6 +816,10 @@ public class IEContent
 		registerTile(TileEntityIndustrialBurner.class);
 		registerTile(TileEntityGasScrubber.class);
 		registerTile(TileEntityGasTurbine.class);
+		registerTile(TileEntityFuelOilBoiler.class);
+		registerTile(TileEntityHRSG.class);
+		registerTile(TileEntitySteamTurbineHall.class);
+		registerTile(TileEntityEngineBank.class);
 		registerTile(TileEntityFlareStack.class);
 		registerTile(TileEntityLubricationManifold.class);
 		registerTile(TileEntityPropaneCylinder.class);
@@ -1120,6 +1124,10 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockIndustrialBurner.instance);
 		MultiblockHandler.registerMultiblock(MultiblockGasScrubber.instance);
 		MultiblockHandler.registerMultiblock(MultiblockGasTurbine.instance);
+		MultiblockHandler.registerMultiblock(MultiblockFuelOilBoiler.instance);
+		MultiblockHandler.registerMultiblock(MultiblockHRSG.instance);
+		MultiblockHandler.registerMultiblock(MultiblockSteamTurbineHall.instance);
+		MultiblockHandler.registerMultiblock(MultiblockEngineBank.instance);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();

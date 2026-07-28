@@ -188,6 +188,77 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 	}
 
 	//	=================================
+	//		THE EXHAUST
+	//	=================================
+
+	/**
+	 * What a full-output turbine throws away, expressed as the steam a recovery boiler could
+	 * raise from it: millibuckets per tick.
+	 * <p>
+	 * This machine converts something under a third of its gas into flux and sends most of the
+	 * rest up the stack at several hundred degrees. That is not a fudge for game balance -- it is
+	 * why combined-cycle plants exist at all, and it is the one number the whole feature turns
+	 * on. Downstream a millibucket of steam is worth a hundred flux, so a full turbine's exhaust
+	 * is worth 18,000 IF/t against the 12,288 the machine makes itself: bolt a
+	 * {@link TileEntityHRSG} to the stack, pipe the steam to a hall, and the same gas yields
+	 * about two and a half times what it did.
+	 * <p>
+	 * Nothing here consumes or reserves anything. The turbine's own behaviour is unchanged
+	 * whether or not something is standing behind it; an unrecovered exhaust is simply thrown
+	 * away, exactly as it always was.
+	 */
+	public static final int EXHAUST_STEAM_AT_FULL = 180;
+
+	/**
+	 * The recovery curve, and it is deliberately the dullest possible one: heat in the stack is
+	 * proportional to the work the machine is doing.
+	 * <p>
+	 * Keyed on <em>delivered output</em> and not on the spool count, because those two part
+	 * company in the cases that matter. A turbine coasting down has a fast rotor and a dead
+	 * combustor -- nothing is burning, so there is nothing hot going up the stack -- and a
+	 * turbine in city mode is delivering full power regardless of its spool. Asking what the
+	 * machine is actually producing gets all three right without a special case for any of them.
+	 *
+	 * @param output Flux per tick the turbine is delivering
+	 * @return millibuckets of steam per tick that exhaust is worth, clamped to
+	 * {@link #EXHAUST_STEAM_AT_FULL}
+	 */
+	public static int exhaustSteamFor(int output)
+	{
+		if(output <= 0)
+			return 0;
+		if(output >= MAX_OUTPUT)
+			return EXHAUST_STEAM_AT_FULL;
+		return EXHAUST_STEAM_AT_FULL*output/MAX_OUTPUT;
+	}
+
+	/**
+	 * The depth the exhaust plenum and the stack sit at: the last course of the package, the far
+	 * end from the filter house.
+	 */
+	public static final int EXHAUST_DEPTH = PetroleumGeometry.TURBINE_DEPTH-1;
+
+	/**
+	 * @return whether this structure index is one of the nine cells of the exhaust end face
+	 * <p>
+	 * "A turbine is nearby" is not the test. The gas leaves at one end of a six-long machine and
+	 * a recovery boiler parked against the intake house would be catching cold filtered air, so
+	 * anything wanting the exhaust has to be against <em>this</em> face and no other. All nine
+	 * cells of the end course count rather than just the stack mouth, because the whole face is
+	 * what the HRSG's own three-by-three intake butts up against -- that dimensional match is why
+	 * the two structures are the widths they are.
+	 */
+	public static boolean isExhaustFace(int pos)
+	{
+		if(pos < 0)
+			return false;
+		int perLayer = PetroleumGeometry.TURBINE_DEPTH*PetroleumGeometry.TURBINE_WIDTH;
+		if(pos >= PetroleumGeometry.TURBINE_HEIGHT*perLayer)
+			return false;
+		return pos%perLayer/PetroleumGeometry.TURBINE_WIDTH==EXHAUST_DEPTH;
+	}
+
+	//	=================================
 	//		FUEL
 	//	=================================
 
@@ -387,9 +458,7 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 	 */
 	private void pushOutput()
 	{
-		//City mode drops the output curve with the fuel curve: metering half a machine's power
-		//against a rotor speed is exactly the accounting the mode exists to skip.
-		int output = CityMode.petroleum()?MAX_OUTPUT: outputAt(spool);
+		int output = getCurrentOutput();
 		if(output <= 0)
 			return;
 		int live = 0;
@@ -425,6 +494,91 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 			found[count++] = te;
 		}
 		terminals = found==null?NO_TERMINALS: Arrays.copyOf(found, count);
+	}
+
+	//	=================================
+	//		THE EXHAUST TAP
+	//	=================================
+
+	/**
+	 * What the machine is putting on the wire this tick, asked of any block of it.
+	 * <p>
+	 * The single definition of "delivering", so the flux hand-off and anything reading the
+	 * exhaust can never disagree about whether the turbine is working. City mode drops the output
+	 * curve with the fuel curve -- metering half a machine's power against a rotor speed is
+	 * exactly the accounting the mode exists to skip -- and a coasting rotor delivers nothing,
+	 * because the breaker is open.
+	 *
+	 * @return Flux per tick, or 0 if the machine is not on line
+	 */
+	public int getCurrentOutput()
+	{
+		TileEntityGasTurbine master = master();
+		if(master==null||!master.formed||!master.active)
+			return 0;
+		return CityMode.petroleum()?MAX_OUTPUT: outputAt(master.spool);
+	}
+
+	/**
+	 * How much heat is going up the stack right now, in millibuckets of raisable steam per tick.
+	 * <p>
+	 * The whole of the public exhaust interface, and deliberately a plain read: a turbine has no
+	 * idea whether anything is recovering its heat, is not slowed or taxed by one that is, and
+	 * needs no per-tick cooperation from it. That keeps the coupling one-way and means a broken,
+	 * unloaded or absent recovery boiler cannot affect the machine it was bolted to.
+	 *
+	 * @return millibuckets of steam per tick, 0 to {@link #EXHAUST_STEAM_AT_FULL}
+	 */
+	public int getExhaustSteamPerTick()
+	{
+		return exhaustSteamFor(getCurrentOutput());
+	}
+
+	/**
+	 * Who currently holds the exhaust, and until when. Master only, and deliberately not saved.
+	 */
+	private BlockPos exhaustClaimant;
+	private long exhaustClaimExpiry;
+
+	/**
+	 * Leases the exhaust to one recovery boiler at a time.
+	 * <p>
+	 * <strong>Why this exists.</strong> The end face is three by three and an HRSG's intake is
+	 * three by three, but nothing stops a second one being built one course higher and catching
+	 * six of the same nine cells. Both would then see a valid exhaust and both would raise a full
+	 * 180 mB/t from it -- the same heat sold twice, which is free energy dressed up as a layout
+	 * trick. Of the two ways out, "make it harmless by splitting the heat" and "make it
+	 * impossible", this is the second: a divided exhaust would quietly halve a working plant when
+	 * somebody built a second boiler nearby, and a player watching their output fall has no way
+	 * of knowing why. A refused claim is a boiler that says out loud that the exhaust is already
+	 * taken.
+	 * <p>
+	 * <strong>Why a lease rather than a registration.</strong> Nothing has to tell the turbine
+	 * that a claimant has been broken, unloaded, dismantled or moved. The holder renews on every
+	 * one of its own passes; anything that stops it running drops the claim within a couple of
+	 * seconds and the next boiler along picks it up. That also makes it correct to leave out of
+	 * NBT entirely -- a reloaded turbine starts unclaimed and whoever is actually there re-takes
+	 * it on its next pass, which is by definition the right answer.
+	 *
+	 * @param claimant   the world position of the claiming machine's master block
+	 * @param leaseTicks how long the claim should stand without being renewed; the caller's own
+	 *                   work interval with room to spare, so one missed pass does not drop it
+	 * @return whether the caller now holds the exhaust
+	 */
+	public boolean claimExhaust(@Nullable BlockPos claimant, int leaseTicks)
+	{
+		if(claimant==null||world==null||world.isRemote)
+			return false;
+		TileEntityGasTurbine master = master();
+		if(master==null||!master.formed)
+			return false;
+		long now = world.getTotalWorldTime();
+		if(master.exhaustClaimant!=null&&!master.exhaustClaimant.equals(claimant)
+				&&now < master.exhaustClaimExpiry)
+			return false;
+		master.exhaustClaimant = claimant;
+		master.exhaustClaimExpiry = now+Math.max(1, leaseTicks);
+		return true;
 	}
 
 	/**
