@@ -825,6 +825,7 @@ public class IEContent
 		registerTile(TileEntityGridService.class);
 		registerTile(TileEntityGridSignal.class);
 		registerTile(TileEntityGridConsole.class);
+		registerTile(TileEntityGridSubstation.class);
 		registerTile(TileEntityFluidInlet.class);
 		registerTile(TileEntityFluidOutlet.class);
 		registerTile(TileEntityFluidValve.class);
@@ -1149,6 +1150,7 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockMixer.instance);
 		MultiblockHandler.registerMultiblock(MultiblockFeedthrough.instance);
 		MultiblockHandler.registerMultiblock(MultiblockGridConsole.instance);
+		MultiblockHandler.registerMultiblock(MultiblockSubstation.instance);
 		MultiblockHandler.registerMultiblock(MultiblockFluidConsole.instance);
 		MultiblockHandler.registerMultiblock(MultiblockDerrick.instance);
 		MultiblockHandler.registerMultiblock(MultiblockPumpjack.instance);

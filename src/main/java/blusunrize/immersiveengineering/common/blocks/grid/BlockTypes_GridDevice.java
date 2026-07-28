@@ -38,7 +38,11 @@ public enum BlockTypes_GridDevice implements IStringSerializable, BlockIEBase.IB
 	/**
 	 * Bridges a segment to redstone, in either direction.
 	 */
-	SIGNAL_UNIT;
+	SIGNAL_UNIT,
+	/**
+	 * Inert on its own; twelve in a 3x2x2 yard make a Substation.
+	 */
+	SUBSTATION_FRAME;
 
 	@Override
 	public String getName()

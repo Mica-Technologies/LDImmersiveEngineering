@@ -149,13 +149,18 @@ class GridAssetsTest
 		}
 
 		@Test
-		@DisplayName("grid_device covers all four metas and every facing")
+		@DisplayName("grid_device covers every meta and every facing")
 		void gridDeviceCoversItsProperties()
 		{
+			//Taken from the enum rather than listed here, so adding a meta and forgetting its
+			//blockstate variant fails immediately. Listing them in both places only meant this test
+			//had to be hand-edited every time, which is exactly when somebody edits it to match the
+			//bug rather than the intent.
 			JsonObject variants = blockstate("grid_device").getAsJsonObject("variants");
-			Set<String> types = keys(variants.getAsJsonObject("type"));
-			assertEquals(new HashSet<>(Arrays.asList("feed_unit", "service_unit", "console_housing",
-				"signal_unit")), types);
+			Set<String> expected = new HashSet<>();
+			for(BlockTypes_GridDevice type : BlockTypes_GridDevice.values())
+				expected.add(type.getName());
+			assertEquals(expected, keys(variants.getAsJsonObject("type")));
 
 			//The block declares IEProperties.FACING_ALL, so all six must resolve even though
 			//the tile restricts placement to the horizontals.
@@ -170,7 +175,10 @@ class GridAssetsTest
 		void gridMultiblockCoversItsProperties()
 		{
 			JsonObject variants = blockstate("grid_multiblock").getAsJsonObject("variants");
-			assertEquals(Collections.singleton("grid_console"), keys(variants.getAsJsonObject("type")));
+			Set<String> expectedTypes = new HashSet<>();
+			for(BlockTypes_GridMultiblock type : BlockTypes_GridMultiblock.values())
+				expectedTypes.add(type.getName());
+			assertEquals(expectedTypes, keys(variants.getAsJsonObject("type")));
 			//BlockIEMultiblock contributes FACING_HORIZONTAL and MULTIBLOCKSLAVE.
 			assertEquals(new HashSet<>(Arrays.asList("north", "east", "south", "west")),
 					keys(variants.getAsJsonObject("facing")));

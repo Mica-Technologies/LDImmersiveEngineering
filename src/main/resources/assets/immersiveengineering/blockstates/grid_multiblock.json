@@ -10,28 +10,54 @@
 		}
 	},
 	"variants": {
-		"inventory,type=grid_console": [{
-			"model": "cube_all",
-			"textures": {"all": "immersiveengineering:blocks/grid_console_screen"}
-		}],
+		"inventory,type=grid_console": [
+			{
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_console_screen"
+				}
+			}
+		],
 		"type": {
-			"grid_console": {}
+			"grid_console": {},
+			"substation": {
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_substation"
+				}
+			}
 		},
 		"boolean0": {
 			"false": {},
 			"true": {
-				"textures": {"front": "immersiveengineering:blocks/grid_console_screen"}
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_console_screen"
+				}
 			}
 		},
 		"facing": {
 			"north": {},
-			"east": {"y": 90},
-			"south": {"y": 180},
-			"west": {"y": 270}
+			"east": {
+				"y": 90
+			},
+			"south": {
+				"y": 180
+			},
+			"west": {
+				"y": 270
+			}
 		},
 		"_0multiblockslave": {
 			"false": {},
 			"true": {}
-		}
+		},
+		"inventory,type=substation": [
+			{
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_substation"
+				}
+			}
+		]
 	}
 }

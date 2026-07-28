@@ -24,7 +24,11 @@ import java.util.Locale;
  */
 public enum BlockTypes_GridMultiblock implements IStringSerializable, BlockIEBase.IBlockEnum
 {
-	GRID_CONSOLE;
+	GRID_CONSOLE,
+	/**
+	 * A formed Substation: a Feed Unit and a Service Unit in one transformer yard.
+	 */
+	SUBSTATION;
 
 	@Override
 	public String getName()

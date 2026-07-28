@@ -11,45 +11,89 @@
 		}
 	},
 	"variants": {
-		"inventory,type=feed_unit": [{
-			"y": 180
-		}],
-		"inventory,type=service_unit": [{
-			"y": 180,
-			"textures": {"front": "immersiveengineering:blocks/grid_device_service_front"}
-		}],
-		"inventory,type=console_housing": [{
-			"model": "cube_all",
-			"textures": {"all": "immersiveengineering:blocks/grid_console_housing"}
-		}],
-		"inventory,type=signal_unit": [{
-			"y": 180,
-			"textures": {"front": "immersiveengineering:blocks/grid_device_signal_front"}
-		}],
+		"inventory,type=feed_unit": [
+			{
+				"y": 180
+			}
+		],
+		"inventory,type=service_unit": [
+			{
+				"y": 180,
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_device_service_front"
+				}
+			}
+		],
+		"inventory,type=console_housing": [
+			{
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_console_housing"
+				}
+			}
+		],
+		"inventory,type=signal_unit": [
+			{
+				"y": 180,
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_device_signal_front"
+				}
+			}
+		],
 		"type": {
 			"feed_unit": {},
 			"service_unit": {
-				"textures": {"front": "immersiveengineering:blocks/grid_device_service_front"}
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_device_service_front"
+				}
 			},
 			"console_housing": {
 				"model": "cube_all",
-				"textures": {"all": "immersiveengineering:blocks/grid_console_housing"}
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_console_housing"
+				}
 			},
 			"signal_unit": {
-				"textures": {"front": "immersiveengineering:blocks/grid_device_signal_front"}
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_device_signal_front"
+				}
+			},
+			"substation_frame": {
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_substation_frame"
+				}
 			}
 		},
 		"facing": {
 			"north": {},
-			"east": {"y": 90},
-			"south": {"y": 180},
-			"west": {"y": 270},
-			"up": {"x": 270},
-			"down": {"x": 90}
+			"east": {
+				"y": 90
+			},
+			"south": {
+				"y": 180
+			},
+			"west": {
+				"y": 270
+			},
+			"up": {
+				"x": 270
+			},
+			"down": {
+				"x": 90
+			}
 		},
 		"boolean0": {
 			"false": {},
 			"true": {}
-		}
+		},
+		"inventory,type=substation_frame": [
+			{
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/grid_substation_frame"
+				}
+			}
+		]
 	}
 }
