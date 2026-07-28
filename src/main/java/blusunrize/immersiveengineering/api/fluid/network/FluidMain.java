@@ -259,11 +259,14 @@ public class FluidMain
 	 */
 	public boolean setFluid(@Nullable String fluidName)
 	{
-		if(pack > 0)
-			return false;
 		String next = fluidName==null||fluidName.isEmpty()?null: fluidName;
+		//Checked before the pack, not after. Setting a main to what it already carries changes
+		//nothing, so refusing it would make "/ie fluidnet fluid <main> <what it already is>" report
+		//"drain it first" -- a refusal for an operation that was never going to do anything.
 		if(Objects.equals(next, fluid))
 			return true;
+		if(pack > 0)
+			return false;
 		fluid = next;
 		notifyDevices();
 		return true;

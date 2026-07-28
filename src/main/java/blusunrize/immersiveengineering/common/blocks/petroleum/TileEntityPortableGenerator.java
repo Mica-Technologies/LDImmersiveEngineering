@@ -61,8 +61,8 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 		IIEInternalFluxHandler, IBlockOverlayText, IComparatorOverride, INeighbourChangeTile
 {
 	/**
-	 * Four buckets. About seven minutes of running -- long enough that a trip to the forecourt is
-	 * an errand rather than a chore, short enough that it stays a portable generator rather than a
+	 * Four buckets. About five minutes of running -- long enough that a trip to the forecourt is an
+	 * errand rather than a chore, short enough that it stays a portable generator rather than a
 	 * base's power supply.
 	 */
 	public static final int TANK_CAPACITY = 4000;
@@ -72,13 +72,39 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 	 */
 	public static final int OUTPUT = 256;
 	/**
-	 * Millibuckets burnt per tick while running.
+	 * Millibuckets burnt per burn, and how many ticks apart the burns are.
 	 * <p>
-	 * That is 51,200 flux per bucket, against the Diesel Generator's roughly 100,000 on diesel.
-	 * Half the value per millibucket, which is the price of portability -- and it is still the best
-	 * thing that has ever happened to a bucket of gasoline, which previously bought nothing at all.
+	 * <strong>Not a per-tick figure.</strong> It was one, at 5 mB/t, which emptied the tank in
+	 * forty seconds and was worth 51,200 flux per bucket -- a fourteenth of what a Diesel Generator
+	 * gets out of diesel, when the intent was about half. A unit test asserting the runtime this
+	 * class documents is what turned that up; the numbers had simply never been multiplied out.
+	 * <p>
+	 * Two millibuckets every three ticks is 1500 ticks per bucket: five minutes on a full tank, and
+	 * 384,000 flux per bucket against the Diesel Generator's ~717,000. A little over half the value
+	 * per millibucket, which is the price of portability -- and still the best thing that has ever
+	 * happened to a bucket of gasoline, which previously bought nothing at all.
+	 * <p>
+	 * Burning on an interval rather than every tick also means the fluid accounting runs a third as
+	 * often, while the flux output stays per-tick and smooth.
 	 */
-	public static final int FUEL_PER_TICK = 5;
+	public static final int FUEL_PER_BURN = 2;
+	public static final int BURN_INTERVAL = 3;
+
+	/**
+	 * @return how many ticks one bucket of fuel lasts
+	 */
+	public static int ticksPerBucket()
+	{
+		return 1000/FUEL_PER_BURN*BURN_INTERVAL;
+	}
+
+	/**
+	 * @return flux produced from one bucket of fuel
+	 */
+	public static int fluxPerBucket()
+	{
+		return OUTPUT*ticksPerBucket();
+	}
 
 	/**
 	 * Registry names of the fuels this will burn. Spark ignition only.
@@ -128,6 +154,11 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 	public boolean running;
 	private boolean[] receiverFaces = new boolean[6];
 	private boolean facesDirty = true;
+	/**
+	 * Ticks of running still paid for by the last burn. Persisted, so reloading a chunk does not
+	 * hand the player a free interval -- or charge them twice for one.
+	 */
+	private int burnTimer;
 
 	@Override
 	public void update()
@@ -149,9 +180,17 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 			//against an open breaker.
 			if(pushOutput() > 0||energyStorage.getEnergyStored() < energyStorage.getMaxEnergyStored())
 			{
-				int burn = CityMode.petroleum()?1: FUEL_PER_TICK;
-				if(tank.drainInternal(burn, true)!=null)
+				//Fuel is paid for an interval at a time; output is produced every tick. The debt
+				//counter is what keeps those two rhythms apart.
+				if(burnTimer <= 0)
 				{
+					int burn = CityMode.petroleum()?1: FUEL_PER_BURN;
+					if(tank.drainInternal(burn, true)!=null)
+						burnTimer = BURN_INTERVAL;
+				}
+				if(burnTimer > 0)
+				{
+					burnTimer--;
 					energyStorage.modifyEnergyStored(OUTPUT);
 					running = true;
 				}
@@ -308,6 +347,7 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 		if(!descPacket)
 		{
 			nbt.setTag("tank", tank.writeToNBT(new NBTTagCompound()));
+			nbt.setInteger("burnTimer", burnTimer);
 			energyStorage.writeToNBT(nbt);
 		}
 	}
@@ -319,6 +359,7 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 		if(!descPacket)
 		{
 			tank.readFromNBT(nbt.getCompoundTag("tank"));
+			burnTimer = nbt.getInteger("burnTimer");
 			energyStorage.readFromNBT(nbt);
 		}
 	}
