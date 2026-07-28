@@ -9,8 +9,9 @@ edit invalidates. This is the same answer the **virtual power grid** already giv
 in this fork, applied to millibuckets.
 
 **Status: implemented, not playtested.** The engine, the three fittings, the console, persistence,
-the tick handler, city mode, the config group and `/ie fluidnet` are all in the tree. The engine is
-covered by 29 unit tests. No number in it has been judged in a game.
+the tick handler, city mode, the config group and `/ie fluidnet` are all in the tree, and the model
+is covered the way the virtual grid's is -- engine, main, registry, device, policy, stats, console
+geometry and assets. No number in it has been judged in a game.
 
 Line numbers in this document are a reading aid, not a contract; the tree moves under them.
 
@@ -59,8 +60,16 @@ to exactly three things:
    never carried anything.
 2. **Every transfer names what is moving.** `extractForMain(String fluid, int max, boolean simulate)`
    rather than `extractForGrid(int max, boolean simulate)`.
-3. **A backup main can only cover a shortfall if it carries the same fluid.** Covering a diesel
-   outage out of a water main would be worse than not covering it at all.
+3. **A backup main can only cover a shortfall if it carries the same fluid**, and the fluid a
+   failover delivers is always the *covered* main's, never the backup's. Covering a diesel outage
+   out of a water main would be worse than not covering it at all.
+
+   > That third rule shipped broken once. The engine took its failover fluid from whichever backup
+   > could supply, and a real `TileEntityFluidOutlet` does not check what it is handed -- it fills
+   > its neighbours with whatever the engine names. It survived review because the test suite's
+   > fake endpoint refuses a fluid it does not hold, so the assertion passed while the bug sat
+   > underneath it. There is now a deliberately promiscuous fake for exactly this case; use it
+   > whenever the thing under test is the engine's own fluid discipline.
 
 Everything else — the collect/serve phase ordering, per-device caps, per-main caps, loss on intake,
 priority ordering, critical-load shedding, the failover walk with its cycle guard and depth bound,
@@ -102,6 +111,11 @@ for a virtual network over a pipe run, and it only holds if it is true of every 
 Buffers exactly one tick of intake — it is a doorway, not a tank. It drains the mounted block **by
 fluid stack rather than by amount**, so a fitting bolted to the wrong tank cannot quietly empty
 somebody's water supply.
+
+Its buffer is **guarded against the main's fluid** while the main is typed, and dumped if the main
+is ever re-typed. Without that, a pipe run plumbed to the wrong Inlet fills the buffer with water
+on a diesel main, `extractForMain` never drains it, and the fitting jams shut permanently with no
+way out -- it exposes no drain path by design.
 
 Its capability is **fill-only**. There is deliberately no drain path: an Outlet feeding an Inlet
 through a pipe would launder fluid straight back into the main it left, and the ledger would show a

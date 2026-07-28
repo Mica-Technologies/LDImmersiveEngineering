@@ -713,7 +713,7 @@ economy inside a tech mod would be worse than none.
 Gasoline runs handheld tools and is explicitly refused by the Diesel Generator, which is correct —
 a compression engine cannot burn it — and until now that left the cut with no consumer that scales.
 The Portable Generator burns the **spark-ignition** fuels (gasoline, ethanol) and refuses diesel,
-at 256 Flux/t from a four-bucket tank. It is deliberately small: a thing you carry to a build site
+at 256 Flux/t from a four-bucket tank that lasts about five minutes. It is deliberately small: a thing you carry to a build site
 and walk back to the pump to refill.
 
 ---
@@ -725,6 +725,10 @@ and walk back to the pump to refill.
 
 Two legs, a beam and a one-block bay. It takes empties out of the inventory on one side, fills them,
 and puts them into the inventory on the other.
+
+Both chests stand **in front of the gantry, one against each leg**. They were briefly on opposite
+faces, which is buildable and undiscoverable -- and this machine has no interface to explain itself
+with.
 
 **No GUI, deliberately**: a machine whose whole job is to sit between two chests should be
 configured by where the chests are, and that also means there is no internal inventory to spill

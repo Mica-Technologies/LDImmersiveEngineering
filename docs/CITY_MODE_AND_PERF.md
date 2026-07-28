@@ -774,6 +774,10 @@ before reaching for a config change.
 - **Chunk-load cache invalidation** is deferred and coalesced to one flood per tick instead of one
   per loaded connector — this was the original "TPS drops while flying around" symptom.
 - **Fluid-pipe endpoint cache** clearing is likewise deferred and coalesced.
+- **Fluid-pipe network flood** was O(n²): a list used as a visited set, `remove(0)` on an
+  `ArrayList` every iteration, and neighbours enqueued with no visited check so every pipe was
+  pushed once per adjacent pipe and each duplicate paid for its own tile-entity lookup. A
+  `HashSet` and an `ArrayDeque` make it linear and fetch each pipe exactly once.
 - **Connector endpoint resolution** is cached within a transfer call rather than re-resolved per hop.
 - **Multiblock insertion recipe lookup** is memoised per tick, so a hopper's simulate-then-insert
   probe scans the recipe list once instead of twice.
