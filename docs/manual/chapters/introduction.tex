@@ -1,11 +1,54 @@
 \chapter{What this is}
 \label{ch:introduction}
 
-The mod, this fork, and how to read this manual.
+Immersive Engineering is a technology mod built around the idea that machinery should look like
+machinery. Its power is carried on wires strung between poles, its ore is crushed by a drum you can
+watch turn, and the large machines are structures you assemble block by block rather than single
+cubes that happen to contain a factory.
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
+This manual documents \textbf{LDImmersiveEngineering}, a private fork of that mod for Minecraft
+1.12.2. Everything the original does, this does. On top of it sit four large additions and one
+performance regime, none of which exist upstream:
+
+\begin{description}
+\item[The virtual power grid] Moves Immersive Flux between places with no wire between them.
+      \autoref{ch:grid}.
+\item[Petroleum] A complete oil chain: prospect, drill, refine, store, burn, sell.
+      \autoref{ch:petroleum}.
+\item[The virtual fluid network] The same idea as the grid, for fluid. \autoref{ch:fluidnet}.
+\item[Conduits] Surface-mounted bundled wiring for the inside of buildings. \autoref{ch:conduits}.
+\item[City mode] Trades simulation detail for server tick time, subsystem by subsystem.
+      \autoref{ch:citymode}.
+\end{description}
+
+\section{How to read this}
+
+Part~II is Immersive Engineering as it ships. Part~III is what the fork adds. Part~IV is generated
+straight from the source tree --- every block, every recipe, every configuration option --- and is
+the place to look when you want a number rather than an explanation.
+
+Three kinds of callout appear throughout:
+
+\begin{ietip}
+Something that makes the mod easier, or a habit worth forming early.
+\end{ietip}
+
+\begin{iewarning}
+Something that will cost you a build, a machine or an afternoon if you get it wrong.
+\end{iewarning}
+
+\begin{iefork}
+Behaviour that differs from stock Immersive Engineering. If you already know the mod, these boxes
+are the parts you have to read.
+\end{iefork}
+
+\section{Where the numbers come from}
+
+Every figure in this manual was read out of the source. Where a number is configurable --- and most
+are --- the value quoted is the shipped default, and \autoref{ch:config} lists the option that
+changes it.
+
+\begin{iewarning}
+A modpack may have changed any of them. If a machine in your world does not match a number here,
+check the config before assuming the manual is wrong.
 \end{iewarning}

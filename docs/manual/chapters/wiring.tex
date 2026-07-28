@@ -1,11 +1,86 @@
 \chapter{Wiring}
 \label{ch:wiring}
 
-Connectors, relays, transformers, wire tiers and losses.
+Power in Immersive Engineering travels along wires strung between connectors. The wires sag, they
+have length limits, they lose energy over distance, and at high voltage they will kill you. That is
+the whole character of the mod in one system.
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
+\section{The three tiers}
+
+\begin{center}
+\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Tier & Wire & Max transfer & Loss & Max length \\
+\midrule
+LV & Copper    & 2\,048 IF/t  & 5\,\%   & 16 blocks \\
+MV & Electrum  & 8\,192 IF/t  & 2.5\,\% & 16 blocks \\
+HV & Steel     & 32\,768 IF/t & 2.5\,\% & 32 blocks \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Loss is proportional to how much of the wire's maximum length the run actually uses, so a short HV
+run loses very little and a run at the limit loses the full percentage.
+
+\begin{ietip}
+Insulated copper and insulated electrum carry the same power as their bare versions and do not shock
+anything that touches them. They cost more. On a build people walk through, pay it.
+\end{ietip}
+
+\section{Connectors and relays}
+
+A \textbf{connector} is where a wire meets a machine: it takes power from the block it is attached
+to, or gives power to it. A \textbf{relay} only passes wire to wire --- it is a pole, not a socket
+--- and relays are how you get a line across a distance without a machine at every corner.
+
+\begin{iewarning}
+A connector accepts only its own tier's wire. Attaching the wrong one destroys the connector.
 \end{iewarning}
+
+\section{Transformers}
+
+Step between tiers. An \textbf{LV/MV Transformer} joins a low-voltage side to a medium-voltage one;
+an \textbf{MV/HV Transformer} does the same higher up. Wire the correct tier to each side --- they
+are not symmetrical, and the block's model tells you which side is which.
+
+\section{Wire coils and the wirecutter}
+
+Wire is placed by holding a \textbf{coil} and right-clicking one connector, then the other. The
+\textbf{Engineer's Wirecutter} removes a wire and returns the coil.
+
+\section{Posts and arms}
+
+\textbf{Wooden} and \textbf{Steel Posts} are what you actually string wire between across country.
+Both accept arms, which give you somewhere to mount connectors and transformers off the pole itself.
+
+\section{Breaker switches and meters}
+
+\begin{description}
+\item[Breaker Switch] A manual on/off in a wire run, also switchable by redstone.
+\item[Redstone Breaker] The same, driven by redstone alone.
+\item[Energy Meter] Reports throughput on the line passing through it.
+\item[Current Transformer] Emits a redstone signal proportional to the power flowing.
+\end{description}
+
+\section{Feedthroughs}
+
+An insulator that carries a wire through a wall without breaking the run, so a line can enter a
+building without a connector on each side.
+
+\section{Wire damage}
+
+An energised HV wire damages anything that touches it, and an overloaded wire burns out and drops
+as scrap.
+
+\begin{iefork}
+City mode changes both. Wire burnout is disabled outright, and shock damage becomes local: rather
+than every powered connector broadcasting to the whole network every tick on the chance somebody is
+touching a wire, a node that needs the information asks for it. That single broadcast was the most
+expensive thing the mod did on a profiled server. \autoref{ch:citymode}.
+\end{iefork}
+
+\begin{iefork}
+This fork also offers two alternatives to wire entirely: the virtual grid (\autoref{ch:grid}) for
+distance, and conduits (\autoref{ch:conduits}) for indoors.
+\end{iefork}

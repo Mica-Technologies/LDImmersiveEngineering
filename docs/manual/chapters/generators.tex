@@ -1,11 +1,61 @@
 \chapter{Generators}
 \label{ch:generators}
 
-Water, wind, thermoelectric, diesel and the lightning rod.
+\section{Water Wheel}
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
+Treated wood. Mounted on a \textbf{Dynamo}, turned by flowing water down one side. Output scales
+with how much of the wheel is being driven, and three wheels can share one dynamo.
+
+Cheap, silent, needs no fuel, produces very little. It is the right first generator and never the
+last.
+
+\section{Windmill}
+
+Treated wood on a dynamo again, mounted high and in the open. Output rises with altitude and falls
+if obstructed. The \textbf{Improved Windmill} adds iron sheet metal for a substantial increase.
+
+\begin{ietip}
+Windmills need clear air around them, not merely above them. A windmill in a valley is a decoration.
+\end{ietip}
+
+\section{Thermoelectric Generator}
+
+Two blocks of differing temperature on opposite sides --- classically lava and packed ice, or a
+blaze-adjacent block against a cold one --- and it produces a steady trickle with no moving parts
+and no fuel logistics. The default output multiplier is~1.
+
+Its virtue is that it never stops. Its vice is that it is slow.
+
+\section{Diesel Generator}
+
+The first serious generator: a multiblock burning biodiesel for \textbf{4\,096 IF/t} by default.
+Needs a fluid supply, and rewards a real one.
+
+\begin{iefork}
+The petroleum chain supplies it far better than the biodiesel loop does, and adds several larger
+plants above it, ending at the Gas Turbine. \autoref{ch:petroleum}.
+\end{iefork}
+
+\section{Lightning Rod}
+
+A tall multiblock that captures strikes for \textbf{16\,000\,000 IF} apiece by default. Entirely
+weather-dependent, spectacular, and useless as a base load --- pair it with storage large enough to
+hold a strike or most of it is wasted.
+
+\section{Storage}
+
+\begin{description}
+\item[LV / MV / HV Capacitor] Buffers of increasing size. Each face can be configured to input,
+      output or nothing with a hammer.
+\item[Capacitor Backup] Keeps a capacitor's contents through a chunk unload.
+\end{description}
+
+\begin{iewarning}
+A capacitor with every face set to output will happily drain itself into whatever is adjacent.
+Configure the faces deliberately.
 \end{iewarning}
+
+\begin{iefork}
+City mode makes fuel cosmetic for generators: a presence check and a token sip instead of a per-tick
+burn rate and tank drain. A generator with fuel in it runs; how much is left stops being tracked.
+\end{iefork}

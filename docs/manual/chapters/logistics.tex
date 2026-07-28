@@ -1,11 +1,55 @@
 \chapter{Logistics}
 \label{ch:logistics}
 
-Conveyors, chutes, sorters, posts and item routing.
+\section{Conveyor belts}
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
-\end{iewarning}
+The mod's item transport, and one of the things it is known for: items ride visibly on top rather
+than vanishing into a pipe.
+
+\begin{description}
+\item[Conveyor Belt] Moves items along. Right-click with a hammer to change direction.
+\item[Uncontrolled] Does not stop items at the end --- they fall off.
+\item[Dropper] Drops items through the block beneath.
+\item[Vertical] Carries items upward.
+\item[Extract / Insert] Pull from and push into adjacent inventories.
+\item[Splitter] Alternates output between two directions.
+\item[Chute] A vertical shaft. Fast, and made of any sheet metal.
+\end{description}
+
+\begin{ietip}
+Belts can be covered with any block, so a line can run through a wall or under a floor and still be
+watched where you want it seen.
+\end{ietip}
+
+\section{Sorting}
+
+\begin{description}
+\item[Item Router] Six outputs, each with its own filter. The workhorse.
+\item[Fluid Sorter] The same, for fluid.
+\end{description}
+
+\section{Storage}
+
+\begin{description}
+\item[Wooden Crate] Keeps its contents when broken, so it doubles as a moving box.
+\item[Reinforced Crate] Lockable to its owner.
+\item[Toolbox] A portable container for tools, food and ammunition.
+\end{description}
+
+\section{Posts and scaffolding}
+
+\textbf{Wooden} and \textbf{Steel Scaffolding} climb like ladders and are the mod's structural
+vocabulary. \textbf{Posts} carry wire across country and take arms for mounting hardware.
+
+\section{Redstone}
+
+\begin{description}
+\item[Redstone Wire Connector] Carries a redstone signal along a wire.
+\item[Breaker Switch] A lever in a power line.
+\item[Current Transformer] A redstone signal proportional to power flowing.
+\end{description}
+
+\begin{iefork}
+Conduits carry redstone too, on any of their sixteen channels, alongside power in the same bundle.
+\autoref{ch:conduits}.
+\end{iefork}

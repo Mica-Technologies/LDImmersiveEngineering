@@ -1,11 +1,63 @@
 \chapter{Multiblocks}
 \label{ch:multiblocks}
 
-Every assembled structure, its shape and its recipe.
+Every structure here is built by placing its blocks in the right shape and then striking it with an
+Engineer's Hammer. The in-game manual renders each one as a rotating diagram; \autoref{ch:ingame}
+carries the text, and the exact block lists are in \autoref{ch:blocks}.
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
-\end{iewarning}
+\begin{ietip}
+Build multiblocks with the hammer already in your hand and the manual page open. Almost every failed
+assembly is one block in the wrong place, and the diagram will show you which.
+\end{ietip}
+
+\section{Processing}
+
+\begin{description}
+\item[Coke Oven] $3\times3\times3$. Coal to coal coke and creosote oil. Needs no power.
+\item[Blast Furnace] $3\times3\times3$. Iron to steel, with slag. Needs no power.
+\item[Advanced Blast Furnace] Faster, and accepts a Preheater for more speed still.
+\item[Alloy Smelter] Combines two metals. Needs no power.
+\item[Crusher] Doubles ore, and grinds a great many other things. The first machine most players
+      build that visibly pays for itself.
+\item[Arc Furnace] Recycles, alloys and processes ores further than the Crusher can. Consumes
+      graphite electrodes, which wear out.
+\item[Metal Press] Ingots to plates, rods and wire with a mould. Cheap to run and enormously
+      cheaper than hammering.
+\item[Squeezer] Presses seeds to plant oil, and other things besides.
+\item[Fermenter] Ferments crops to ethanol.
+\item[Refinery] Plant oil and ethanol to biodiesel.
+\item[Mixer] Combines fluids with items --- concrete, most importantly.
+\item[Bottling Machine] Fills containers with a fluid.
+\item[Auto Workbench] Automates blueprint crafting.
+\item[Assembler] Automates ordinary crafting from up to three recipes at once, pulling from a
+      shared inventory.
+\end{description}
+
+\section{Mining}
+
+\begin{description}
+\item[Excavator] The largest structure in the mod. Digs a mineral vein located by Sample Drill,
+      producing ore in quantity until the vein depletes. Consumes \textbf{4\,096 IF/t} by default.
+\item[Bucket Wheel] The visible half of the Excavator, and the reason it is worth building where
+      people can see it.
+\end{description}
+
+\section{Storage and power}
+
+\begin{description}
+\item[Sheetmetal Tank] A $5\times5\times5$ vessel holding 512\,000\,mB.
+\item[Silo] The same idea for solid items.
+\item[Diesel Generator] \autoref{ch:generators}.
+\item[Lightning Rod] \autoref{ch:generators}.
+\end{description}
+
+\begin{iefork}
+The fork adds several: the Grid Management Console and Substation (\autoref{ch:grid}), the Fluid
+Control Console (\autoref{ch:fluidnet}), and the whole petroleum chain --- Derrick, Cracking Unit,
+Loading Gantry, the buried tanks and the free-form Storage Tank (\autoref{ch:petroleum}).
+\end{iefork}
+
+\begin{iefork}
+City mode stops idle multiblocks re-scanning the recipe list every tick and widens the scan interval
+for the rest. A room full of idle machines is close to free.
+\end{iefork}

@@ -1,11 +1,77 @@
 \chapter{Getting started}
 \label{ch:getting-started}
 
-Hammer, ore, coke oven, first power.
+Immersive Engineering does not begin with a machine. It begins with a hammer and a fire.
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
+\section{The Engineer's Hammer}
+
+Three iron ingots and two sticks. It is the mod's universal tool and you will never stop carrying
+one:
+
+\begin{itemize}
+\item \textbf{Assembles multiblocks.} Every structure in \autoref{ch:multiblocks} is built by
+      placing its blocks and then striking one of them.
+\item \textbf{Rotates blocks.} Right-click most machines to turn them.
+\item \textbf{Configures sides.} Sneak-right-click a machine face to cycle what that side does.
+\item \textbf{Dismantles.} Takes a multiblock apart into its parts.
+\end{itemize}
+
+\section{The Engineer's Manual}
+
+One book and one lever. It is the in-game version of this document, and it updates itself as you
+obtain things. \autoref{ch:ingame} reproduces it in full.
+
+\section{Treated wood}
+
+Creosote oil in a barrel or a Bottling Machine turns planks into \textbf{treated wood}, which
+resists weather and is the base of almost everything early. You get creosote from the coke oven, so
+the coke oven comes first.
+
+\section{The Coke Oven}
+
+A $3\times3\times3$ of Coke Bricks. Turns coal into \textbf{coal coke} and \textbf{creosote oil},
+both of which you need continuously:
+
+\begin{itemize}
+\item Coal coke burns longer than coal and is the fuel for the Blast Furnace.
+\item Creosote oil treats wood and, later, is a Squeezer input.
+\end{itemize}
+
+\begin{ietip}
+Build two. The oven is slow, both outputs are consumed constantly, and the second one costs almost
+nothing next to the time it saves.
+\end{ietip}
+
+\section{The Blast Furnace}
+
+A $3\times3\times3$ of Blast Bricks. Iron plus coal coke gives \textbf{steel}, which is the material
+the entire middle of the mod is built from. It also produces \textbf{slag}, a Blast Brick
+ingredient, so the furnace partly pays for its own expansion.
+
+The \textbf{Advanced Blast Furnace} is the upgrade: faster, and it accepts external heating from a
+Blast Furnace Preheater.
+
+\section{Your first power}
+
+Immersive Engineering measures power in \textbf{Immersive Flux (IF)}, which is Forge Energy under
+another name --- it interoperates with RF and FE at one to one.
+
+The cheapest start is a \textbf{Water Wheel} or a \textbf{Windmill}: both are built from treated
+wood, need no fuel and produce a trickle. Put a \textbf{Dynamo} behind the wheel, an \textbf{LV
+Connector} on the dynamo, and run copper wire to whatever needs it.
+
+\begin{iewarning}
+Wires are not decorative. Walking into an energised HV wire will hurt you, and connecting a wire to
+a connector of the wrong tier will destroy it. See \autoref{ch:wiring}.
 \end{iewarning}
+
+\section{The order most people build in}
+
+\begin{enumerate}
+\item Hammer, manual, coke oven.
+\item Treated wood, then a water wheel or windmill for a first trickle of power.
+\item Blast furnace, then steel.
+\item Crusher, for doubled ore.
+\item Metal Press, for cheap plates and rods --- this is the point the mod starts paying you back.
+\item Diesel generator or one of the fork's power plants (\autoref{ch:petroleum}) for real output.
+\end{enumerate}

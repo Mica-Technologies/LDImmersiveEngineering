@@ -1,11 +1,52 @@
 \chapter{Machines}
 \label{ch:machines}
 
-The single-block devices and what each is for.
+The single-block devices. Everything here is placed, powered and used on its own; the assembled
+structures are in \autoref{ch:multiblocks}.
 
-egin{iewarning}
-This chapter is not written yet. The reference tables in Part~IV already cover this
-material completely and are generated from the source, so nothing here is missing
-from the manual as a whole --- what is missing is the prose that explains it.
-See utoref{ch:blocks}, utoref{ch:recipes} and utoref{ch:ingame}.
-\end{iewarning}
+\section{Powered}
+
+\begin{description}
+\item[Sample Drill] Takes a core sample of the chunk, telling you what mineral vein is beneath it.
+      The prerequisite for an Excavator.
+\item[Charging Station] Charges tools, armour and any item that holds flux.
+\item[Fluid Pump] Moves fluid through pipes, and is what makes a pipe network do anything.
+\item[Fluid Placer] Places fluid into the world as a source block.
+\item[Garden Cloche (Belljar)] Grows a crop in a glass jar from water and fertiliser. Slow, tidy,
+      and entirely automatic.
+\item[Floodlight] A directional lamp. Expensive to run and the brightest light in the mod.
+\item[Turret (Gun / Chemical)] An automated defence, configurable by owner and target type.
+\item[Tesla Coil] Damages entities in a radius. Genuinely dangerous to its owner.
+\item[Electric Lantern] A small lamp. Cheap enough to use in quantity.
+\end{description}
+
+\begin{iefork}
+City mode caps how many light blocks a Floodlight may place and stops it re-tracing its beams on a
+timer --- it re-traces only when the light switches or a neighbour changes. Floodlights are usually
+the most expensive block in a city build.
+\end{iefork}
+
+\section{Unpowered}
+
+\begin{description}
+\item[Wooden Barrel] Holds fluid, and is where creosote treats wood by hand.
+\item[Wooden Crate] Storage that keeps its contents when broken.
+\item[Reinforced Crate] The same, lockable.
+\item[Workbench] Where blueprints are used and tools are modified.
+\item[Item Router] Sorts items by filter into up to six outputs.
+\item[Fluid Sorter] The same for fluid.
+\item[Redstone Wire Connector] Carries a redstone signal down a wire rather than along the ground.
+\end{description}
+
+\section{Fluid pipes}
+
+Steel pipes carrying fluid between machines. They connect automatically, can be covered with sheet
+metal to hide them, and need a Fluid Pump to move anything.
+
+\begin{iefork}
+Two changes here. The pipe network's flood fill was rewritten --- it used a linear scan for its
+closed set and removed from the head of a list for its open set, which is quadratic on a large tank
+farm --- and city mode lets a pipe hand its fluid to endpoints in order rather than simulating a
+fill against every one of them and splitting in proportion. Nothing is created or destroyed; only
+which of several tanks fills first changes.
+\end{iefork}
