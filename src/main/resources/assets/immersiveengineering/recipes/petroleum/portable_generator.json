@@ -1,0 +1,27 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_device",
+		"data": 8
+	},
+	"pattern": [
+		"SPS",
+		"CEC",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"P": {
+			"item": "immersiveengineering:metal_device1",
+			"data": 6
+		},
+		"C": {
+			"item": "#copperCoil"
+		},
+		"E": {
+			"item": "#componentSteel"
+		}
+	}
+}

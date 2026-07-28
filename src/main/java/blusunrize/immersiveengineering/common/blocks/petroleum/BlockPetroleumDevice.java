@@ -76,6 +76,12 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 				return new TileEntityLubricationManifold();
 			case FLARE_STACK:
 				return new TileEntityFlareStack();
+			case GAS_PUMP:
+				return new TileEntityGasPump();
+			case FORECOURT_SIGN:
+				return new TileEntityForecourtSign();
+			case PORTABLE_GENERATOR:
+				return new TileEntityPortableGenerator();
 			case OILFIELD_FRAME:
 			case TANK_FILL_CAP:
 				//Inert on its own; it only matters as part of an assembled structure.

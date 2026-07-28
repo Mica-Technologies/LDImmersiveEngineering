@@ -1,0 +1,23 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_device",
+		"data": 7
+	},
+	"pattern": [
+		"SGS",
+		"SGS",
+		" R "
+	],
+	"key": {
+		"S": {
+			"item": "#plateIron"
+		},
+		"G": {
+			"item": "#paneGlass"
+		},
+		"R": {
+			"item": "#stickTreatedWood"
+		}
+	}
+}

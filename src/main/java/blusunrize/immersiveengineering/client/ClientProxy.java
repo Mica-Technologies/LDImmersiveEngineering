@@ -63,6 +63,7 @@ import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorVer
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorChute;
 import blusunrize.immersiveengineering.common.blocks.multiblocks.*;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDecoration;
+import blusunrize.immersiveengineering.common.blocks.petroleum.TileEntityGasPump;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDevice;
 import blusunrize.immersiveengineering.common.blocks.stone.*;
 import blusunrize.immersiveengineering.common.blocks.wooden.*;
@@ -1422,6 +1423,8 @@ public class ClientProxy extends CommonProxy
 					gui = new GuiGridDevice(player.inventory, (TileEntityGridDevice)te);
 				if(ID==Lib.GUIID_FluidConsole&&te instanceof TileEntityFluidConsole)
 					gui = new GuiFluidConsole(player.inventory, (TileEntityFluidConsole)te);
+				if(ID==Lib.GUIID_GasPump&&te instanceof TileEntityGasPump)
+					gui = new GuiGasPump(player.inventory, (TileEntityGasPump)te);
 				if(gui!=null)
 					((IGuiTile)te).onGuiOpened(player, true);
 				return gui;

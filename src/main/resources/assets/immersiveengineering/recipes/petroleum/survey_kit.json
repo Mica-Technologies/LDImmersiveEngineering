@@ -1,0 +1,26 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum",
+		"data": 5
+	},
+	"pattern": [
+		"SGS",
+		"CRC",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateIron"
+		},
+		"G": {
+			"item": "#paneGlass"
+		},
+		"C": {
+			"item": "#componentIron"
+		},
+		"R": {
+			"item": "#dustRedstone"
+		}
+	}
+}

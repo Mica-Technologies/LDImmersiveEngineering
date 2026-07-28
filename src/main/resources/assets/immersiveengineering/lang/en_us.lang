@@ -1858,3 +1858,15 @@ tile.immersiveengineering.fluidnet_device.main_valve.name=Main Valve
 tile.immersiveengineering.fluidnet_device.console_housing.name=Fluid Console Housing
 tile.immersiveengineering.fluidnet_multiblock.fluid_console.name=Fluid Control Console
 chat.immersiveengineering.info.fluidnet.consoleUnformed=Arrange four Fluid Console Housings in a 2x2 wall, then strike the front face with an Engineer's Hammer.
+
+#Petroleum -- stations
+tile.immersiveengineering.petroleum_device.gas_pump.name=Gas Station Pump
+tile.immersiveengineering.petroleum_device.forecourt_sign.name=Forecourt Price Sign
+tile.immersiveengineering.petroleum_device.portable_generator.name=Portable Generator
+tile.immersiveengineering.petroleum_decoration.forecourt_canopy.name=Forecourt Canopy
+item.immersiveengineering.petroleum.nozzle.name=Fuel Nozzle
+item.immersiveengineering.petroleum.drill_pipe.name=Drill Pipe
+item.immersiveengineering.petroleum.blowout_preventer.name=Blowout Preventer
+item.immersiveengineering.petroleum.absorbent_pad.name=Absorbent Pad
+item.immersiveengineering.petroleum.petcoke.name=Petroleum Coke
+item.immersiveengineering.petroleum.survey_kit.name=Seismic Survey Kit

@@ -14,6 +14,9 @@
 		"inventory,type=asphalt_marked": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt_marked"}
 		}],
+		"inventory,type=forecourt_canopy": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_canopy"}
+		}],
 		"type": {
 			"asphalt": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt"}
@@ -23,6 +26,9 @@
 			},
 			"asphalt_marked": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_asphalt_marked"}
+			},
+			"forecourt_canopy": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_canopy"}
 			}
 		}
 	}

@@ -1,0 +1,17 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum",
+		"data": 3,
+		"count": 8
+	},
+	"pattern": [
+		"WW",
+		"WW"
+	],
+	"key": {
+		"W": {
+			"item": "#fiberHemp"
+		}
+	}
+}

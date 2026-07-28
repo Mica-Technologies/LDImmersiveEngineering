@@ -1,0 +1,27 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_device",
+		"data": 6
+	},
+	"pattern": [
+		"SGS",
+		"PCP",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"G": {
+			"item": "#paneGlass"
+		},
+		"P": {
+			"item": "immersiveengineering:metal_device1",
+			"data": 6
+		},
+		"C": {
+			"item": "#componentSteel"
+		}
+	}
+}

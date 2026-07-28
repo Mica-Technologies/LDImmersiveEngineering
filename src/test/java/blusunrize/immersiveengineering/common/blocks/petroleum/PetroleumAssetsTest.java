@@ -362,6 +362,13 @@ class PetroleumAssetsTest
 			for(BlockTypes_PetroleumMultiblock type : BlockTypes_PetroleumMultiblock.values())
 				multiMetas.add(type.getMeta());
 			validMetas.put("immersiveengineering:petroleum_multiblock", multiMetas);
+			//The loose items are not a block enum, so their metas come from the shared name table
+			//rather than from a count written out here -- a hard-coded range would go stale the
+			//first time an item was appended, which is precisely when this check matters.
+			Set<Integer> itemMetas = new HashSet<>();
+			for(int meta = 0; meta < blusunrize.immersiveengineering.common.items.PetroleumItemNames.SUB_NAMES.length; meta++)
+				itemMetas.add(meta);
+			validMetas.put("immersiveengineering:petroleum", itemMetas);
 
 			for(String file : recipeFiles())
 			{

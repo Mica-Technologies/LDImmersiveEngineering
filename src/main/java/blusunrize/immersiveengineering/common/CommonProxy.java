@@ -20,6 +20,7 @@ import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.fluidnet.TileEntityFluidConsole;
+import blusunrize.immersiveengineering.common.blocks.petroleum.TileEntityGasPump;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridConsole;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
 import blusunrize.immersiveengineering.common.blocks.metal.*;
@@ -166,6 +167,8 @@ public class CommonProxy implements IGuiHandler
 					gui = new ContainerGridDevice(player.inventory, (TileEntityGridDevice)te);
 				if(ID==Lib.GUIID_FluidConsole&&te instanceof TileEntityFluidConsole)
 					gui = new ContainerFluidConsole(player.inventory, (TileEntityFluidConsole)te);
+				if(ID==Lib.GUIID_GasPump&&te instanceof TileEntityGasPump)
+					gui = new ContainerGasPump(player.inventory, (TileEntityGasPump)te);
 				if(gui!=null)
 					((IGuiTile)te).onGuiOpened(player, false);
 				return gui;

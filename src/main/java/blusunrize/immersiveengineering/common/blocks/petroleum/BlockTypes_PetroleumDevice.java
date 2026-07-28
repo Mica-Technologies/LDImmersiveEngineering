@@ -46,7 +46,19 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	 * The one fitting a buried tank shows above ground: what a pipe connects to, what a comparator
 	 * reads, and the whole of the tank's gauge.
 	 */
-	TANK_FILL_CAP;
+	TANK_FILL_CAP,
+	/**
+	 * The forecourt bowser: hands fuel to a person rather than to a machine.
+	 */
+	GAS_PUMP,
+	/**
+	 * The price board, read from the road.
+	 */
+	FORECOURT_SIGN,
+	/**
+	 * A generator you carry to the job and refuel at the pump.
+	 */
+	PORTABLE_GENERATOR;
 
 	@Override
 	public String getName()

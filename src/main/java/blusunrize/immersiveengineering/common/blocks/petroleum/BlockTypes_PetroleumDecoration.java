@@ -37,7 +37,11 @@ public enum BlockTypes_PetroleumDecoration implements IStringSerializable, Block
 	/**
 	 * Carries a painted lane marking.
 	 */
-	ASPHALT_MARKED;
+	ASPHALT_MARKED,
+	/**
+	 * The forecourt roof: a clean panel with a lit underside, so a station reads as a station.
+	 */
+	FORECOURT_CANOPY;
 
 	@Override
 	public String getName()

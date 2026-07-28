@@ -203,6 +203,7 @@ public class IEContent
 	public static ItemIEBase itemDrill;
 	public static ItemIEBase itemDrillhead;
 	public static ItemIEBase itemJerrycan;
+	public static ItemIEBase itemPetroleum;
 	public static ItemIEBase itemMold;
 	public static ItemIEBase itemBlueprint;
 	public static ItemIEBase itemRevolver;
@@ -389,6 +390,7 @@ public class IEContent
 		itemDrill = new ItemDrill();
 		itemDrillhead = new ItemDrillhead();
 		itemJerrycan = new ItemJerrycan();
+		itemPetroleum = new ItemPetroleum();
 		itemMold = new ItemIEBase("mold", 1, "plate", "gear", "rod", "bullet_casing", "wire", "packing4", "packing9", "unpacking");
 		itemBlueprint = new ItemEngineersBlueprint().setRegisterSubModels(false);
 		BlueprintCraftingRecipe.itemBlueprint = itemBlueprint;
@@ -835,6 +837,9 @@ public class IEContent
 		registerTile(TileEntityDomesticTank.class);
 		registerTile(TileEntityCommercialTank.class);
 		registerTile(TileEntityBulkDepot.class);
+		registerTile(TileEntityGasPump.class);
+		registerTile(TileEntityForecourtSign.class);
+		registerTile(TileEntityPortableGenerator.class);
 
 
 

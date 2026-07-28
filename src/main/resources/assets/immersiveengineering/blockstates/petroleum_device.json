@@ -23,6 +23,15 @@
 		"inventory,type=tank_fill_cap": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
 		}],
+		"inventory,type=gas_pump": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_gas_pump"}
+		}],
+		"inventory,type=forecourt_sign": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_forecourt_sign"}
+		}],
+		"inventory,type=portable_generator": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_portable_generator"}
+		}],
 		"inventory,type=wellhead": [{
 			"model": "immersiveengineering:petroleum/wellhead",
 			"textures": {
@@ -45,6 +54,15 @@
 			},
 			"tank_fill_cap": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
+			},
+			"gas_pump": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_gas_pump"}
+			},
+			"forecourt_sign": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_forecourt_sign"}
+			},
+			"portable_generator": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_portable_generator"}
 			},
 			"wellhead": {
 				"model": "immersiveengineering:petroleum/wellhead",

@@ -106,6 +106,7 @@ def main():
     write_blocks(BLOCK_DIR)
     write_roads(BLOCK_DIR)
     write_extra(BLOCK_DIR)
+    write_stations(BLOCK_DIR, ITEM_DIR)
 
 
 # ---------------------------------------------------------------------------
@@ -524,3 +525,199 @@ def write_extra(out_dir):
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Stations (P7). Same palette discipline as everything above; the forecourt is
+# meant to read as the tidy, public-facing end of an industry that is otherwise
+# all rust and scaffolding, so these lean on PALE rather than STEEL.
+# ---------------------------------------------------------------------------
+def gas_pump():
+    """Bowser face: a meter window over a fuel-grade band."""
+    img = _blank(PALE)
+    px = img.load()
+    _rect(px, 1, 1, 14, 14, PALE_DARK)
+    _rect(px, 2, 2, 13, 6, GLASS)
+    # The mechanical digits. Four dark blocks reading as a meter, which is the one
+    # feature that says "pump" rather than "cabinet" at a distance.
+    for x in (3, 6, 9, 12):
+        _rect(px, x, 3, x, 5, OUTLINE)
+    _rect(px, 2, 8, 13, 9, ORANGE)
+    _rect(px, 2, 11, 13, 12, PALE)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _rect(px, 0, 0, 0, 15, OUTLINE)
+    _rect(px, 15, 0, 15, 15, OUTLINE)
+    return img
+
+
+def forecourt_sign():
+    """Price board: a dark field for the digits with a lit border."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 1, 1, 14, 14, OUTLINE)
+    _rect(px, 2, 3, 13, 12, (12, 14, 12, 255))
+    # Two rows of "digits", implied rather than drawn -- the real number is the
+    # block's overlay text, and a texture that showed a fixed price would contradict it.
+    for y in (5, 9):
+        for x in (3, 5, 8, 11):
+            _rect(px, x, y, x+1, y+2, ORANGE)
+    _rect(px, 1, 1, 14, 1, PALE_DARK)
+    return img
+
+
+def portable_generator():
+    """A small engine on a frame: pull cord, muffler, filler cap."""
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    _rect(px, 1, 4, 14, 13, ORANGE_MUTED)
+    _rect(px, 1, 4, 14, 4, STEEL_LIT)
+    # Filler cap on top, which is where the nozzle goes.
+    _rect(px, 5, 1, 9, 3, STEEL)
+    _dots(px, [(6, 2), (8, 2)], BOLT)
+    # Muffler down the right-hand side.
+    _rect(px, 11, 6, 13, 11, STEEL_DARK)
+    _rect(px, 11, 6, 13, 6, STEEL)
+    # Pull cord.
+    _rect(px, 3, 7, 3, 11, BOLT)
+    _rect(px, 2, 11, 5, 11, BOLT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    return img
+
+
+def forecourt_canopy():
+    """Roof panel: pale cladding with a lit seam, seen from below."""
+    img = _blank(PALE)
+    px = img.load()
+    for x in range(0, 16, 4):
+        _rect(px, x, 0, x, 15, PALE_DARK)
+    _rect(px, 0, 7, 15, 8, (250, 250, 235, 255))
+    _rect(px, 0, 0, 15, 0, PALE_DARK)
+    _rect(px, 0, 15, 15, 15, PALE_DARK)
+    return img
+
+
+STATION_BLOCKS = {
+    "petroleum_gas_pump": gas_pump,
+    "petroleum_forecourt_sign": forecourt_sign,
+    "petroleum_portable_generator": portable_generator,
+    "petroleum_canopy": forecourt_canopy,
+}
+
+
+# ---------------------------------------------------------------------------
+# Loose items. 16x16 with transparent margins, unlike the block set: an item
+# texture that fills its square reads as a tile rather than an object.
+# ---------------------------------------------------------------------------
+def _item_blank():
+    from PIL import Image as _I
+    return _I.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+
+def item_nozzle():
+    """Fuel nozzle: a pistol grip and a spout."""
+    img = _item_blank()
+    px = img.load()
+    _rect(px, 4, 3, 6, 10, STEEL)
+    _rect(px, 4, 3, 6, 3, STEEL_LIT)
+    _rect(px, 7, 4, 12, 5, STEEL_DARK)
+    _rect(px, 11, 2, 12, 4, STEEL)
+    _rect(px, 5, 10, 7, 13, ORANGE)
+    _dots(px, [(5, 6), (5, 8)], BOLT)
+    return img
+
+
+def item_drill_pipe():
+    """A length of casing, threaded at both ends."""
+    img = _item_blank()
+    px = img.load()
+    _rect(px, 6, 1, 9, 14, STEEL)
+    _rect(px, 6, 1, 6, 14, STEEL_LIT)
+    _rect(px, 9, 1, 9, 14, STEEL_DARK)
+    for y in (2, 3, 12, 13):
+        _rect(px, 5, y, 10, y, BOLT)
+    return img
+
+
+def item_blowout_preventer():
+    """A stack of rams with a hand wheel: the thing that stops a gusher."""
+    img = _item_blank()
+    px = img.load()
+    _rect(px, 4, 4, 11, 12, STEEL_DARK)
+    _rect(px, 4, 4, 11, 4, STEEL)
+    _rect(px, 3, 6, 12, 7, VALVE_RED)
+    _rect(px, 3, 9, 12, 10, VALVE_RED)
+    _rect(px, 6, 1, 9, 3, STEEL)
+    _rect(px, 5, 2, 10, 2, BOLT)
+    return img
+
+
+def item_absorbent_pad():
+    """A folded mat, stained at one corner."""
+    img = _item_blank()
+    px = img.load()
+    _rect(px, 2, 4, 13, 12, (222, 214, 190, 255))
+    _rect(px, 2, 4, 13, 4, (240, 234, 214, 255))
+    _rect(px, 2, 12, 13, 12, (176, 168, 146, 255))
+    _rect(px, 9, 8, 13, 12, (52, 42, 34, 255))
+    _rect(px, 2, 8, 13, 8, (176, 168, 146, 255))
+    return img
+
+
+def item_petcoke():
+    """A lump of green coke: dull, angular, obviously fuel."""
+    img = _item_blank()
+    px = img.load()
+    _rect(px, 4, 4, 11, 11, (44, 42, 44, 255))
+    _rect(px, 3, 6, 12, 9, (44, 42, 44, 255))
+    _rect(px, 5, 5, 8, 6, (72, 68, 72, 255))
+    _dots(px, [(6, 8), (9, 7), (7, 10)], (96, 92, 96, 255))
+    _dots(px, [(4, 10), (11, 5)], (26, 24, 26, 255))
+    return img
+
+
+def item_survey_kit():
+    """A geophone and a case: the thing that reads the ground before you drill."""
+    img = _item_blank()
+    px = img.load()
+    _rect(px, 2, 6, 13, 13, ORANGE_MUTED)
+    _rect(px, 2, 6, 13, 6, ORANGE)
+    _rect(px, 2, 13, 13, 13, OUTLINE)
+    _rect(px, 4, 8, 11, 11, (12, 14, 12, 255))
+    _rect(px, 5, 9, 10, 9, (108, 214, 108, 255))
+    # The spike, stowed on the lid.
+    _rect(px, 7, 2, 8, 5, STEEL)
+    _rect(px, 6, 4, 9, 4, BOLT)
+    return img
+
+
+STATION_ITEMS = {
+    "petroleum_nozzle": item_nozzle,
+    "petroleum_drill_pipe": item_drill_pipe,
+    "petroleum_blowout_preventer": item_blowout_preventer,
+    "petroleum_absorbent_pad": item_absorbent_pad,
+    "petroleum_petcoke": item_petcoke,
+    "petroleum_survey_kit": item_survey_kit,
+}
+
+ITEM_DIR = os.path.join("src", "main", "resources", "assets", "immersiveengineering",
+                        "textures", "items")
+
+# Deliberately NOT redefining PALE, PALE_DARK or GLASS: they are already set above and
+# the Steam Turbine Hall's cladding uses them. Shadowing them here would silently repaint
+# a texture this section has nothing to do with.
+ORANGE_MUTED = (186, 96, 40, 255)
+
+
+def write_stations(block_dir=None, item_dir=None):
+    block_dir = block_dir or BLOCK_DIR
+    item_dir = item_dir or ITEM_DIR
+    for name, builder in sorted(STATION_BLOCKS.items()):
+        path = os.path.join(block_dir, name+".png")
+        builder().save(path, "PNG", optimize=True)
+        print("wrote", path)
+    for name, builder in sorted(STATION_ITEMS.items()):
+        path = os.path.join(item_dir, name+".png")
+        builder().save(path, "PNG", optimize=True)
+        print("wrote", path)
