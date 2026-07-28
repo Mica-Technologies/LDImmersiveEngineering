@@ -89,6 +89,11 @@ public class Config
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModeWires = true;
 
+		@Comment({"City mode: fluid pipes. A pipe hands its fluid to the endpoints on its network in order until the fluid runs out, instead of simulating a fill against every one of them and then splitting the resource between them in proportion to what each asked for.",
+				"That halves the capability calls per fill and drops the per-fill list and map allocation. Transfer limits still apply and nothing is created or destroyed -- the only difference a player could observe is which of several tanks fills first.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModePipes = true;
+
 		@Comment({"City mode: floodlights. Skips the periodic re-scan of the light beams, recomputing only when the light actually switches or a neighbouring block changes, and caps how many light blocks a single floodlight may place.",
 				"Floodlights are usually the most expensive block in a city build because each one places a number of individually ticking light blocks and periodically re-traces 13 beams and recalculates lighting.",
 				"Only applies when cityMode is enabled."})

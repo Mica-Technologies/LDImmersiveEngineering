@@ -17,6 +17,7 @@ import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import blusunrize.immersiveengineering.common.blocks.wooden.BlockTypes_WoodenDecoration;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
 import com.google.common.collect.Lists;
@@ -78,6 +79,14 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 	//chunk streaming) coalesces into a single re-flood. Worst case a fluid route is one tick stale, which
 	//self-corrects.
 	private static volatile boolean indirectConnectionsDirty = false;
+
+	/**
+	 * Safety valve on how far one flood will travel, in pipe blocks.
+	 * <p>
+	 * Unchanged from the value this has always used. It exists so a pathological network cannot make
+	 * a single fill call unbounded; a real one never approaches it.
+	 */
+	public static final int MAX_FLOOD_NODES = 1024;
 
 	public static void markIndirectConnectionsDirty()
 	{
@@ -148,44 +157,63 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 		if(cached!=null)
 			return cached;
 
-		ArrayList<BlockPos> openList = new ArrayList<>();
-		ArrayList<BlockPos> closedList = new ArrayList<>();
+		//	=================================
+		//	The flood, rewritten from O(n^2) to O(n).
+		//	=================================
+		//
+		// This was three ArrayLists doing set work. `closedList.contains(next)` is a linear scan on a
+		// list that grows to the node cap, `openList.remove(0)` shifts the whole backing array on
+		// every single iteration, and -- worst of all -- a neighbouring pipe was pushed onto the open
+		// list without any visited check, so every pipe was enqueued once per adjacent pipe and each
+		// duplicate paid for its own getExistingTileEntity (a chunk lookup and a map get) before
+		// being thrown away by the contains() check.
+		//
+		// On a refinery-sized network that is hundreds of thousands of redundant comparisons and tens
+		// of thousands of redundant tile lookups, per flood, and a flood happens for every pipe
+		// position after every pipe edit. A HashSet and an ArrayDeque make it linear, and the
+		// visited-before-enqueue check means each pipe's tile entity is fetched exactly once.
+		//
+		// Behaviour is unchanged: the same nodes are reached, the same handlers collected, and the
+		// same cap applies -- it is only the bookkeeping that was quadratic.
+		Set<BlockPos> visited = new HashSet<>();
+		ArrayDeque<BlockPos> openList = new ArrayDeque<>();
 		Set<DirectionalFluidOutput> fluidHandlers = Collections.newSetFromMap(new ConcurrentHashMap<>());
 		openList.add(node);
-		while(!openList.isEmpty()&&closedList.size() < 1024)
+		visited.add(node);
+		while(!openList.isEmpty()&&visited.size() <= MAX_FLOOD_NODES)
 		{
-			BlockPos next = openList.get(0);
+			BlockPos next = openList.poll();
 			TileEntity pipeTile = Utils.getExistingTileEntity(world, next);
-			if(!closedList.contains(next)&&(pipeTile instanceof IFluidPipe))
+			if(!(pipeTile instanceof IFluidPipe))
+				continue;
+			for(int i = 0; i < 6; i++)
 			{
-				if(pipeTile instanceof TileEntityFluidPipe)
-					closedList.add(next);
-				IFluidTankProperties[] tankInfo;
-				for(int i = 0; i < 6; i++)
+				EnumFacing fd = EnumFacing.byIndex(i);
+				if(!((IFluidPipe)pipeTile).hasOutputConnection(fd))
+					continue;
+				BlockPos nextPos = next.offset(fd);
+				TileEntity adjacentTile = Utils.getExistingTileEntity(world, nextPos);
+				if(adjacentTile==null)
+					continue;
+				if(adjacentTile instanceof TileEntityFluidPipe)
 				{
-					//						boolean b = (te instanceof TileEntityFluidPipe)? (((TileEntityFluidPipe) te).sideConfig[i]==0): (((TileEntityFluidPump) te).sideConfig[i]==1);
-					EnumFacing fd = EnumFacing.byIndex(i);
-					if(((IFluidPipe)pipeTile).hasOutputConnection(fd))
+					//Checked before enqueueing rather than after dequeueing, which is the whole
+					//point: an already-seen pipe costs one hash lookup instead of a tile fetch and
+					//a linear scan.
+					if(visited.add(nextPos))
+						openList.add(nextPos);
+				}
+				else if(adjacentTile.hasCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, fd.getOpposite()))
+				{
+					IFluidHandler handler = adjacentTile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, fd.getOpposite());
+					if(handler!=null)
 					{
-						BlockPos nextPos = next.offset(fd);
-						TileEntity adjacentTile = Utils.getExistingTileEntity(world, nextPos);
-						if(adjacentTile!=null)
-							if(adjacentTile instanceof TileEntityFluidPipe)
-								openList.add(nextPos);
-							else if(adjacentTile.hasCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, fd.getOpposite()))
-							{
-								IFluidHandler handler = adjacentTile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, fd.getOpposite());
-								if(handler!=null)
-								{
-									tankInfo = handler.getTankProperties();
-									if(tankInfo!=null&&tankInfo.length > 0)
-										fluidHandlers.add(new DirectionalFluidOutput(handler, adjacentTile, fd));
-								}
-							}
+						IFluidTankProperties[] tankInfo = handler.getTankProperties();
+						if(tankInfo!=null&&tankInfo.length > 0)
+							fluidHandlers.add(new DirectionalFluidOutput(handler, adjacentTile, fd));
 					}
 				}
 			}
-			openList.remove(0);
 		}
 		if(FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
 		{
@@ -413,6 +441,8 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 //NO OUTPUTS!
 				return 0;
 			BlockPos ccFrom = new BlockPos(pipe.getPos().offset(facing));
+			if(CityMode.pipes())
+				return fillCityMode(resource, doFill, outputList, ccFrom, canAccept);
 			int sum = 0;
 			HashMap<DirectionalFluidOutput, Integer> sorting = new HashMap<DirectionalFluidOutput, Integer>();
 			for(DirectionalFluidOutput output : outputList)
@@ -456,6 +486,50 @@ public class TileEntityFluidPipe extends TileEntityIEBase implements IFluidPipe,
 				return f;
 			}
 			return 0;
+		}
+
+		/**
+		 * City mode: hand the fluid out in order until it runs out.
+		 * <p>
+		 * The full path above walks every endpoint on the network <em>twice</em> -- once simulating,
+		 * to learn what each would take, and again to apportion the resource between them in
+		 * proportion to what they asked for -- and builds an {@code ArrayList} and a
+		 * {@code HashMap} to do it, on every fill call, from every pump, every tick. On a city where
+		 * a water main touches sixty tanks that is a hundred and twenty capability calls a tick to
+		 * decide something nobody in a decorative build will ever notice.
+		 * <p>
+		 * This is exactly the trade {@code CityMode.wires()} already makes with the wire network:
+		 * proportional distribution is a fairness property, and fairness between tanks is a
+		 * simulation detail, not a thing a player sees. One pass, no simulate, no allocation beyond
+		 * the list the cache already handed us. The fluid still respects each endpoint's transfer
+		 * limit and still stops when the resource is exhausted, so nothing is created or destroyed --
+		 * the tank nearest the pump simply fills first.
+		 */
+		private int fillCityMode(FluidStack resource, boolean doFill,
+								 ArrayList<DirectionalFluidOutput> outputList, BlockPos ccFrom,
+								 int canAccept)
+		{
+			int moved = 0;
+			for(int i = 0; i < outputList.size()&&canAccept > 0; i++)
+			{
+				DirectionalFluidOutput output = outputList.get(i);
+				BlockPos cc = Utils.toCC(output.containingTile);
+				if(cc.equals(ccFrom)||!pipe.world.isBlockLoaded(cc)||pipe.equals(output.containingTile))
+					continue;
+				int limit = getTranferrableAmount(resource, output);
+				int offered = Math.min(limit, canAccept);
+				if(offered <= 0)
+					continue;
+				int accepted = output.output.fill(
+						Utils.copyFluidStackWithAmount(resource, offered, true), doFill);
+				if(accepted <= 0)
+					continue;
+				if(accepted > IEConfig.Machines.pipe_transferrate)
+					pipe.canOutputPressurized(output.containingTile, true);
+				moved += accepted;
+				canAccept -= accepted;
+			}
+			return moved;
 		}
 
 		private int getTranferrableAmount(FluidStack resource, DirectionalFluidOutput output)

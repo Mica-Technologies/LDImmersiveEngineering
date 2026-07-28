@@ -88,7 +88,9 @@ class CityModeTest
 				+" floodlights="+IEConfig.cityModeFloodlights
 				+" generators="+IEConfig.cityModeGenerators
 				+" machines="+IEConfig.cityModeMachines
-				+" virtualGrid="+IEConfig.cityModeVirtualGrid;
+				+" virtualGrid="+IEConfig.cityModeVirtualGrid
+				+" petroleum="+IEConfig.cityModePetroleum
+				+" pipes="+IEConfig.cityModePipes;
 	}
 
 	/**

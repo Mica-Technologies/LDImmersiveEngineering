@@ -44,6 +44,24 @@ public final class CityMode
 	}
 
 	/**
+	 * Fluid pipes stop apportioning and simply hand the fluid out in order.
+	 * <p>
+	 * The full path walks every endpoint on a network twice per fill -- once simulating to learn
+	 * what each would take, then again to split the resource between them in proportion. That is a
+	 * fairness property, and fairness between tanks is a simulation detail rather than something a
+	 * player sees; in a decorative build it is a hundred capability calls a tick to decide which of
+	 * sixty identical tanks gets the water first.
+	 * <p>
+	 * This is the pipe network's counterpart to {@link #wires()} -- same trade, same reasoning.
+	 * Transfer limits still apply and nothing is created or destroyed; the nearest tank simply
+	 * fills first.
+	 */
+	public static boolean pipes()
+	{
+		return IEConfig.cityMode&&IEConfig.cityModePipes;
+	}
+
+	/**
 	 * Floodlights skip their periodic beam re-scan and cap how many light blocks they place.
 	 */
 	public static boolean floodlights()
