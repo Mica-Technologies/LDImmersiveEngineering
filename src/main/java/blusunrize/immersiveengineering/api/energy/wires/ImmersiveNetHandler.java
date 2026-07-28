@@ -10,6 +10,7 @@ package blusunrize.immersiveengineering.api.energy.wires;
 
 import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.ApiUtils;
+import blusunrize.immersiveengineering.api.energy.wires.conduit.ChannelSet;
 import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.TargetingInfo;
 import blusunrize.immersiveengineering.common.Config.IEConfig;
@@ -810,12 +811,60 @@ public class ImmersiveNetHandler
 		public double horizontalLength;
 		public Vec3d across = null;
 
+		/**
+		 * The conductors this connection carries, when it is a conduit bundle rather than an
+		 * ordinary wire.
+		 * <p>
+		 * Null on every wire in the game today, and on every connection in every save written
+		 * before conduits existed -- which is the point. A bundle is <em>one</em> edge in this
+		 * graph carrying up to sixteen channels, not sixteen edges, so nothing that walks the
+		 * graph per tick gets any bigger for a corridor full of circuits. See
+		 * {@code api/energy/wires/conduit/ChannelSet}.
+		 * <p>
+		 * Use {@link #isBundle()} rather than testing this for null at call sites: an empty set is
+		 * a conduit with nothing patched, which is a different thing from a plain wire, and the
+		 * distinction matters at exactly the moments it is easiest to get wrong.
+		 */
+		@Nullable
+		public ChannelSet channels;
+
 		public Connection(BlockPos start, BlockPos end, WireType cableType, int length)
 		{
 			this.start = start;
 			this.end = end;
 			this.cableType = cableType;
 			this.length = length;
+		}
+
+		public Connection(BlockPos start, BlockPos end, WireType cableType, int length,
+						  @Nullable ChannelSet channels)
+		{
+			this(start, end, cableType, length);
+			this.channels = channels;
+		}
+
+		/**
+		 * @return true if this is a conduit bundle -- including one with nothing patched into it,
+		 * which is an empty conduit rather than an ordinary wire
+		 */
+		public boolean isBundle()
+		{
+			return channels!=null;
+		}
+
+		/**
+		 * Whether two connections carry the same conductors.
+		 * <p>
+		 * A plain wire and a bundle between the same two points are <em>not</em> the same
+		 * connection, and neither are two bundles patched differently. This is what
+		 * {@link #compareTo} leans on so that adding a conduit alongside an existing wire does not
+		 * look like a duplicate and get dropped.
+		 */
+		public boolean hasSameChannels(Connection con)
+		{
+			if(channels==null||con.channels==null)
+				return channels==con.channels;
+			return channels.equals(con.channels);
 		}
 
 		public boolean hasSameConnectors(Connection con)
@@ -878,6 +927,10 @@ public class ImmersiveNetHandler
 				tag.setIntArray("end", new int[]{end.getX(), end.getY(), end.getZ()});
 			tag.setString("cableType", cableType.getUniqueName());
 			tag.setInteger("length", length);
+			//Written only for bundles, so an ordinary wire's tag is byte-for-byte what it was
+			//before conduits existed. A world that never builds one never grows the key.
+			if(channels!=null)
+				tag.setTag("channels", channels.writeToNBT());
 			return tag;
 		}
 
@@ -896,7 +949,14 @@ public class ImmersiveNetHandler
 			WireType type = ApiUtils.getWireTypeFromNBT(tag, "cableType");
 
 			if(start!=null&&end!=null&&type!=null)
-				return new Connection(start, end, type, tag.getInteger("length"));
+			{
+				//No key means a wire, not an empty bundle. Every connection in every pre-conduit
+				//save takes this branch and comes back exactly as it went in -- which is the whole
+				//migration story, and the reason the key is absent rather than empty for wires.
+				ChannelSet channels = tag.hasKey("channels")
+						?ChannelSet.readFromNBT(tag.getCompoundTag("channels")): null;
+				return new Connection(start, end, type, tag.getInteger("length"), channels);
+			}
 			return null;
 		}
 
@@ -923,6 +983,17 @@ public class ImmersiveNetHandler
 				return end.getY() > o.end.getY()?1: -1;
 			if(end.getZ()!=o.end.getZ())
 				return end.getZ() > o.end.getZ()?1: -1;
+			//Last, and only ever a tie-break: two connections identical in every other respect are
+			//still distinct if one is a bundle and the other a wire. Without this they collapse
+			//into one entry in the sorted sets that hold connections, and one of them silently
+			//stops existing -- which is a far worse failure than allowing both.
+			//Two plain wires both land on -1 here, so nothing about existing behaviour moves.
+			//Whether a conduit and a wire may actually share a pair of connectors is a placement
+			//question, and P3 answers it; this only makes both representable.
+			int mine = channels==null?-1: channels.getMask();
+			int theirs = o.channels==null?-1: o.channels.getMask();
+			if(mine!=theirs)
+				return mine > theirs?1: -1;
 			return 0;
 		}
 
