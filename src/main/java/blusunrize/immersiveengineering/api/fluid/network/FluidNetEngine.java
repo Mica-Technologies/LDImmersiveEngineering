@@ -296,6 +296,24 @@ public final class FluidNetEngine
 		if(outlets.isEmpty())
 			return;
 
+		//	=================================
+		//	The fluid a failover delivers is THIS main's, never the backup's.
+		//	=================================
+		//
+		// This was wrong once, and it was wrong in the worst way: the fluid was taken from whichever
+		// backup happened to be able to supply, so a diesel main backed by a water main offered its
+		// outlets water -- and a real Outlet does not check what it is handed, it simply fills its
+		// neighbours. The engine is the only place that check can live.
+		//
+		// It took a while to find because the test suite's fake endpoint refuses a fluid it does not
+		// hold, so the assertion passed while the bug sat underneath it. That is bug class 11 in the
+		// plan: a test that documents behaviour instead of catching it.
+		String fluid = main.getFluid();
+		//An untyped main has never carried anything, so there is nothing to cover. Letting a backup
+		//supply one would mean a main whose console says "untyped" quietly delivering diesel.
+		if(fluid==null)
+			return;
+
 		for(int i = 0; i < outlets.size(); i++)
 		{
 			FluidDevice outlet = outlets.get(i);
@@ -306,82 +324,27 @@ public final class FluidNetEngine
 			if(want <= 0)
 				continue;
 
-			Set<UUID> visited = new HashSet<>();
-			visited.add(main.getId());
-			//The fluid comes from whichever backup can actually supply, not from this main -- an
-			//outage on an untyped main still has to deliver something, and the backup is the only
-			//one that knows what.
-			Backup backup = firstSupplier(net, main, visited, 0);
-			if(backup==null||backup.fluid==null)
-				continue;
-
-			//What the world would still take of that fluid. If it takes nothing, the load is
-			//satisfied and there is no shortfall to cover.
-			int demand = clampResult(endpoint.insertFromMain(backup.fluid, want, true), want);
+			//What the world would still take. If it takes nothing, the load is satisfied and there
+			//is no shortfall to cover.
+			int demand = clampResult(endpoint.insertFromMain(fluid, want, true), want);
 			if(demand <= 0)
 				continue;
 
-			visited.clear();
+			Set<UUID> visited = new HashSet<>();
 			visited.add(main.getId());
-			int available = walkFailover(net, main, backup.fluid, demand, visited, 0, false);
+			int available = walkFailover(net, main, fluid, demand, visited, 0, false);
 			if(available <= 0)
 				continue;
 
-			int accepted = clampResult(endpoint.insertFromMain(backup.fluid, available, false), available);
+			int accepted = clampResult(endpoint.insertFromMain(fluid, available, false), available);
 			if(accepted <= 0)
 				continue;
 			//Debit exactly what was delivered, walking the same order so the same backups are
 			//charged as were surveyed.
 			visited.clear();
 			visited.add(main.getId());
-			walkFailover(net, main, backup.fluid, accepted, visited, 0, true);
+			walkFailover(net, main, fluid, accepted, visited, 0, true);
 			outlet.recordThroughput(accepted);
-		}
-	}
-
-	/**
-	 * The first backup in the chain that is open and actually holds something, together with what
-	 * it holds.
-	 * <p>
-	 * Exists because a fluid chain has to agree on the fluid before it can survey demand: an
-	 * Outlet's answer to "how much would you take" depends on what is being offered, which is not
-	 * true of a wire.
-	 */
-	@Nullable
-	private static Backup firstSupplier(VirtualFluidNet net, FluidMain origin, Set<UUID> visited, int depth)
-	{
-		if(depth >= FluidNetConfig.maxFailoverDepth)
-			return null;
-		List<UUID> links = origin.getFailover();
-		for(int i = 0; i < links.size(); i++)
-		{
-			UUID backupId = links.get(i);
-			if(!visited.add(backupId))
-				continue;
-			FluidMain backup = net.getMain(backupId);
-			if(backup==null||!backup.isOperational())
-				continue;
-			if(backup.getFluid()!=null&&backup.getPack() > 0&&backup.getOutputBudget() > 0)
-				return new Backup(backup.getFluid());
-			Backup deeper = firstSupplier(net, backup, visited, depth+1);
-			if(deeper!=null)
-				return deeper;
-		}
-		return null;
-	}
-
-	/**
-	 * What a failover walk found: only the fluid, because the amounts are surveyed separately by
-	 * {@link #walkFailover}.
-	 */
-	private static final class Backup
-	{
-		@Nullable
-		final String fluid;
-
-		Backup(@Nullable String fluid)
-		{
-			this.fluid = fluid;
 		}
 	}
 
@@ -536,13 +499,19 @@ public final class FluidNetEngine
 			return false;
 		Set<UUID> visited = new HashSet<>();
 		visited.add(main.getId());
-		return walkPressurised(net, main, visited, 0);
+		//The same fluid rule as normal mode's failover. A live water main does not mean a diesel
+		//main has supply, and city mode being cheap is not a reason for it to be wrong -- the whole
+		//point of presence semantics is that the one bit it reports is trustworthy.
+		return walkPressurised(net, main, main.getFluid(), visited, 0);
 	}
 
 	private static boolean walkPressurised(VirtualFluidNet net, FluidMain origin,
-										   Set<UUID> visited, int depth)
+										   @Nullable String fluid, Set<UUID> visited, int depth)
 	{
-		if(depth >= FluidNetConfig.maxFailoverDepth)
+		//An untyped main has no supply to stand in for. Its outlets are skipped by the delivery pass
+		//anyway, so reporting it as pressurised would light a lamp for something that will never
+		//move a millibucket.
+		if(fluid==null||depth >= FluidNetConfig.maxFailoverDepth)
 			return false;
 		List<UUID> links = origin.getFailover();
 		for(int i = 0; i < links.size(); i++)
@@ -553,9 +522,9 @@ public final class FluidNetEngine
 			FluidMain backup = net.getMain(backupId);
 			if(backup==null||!backup.isOperational())
 				continue;
-			if(backup.isSourceLive())
+			if(backup.isSourceLive()&&fluid.equals(backup.getFluid()))
 				return true;
-			if(walkPressurised(net, backup, visited, depth+1))
+			if(walkPressurised(net, backup, fluid, visited, depth+1))
 				return true;
 		}
 		return false;

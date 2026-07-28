@@ -208,12 +208,18 @@ public class TileEntityReinjectionWell extends TileEntityIEBase implements ITick
 		int recoverable = recoveredFrom(volume, perMille);
 		if(recoverable > allowance)
 		{
-			volume = (int)Math.max(1, (long)allowance*1000L/perMille);
+			//Re-clamped to the tank as well as to the allowance. Trimming to the allowance alone
+			//could raise the volume above what is actually held, and the pass would then credit the
+			//field for injectant that was never there.
+			volume = (int)Math.min(held.amount, Math.max(1, (long)allowance*1000L/perMille));
 			recoverable = recoveredFrom(volume, perMille);
 		}
 		if(recoverable <= 0)
 		{
-			status = STATUS_SPENT;
+			//Two different nothings, and the overlay has to tell them apart: a field that will take
+			//no more is permanent, while a well holding less injectant than one millibucket of
+			//recovery costs is simply waiting for a delivery.
+			status = allowance <= 0?STATUS_SPENT: STATUS_IDLE;
 			return;
 		}
 

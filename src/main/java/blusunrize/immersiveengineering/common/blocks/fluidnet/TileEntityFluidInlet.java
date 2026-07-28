@@ -49,7 +49,27 @@ public class TileEntityFluidInlet extends TileEntityFluidNetDevice
 	 * A buffer, not a tank. Sized to the transfer cap so exactly one tick of intake fits: this
 	 * fitting is a doorway, and storage is what the buried tanks are for.
 	 */
-	private final FluidTank buffer = new FluidTank(FluidNetConfig.defaultDeviceCap);
+	private final FluidTank buffer = new FluidTank(FluidNetConfig.defaultDeviceCap)
+	{
+		@Override
+		public boolean canFillFluidType(FluidStack fluid)
+		{
+			//	=================================
+			//	Guarded, or this fitting jams shut forever.
+			//	=================================
+			//
+			// Without this, a pipe run plumbed to the wrong Inlet fills the buffer with water on a
+			// diesel main. extractForMain only ever drains the main's own fluid, so the water sits
+			// there permanently, the buffer is full, nothing else can get in, and there is no way
+			// for the player to empty it -- the Inlet exposes no drain path by design.
+			//
+			// While the main has not decided what it carries, anything is accepted: that is how it
+			// decides.
+			String wanted = getMainFluid();
+			return wanted==null||fluid==null||fluid.getFluid()==null
+					||wanted.equals(fluid.getFluid().getName());
+		}
+	};
 
 	@Override
 	public FluidDeviceType getDeviceType()
@@ -68,6 +88,14 @@ public class TileEntityFluidInlet extends TileEntityFluidNetDevice
 		//somebody lowered a setting, and quietly keeping it would make the cap a lie.
 		if(buffer.getFluidAmount() > size)
 			buffer.drainInternal(buffer.getFluidAmount()-size, true);
+		//This also runs when the main's fluid changes, which is the only moment a buffer can be
+		//holding something the main no longer wants. Dumping it is the only option that leaves the
+		//fitting usable -- keeping it would jam the Inlet exactly as an unguarded fill would.
+		FluidStack held = buffer.getFluid();
+		String wanted = getMainFluid();
+		if(held!=null&&wanted!=null&&held.getFluid()!=null
+				&&!wanted.equals(held.getFluid().getName()))
+			buffer.drainInternal(held.amount, true);
 	}
 
 	//	=================================

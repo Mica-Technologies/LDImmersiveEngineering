@@ -46,6 +46,10 @@ public class FakeFluidEndpoint implements IFluidEndpoint
 	 * main's type through rather than the endpoint's own.
 	 */
 	public String lastOffered;
+	/**
+	 * When set, this endpoint accepts any fluid -- see {@link #acceptingAnything(int)}.
+	 */
+	public boolean promiscuous;
 
 	/**
 	 * What the world's redstone reads at this block (VALVE side, input mode).
@@ -76,6 +80,27 @@ public class FakeFluidEndpoint implements IFluidEndpoint
 		FakeFluidEndpoint endpoint = new FakeFluidEndpoint();
 		endpoint.fluid = fluid;
 		endpoint.capacity = capacity;
+		return endpoint;
+	}
+
+	/**
+	 * An outlet that takes whatever it is handed, which is what a real one does.
+	 * <p>
+	 * {@code TileEntityFluidOutlet} does not check the fluid -- it fills its neighbours with
+	 * whatever the engine names, because the engine is the only thing that knows what the main
+	 * carries. A fake that refuses a mismatch is therefore <em>stricter than the real block</em>,
+	 * and any test relying on that refusal is testing the fake.
+	 * <p>
+	 * That is not hypothetical: the engine shipped a failover path that took its fluid from the
+	 * backup rather than from the main, so a diesel main backed by a water main offered its outlets
+	 * water. Every assertion passed, because this class refused it. Use this endpoint whenever the
+	 * thing under test is the engine's own fluid discipline.
+	 */
+	public static FakeFluidEndpoint acceptingAnything(int capacity)
+	{
+		FakeFluidEndpoint endpoint = new FakeFluidEndpoint();
+		endpoint.capacity = capacity;
+		endpoint.promiscuous = true;
 		return endpoint;
 	}
 
@@ -118,7 +143,7 @@ public class FakeFluidEndpoint implements IFluidEndpoint
 		else
 			insertCalls++;
 		lastOffered = offered;
-		if(offered==null||!offered.equals(fluid))
+		if(offered==null||(!promiscuous&&!offered.equals(fluid)))
 			return 0;
 		int amount = Math.min(max, capacity);
 		if(amount <= 0)

@@ -257,6 +257,9 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 		//Decided before the rig comes down, because the gusher happens at the bore and the rig is
 		//what was standing over it.
 		boolean gusher = shouldGush();
+		//Captured before the rig comes down: blowOut runs after this tile entity's own block has
+		//been set to air, and re-resolving the deposit from an invalidated tile is asking for it.
+		Reservoir reservoirAtBore = gusher?getReservoir(): null;
 		List<BlockPos> parts = collectParts();
 		//Clearing `formed` first is load-bearing: removing a part's block runs
 		//BlockIEMultiblock's break handling, and a part that still believes it is formed would
@@ -277,7 +280,7 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 					new ItemStack(IEContent.blockPetroleumDevice, parts.size(),
 							BlockTypes_PetroleumDevice.OILFIELD_FRAME.getMeta())));
 		if(gusher)
-			blowOut(bore);
+			blowOut(bore, reservoirAtBore);
 	}
 
 	/**
@@ -320,9 +323,8 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 	 * Pad picks it up. A blowout should cost a player an afternoon of tidying and a slice of their
 	 * field, not their base.
 	 */
-	private void blowOut(BlockPos bore)
+	private void blowOut(BlockPos bore, @Nullable Reservoir reservoir)
 	{
-		Reservoir reservoir = getReservoir();
 		if(reservoir!=null)
 		{
 			//A tenth of what is left, straight up the bore and onto the ground. Enough to hurt,
@@ -337,9 +339,14 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 			{
 				if(dx*dx+dz*dz > GUSHER_RADIUS*GUSHER_RADIUS)
 					continue;
-				//Only onto ground that is already open. A gusher that carved through a player's
-				//floor would be a grief mechanic rather than a consequence.
-				BlockPos at = world.getHeight(bore.add(dx, 0, dz));
+				//Around the wellhead, not at the world's surface height. Using getHeight put the
+				//spill on the roof when the rig was in a cave or under a build -- crude appearing
+				//somewhere the player was not standing, from a machine they could not see.
+				//
+				//Only onto ground that is already open, and only where something can hold it up: a
+				//gusher that carved through a floor would be a grief mechanic rather than a
+				//consequence.
+				BlockPos at = bore.add(dx, 0, dz);
 				if(at.getY() <= 0||!world.isAirBlock(at)||!world.getBlockState(at.down()).isFullBlock())
 					continue;
 				world.setBlockState(at, IEContent.blockFluidCrudeOil.getDefaultState());

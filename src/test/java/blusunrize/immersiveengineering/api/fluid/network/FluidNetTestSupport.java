@@ -111,6 +111,21 @@ public final class FluidNetTestSupport
 		return device;
 	}
 
+	/**
+	 * An Outlet that accepts whatever the engine hands it, as a real one does. Use this when the
+	 * thing under test is the engine's own fluid discipline rather than the endpoint's.
+	 */
+	public static FluidDevice promiscuousOutlet(VirtualFluidNet net, FluidMain main, int demand, int cap)
+	{
+		FluidDevice device = net.registerDevice(pos(), FluidDeviceType.OUTLET);
+		device.setTransferCap(cap);
+		net.assignDevice(device, main==null?null: main.getId());
+		device.setEndpoint(FakeFluidEndpoint.acceptingAnything(demand));
+		if(main!=null)
+			main.invalidateViews();
+		return device;
+	}
+
 	public static FakeFluidEndpoint endpointOf(FluidDevice device)
 	{
 		return (FakeFluidEndpoint)device.getEndpoint();

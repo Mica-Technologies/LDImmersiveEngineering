@@ -401,19 +401,67 @@ class FluidNetEngineTest
 		@DisplayName("a backup carrying a different fluid is not a backup")
 		void wrongFluidCannotCover()
 		{
-			//Covering a diesel shortfall out of a water main would be worse than not covering it.
+			//	=================================
+			//	The outlet here takes ANYTHING, on purpose.
+			//	=================================
+			//
+			// This test used to use an ordinary outlet, which refuses a fluid it does not hold -- and
+			// so it passed while the engine was taking its failover fluid from the backup rather than
+			// from the main. A real TileEntityFluidOutlet does no such check: it fills its neighbours
+			// with whatever the engine names. The guard has to be in the engine, so the fake must not
+			// provide one, or the test is only ever exercising the fake.
 			FluidMain primary = main(net, "diesel", DIESEL);
 			FluidMain backup = main(net, "water", WATER);
 			primary.addFailover(backup.getId());
 			primary.setEnabled(false);
 
 			inlet(net, backup, WATER, 500, 1000);
-			FluidDevice load = outlet(net, primary, DIESEL, 500, 1000);
+			FluidDevice load = promiscuousOutlet(net, primary, 500, 1000);
+
+			tick();
+
+			assertEquals(0, endpointOf(load).totalInserted,
+					"a diesel main was covered out of a water main");
+			assertTrue(backup.getPack() > 0, "the water main should be untouched");
+		}
+
+		@Test
+		@DisplayName("a failover never offers an outlet anything but its own main's fluid")
+		void failoverOffersTheMainsFluid()
+		{
+			FluidMain primary = main(net, "diesel", DIESEL);
+			FluidMain backup = main(net, "backup diesel", DIESEL);
+			primary.addFailover(backup.getId());
+			primary.setEnabled(false);
+
+			inlet(net, backup, DIESEL, 500, 1000);
+			FluidDevice load = promiscuousOutlet(net, primary, 500, 1000);
+
+			tick();
+
+			assertEquals(500, endpointOf(load).totalInserted, "a matching backup should cover");
+			assertEquals(DIESEL, endpointOf(load).lastOffered,
+					"the fluid named must be the main's, never the backup's");
+		}
+
+		@Test
+		@DisplayName("an untyped main cannot be covered at all")
+		void untypedMainDoesNotFailOver()
+		{
+			//It has never carried anything, so there is nothing to cover -- and a main whose console
+			//says "untyped" must not quietly start delivering diesel.
+			FluidMain primary = main(net, "not built yet");
+			FluidMain backup = main(net, "diesel", DIESEL);
+			primary.addFailover(backup.getId());
+			primary.setEnabled(false);
+
+			inlet(net, backup, DIESEL, 500, 1000);
+			FluidDevice load = promiscuousOutlet(net, primary, 500, 1000);
 
 			tick();
 
 			assertEquals(0, endpointOf(load).totalInserted);
-			assertTrue(backup.getPack() > 0, "the water main should be untouched");
+			assertNull(primary.getFluid(), "an untyped main must not be typed by its backup");
 		}
 
 		@Test
@@ -519,6 +567,44 @@ class FluidNetEngineTest
 			cityTick(0);
 
 			assertEquals(GAS, main.getFluid());
+			assertEquals(1000, endpointOf(load).totalInserted);
+		}
+
+		@Test
+		@DisplayName("a live backup carrying a different fluid does not pressurise a main")
+		void wrongFluidDoesNotPressurise()
+		{
+			//City mode trades accounting for a single bit, so that bit has to be trustworthy. A live
+			//water main is not evidence that a diesel main has supply.
+			FluidNetConfig.sipIntervalTicks = 1;
+			FluidMain primary = main(net, "diesel", DIESEL);
+			FluidMain backup = main(net, "water", WATER);
+			primary.addFailover(backup.getId());
+			primary.setEnabled(false);
+			inlet(net, backup, WATER, 10000, 1000);
+			FluidDevice load = promiscuousOutlet(net, primary, 100000, 1000);
+
+			cityTick(0);
+
+			assertFalse(primary.isPressurised());
+			assertEquals(0, endpointOf(load).totalInserted);
+		}
+
+		@Test
+		@DisplayName("a live backup carrying the same fluid does pressurise it")
+		void matchingBackupPressurises()
+		{
+			FluidNetConfig.sipIntervalTicks = 1;
+			FluidMain primary = main(net, "diesel", DIESEL);
+			FluidMain backup = main(net, "reserve", DIESEL);
+			primary.addFailover(backup.getId());
+			primary.setEnabled(false);
+			inlet(net, backup, DIESEL, 10000, 1000);
+			FluidDevice load = outlet(net, primary, DIESEL, 100000, 1000);
+
+			cityTick(0);
+
+			assertTrue(primary.isPressurised());
 			assertEquals(1000, endpointOf(load).totalInserted);
 		}
 

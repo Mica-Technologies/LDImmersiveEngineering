@@ -118,8 +118,18 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 		ItemStack held = player.getHeldItem(hand);
 		if(held.isEmpty())
 			return 0;
-		IFluidHandlerItem handler = FluidUtil.getFluidHandler(
-				held.getCount() > 1?copyOne(held): held);
+		//	=================================
+		//	Always one, always written back.
+		//	=================================
+		//
+		// This used to wrap the player's own stack when they held exactly one, on the theory that
+		// filling it in place was tidier. It is not tidy, it is wrong: an NBT-backed container like
+		// the jerrycan does mutate in place, but a bucket-like one does not -- FluidBucketWrapper
+		// swaps the item its wrapper holds and leaves the original stack untouched, so the fill
+		// only exists in getContainer(). The pump debited its tank, the player got nothing, and the
+		// fuel was gone. Copying and writing the result back is correct for both kinds.
+		ItemStack one = copyOne(held);
+		IFluidHandlerItem handler = FluidUtil.getFluidHandler(one);
 		if(handler==null)
 			return 0;
 		FluidStack available = tank.getFluid();
@@ -135,12 +145,15 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 		int accepted = handler.fill(offered, true);
 		if(accepted <= 0)
 			return 0;
-		//The container is only put back when the stack was split, so a single held item is filled
-		//in place and a stack of five buckets yields one full bucket and four empties.
-		if(held.getCount() > 1)
+
+		ItemStack filled = handler.getContainer();
+		if(held.getCount()==1)
+			//Straight back into the hand, so a filled bucket does not wander off to another hotbar
+			//slot the way addItemStackToInventory would send it.
+			player.setHeldItem(hand, filled);
+		else
 		{
 			held.shrink(1);
-			ItemStack filled = handler.getContainer();
 			if(!player.inventory.addItemStackToInventory(filled))
 				player.dropItem(filled, false);
 		}

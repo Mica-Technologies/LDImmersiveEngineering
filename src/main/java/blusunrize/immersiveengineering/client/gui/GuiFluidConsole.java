@@ -125,6 +125,11 @@ public class GuiFluidConsole extends GuiIEContainerBase
 	private int selectedDevice = -1;
 
 	private GuiLineGraph graph;
+	/**
+	 * Snapshot of the state the current widgets were built from, so a rebuild happens only when
+	 * the set of widgets actually has to change.
+	 */
+	private String lastSignature = "";
 
 	public GuiFluidConsole(InventoryPlayer inventoryPlayer, TileEntityFluidConsole tile)
 	{
@@ -177,6 +182,7 @@ public class GuiFluidConsole extends GuiIEContainerBase
 			default:
 				break;
 		}
+		lastSignature = structureSignature();
 	}
 
 	@Override
@@ -184,6 +190,48 @@ public class GuiFluidConsole extends GuiIEContainerBase
 	{
 		super.onGuiClosed();
 		Keyboard.enableRepeatEvents(false);
+	}
+
+	/**
+	 * Rebuilds the panel when the <em>set</em> of things it is showing changes.
+	 * <p>
+	 * Without this the window is built once and never again: a console opened before the first sync
+	 * arrives shows an empty main list for as long as it stays open, and creating a main, linking a
+	 * fitting or deleting anything appears to do nothing until the player switches tabs. The server
+	 * had the right answer the whole time -- the screen simply never asked again.
+	 * <p>
+	 * Gated on a signature rather than rebuilt unconditionally, because {@link #initGui} recreates
+	 * the text fields and would eat the player's caret twice a second while they typed a name.
+	 */
+	@Override
+	public void updateScreen()
+	{
+		super.updateScreen();
+		if(tab==Tab.FITTINGS)
+			rebuildDeviceView();
+		String signature = structureSignature();
+		if(!signature.equals(lastSignature))
+			initGui();
+	}
+
+	/**
+	 * Everything that decides which widgets exist. When this changes, only a rebuild will do.
+	 */
+	private String structureSignature()
+	{
+		FluidMain main = selectedMain();
+		FluidDevice device = selectedDeviceRecord();
+		StringBuilder sig = new StringBuilder(tab.name());
+		sig.append('|').append(net().getMainCount());
+		//The fluid and the pack are in here because both decide whether the "clear fluid" button
+		//exists at all -- and that button appearing the moment a main finishes draining is the one
+		//piece of feedback that tells a player why it was missing before.
+		sig.append('|').append(main==null?"-": main.getId()+":"+main.isTripped()
+				+":"+main.getFluid()+":"+(main.getPack() > 0));
+		sig.append('|').append(showUnlinked).append(':').append(deviceView.size());
+		sig.append('|').append(device==null?"-": device.getPos()+":"+device.isLinked()
+				+":"+device.getType());
+		return sig.toString();
 	}
 
 	private GuiButtonFlat button(int id, int x, int y, int w, int h, String label)

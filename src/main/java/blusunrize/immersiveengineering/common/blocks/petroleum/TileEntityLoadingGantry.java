@@ -108,8 +108,11 @@ public class TileEntityLoadingGantry extends TileEntityMultiblockPart<TileEntity
 	{
 		int previous = status;
 		status = STATUS_IDLE;
+		//Both chests stand in front of the gantry, one against each leg. They used to be on
+		//opposite faces -- intake in front of the left leg, output behind the right -- which is
+		//buildable but undiscoverable, and this machine has no interface to explain itself with.
 		IItemHandler in = neighbourInventory(MultiblockLoadingGantry.INTAKE_POS, facing.getOpposite());
-		IItemHandler out = neighbourInventory(MultiblockLoadingGantry.OUTPUT_POS, facing);
+		IItemHandler out = neighbourInventory(MultiblockLoadingGantry.OUTPUT_POS, facing.getOpposite());
 		if(in!=null&&out!=null)
 			fill(in, out);
 		if(status!=previous)
