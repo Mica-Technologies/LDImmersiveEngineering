@@ -142,7 +142,13 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 	public void onBlockBroken()
 	{
 		if(world!=null&&!world.isRemote)
+		{
 			VirtualFluidNet.INSTANCE.unregisterDevice(new DimensionBlockPos(pos, world));
+			//A fitting that was holding its chunk loaded must stop the moment it is mined. Without
+			//this the ticket outlives the block that asked for it, and the chunk stays pinned until
+			//something else happens to trigger a rebuild -- which may be the next server start.
+			blusunrize.immersiveengineering.common.util.fluidnet.FluidNetChunkLoader.refresh();
+		}
 		this.device = null;
 	}
 

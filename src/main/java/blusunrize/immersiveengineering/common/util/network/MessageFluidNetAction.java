@@ -12,6 +12,7 @@ import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.fluid.network.*;
 import blusunrize.immersiveengineering.common.gui.ContainerFluidNetBase;
 import blusunrize.immersiveengineering.common.util.IELogger;
+import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetChunkLoader;
 import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetSaveData;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayerMP;
@@ -292,6 +293,9 @@ public class MessageFluidNetAction implements IMessage
 						return;
 				}
 				net.assignDevice(device, target==null?null: target.getId());
+				//Assignment changes which main's ordering the fitting belongs to, and an unlinked
+				//fitting stops pinning its chunk.
+				FluidNetChunkLoader.refresh();
 			}
 			else
 			{
@@ -302,9 +306,18 @@ public class MessageFluidNetAction implements IMessage
 				if(args.hasKey("critical"))
 					device.setCritical(args.getBoolean("critical"));
 				if(args.hasKey("chunkLoad"))
+				{
 					device.setChunkLoad(args.getBoolean("chunkLoad"));
+					FluidNetChunkLoader.refresh();
+				}
 				if(args.hasKey("enabled"))
+				{
+					//A disabled fitting stops pinning its chunk: the toggle means "this fitting is
+					//not in service", and a fitting that is not in service should not be holding
+					//a chunk in memory.
 					device.setEnabled(args.getBoolean("enabled"));
+					FluidNetChunkLoader.refresh();
+				}
 				if(args.hasKey("valveOutput"))
 					device.setValveOutput(args.getBoolean("valveOutput"));
 				if(args.hasKey("valveInverted"))

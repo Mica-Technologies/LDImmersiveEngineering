@@ -23,6 +23,7 @@ import blusunrize.immersiveengineering.common.util.advancements.IEAdvancements;
 import blusunrize.immersiveengineering.common.util.commands.CommandHandler;
 import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
 import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
+import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetChunkLoader;
 import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetSaveData;
 import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetTickHandler;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
@@ -225,6 +226,7 @@ public class ImmersiveEngineering
 			//Drop chunk-loading tickets and live tile attachments so a second world started in
 			//the same session does not inherit either.
 			GridChunkLoader.releaseAll();
+			FluidNetChunkLoader.releaseAll();
 			VirtualGrid.INSTANCE.detachAll();
 			VirtualFluidNet.INSTANCE.detachAll();
 		} catch(RuntimeException e)
@@ -279,6 +281,7 @@ public class ImmersiveEngineering
 				//world in one session cannot inherit the previous one's mains.
 				FluidNetTickHandler.reset();
 				FluidNetSaveData.load(world);
+				FluidNetChunkLoader.refresh();
 
 				//Reservoirs likewise. Nothing is generated here -- deposits are rolled from the
 				//seed on demand -- so this only restores which ones have been drawn down. The

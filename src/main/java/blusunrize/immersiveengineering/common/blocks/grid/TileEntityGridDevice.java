@@ -140,7 +140,13 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 	public void onBlockBroken()
 	{
 		if(world!=null&&!world.isRemote)
+		{
 			VirtualGrid.INSTANCE.unregisterDevice(new DimensionBlockPos(pos, world));
+			//A box that was holding its chunk loaded must stop the moment it is mined, or the ticket
+			//outlives the block that asked for it and the chunk stays pinned until something else
+			//happens to trigger a rebuild -- possibly the next server start.
+			blusunrize.immersiveengineering.common.util.grid.GridChunkLoader.refresh();
+		}
 		this.device = null;
 	}
 
