@@ -101,7 +101,7 @@ City mode trades Immersive Engineering's simulation detail for server tick time.
 city/roleplay packs where the mod's machinery is set dressing rather than an engineering puzzle:
 you keep the entire look of the build, and give up the physics behind it.
 
-It covers five subsystems:
+It covers seven subsystems:
 
 | Subsystem | What is simplified |
 |---|---|
@@ -110,6 +110,8 @@ It covers five subsystems:
 | **Generators** | Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and a per-tick tank drain. |
 | **Machines** | Idle multiblocks stop re-scanning the recipe list every tick, and the scan interval widens. |
 | **Virtual grid** | Segments stop accounting for flux and switch to presence: a segment is energized or it is not, and its Service Units deliver freely. See [Virtual Power Grid](#virtual-power-grid). |
+| **Fluid pipes** | A pipe hands its fluid to the endpoints on its network in order until it runs out, instead of simulating a fill against every one of them and then splitting the result in proportion. See [Fluid Pipes](#fluid-pipes). |
+| **Conduits** | Bundles stop moving units of flux and switch to presence, exactly as the grid does: a conductor is energised or it is not. See [Conduits](#conduits). |
 
 **It is off by default**, and off means byte-identical to stock.
 
@@ -566,6 +568,68 @@ feeds collected, because nothing is being collected — the feed is only being *
 tab says so directly rather than letting the graphs be misread: it labels a city-mode segment as
 presence accounting. If you want a grid where the arithmetic is honest, leave
 `cityModeVirtualGrid=false` while the master switch is on; the two are independent.
+
+---
+
+## Fluid Pipes
+
+Gated behind `cityModePipes`, resolved through `CityMode.pipes()`. Implemented in
+`common/blocks/metal/TileEntityFluidPipe`.
+
+The stock path walks every endpoint on a pipe network **twice per fill**: once simulating a fill
+against each to learn what it would take, then again to split the fluid between them in proportion
+to what each asked for. That is a fairness property — sixty identical tanks all fill at the same
+rate rather than the nearest one filling first.
+
+City mode drops the fairness and keeps everything else. The pipe hands its fluid to the endpoints
+in order until it runs out. Transfer limits still apply, nothing is created or destroyed, and the
+only difference a player could observe is **which of several tanks fills first**.
+
+That halves the capability calls per fill and removes the per-fill list and map allocation.
+Fairness between tanks is a simulation detail; in a decorative build it is a hundred capability
+calls a tick to decide something nobody is watching.
+
+**Unrelated to city mode, and worth knowing:** the pipe's network flood fill was rewritten during
+this fork's performance work. It used a list plus `contains` for the closed set and removed from
+the head of an `ArrayList` for the open set, and enqueued neighbours without a visited check, so
+each pipe was fetched once per adjacent pipe. It is now a `HashSet` and an `ArrayDeque` with a
+node cap. That change applies in **both** modes, and on a large tank farm it is the larger of the
+two wins.
+
+---
+
+## Conduits
+
+Gated behind `cityModeConduits`, resolved through `CityMode.conduits()`. Implemented in
+`common/blocks/conduit/TileEntityJunctionBox`. Full feature documentation lives in
+[CONDUITS.md](CONDUITS.md).
+
+Conduit is this fork's own feature: surface-mounted tubing carrying up to sixteen independent
+conductors, for wiring the inside of a building where a catenary would sag through the room.
+
+**Its normal mode is already cheap, by construction:**
+
+- **One edge per run.** Sixteen conductors down a corridor are a single `Connection` in the wire
+  graph, not sixteen, and the conduit blocks between two junction boxes are never nodes in it.
+  Everything that walks that graph sees the graph it saw before conduits existed.
+- **Idle is free.** A junction box carrying nothing does one integer comparison per tick. Most
+  conduit in most bases is carrying nothing most of the time.
+- **No search.** Energy moves as a bucket brigade — half the difference to whichever neighbour is
+  holding less — rather than by finding every reachable sink each tick and dividing supply between
+  them. That last is what the wires do, and with sixteen channels it would be sixteen path walks
+  per box per tick. The cost of the brigade is one tick per hop, and boxes only exist at corners
+  and ends.
+- **Redstone is edge-driven.** A run re-derives its signals when a neighbour changes, never on a
+  timer, and only if a box on it actually has a redstone face.
+
+**City mode replaces the remaining accounting with presence**, exactly as the grid does: a
+conductor is energised or it is not, an energised breakout delivers at full rate, and no line loss
+is charged. A conductor goes dark about a second after whatever fed it stops, so a switched circuit
+still visibly switches.
+
+**What you give up:** the same thing the grid gives up — the numbers stop being conservation. A
+breakout delivers without anything being debited upstream, because nothing upstream is being
+counted.
 
 ---
 

@@ -355,6 +355,54 @@ class ConduitAssetsTest
 		}
 	}
 
+	@Nested
+	@DisplayName("the manual chapter")
+	class Manual
+	{
+		@Test
+		@DisplayName("it has a title, a subtitle and no gaps")
+		void chapterIsComplete()
+		{
+			//A page whose lang key is missing renders the raw key at the reader, and the only way to
+			//see it is to open the book at that exact page.
+			String lang = lang();
+			assertTrue(lang.contains("ie.manual.entry.conduits.name="));
+			assertTrue(lang.contains("ie.manual.entry.conduits.subtext="));
+			int page = 0;
+			while(lang.contains("ie.manual.entry.conduits"+page+"="))
+				page++;
+			assertTrue(page > 0, "the chapter has no pages at all");
+			assertFalse(lang.contains("ie.manual.entry.conduits"+(page+1)+"="),
+					"page "+(page+1)+" has text but page "+page+" does not -- a gap in the chapter");
+		}
+
+		@Test
+		@DisplayName("every page it registers has text")
+		void everyRegisteredPageHasText()
+		{
+			//The other half of the same failure: a page registered in ClientProxy with no lang key
+			//behind it. Counting the registrations is the only way to notice from here.
+			String proxy;
+			try
+			{
+				proxy = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
+						"src/main/java/blusunrize/immersiveengineering/client/ClientProxy.java")),
+						java.nio.charset.StandardCharsets.UTF_8);
+			} catch(IOException e)
+			{
+				throw new AssertionError("could not read ClientProxy", e);
+			}
+			int registered = 0;
+			while(proxy.contains("\"conduits"+registered+"\""))
+				registered++;
+			assertTrue(registered > 0, "the chapter is not registered at all");
+			String lang = lang();
+			for(int page = 0; page < registered; page++)
+				assertTrue(lang.contains("ie.manual.entry.conduits"+page+"="),
+						"page "+page+" is registered but has no text");
+		}
+	}
+
 	private static String lang()
 	{
 		try

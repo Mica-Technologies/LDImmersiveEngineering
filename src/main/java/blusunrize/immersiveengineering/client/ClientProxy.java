@@ -51,6 +51,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IIEMetaBlock;
 import blusunrize.immersiveengineering.common.blocks.cloth.BlockTypes_ClothDevice;
 import blusunrize.immersiveengineering.common.blocks.cloth.TileEntityShaderBanner;
+import blusunrize.immersiveengineering.common.blocks.conduit.BlockTypes_Conduit;
 import blusunrize.immersiveengineering.common.blocks.fluidnet.TileEntityFluidConsole;
 import blusunrize.immersiveengineering.common.items.ItemNetworkTerminal;
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
@@ -804,6 +805,20 @@ public class ClientProxy extends CommonProxy
 						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid9"),
 				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"));
+		//Conduits. Next to the wires and the grid, because the three are the same question asked
+		//three ways: how does power get from there to here, and what does it look like on the way.
+		ManualHelper.getManual().addEntry("conduits", ManualHelper.CAT_ENERGY,
+				new ManualPages.Text(ManualHelper.getManual(), "conduits0"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "conduits1",
+						new ItemStack(IEContent.blockConduit, 1,
+								BlockTypes_Conduit.CONDUIT_RUN.getMeta())),
+				new ManualPages.Text(ManualHelper.getManual(), "conduits2"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "conduits3",
+						new ItemStack(IEContent.blockConduit, 1,
+								BlockTypes_Conduit.JUNCTION_BOX.getMeta())),
+				new ManualPages.Text(ManualHelper.getManual(), "conduits4"),
+				new ManualPages.Text(ManualHelper.getManual(), "conduits5"),
+				new ManualPages.Text(ManualHelper.getManual(), "conduits6"));
 		//Petroleum. In CAT_ENERGY because the whole chain ends in fuel: everything a player builds
 		//out here is on the way to a diesel generator, a turbine or a firebox, and the chapter only
 		//makes sense read next to those.
