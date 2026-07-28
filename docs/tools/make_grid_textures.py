@@ -21,6 +21,7 @@ and any future re-UV stay sane.
 """
 
 import argparse
+import json
 import os
 
 from PIL import Image
@@ -50,6 +51,13 @@ SCANLINE = (72, 132, 128, 255)
 SCREEN_GLOW = (126, 214, 200, 255)
 
 SIZE = 16
+
+# Ticks per frame for every animated sprite this file writes. MC's animation
+# format has no independent "speed" knob -- frametime times frame count is the
+# whole loop -- so this one constant is what stands between "a console that
+# looks alive" and "a console that strobes." Four frames at 8 ticks is a 1.6s
+# loop, slow enough to read as idle machinery from across a room.
+ANIMATION_FRAMETIME = 8
 
 
 def new_image(fill=STEEL):
@@ -269,8 +277,16 @@ def console_top():
     return img
 
 
-def console_screen():
-    """The lit screen half: dark glass, scanlines, a fake trace and status LEDs."""
+def _console_screen_frame(sweep_row):
+    """One frame of the lit screen: dark glass, scanlines, a fake trace and
+    status LEDs, plus -- if sweep_row lands inside the glass -- a brighter
+    scanline standing in for a CRT's refresh bar.
+
+    The sweep is applied last and only ever brightens plain glass pixels
+    (GLASS or GLASS_DARK). Skipping the trace, baseline and LEDs keeps those
+    readouts fixed every frame; if the sweep touched them too the screen would
+    read as flickering data rather than an idling display.
+    """
     img = new_image(GLASS_DARK)
     px = img.load()
     outline_rect(px, 0, 0, 15, 15, OUTLINE)
@@ -288,7 +304,33 @@ def console_screen():
     dots(px, [(3, 14), (5, 14)], LAMP_GREEN)
     dots(px, [(7, 14)], ORANGE)
     dots(px, [(9, 14), (11, 14)], LAMP_OFF)
+    if 2 <= sweep_row <= 13:
+        for x in range(2, 14):
+            if px[x, sweep_row] in (GLASS, GLASS_DARK):
+                px[x, sweep_row] = SCANLINE
     return img
+
+
+# Rows the sweep visits, one per frame, spaced across the glass (y 2..13) but
+# not evenly dividing it -- the last frame sits at 11, not 13, so the loop's
+# wrap from bottom back to top reads as a CRT's vertical retrace rather than
+# a stutter.
+_SWEEP_ROWS = (2, 5, 8, 11)
+
+
+def console_screen():
+    """The lit screen half, stacked into a 4-frame Minecraft animation sheet.
+
+    A static screen next to a lit status lamp and a live Stats tab reads as
+    broken hardware, so this is animated. MC's animated sprite format is just
+    N square frames stacked top to bottom in one PNG with a sibling .mcmeta
+    (written by main()) -- there is no per-frame file, so the sheet has to be
+    assembled here rather than saved frame by frame.
+    """
+    sheet = Image.new("RGBA", (SIZE, SIZE*len(_SWEEP_ROWS)))
+    for i, sweep_row in enumerate(_SWEEP_ROWS):
+        sheet.paste(_console_screen_frame(sweep_row), (0, i*SIZE))
+    return sheet
 
 
 def console_panel():
@@ -342,8 +384,19 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     for name, builder in sorted(TEXTURES.items()):
         path = os.path.join(args.out, name + ".png")
-        builder().save(path, "PNG", optimize=True)
+        image = builder()
+        image.save(path, "PNG", optimize=True)
         print("wrote", path)
+        # Anything taller than it is wide is a stacked animation sheet, not a
+        # block face. Minecraft doesn't need to be told the frame size -- it
+        # divides by the width on its own -- but with no .mcmeta at all it
+        # just squashes every frame into one texture, silently, which is a
+        # far worse failure than a missing file would be.
+        if image.height!=image.width:
+            meta_path = path+".mcmeta"
+            with open(meta_path, "w") as f:
+                f.write(json.dumps({"animation": {"frametime": ANIMATION_FRAMETIME}}, indent=2)+"\n")
+            print("wrote", meta_path)
 
 
 if __name__ == "__main__":

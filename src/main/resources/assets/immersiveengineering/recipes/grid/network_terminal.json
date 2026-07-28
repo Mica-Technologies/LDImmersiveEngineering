@@ -1,0 +1,25 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:network_terminal"
+	},
+	"pattern": [
+		" A ",
+		"SGS",
+		"SCS"
+	],
+	"key": {
+		"A": {
+			"item": "#stickTreatedWood"
+		},
+		"S": {
+			"item": "#plateSteel"
+		},
+		"G": {
+			"item": "#paneGlass"
+		},
+		"C": {
+			"item": "#componentSteel"
+		}
+	}
+}

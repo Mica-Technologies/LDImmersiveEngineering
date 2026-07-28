@@ -73,6 +73,7 @@ public class Lib
 	public static final int GUIID_Manual = GUIID_Base_Item+0;
 	public static final int GUIID_Revolver = GUIID_Base_Item+1;
 	public static final int GUIID_Toolbox = GUIID_Base_Item+2;
+	public static final int GUIID_NetworkTerminal = GUIID_Base_Item+3;
 	public static final int GUIID_MaintenanceKit= GUIID_Base_Item+3;
 
 	public static final String NBT_Earmuffs = "IE:Earmuffs";

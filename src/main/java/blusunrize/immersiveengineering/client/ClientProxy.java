@@ -52,6 +52,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IIEMetaBl
 import blusunrize.immersiveengineering.common.blocks.cloth.BlockTypes_ClothDevice;
 import blusunrize.immersiveengineering.common.blocks.cloth.TileEntityShaderBanner;
 import blusunrize.immersiveengineering.common.blocks.fluidnet.TileEntityFluidConsole;
+import blusunrize.immersiveengineering.common.items.ItemNetworkTerminal;
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridConsole;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
@@ -1411,6 +1412,8 @@ public class ClientProxy extends CommonProxy
 					return new GuiRevolver(player.inventory, world, slot, item);
 				if(ID==Lib.GUIID_Toolbox&&item.getItem() instanceof ItemToolbox)
 					return new GuiToolbox(player.inventory, world, slot, item);
+				if(ID==Lib.GUIID_NetworkTerminal&&item.getItem() instanceof ItemNetworkTerminal)
+					return new GuiNetworkTerminal(player.inventory);
 				if(ID==Lib.GUIID_MaintenanceKit&&item.getItem() instanceof ItemMaintenanceKit)
 					return new GuiMaintenanceKit(player.inventory, world, slot, item);
 			}
