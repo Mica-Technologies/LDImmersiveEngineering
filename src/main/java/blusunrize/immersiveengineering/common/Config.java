@@ -94,6 +94,12 @@ public class Config
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModePipes = true;
 
+		@Comment({"City mode: conduits. A bundle stops accounting for individual units of flux and switches to presence: a conductor is either energised or it is not, an energised breakout delivers at full rate, and line loss is not charged.",
+				"That replaces the per-channel gradient arithmetic on every junction box with a flag propagated along the run, and removes the buffering that makes a long run ramp up. This is the conduit's counterpart to the virtual grid's city mode -- same trade, same reasoning.",
+				"A conductor goes dark about a second after whatever was feeding it stops, so a switched circuit still visibly switches.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeConduits = true;
+
 		@Comment({"City mode: floodlights. Skips the periodic re-scan of the light beams, recomputing only when the light actually switches or a neighbouring block changes, and caps how many light blocks a single floodlight may place.",
 				"Floodlights are usually the most expensive block in a city build because each one places a number of individually ticking light blocks and periodically re-traces 13 beams and recalculates lighting.",
 				"Only applies when cityMode is enabled."})

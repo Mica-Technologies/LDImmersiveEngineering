@@ -90,7 +90,8 @@ class CityModeTest
 				+" machines="+IEConfig.cityModeMachines
 				+" virtualGrid="+IEConfig.cityModeVirtualGrid
 				+" petroleum="+IEConfig.cityModePetroleum
-				+" pipes="+IEConfig.cityModePipes;
+				+" pipes="+IEConfig.cityModePipes
+				+" conduits="+IEConfig.cityModeConduits;
 	}
 
 	/**
@@ -354,6 +355,37 @@ class CityModeTest
 	{
 		config(false, true, true, true, true, false);
 		assertFalse(CityMode.grid());
+	}
+
+	// ---------------------------------------------------------------- conduits()
+
+	@Test
+	@DisplayName("conduits(): master on + subsystem on -> simplified")
+	void conduitsMasterOnSubOn()
+	{
+		IEConfig.cityMode = true;
+		IEConfig.cityModeConduits = true;
+		assertTrue(CityMode.conduits());
+	}
+
+	@Test
+	@DisplayName("conduits(): master on + subsystem off -> stock")
+	void conduitsMasterOnSubOff()
+	{
+		IEConfig.cityMode = true;
+		IEConfig.cityModeConduits = false;
+		assertFalse(CityMode.conduits());
+	}
+
+	@Test
+	@DisplayName("conduits(): the master switch alone restores stock behaviour")
+	void conduitsMasterOff()
+	{
+		//The property the whole class exists for: turning the master off is always sufficient,
+		//whatever the per-subsystem flags say.
+		IEConfig.cityMode = false;
+		IEConfig.cityModeConduits = true;
+		assertFalse(CityMode.conduits());
 	}
 
 	// ---------------------------------------------------------------- master dominance

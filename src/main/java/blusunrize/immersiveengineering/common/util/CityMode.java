@@ -62,6 +62,26 @@ public final class CityMode
 	}
 
 	/**
+	 * Conduits switch from moving units of flux to presence: a conductor is either energised or it
+	 * is not, an energised breakout delivers at full rate, and no line loss is charged.
+	 * <p>
+	 * The full path keeps a buffer per channel per junction box and moves half the difference
+	 * between neighbours each tick. That gradient is what makes energy find its way to a load
+	 * without anybody walking the run, and it is also arithmetic on every box on every tick for
+	 * every conductor carrying anything. In a decorative build the answer to "is this corridor lit"
+	 * is yes, and the sixteen subtractions that established it were spent proving something nobody
+	 * was going to look at.
+	 * <p>
+	 * This is the conduit's counterpart to {@link #grid()} rather than to {@link #wires()} -- the
+	 * grid made the same move from accounting to presence, for the same reason. A conductor still
+	 * goes dark about a second after its source stops, so a switched circuit still switches.
+	 */
+	public static boolean conduits()
+	{
+		return IEConfig.cityMode&&IEConfig.cityModeConduits;
+	}
+
+	/**
 	 * Floodlights skip their periodic beam re-scan and cap how many light blocks they place.
 	 */
 	public static boolean floodlights()

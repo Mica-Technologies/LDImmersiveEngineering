@@ -21,6 +21,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbou
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import net.minecraft.util.ITickable;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.EnergyHelper;
@@ -99,6 +100,15 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * neighbours.
 	 */
 	private int liveMask;
+
+	/**
+	 * How fast an unfed conductor goes dark in city mode, per tick.
+	 * <p>
+	 * A twentieth of a channel, so a circuit whose source stops is visibly out within a second. A
+	 * latch with no decay would leave a corridor lit by a generator somebody dismantled last week,
+	 * which is exactly the sort of quiet wrongness city mode is not allowed to introduce.
+	 */
+	private static final int CITY_DECAY = Math.max(1, CHANNEL_CAPACITY/20);
 
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
@@ -313,6 +323,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//in place rather than copied: this is the one loop in the feature that runs every tick, and
 		//a set allocated per live box per tick is exactly the shape of thing this mod's profiling
 		//history is about.
+		boolean city = CityMode.conduits();
 		Set<Connection> runs = ImmersiveNetHandler.INSTANCE.getConnections(world, getPos());
 		if(runs!=null)
 			for(Connection run : runs)
@@ -321,15 +332,51 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 					continue;
 				for(WireChannel channel : WireChannel.VALUES)
 					if((liveMask&channel.getMask())!=0)
-						passAlong(run, channel);
+					{
+						if(city)
+							energise(run, channel);
+						else
+							passAlong(run, channel);
+					}
 			}
 
 		for(WireChannel channel : WireChannel.VALUES)
-			if(held[channel.ordinal()] <= 0)
+		{
+			int index = channel.ordinal();
+			//City mode's only outgoing debit. Nothing else takes anything off a conductor there --
+			//an energised one delivers without being drained -- so this is what makes a circuit go
+			//out when its source does rather than staying lit forever.
+			if(city)
+				held[index] -= CITY_DECAY;
+			if(held[index] <= 0)
 			{
-				held[channel.ordinal()] = 0;
+				held[index] = 0;
 				liveMask &= ~channel.getMask();
 			}
+		}
+	}
+
+	/**
+	 * City mode's version of {@link #passAlong}: hand the neighbour the fact that this conductor is
+	 * live, rather than a quantity of flux.
+	 * <p>
+	 * The peer is topped up to full rather than given a share, so presence spreads along a run at
+	 * one box per tick and every box on it reports the same thing. No gradient, no loss, no
+	 * arithmetic beyond a comparison.
+	 */
+	private void energise(Connection run, WireChannel channel)
+	{
+		if(run.channels==null||run.channels.getSpec(channel)==null)
+			return;
+		TileEntity te = world.isBlockLoaded(run.end)?world.getTileEntity(run.end): null;
+		if(!(te instanceof TileEntityJunctionBox))
+			return;
+		TileEntityJunctionBox peer = (TileEntityJunctionBox)te;
+		int index = channel.ordinal();
+		if(peer.held[index] >= held[index]-CITY_DECAY)
+			return;
+		peer.held[index] = held[index]-CITY_DECAY;
+		peer.liveMask |= channel.getMask();
 	}
 
 	private void drainToBreakout(WireChannel channel)
@@ -345,7 +392,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(target==null)
 			return;
 		int accepted = EnergyHelper.insertFlux(target, face.getOpposite(), offered, false);
-		held[index] -= accepted;
+		//City mode delivers without debiting: the conductor is energised, and where the energy came
+		//from is precisely the accounting it exists to stop doing. The decay in update() is what
+		//keeps that from being a free generator that never switches off.
+		if(!CityMode.conduits())
+			held[index] -= accepted;
 		lastMoved[index] += accepted;
 	}
 
