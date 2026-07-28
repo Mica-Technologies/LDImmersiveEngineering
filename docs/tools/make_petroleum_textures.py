@@ -471,7 +471,38 @@ def engine_block():
     _rect(px, 0, 13, 15, 13, RUST)
     return img
 
+def tank_cap():
+    """Buried tank fitting: a bolted filler cap and a gauge window, flush with the ground.
+
+    This is the only block of a buried tank a player can see, so the texture has one job --
+    read as "there is a tank under here, and this is where you plug into it" from standing
+    height. Everything else about the tank is invisible by design.
+    """
+    img = _blank(STEEL_DARK)
+    px = img.load()
+    # Octagon, built from three overlapping rectangles, so the fitting reads as round
+    # against the square block it is set into.
+    _rect(px, 4, 2, 11, 13, STEEL)
+    _rect(px, 2, 4, 13, 11, STEEL)
+    _rect(px, 3, 3, 12, 12, STEEL)
+    # Raised lip, lit from the top left like every other block in the set.
+    _rect(px, 5, 3, 10, 3, STEEL_LIT)
+    _rect(px, 3, 5, 3, 10, STEEL_LIT)
+    # The gauge. Brightest thing on the texture on purpose: an invisible tank whose level
+    # cannot be read from the surface is a bad object, and this is where the reading lives.
+    _rect(px, 6, 6, 9, 9, OUTLINE)
+    _rect(px, 7, 7, 8, 8, GLASS)
+    _dots(px, [(5, 4), (10, 4), (4, 5), (11, 5),
+               (4, 10), (11, 10), (5, 11), (10, 11)], BOLT)
+    _rect(px, 0, 0, 15, 0, OUTLINE)
+    _rect(px, 0, 15, 15, 15, OUTLINE)
+    _rect(px, 0, 0, 0, 15, OUTLINE)
+    _rect(px, 15, 0, 15, 15, OUTLINE)
+    return img
+
+
 EXTRA_BLOCKS = {
+    "petroleum_tank_cap": tank_cap,
     "petroleum_flare_stack": flare_stack,
     "petroleum_vessel": vessel,
     "petroleum_turbine_body": turbine_body,

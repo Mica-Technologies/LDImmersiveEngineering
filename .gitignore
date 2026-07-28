@@ -54,3 +54,6 @@ desktop.ini
 
 # local-only agent/dev plans (kept private, not published)
 docs/agent-plans/
+# Python bytecode from the texture generators
+__pycache__/
+*.pyc

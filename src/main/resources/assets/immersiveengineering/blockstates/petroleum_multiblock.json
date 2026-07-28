@@ -36,6 +36,15 @@
 		"inventory,type=engine_bank": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_engine_block"}
 		}],
+		"inventory,type=domestic_tank": [{
+			"textures": {"all": "immersiveengineering:blocks/sheetmetal_iron"}
+		}],
+		"inventory,type=commercial_tank": [{
+			"textures": {"all": "immersiveengineering:blocks/sheetmetal_steel"}
+		}],
+		"inventory,type=bulk_depot": [{
+			"textures": {"all": "immersiveengineering:blocks/sheetmetal_steel"}
+		}],
 		"type": {
 			"derrick": {},
 			"pumpjack": {
@@ -64,11 +73,22 @@
 			},
 			"engine_bank": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_engine_block"}
+			},
+			"domestic_tank": {
+				"textures": {"all": "immersiveengineering:blocks/sheetmetal_iron"}
+			},
+			"commercial_tank": {
+				"textures": {"all": "immersiveengineering:blocks/sheetmetal_steel"}
+			},
+			"bulk_depot": {
+				"textures": {"all": "immersiveengineering:blocks/sheetmetal_steel"}
 			}
 		},
 		"boolean0": {
 			"false": {},
-			"true": {}
+			"true": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
+			}
 		}
 	}
 }

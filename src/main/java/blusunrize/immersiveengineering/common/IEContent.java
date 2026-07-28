@@ -823,6 +823,9 @@ public class IEContent
 		registerTile(TileEntityFlareStack.class);
 		registerTile(TileEntityLubricationManifold.class);
 		registerTile(TileEntityPropaneCylinder.class);
+		registerTile(TileEntityDomesticTank.class);
+		registerTile(TileEntityCommercialTank.class);
+		registerTile(TileEntityBulkDepot.class);
 
 
 
@@ -1128,6 +1131,10 @@ public class IEContent
 		MultiblockHandler.registerMultiblock(MultiblockHRSG.instance);
 		MultiblockHandler.registerMultiblock(MultiblockSteamTurbineHall.instance);
 		MultiblockHandler.registerMultiblock(MultiblockEngineBank.instance);
+		//Three instances of one class rather than three classes: everything that differs between
+		//the tiers is data, so they share a shape, a formation routine and a burial check.
+		for(MultiblockBuriedTank tank : MultiblockBuriedTank.ALL)
+			MultiblockHandler.registerMultiblock(tank);
 
 		/*VILLAGE*/
 		IEVillagerHandler.initIEVillagerHouse();

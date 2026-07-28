@@ -63,7 +63,19 @@ public enum BlockTypes_PetroleumMultiblock implements IStringSerializable, Block
 	/**
 	 * Cylinder banks that scale by building another one alongside.
 	 */
-	ENGINE_BANK;
+	ENGINE_BANK,
+	/**
+	 * One house's worth of fuel, under the garden.
+	 */
+	DOMESTIC_TANK,
+	/**
+	 * A forecourt's or a workshop's supply, under the yard.
+	 */
+	COMMERCIAL_TANK,
+	/**
+	 * A refinery's or a town's stock, under the ground it stands on.
+	 */
+	BULK_DEPOT;
 
 	@Override
 	public String getName()

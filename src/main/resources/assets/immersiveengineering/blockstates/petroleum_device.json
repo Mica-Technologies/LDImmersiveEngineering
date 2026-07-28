@@ -20,6 +20,9 @@
 		"inventory,type=flare_stack": [{
 			"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
 		}],
+		"inventory,type=tank_fill_cap": [{
+			"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
+		}],
 		"inventory,type=wellhead": [{
 			"model": "immersiveengineering:petroleum/wellhead",
 			"textures": {
@@ -39,6 +42,9 @@
 			},
 			"flare_stack": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_flare_stack"}
+			},
+			"tank_fill_cap": {
+				"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
 			},
 			"wellhead": {
 				"model": "immersiveengineering:petroleum/wellhead",

@@ -1,0 +1,24 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_device",
+		"data": 5,
+		"count": 2
+	},
+	"pattern": [
+		" G ",
+		"PCP",
+		" P "
+	],
+	"key": {
+		"P": {
+			"item": "#plateIron"
+		},
+		"C": {
+			"item": "#componentIron"
+		},
+		"G": {
+			"item": "#paneGlass"
+		}
+	}
+}

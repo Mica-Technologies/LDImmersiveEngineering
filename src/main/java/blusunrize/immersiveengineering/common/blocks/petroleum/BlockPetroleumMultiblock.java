@@ -67,6 +67,12 @@ public class BlockPetroleumMultiblock extends BlockIEMultiblock<BlockTypes_Petro
 				return new TileEntitySteamTurbineHall();
 			case ENGINE_BANK:
 				return new TileEntityEngineBank();
+			case DOMESTIC_TANK:
+				return new TileEntityDomesticTank();
+			case COMMERCIAL_TANK:
+				return new TileEntityCommercialTank();
+			case BULK_DEPOT:
+				return new TileEntityBulkDepot();
 		}
 		return null;
 	}

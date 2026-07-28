@@ -41,7 +41,12 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * A bottle of propane you fill somewhere and carry to wherever it is needed.
 	 */
-	PROPANE_CYLINDER;
+	PROPANE_CYLINDER,
+	/**
+	 * The one fitting a buried tank shows above ground: what a pipe connects to, what a comparator
+	 * reads, and the whole of the tank's gauge.
+	 */
+	TANK_FILL_CAP;
 
 	@Override
 	public String getName()

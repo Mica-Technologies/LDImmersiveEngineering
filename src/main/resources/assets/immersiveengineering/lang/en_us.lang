@@ -1843,3 +1843,10 @@ desc.immersiveengineering.info.petroleum.freeFlowing=Free-flowing
 desc.immersiveengineering.info.petroleum.needsPump=Needs a pumpjack
 desc.immersiveengineering.info.petroleum.pumped=Pumped
 chat.immersiveengineering.info.petroleum.derrickUnformed=Build a 3x3 lattice nine blocks tall, then strike it with an Engineer's Hammer.
+
+#Petroleum -- storage and distribution
+tile.immersiveengineering.petroleum_device.tank_fill_cap.name=Tank Fill Cap
+tile.immersiveengineering.petroleum_multiblock.domestic_tank.name=Domestic Tank
+tile.immersiveengineering.petroleum_multiblock.commercial_tank.name=Commercial Tank
+tile.immersiveengineering.petroleum_multiblock.bulk_depot.name=Bulk Depot
+chat.immersiveengineering.info.petroleum.tankNotBuried=This tank is not buried. Every block of its roof except the fill cap needs something on top of it.
