@@ -61,7 +61,9 @@ import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorDro
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorSplit;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorVertical;
 import blusunrize.immersiveengineering.common.blocks.metal.conveyors.ConveyorChute;
+import blusunrize.immersiveengineering.common.blocks.fluidnet.BlockTypes_FluidNetDevice;
 import blusunrize.immersiveengineering.common.blocks.multiblocks.*;
+import blusunrize.immersiveengineering.common.items.ItemPetroleum;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDecoration;
 import blusunrize.immersiveengineering.common.blocks.petroleum.TileEntityGasPump;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDevice;
@@ -829,7 +831,58 @@ public class ClientProxy extends CommonProxy
 						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.LUBRICATION_MANIFOLD.getMeta())),
 				new ManualPages.CraftingMulti(ManualHelper.getManual(), "petroleum19",
 						new ItemStack(IEContent.blockPetroleumDecoration, 1, BlockTypes_PetroleumDecoration.ASPHALT_TILE.getMeta()),
-						new ItemStack(IEContent.blockPetroleumDecoration, 1, BlockTypes_PetroleumDecoration.ASPHALT_MARKED.getMeta())));
+						new ItemStack(IEContent.blockPetroleumDecoration, 1, BlockTypes_PetroleumDecoration.ASPHALT_MARKED.getMeta())),
+				//Power generation. The chapter runs long, but splitting it would put the plants in a
+				//chapter of their own that only makes sense after this one -- and a player who has just
+				//built a distillation tower is exactly who should be reading about the heavy cuts.
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum20"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum21", MultiblockFuelOilBoiler.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum22"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum23", MultiblockSteamTurbineHall.instance),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum24", MultiblockHRSG.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum25"),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum26", MultiblockEngineBank.instance),
+				//Storage.
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum27",
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.TANK_FILL_CAP.getMeta())),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum28", MultiblockBuriedTank.domestic),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum29", MultiblockBuriedTank.commercial),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum30", MultiblockBuriedTank.bulk),
+				//The forecourt.
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum31",
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.GAS_PUMP.getMeta())),
+				new ManualPages.CraftingMulti(ManualHelper.getManual(), "petroleum32",
+						new ItemStack(IEContent.itemPetroleum, 1, ItemPetroleum.NOZZLE),
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.FORECOURT_SIGN.getMeta())),
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum33",
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.PORTABLE_GENERATOR.getMeta())),
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum34", MultiblockLoadingGantry.instance),
+				//Deep refining and recovery.
+				new ManualPageMultiblock(ManualHelper.getManual(), "petroleum35", MultiblockCrackingUnit.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "petroleum36"),
+				new ManualPages.CraftingMulti(ManualHelper.getManual(), "petroleum37",
+						new ItemStack(IEContent.itemPetroleum, 1, ItemPetroleum.BLOWOUT_PREVENTER),
+						new ItemStack(IEContent.itemPetroleum, 1, ItemPetroleum.ABSORBENT_PAD)),
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum38",
+						new ItemStack(IEContent.blockPetroleumDevice, 1, BlockTypes_PetroleumDevice.REINJECTION_WELL.getMeta())),
+				new ManualPages.Crafting(ManualHelper.getManual(), "petroleum39",
+						new ItemStack(IEContent.itemPetroleum, 1, ItemPetroleum.SURVEY_KIT)));
+
+		//The virtual fluid network. Its own chapter rather than more petroleum pages, because it is
+		//not about oil: it carries water mains and district heating just as happily, and a player who
+		//has never drilled a well should still find it.
+		ManualHelper.getManual().addEntry("fluidNetwork", ManualHelper.CAT_ENERGY,
+				new ManualPages.Text(ManualHelper.getManual(), "fluidNetwork0"),
+				new ManualPages.CraftingMulti(ManualHelper.getManual(), "fluidNetwork1",
+						new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.FLUID_INLET.getMeta()),
+						new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.FLUID_OUTLET.getMeta())),
+				new ManualPages.Crafting(ManualHelper.getManual(), "fluidNetwork2",
+						new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.CONSOLE_HOUSING.getMeta())),
+				new ManualPageMultiblock(ManualHelper.getManual(), "fluidNetwork3", MultiblockFluidConsole.instance),
+				new ManualPages.Text(ManualHelper.getManual(), "fluidNetwork4"),
+				new ManualPages.Text(ManualHelper.getManual(), "fluidNetwork5"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "fluidNetwork6",
+						new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.MAIN_VALVE.getMeta())));
 
 		Map<String, Integer> sortedMap = ThermoelectricHandler.getThermalValuesSorted(true);
 		String[][] table = formatToTable_ItemIntHashmap(sortedMap, "K");
