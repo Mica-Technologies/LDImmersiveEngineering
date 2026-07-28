@@ -25,6 +25,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fluids.FluidStack;
+import blusunrize.immersiveengineering.common.util.CityModeTank;
 import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.fluids.IFluidTank;
 
@@ -73,7 +74,9 @@ public abstract class TileEntityBuriedTank<T extends TileEntityBuriedTank<T>>
 	{
 		super(tier.size);
 		this.tier = tier;
-		this.tank = new FluidTank(tier.capacity)
+		//CityModeTank rather than FluidTank: in city mode a tank with anything in it is a
+		//bottomless source of it, which is the whole point of a decorative fuel depot.
+		this.tank = new CityModeTank(tier.capacity)
 		{
 			@Override
 			protected void onContentsChanged()

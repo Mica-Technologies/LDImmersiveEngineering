@@ -100,6 +100,12 @@ public class Config
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModeConduits = true;
 
+		@Comment({"City mode: tanks. A tank holding any fluid at all becomes an unlimited source of it -- draw as much as you like and the level does not move. An empty tank still gives nothing, so filling one still matters and a dry tank still reads as dry.",
+				"Filling is untouched: a tank still fills at its ordinary rate from whatever is feeding it. Only the draw side is free.",
+				"Applies to the buried Domestic, Commercial and Bulk tanks and to the Sheetmetal Tank.",
+				"Only applies when cityMode is enabled."})
+		public static boolean cityModeTanks = true;
+
 		@Comment({"City mode: floodlights. Skips the periodic re-scan of the light beams, recomputing only when the light actually switches or a neighbouring block changes, and caps how many light blocks a single floodlight may place.",
 				"Floodlights are usually the most expensive block in a city build because each one places a number of individually ticking light blocks and periodically re-traces 13 beams and recalculates lighting.",
 				"Only applies when cityMode is enabled."})

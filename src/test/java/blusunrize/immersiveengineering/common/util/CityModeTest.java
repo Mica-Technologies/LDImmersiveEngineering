@@ -91,7 +91,8 @@ class CityModeTest
 				+" virtualGrid="+IEConfig.cityModeVirtualGrid
 				+" petroleum="+IEConfig.cityModePetroleum
 				+" pipes="+IEConfig.cityModePipes
-				+" conduits="+IEConfig.cityModeConduits;
+				+" conduits="+IEConfig.cityModeConduits
+				+" tanks="+IEConfig.cityModeTanks;
 	}
 
 	/**
@@ -386,6 +387,61 @@ class CityModeTest
 		IEConfig.cityMode = false;
 		IEConfig.cityModeConduits = true;
 		assertFalse(CityMode.conduits());
+	}
+
+	// ---------------------------------------------------------------- tanks()
+
+	@Test
+	@DisplayName("tanks(): master on + subsystem on -> simplified")
+	void tanksMasterOnSubOn()
+	{
+		IEConfig.cityMode = true;
+		IEConfig.cityModeTanks = true;
+		assertTrue(CityMode.tanks());
+	}
+
+	@Test
+	@DisplayName("tanks(): master on + subsystem off -> stock")
+	void tanksMasterOnSubOff()
+	{
+		IEConfig.cityMode = true;
+		IEConfig.cityModeTanks = false;
+		assertFalse(CityMode.tanks());
+	}
+
+	@Test
+	@DisplayName("tanks(): the master switch alone restores stock behaviour")
+	void tanksMasterOff()
+	{
+		IEConfig.cityMode = false;
+		IEConfig.cityModeTanks = true;
+		assertFalse(CityMode.tanks());
+	}
+
+	@Test
+	@DisplayName("every tank in the mod goes through CityModeTank")
+	void everyTankIsCityModeAware()
+	{
+		//A tank left as a plain FluidTank is one the master switch does not reach, and the only
+		//symptom is a depot that quietly drains in a world where nothing else does.
+		for(String path : new String[]{
+				"src/main/java/blusunrize/immersiveengineering/common/blocks/petroleum/TileEntityBuriedTank.java",
+				"src/main/java/blusunrize/immersiveengineering/common/blocks/metal/TileEntitySheetmetalTank.java"})
+		{
+			String source;
+			try
+			{
+				source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
+						java.nio.charset.StandardCharsets.UTF_8);
+			} catch(java.io.IOException e)
+			{
+				throw new AssertionError("could not read "+path, e);
+			}
+			assertTrue(source.contains("new CityModeTank("),
+					path+" builds a plain FluidTank, so city mode cannot reach it");
+			assertFalse(source.contains("new FluidTank("),
+					path+" still has a plain FluidTank alongside the city-mode one");
+		}
 	}
 
 	// ---------------------------------------------------------------- master dominance

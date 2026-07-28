@@ -28,6 +28,7 @@ import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraftforge.fluids.FluidStack;
+import blusunrize.immersiveengineering.common.util.CityModeTank;
 import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.IFluidTank;
@@ -37,7 +38,9 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 
 public class TileEntitySheetmetalTank extends TileEntityMultiblockPart<TileEntitySheetmetalTank> implements IBlockOverlayText, IPlayerInteraction, IComparatorOverride
 {
-	public FluidTank tank = new FluidTank(512000);
+	//CityModeTank rather than FluidTank: in city mode a tank with anything in it is a bottomless
+	//source of it. Stock behaviour is unchanged whenever the master switch is off.
+	public FluidTank tank = new CityModeTank(512000);
 	private int[] oldComps = new int[4];
 	private int masterCompOld;
 

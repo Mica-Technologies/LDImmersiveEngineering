@@ -82,6 +82,18 @@ public final class CityMode
 	}
 
 	/**
+	 * A tank holding anything at all becomes an unlimited source of it. Empty is still empty.
+	 * <p>
+	 * Presence rather than accounting, like {@link #grid()} and {@link #conduits()}. Filling is
+	 * untouched -- only the draw side is free -- so a tank still fills at its ordinary rate and
+	 * there is still something to build. See {@code CityModeTank}.
+	 */
+	public static boolean tanks()
+	{
+		return IEConfig.cityMode&&IEConfig.cityModeTanks;
+	}
+
+	/**
 	 * Floodlights skip their periodic beam re-scan and cap how many light blocks they place.
 	 */
 	public static boolean floodlights()
