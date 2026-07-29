@@ -55,17 +55,36 @@ public class TileEntityPropaneCylinder extends TileEntityIEBase implements ITile
 	 */
 	public static final int CAPACITY = 4000;
 
-	public final FluidTank tank = new FluidTank(CAPACITY)
+	public final FluidTank tank;
+
+	public TileEntityPropaneCylinder()
 	{
-		@Override
-		public boolean canFillFluidType(FluidStack fluid)
+		this(CAPACITY);
+	}
+
+	/**
+	 * The larger shapes are the same vessel in a different body, so they are subclasses carrying
+	 * only their size rather than copies of everything below.
+	 * <p>
+	 * A constructor argument and a class each, rather than one class reading its capacity out of
+	 * NBT, for the reason the buried tanks give: Forge builds a tile entity through a no-argument
+	 * constructor on chunk load, so a vessel that had to recall its own size would have to guess
+	 * when the tag was missing -- and guessing small silently voids whatever was in it.
+	 */
+	protected TileEntityPropaneCylinder(int capacity)
+	{
+		this.tank = new FluidTank(capacity)
 		{
-			//A propane bottle takes propane. Letting it hold anything would quietly make it the
-			//cheapest portable tank in the mod for every fluid at once.
-			return fluid!=null&&fluid.getFluid()!=null
-					&&"propane".equals(fluid.getFluid().getName());
-		}
-	};
+			@Override
+			public boolean canFillFluidType(FluidStack fluid)
+			{
+				//A propane bottle takes propane. Letting it hold anything would quietly make it the
+				//cheapest portable tank in the mod for every fluid at once.
+				return fluid!=null&&fluid.getFluid()!=null
+						&&"propane".equals(fluid.getFluid().getName());
+			}
+		};
+	}
 
 	//	=================================
 	//		CAPABILITY
@@ -158,7 +177,10 @@ public class TileEntityPropaneCylinder extends TileEntityIEBase implements ITile
 		if(tank.getFluidAmount() <= 0)
 			return new String[]{TextFormatting.GRAY+"Empty"+TextFormatting.RESET};
 		return new String[]{tank.getFluid().getLocalizedName(),
-				tank.getFluidAmount()+" / "+CAPACITY+" mB"};
+				//The tank's own capacity, not the constant: the larger bodies are this class with a
+				//different number, and a readout quoting four buckets on a twenty-four bucket tank
+				//would be the first thing anybody noticed and the last thing they trusted.
+				tank.getFluidAmount()+" / "+tank.getCapacity()+" mB"};
 	}
 
 	@Override
@@ -170,7 +192,7 @@ public class TileEntityPropaneCylinder extends TileEntityIEBase implements ITile
 	@Override
 	public int getComparatorInputOverride()
 	{
-		return Math.min(15, (int)Math.ceil(15.0*tank.getFluidAmount()/CAPACITY));
+		return Math.min(15, (int)Math.ceil(15.0*tank.getFluidAmount()/tank.getCapacity()));
 	}
 
 	//	=================================

@@ -52,9 +52,10 @@ class BlockTypesPetroleumDeviceTest
 	@DisplayName("the constant count is frozen")
 	void constantCountIsFrozen()
 	{
-		//Appended to on 2026-07-28 for the Storage Tank wall. Appending is safe -- every existing
-		//meta keeps its number -- which is exactly what orderIsFrozen below is here to prove.
-		assertEquals(11, values().length,
+		//Appended to on 2026-07-28 for the Storage Tank wall, and on 2026-07-29 for the upright and
+		//torpedo propane tanks. Appending is safe -- every existing meta keeps its number -- which is
+		//exactly what orderIsFrozen below is here to prove.
+		assertEquals(13, values().length,
 				"a constant was added or removed -- confirm the metadata remap is intentional");
 		assertTrue(values().length <= 16,
 				"block metadata is four bits; a seventeenth constant cannot be stored in a "

@@ -38,8 +38,15 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 		this.lightOpacity = 0;
 		//The wellhead is a valve stack, not a solid cube.
 		this.setNotNormalBlock(BlockTypes_PetroleumDevice.WELLHEAD.getMeta());
-		this.setNotNormalBlock(BlockTypes_PetroleumDevice.PROPANE_CYLINDER.getMeta());
-		this.setMetaBlockLayer(BlockTypes_PetroleumDevice.PROPANE_CYLINDER.getMeta(), BlockRenderLayer.CUTOUT);
+		//All three propane bodies: none of them fills its block, and all three are drawn cut out.
+		for(BlockTypes_PetroleumDevice vessel : new BlockTypes_PetroleumDevice[]{
+				BlockTypes_PetroleumDevice.PROPANE_CYLINDER,
+				BlockTypes_PetroleumDevice.PROPANE_TANK_UPRIGHT,
+				BlockTypes_PetroleumDevice.PROPANE_TANK_TORPEDO})
+		{
+			this.setNotNormalBlock(vessel.getMeta());
+			this.setMetaBlockLayer(vessel.getMeta(), BlockRenderLayer.CUTOUT);
+		}
 		this.setMetaBlockLayer(BlockTypes_PetroleumDevice.WELLHEAD.getMeta(), BlockRenderLayer.CUTOUT);
 	}
 
@@ -84,6 +91,10 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 				return new TileEntityWellhead();
 			case PROPANE_CYLINDER:
 				return new TileEntityPropaneCylinder();
+			case PROPANE_TANK_UPRIGHT:
+				return new TileEntityPropaneTankUpright();
+			case PROPANE_TANK_TORPEDO:
+				return new TileEntityPropaneTankTorpedo();
 			case LUBRICATION_MANIFOLD:
 				return new TileEntityLubricationManifold();
 			case FLARE_STACK:

@@ -846,6 +846,8 @@ public class IEContent
 		registerTile(TileEntityFlareStack.class);
 		registerTile(TileEntityLubricationManifold.class);
 		registerTile(TileEntityPropaneCylinder.class);
+		registerTile(TileEntityPropaneTankUpright.class);
+		registerTile(TileEntityPropaneTankTorpedo.class);
 		registerTile(TileEntityDomesticTank.class);
 		registerTile(TileEntityCommercialTank.class);
 		registerTile(TileEntityBulkDepot.class);

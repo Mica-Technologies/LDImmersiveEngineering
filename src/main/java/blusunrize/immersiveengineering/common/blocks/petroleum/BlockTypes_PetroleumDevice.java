@@ -66,7 +66,15 @@ public enum BlockTypes_PetroleumDevice implements IStringSerializable, BlockIEBa
 	/**
 	 * Loose steel until a hollow box of it is hammered into a Storage Tank.
 	 */
-	STORAGE_TANK_WALL;
+	STORAGE_TANK_WALL,
+	/**
+	 * The tall bottle that stands beside a building. Twelve buckets.
+	 */
+	PROPANE_TANK_UPRIGHT,
+	/**
+	 * The horizontal drum on saddles at the end of a garden. Twenty-four buckets.
+	 */
+	PROPANE_TANK_TORPEDO;
 
 	@Override
 	public String getName()

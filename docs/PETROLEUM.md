@@ -40,6 +40,8 @@ Line numbers in this document are a reading aid, not a contract; the tree moves 
 | **Gas Turbine** | Complete | A 3×6×3 machine that burns natural gas for Flux, with a spool-up curve that makes it a peaker rather than a base load. |
 | **Lubrication Manifold** | Complete | A single block that bolts onto a working machine and rebates part of its running cost while it has lubricant. |
 | **Propane Cylinder** | Complete | A portable four-bucket bottle that keeps its contents when broken. The domestic-scale answer to "I have propane, now what". |
+| **Upright Propane Tank** | Complete | The same vessel in a taller body: twelve buckets, for a building rather than a barbecue. |
+| **Torpedo Propane Tank** | Complete | The horizontal drum on saddles: twenty-four buckets, and what a house actually runs on. |
 | **Fuel Oil Boiler** | Untested | A 5×5×7 furnace that makes steam rather than Flux. What finally gives heavy fuel oil a job at scale. |
 | **Heat Recovery Steam Generator** | Untested | A 3×5×3 tube bank that makes steam from a Gas Turbine's exhaust and burns nothing of its own. |
 | **Steam Turbine Hall** | Untested | 5×9×5, the largest structure here and the most efficient thing in the mod at turning fuel into Flux. |
@@ -547,11 +549,41 @@ is server-side while the overlay draws client-side.
 
 ---
 
-## Propane Cylinder
+## Propane vessels
 
-The bottle off the back of a barbecue: 4000 mB, portable, and it keeps its contents when broken so
-that swapping an empty for a full one is the gesture rather than plumbing anything. The same trick
-the wooden barrel uses.
+Three bodies, one behaviour. All three take propane and nothing else, all three keep their contents
+when broken, and all three fill from a bucket, a can or a pipe.
+
+| Block | Capacity | What it is |
+|---|---|---|
+| **Propane Cylinder** | 4,000 mB | The bottle off the back of a barbecue |
+| **Upright Propane Tank** | 12,000 mB | The tall bottle standing beside a building |
+| **Torpedo Propane Tank** | 24,000 mB | The horizontal drum on saddles at the end of a garden |
+
+They exist because a forecourt, a back garden and a job site do not look alike and until now all
+three had the same bottle on them. The sizes follow the shapes rather than the other way round —
+a player who sees a bigger tank expects it to hold more, and a ladder that contradicted that would
+be worse than no ladder.
+
+The torpedo deliberately stops short of the buried **Domestic Tank**'s 32,000. That tier's whole
+proposition is being invisible and cheap, and an above-ground tank beating it on capacity as well
+as on convenience would leave it with nothing to be.
+
+They are one class: `TileEntityPropaneCylinder` with a capacity in its constructor, and a subclass
+per body carrying only that number. A constructor argument rather than a value in NBT, for the
+reason the buried tanks give — Forge builds a tile entity through a no-argument constructor on
+chunk load, so a vessel that had to recall its own size would have to guess when the tag was
+missing, and guessing small silently voids whatever was in it.
+
+**The torpedo does not rotate.** `petroleum_device` declares no facing property at all — the two
+directional blocks on it keep their facing on the tile and are drawn as plain cubes — so making
+this one turn means adding a facing to every meta and a rotation submap applying to all of them.
+That is a change worth making on its own rather than as a rider on a new tank.
+
+### The cylinder
+
+4000 mB, portable, and it keeps its contents when broken so that swapping an empty for a full one
+is the gesture rather than plumbing anything. The same trick the wooden barrel uses.
 
 It is the smallest rung of the tank ladder and the only portable one. Everything else in this
 feature is infrastructure — wells, towers, pipe runs — and all of it is useless to a player who

@@ -1,0 +1,20 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_device",
+		"data": 11
+	},
+	"pattern": [
+		" C ",
+		"SSS",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"C": {
+			"item": "#componentSteel"
+		}
+	}
+}

@@ -133,12 +133,44 @@
 				"textures": {
 					"all": "immersiveengineering:blocks/petroleum_storage_tank"
 				}
+			},
+			"propane_tank_upright": {
+				"model": "immersiveengineering:petroleum/propane_tank_upright",
+				"textures": {
+					"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"
+				}
+			},
+			"propane_tank_torpedo": {
+				"model": "immersiveengineering:petroleum/propane_tank_torpedo",
+				"textures": {
+					"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"
+				}
 			}
 		},
 		"inventory,type=storage_tank_wall": [
 			{
 				"textures": {
 					"all": "immersiveengineering:blocks/petroleum_storage_tank"
+				}
+			}
+		],
+		"inventory,type=propane_tank_upright": [
+			{
+				"model": "immersiveengineering:petroleum/propane_tank_upright",
+				"textures": {
+					"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"
+				}
+			}
+		],
+		"inventory,type=propane_tank_torpedo": [
+			{
+				"model": "immersiveengineering:petroleum/propane_tank_torpedo",
+				"textures": {
+					"tank": "immersiveengineering:blocks/petroleum_propane_cylinder",
+					"particle": "immersiveengineering:blocks/petroleum_propane_cylinder"
 				}
 			}
 		]

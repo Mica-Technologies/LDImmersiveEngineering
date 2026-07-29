@@ -1,0 +1,23 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:petroleum_device",
+		"data": 12
+	},
+	"pattern": [
+		"SCS",
+		"SSS",
+		"WSW"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"C": {
+			"item": "#componentSteel"
+		},
+		"W": {
+			"item": "#stickTreatedWood"
+		}
+	}
+}
