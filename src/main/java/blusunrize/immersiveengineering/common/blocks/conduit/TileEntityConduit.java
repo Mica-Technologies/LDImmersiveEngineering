@@ -14,6 +14,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectio
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbourChangeTile;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
@@ -23,6 +24,7 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextFormatting;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -174,9 +176,41 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	public EnumFacing getFacingForPlacement(EntityLivingBase placer, BlockPos pos, EnumFacing side,
 											float hitX, float hitY, float hitZ)
 	{
-		//The clicked face points out of the block being clicked; the conduit is clipped to it, so
-		//its own mounting direction is the opposite.
-		return side.getOpposite();
+		//Clicking bare wall still means "clip to the face I clicked" -- see ConduitPlacement, which
+		//owns the rule and widens it to cover the two gestures that used to produce dead stubs:
+		//continuing a run off the end of one, and starting a run off a junction box.
+		return ConduitPlacement.mountFor(pos, side, new Surroundings());
+	}
+
+	/**
+	 * The placement rule's view of the world. An inner class rather than a lambda because the rule
+	 * asks three different questions.
+	 */
+	private final class Surroundings implements ConduitPlacement.Surroundings
+	{
+		@Nullable
+		@Override
+		public EnumFacing conduitMountAt(BlockPos at)
+		{
+			//getExistingTileEntity, not getTileEntity: a placement must not generate the chunk next
+			//door to decide which way round a block goes.
+			TileEntity te = Utils.getExistingTileEntity(world, at);
+			return te instanceof TileEntityConduit?((TileEntityConduit)te).facing: null;
+		}
+
+		@Override
+		public boolean isJunctionAt(BlockPos at)
+		{
+			return Utils.getExistingTileEntity(world, at) instanceof TileEntityJunctionBox;
+		}
+
+		@Override
+		public boolean isMountable(BlockPos at, EnumFacing face)
+		{
+			//Solidity rather than "is there a block": BlockConduit reports every side non-solid, so
+			//this is also what stops the box rule quietly mounting a conduit onto another conduit.
+			return world.getBlockState(at).isSideSolid(world, at, face);
+		}
 	}
 
 	@Override
