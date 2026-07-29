@@ -260,6 +260,54 @@ class FluidNetAssetsTest
 		}
 
 		/**
+		 * The console's display is one screen across two blocks, and the halves have to join
+		 * without a seam.
+		 * <p>
+		 * The mirror of the grid console's test, because this console is the grid console's mirror:
+		 * it had the identical bug -- the whole screen painted on both upper blocks, so the pair
+		 * drew as two terminals with a border down the middle -- and it gets the identical fix. If
+		 * one of these two tests is ever deleted, the other is covering a feature that no longer
+		 * exists in the same shape.
+		 */
+		@Test
+		@DisplayName("the two screen halves glue back into one bordered display")
+		void seamedScreenHalvesFormOneDisplay()
+		{
+			BufferedImage left = load(new File(ASSETS+"textures/blocks/fluidnet_console_screen_left.png"));
+			BufferedImage right = load(new File(ASSETS+"textures/blocks/fluidnet_console_screen_right.png"));
+			assertEquals(left.getWidth(), right.getWidth(), "the halves are different widths");
+			assertEquals(left.getHeight(), right.getHeight(), "the halves have different frame counts");
+
+			int w = left.getWidth(), h = left.getHeight();
+			Set<Integer> ring = new HashSet<>();
+			for(int x = 0; x < w; x++)
+			{
+				ring.add(left.getRGB(x, 0));
+				ring.add(left.getRGB(x, h-1));
+				ring.add(right.getRGB(x, 0));
+				ring.add(right.getRGB(x, h-1));
+			}
+			//Outer edges only. The two columns either side of the seam are meant to be glass.
+			for(int y = 0; y < h; y++)
+			{
+				ring.add(left.getRGB(0, y));
+				ring.add(right.getRGB(w-1, y));
+			}
+			assertEquals(1, ring.size(),
+					"the reassembled display does not have a single-colour border: found "+ring.size()
+							+" colours around its outside");
+
+			int frame = ring.iterator().next();
+			boolean seamIsClear = false;
+			for(int y = 1; y < h-1; y++)
+				if(left.getRGB(w-1, y)!=frame||right.getRGB(0, y)!=frame)
+					seamIsClear = true;
+			assertTrue(seamIsClear,
+					"both columns either side of the seam are the frame colour, so the display still "
+							+"draws with a line down its middle");
+		}
+
+		/**
 		 * Width is always 16 -- these are block faces -- but height is allowed to be
 		 * any whole multiple of that: MC's animated sprite format stacks square frames
 		 * top to bottom in one PNG, so a taller texture is only wrong if its height does

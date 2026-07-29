@@ -101,22 +101,41 @@ def console_housing():
     return img
 
 
-def console_screen():
-    """The lit screen half, borrowed frame for frame from the grid's animated
-    sheet. The only warm pixels on that screen are the one orange status LED
-    (ORANGE) and its unused shade (ORANGE_DARK) -- everything else is already
-    grey or teal glass -- so recolouring those two is enough to turn the
-    grid's console into the fluid console's without redrawing anything.
+def _recolour(img):
+    """Turn the grid's screen into the fluid console's.
+
+    The only warm pixels on that screen are the orange status LEDs (ORANGE) and
+    their unused shade (ORANGE_DARK) -- everything else is already grey or teal
+    glass -- so recolouring those two is enough without redrawing anything.
     """
-    img = grid.console_screen()
     px = img.load()
     for y in range(img.height):
-        for x in range(grid.SIZE):
+        for x in range(img.width):
             if px[x, y]==grid.ORANGE:
                 px[x, y] = FLUID
             elif px[x, y]==grid.ORANGE_DARK:
                 px[x, y] = FLUID_DARK
     return img
+
+
+def console_screen():
+    """The whole screen on one block, for the item model."""
+    return _recolour(grid.console_screen())
+
+
+def console_screen_left():
+    """The left-hand block of the display, split the same way the grid's is.
+
+    The fluid console is the grid console's mirror down to the block count, so
+    it had the same two-complete-screens bug and gets the same fix. Anything
+    here that stops mirroring is a bug in one of them.
+    """
+    return _recolour(grid.console_screen_left())
+
+
+def console_screen_right():
+    """The right-hand block of the display."""
+    return _recolour(grid.console_screen_right())
 
 
 TEXTURES = {
@@ -127,6 +146,8 @@ TEXTURES = {
     "fluidnet_device_valve_front": valve_front,
     "fluidnet_console_housing": console_housing,
     "fluidnet_console_screen": console_screen,
+    "fluidnet_console_screen_left": console_screen_left,
+    "fluidnet_console_screen_right": console_screen_right,
 }
 
 

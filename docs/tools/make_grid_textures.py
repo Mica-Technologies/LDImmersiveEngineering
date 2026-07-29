@@ -326,11 +326,85 @@ def console_screen():
     N square frames stacked top to bottom in one PNG with a sibling .mcmeta
     (written by main()) -- there is no per-frame file, so the sheet has to be
     assembled here rather than saved frame by frame.
+
+    Kept for the item model, which shows a console as a single cube and so
+    wants one whole screen on it. The console in the world uses the split pair
+    below instead -- see _console_screen_wide_frame.
     """
     sheet = Image.new("RGBA", (SIZE, SIZE*len(_SWEEP_ROWS)))
     for i, sweep_row in enumerate(_SWEEP_ROWS):
         sheet.paste(_console_screen_frame(sweep_row), (0, i*SIZE))
     return sheet
+
+
+def _console_screen_wide_frame(sweep_row):
+    """One frame of the console's display, drawn 32 wide across both blocks.
+
+    The console is a two-by-two wall and its upper row is two blocks. Painting
+    the 16x16 screen above on each of them gave two complete screens, borders
+    and all, side by side -- which is what a playtester photographed and asked
+    about. A display is one display, so it is drawn once at the width it
+    actually occupies and cut in half afterwards.
+
+    Same furniture as the single-block screen and deliberately so: one outline
+    around the whole panel rather than one per block, scanlines that run the
+    full width, a trace long enough to be worth reading, and the status LEDs
+    spread along the bottom instead of crowded into sixteen pixels.
+    """
+    width = SIZE*2
+    img = Image.new("RGBA", (width, SIZE), GLASS_DARK)
+    px = img.load()
+    outline_rect(px, 0, 0, width - 1, SIZE - 1, OUTLINE)
+    rect(px, 1, 1, width - 2, 14, GLASS)
+    # Scanlines, unbroken across the seam -- the join between the two blocks is
+    # exactly where a per-block border used to announce itself.
+    for y in range(2, 14, 2):
+        rect(px, 2, y, width - 3, y, GLASS_DARK)
+    # A load trace over the full width. Longer than the single-block one rather
+    # than the same shape stretched, so the extra room buys more readout.
+    trace = [(2, 10), (3, 9), (4, 9), (5, 7), (6, 8), (7, 6), (8, 5), (9, 6),
+             (10, 4), (11, 5), (12, 4), (13, 6), (14, 5), (15, 7), (16, 6),
+             (17, 4), (18, 5), (19, 3), (20, 4), (21, 6), (22, 5), (23, 7),
+             (24, 6), (25, 8), (26, 7), (27, 9), (28, 8), (29, 9)]
+    dots(px, trace, SCREEN_GLOW)
+    dots(px, [(x, y + 1) for x, y in trace], SCANLINE)
+    # Baseline and status LEDs along the bottom.
+    rect(px, 2, 12, width - 3, 12, SCANLINE)
+    dots(px, [(3, 14), (5, 14), (20, 14), (22, 14)], LAMP_GREEN)
+    dots(px, [(7, 14), (24, 14)], ORANGE)
+    dots(px, [(9, 14), (11, 14), (26, 14), (28, 14)], LAMP_OFF)
+    if 2 <= sweep_row <= 13:
+        for x in range(2, width - 2):
+            if px[x, sweep_row] in (GLASS, GLASS_DARK):
+                px[x, sweep_row] = SCANLINE
+    return img
+
+
+def _console_screen_half(right):
+    """One block's worth of the wide display, as a stacked animation sheet.
+
+    Cut per frame rather than by cutting an assembled sheet, because the frames
+    are stacked vertically and a horizontal slice of the sheet is every frame's
+    half already in the right order -- but only if the halving happens before
+    the stacking. Doing it the other way round is the kind of thing that works
+    by accident and stops working when the frame count changes.
+    """
+    sheet = Image.new("RGBA", (SIZE, SIZE*len(_SWEEP_ROWS)))
+    for i, sweep_row in enumerate(_SWEEP_ROWS):
+        frame = _console_screen_wide_frame(sweep_row)
+        left = SIZE if right else 0
+        sheet.paste(frame.crop((left, 0, left + SIZE, SIZE)), (0, i*SIZE))
+    return sheet
+
+
+def console_screen_left():
+    """The left-hand block of the console's display, seen from the front."""
+    return _console_screen_half(False)
+
+
+def console_screen_right():
+    """The right-hand block of the console's display, seen from the front."""
+    return _console_screen_half(True)
 
 
 def console_panel():
@@ -368,6 +442,8 @@ TEXTURES = {
     "grid_console_side": console_side,
     "grid_console_top": console_top,
     "grid_console_screen": console_screen,
+    "grid_console_screen_left": console_screen_left,
+    "grid_console_screen_right": console_screen_right,
     "grid_console_panel": console_panel,
 }
 

@@ -10,24 +10,48 @@
 		}
 	},
 	"variants": {
-		"inventory,type=fluid_console": [{
-			"model": "cube_all",
-			"textures": {"all": "immersiveengineering:blocks/fluidnet_console_screen"}
-		}],
+		"inventory,type=fluid_console": [
+			{
+				"model": "cube_all",
+				"textures": {
+					"all": "immersiveengineering:blocks/fluidnet_console_screen"
+				}
+			}
+		],
 		"type": {
 			"fluid_console": {}
 		},
-		"boolean0": {
-			"false": {},
+		"boolean1": {
+			"false": {
+				"textures": {
+					"front": "immersiveengineering:blocks/fluidnet_console_screen_left"
+				}
+			},
 			"true": {
-				"textures": {"front": "immersiveengineering:blocks/fluidnet_console_screen"}
+				"textures": {
+					"front": "immersiveengineering:blocks/fluidnet_console_screen_right"
+				}
 			}
+		},
+		"boolean0": {
+			"false": {
+				"textures": {
+					"front": "immersiveengineering:blocks/fluidnet_console_panel"
+				}
+			},
+			"true": {}
 		},
 		"facing": {
 			"north": {},
-			"east": {"y": 90},
-			"south": {"y": 180},
-			"west": {"y": 270}
+			"east": {
+				"y": 90
+			},
+			"south": {
+				"y": 180
+			},
+			"west": {
+				"y": 270
+			}
 		},
 		"_0multiblockslave": {
 			"false": {},

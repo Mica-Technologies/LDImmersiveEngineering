@@ -57,6 +57,18 @@ public final class FluidConsoleGeometry
 	}
 
 	/**
+	 * @return true if this structure index is the right-hand column, seen from the front
+	 * <p>
+	 * The mirror of {@code GridConsoleGeometry.isRightColumn}, and for the same reason: the screen
+	 * is one display across two blocks, and painting all of it on both gives two consoles standing
+	 * next to each other.
+	 */
+	public static boolean isRightColumn(int structureIndex)
+	{
+		return structureIndex%WIDTH==WIDTH-1;
+	}
+
+	/**
 	 * The four positions a console occupies, given the origin (the bottom block of the left-hand
 	 * column as seen from the front).
 	 */

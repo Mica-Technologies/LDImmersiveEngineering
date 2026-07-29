@@ -55,6 +55,20 @@ public final class GridConsoleGeometry
 	}
 
 	/**
+	 * @return true if this structure index is the right-hand column, seen from the front
+	 * <p>
+	 * The screen is one display across two blocks, so each of them has to know which half of it to
+	 * wear. Painting the whole screen on both -- which is what happened before -- gives two complete
+	 * screens with a border down the middle, and a console that looks like two consoles.
+	 */
+	public static boolean isRightColumn(int structureIndex)
+	{
+		//Row-major over height then width, and cells() lays each row out along `right`, so the
+		//remainder is the column and column one is the right-hand one.
+		return structureIndex%WIDTH==WIDTH-1;
+	}
+
+	/**
 	 * The four positions a console occupies, given the origin (the bottom block of the
 	 * left-hand column as seen from the front).
 	 */

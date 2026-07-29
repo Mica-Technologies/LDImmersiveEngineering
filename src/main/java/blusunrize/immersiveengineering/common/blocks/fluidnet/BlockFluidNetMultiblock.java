@@ -32,7 +32,8 @@ public class BlockFluidNetMultiblock extends BlockIEMultiblock<BlockTypes_FluidN
 	{
 		super("fluidnet_multiblock", Material.IRON,
 				PropertyEnum.create("type", BlockTypes_FluidNetMultiblock.class), ItemBlockIEBase.class,
-				IEProperties.BOOLEANS[0], Properties.AnimationProperty, IEProperties.OBJ_TEXTURE_REMAP);
+				IEProperties.BOOLEANS[0], IEProperties.BOOLEANS[1], Properties.AnimationProperty,
+				IEProperties.OBJ_TEXTURE_REMAP);
 		setHardness(3.0F);
 		setResistance(15.0F);
 	}
@@ -51,8 +52,13 @@ public class BlockFluidNetMultiblock extends BlockIEMultiblock<BlockTypes_FluidN
 		//lower row the valve bank. Structure indices 2 and 3 are the upper row.
 		TileEntity te = world.getTileEntity(pos);
 		if(te instanceof TileEntityFluidConsole)
-			state = state.withProperty(IEProperties.BOOLEANS[0],
-					FluidConsoleGeometry.isUpperRow(((TileEntityFluidConsole)te).pos));
+		{
+			int index = ((TileEntityFluidConsole)te).pos;
+			state = state.withProperty(IEProperties.BOOLEANS[0], FluidConsoleGeometry.isUpperRow(index));
+			//Which half of the display this block wears. See the grid console, which this mirrors
+			//exactly, including the blockstate ordering that makes the lower row win.
+			state = state.withProperty(IEProperties.BOOLEANS[1], FluidConsoleGeometry.isRightColumn(index));
+		}
 		return state;
 	}
 

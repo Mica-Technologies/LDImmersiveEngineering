@@ -32,7 +32,8 @@ public class BlockGridMultiblock extends BlockIEMultiblock<BlockTypes_GridMultib
 	{
 		super("grid_multiblock", Material.IRON,
 				PropertyEnum.create("type", BlockTypes_GridMultiblock.class), ItemBlockIEBase.class,
-				IEProperties.BOOLEANS[0], Properties.AnimationProperty, IEProperties.OBJ_TEXTURE_REMAP);
+				IEProperties.BOOLEANS[0], IEProperties.BOOLEANS[1], Properties.AnimationProperty,
+				IEProperties.OBJ_TEXTURE_REMAP);
 		setHardness(3.0F);
 		setResistance(15.0F);
 	}
@@ -51,7 +52,14 @@ public class BlockGridMultiblock extends BlockIEMultiblock<BlockTypes_GridMultib
 		//the lower row the switch bank. Structure indices 2 and 3 are the upper row.
 		TileEntity te = world.getTileEntity(pos);
 		if(te instanceof TileEntityGridConsole)
-			state = state.withProperty(IEProperties.BOOLEANS[0], GridConsoleGeometry.isUpperRow(((TileEntityGridConsole)te).pos));
+		{
+			int index = ((TileEntityGridConsole)te).pos;
+			state = state.withProperty(IEProperties.BOOLEANS[0], GridConsoleGeometry.isUpperRow(index));
+			//And which half of the screen it wears. The blockstate applies boolean1 before boolean0,
+			//so the lower row's own entry puts the switch panel back over whichever half this chose --
+			//see the file, where that ordering is the whole mechanism.
+			state = state.withProperty(IEProperties.BOOLEANS[1], GridConsoleGeometry.isRightColumn(index));
+		}
 		return state;
 	}
 

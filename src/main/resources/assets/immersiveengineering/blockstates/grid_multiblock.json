@@ -27,13 +27,25 @@
 				}
 			}
 		},
-		"boolean0": {
-			"false": {},
+		"boolean1": {
+			"false": {
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_console_screen_left"
+				}
+			},
 			"true": {
 				"textures": {
-					"front": "immersiveengineering:blocks/grid_console_screen"
+					"front": "immersiveengineering:blocks/grid_console_screen_right"
 				}
 			}
+		},
+		"boolean0": {
+			"false": {
+				"textures": {
+					"front": "immersiveengineering:blocks/grid_console_panel"
+				}
+			},
+			"true": {}
 		},
 		"facing": {
 			"north": {},

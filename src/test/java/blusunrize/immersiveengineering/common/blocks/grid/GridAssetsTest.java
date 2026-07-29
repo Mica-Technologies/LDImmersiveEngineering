@@ -344,6 +344,64 @@ class GridAssetsTest
 			}
 		}
 
+		private boolean isScreenHalf(File file)
+		{
+			return file.getName().endsWith("_screen_left.png")||file.getName().endsWith("_screen_right.png");
+		}
+
+		/**
+		 * The console's display is one screen across two blocks, and the two halves have to join
+		 * without a seam.
+		 * <p>
+		 * Worth asserting rather than eyeballing, because getting it wrong does not look broken --
+		 * it looks like a console with a line down the middle, which is precisely what the previous
+		 * version was: the whole 16x16 screen painted on both upper blocks, borders and all, so a
+		 * playtester photographed it and asked why there were two terminals.
+		 * <p>
+		 * Glued back together, the pair must satisfy the same uniform-border rule every other
+		 * texture does. That single assertion catches a missing outer edge, a stray border along the
+		 * seam, and the two halves being generated at different sizes.
+		 */
+		@Test
+		@DisplayName("the two screen halves glue back into one bordered display")
+		void seamedScreenHalvesFormOneDisplay()
+		{
+			java.awt.image.BufferedImage left = load(new File(ASSETS+"textures/blocks/grid_console_screen_left.png"));
+			java.awt.image.BufferedImage right = load(new File(ASSETS+"textures/blocks/grid_console_screen_right.png"));
+			assertEquals(left.getWidth(), right.getWidth(), "the halves are different widths");
+			assertEquals(left.getHeight(), right.getHeight(), "the halves have different frame counts");
+
+			int w = left.getWidth(), h = left.getHeight();
+			Set<Integer> ring = new HashSet<>();
+			for(int x = 0; x < w; x++)
+			{
+				ring.add(left.getRGB(x, 0));
+				ring.add(left.getRGB(x, h-1));
+				ring.add(right.getRGB(x, 0));
+				ring.add(right.getRGB(x, h-1));
+			}
+			//Outer edges only: the left half's left column and the right half's right column. The
+			//two columns either side of the seam are meant to be glass and are not looked at.
+			for(int y = 0; y < h; y++)
+			{
+				ring.add(left.getRGB(0, y));
+				ring.add(right.getRGB(w-1, y));
+			}
+			assertEquals(1, ring.size(),
+					"the reassembled display does not have a single-colour border: found "+ring.size()
+							+" colours around its outside");
+
+			//And the seam itself must not be a border, or the join draws as two screens again.
+			int frame = ring.iterator().next();
+			boolean seamIsClear = false;
+			for(int y = 1; y < h-1; y++)
+				if(left.getRGB(w-1, y)!=frame||right.getRGB(0, y)!=frame)
+					seamIsClear = true;
+			assertTrue(seamIsClear,
+					"both columns either side of the seam are the frame colour, so the display still "
+							+"draws with a line down its middle");
+		}
+
 		private File[] gridTextures()
 		{
 			File dir = new File(ASSETS+"textures/blocks");
@@ -403,6 +461,12 @@ class GridAssetsTest
 		{
 			for(File file : gridTextures())
 			{
+				//The two halves of the console display are the deliberate exception: each carries a
+				//border on three sides and bare glass on the fourth, because the fourth is the seam
+				//down the middle of one screen. seamedScreenHalvesFormOneDisplay below is the rule
+				//that replaces this one for them, and it is the stronger of the two.
+				if(isScreenHalf(file))
+					continue;
 				java.awt.image.BufferedImage image = load(file);
 				int w = image.getWidth(), h = image.getHeight();
 				Set<Integer> ring = new HashSet<>();
