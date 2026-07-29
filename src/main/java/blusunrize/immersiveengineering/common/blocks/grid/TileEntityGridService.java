@@ -79,7 +79,10 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 		//launders energy back into the grid it just left.
 		if(target==null||target instanceof TileEntityGridDevice)
 			return 0;
-		return Math.max(0, EnergyHelper.insertFlux(target, side.getOpposite(), amount, simulate));
+		//acceptingSide rather than side.getOpposite(): a wire connector beside this unit takes flux
+		//only on the face it is bolted to, which is the whole of why hooking one up felt like guesswork.
+		EnumFacing from = EnergyHelper.acceptingSide(target, side.getOpposite());
+		return from==null?0: Math.max(0, EnergyHelper.insertFlux(target, from, amount, simulate));
 	}
 
 	private void rescanFaces()
@@ -88,7 +91,7 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 		{
 			TileEntity target = Utils.getExistingTileEntity(world, pos.offset(side));
 			receiverFaces[side.ordinal()] = target!=null&&!(target instanceof TileEntityGridDevice)
-					&&EnergyHelper.isFluxReceiver(target, side.getOpposite());
+					&&EnergyHelper.acceptingSide(target, side.getOpposite())!=null;
 		}
 		facesDirty = false;
 	}
@@ -113,6 +116,15 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 			return null;
 		return "Nothing adjacent accepts power. Bolt this onto a machine or capacitor, "
 				+"or put a wire connector against it to feed a wire network.";
+	}
+
+	@Override
+	protected String describeWorldHookupHint()
+	{
+		//Said while it is working, not only once it has failed. See describeWorldHookupHint's own
+		//comment for why that distinction is the whole point of the second line existing.
+		return "Powers what it touches. A wire connector beside this unit is fed "
+				+"whichever way it faces.";
 	}
 
 	/**

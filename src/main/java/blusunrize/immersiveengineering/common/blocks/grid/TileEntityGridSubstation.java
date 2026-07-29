@@ -206,7 +206,11 @@ public class TileEntityGridSubstation extends TileEntityMultiblockPart<TileEntit
 		TileEntity sink = partner(SubstationGeometry.SERVICE_INDEX);
 		if(sink==null)
 			return 0;
-		return EnergyHelper.insertFlux(sink, facing.getOpposite(), max, simulate);
+		//Through acceptingSide for the same reason the Service Unit does: a connector parked in front
+		//of the yard takes flux only on the face it is bolted to, so asking it about the face that
+		//touches us is asking the one question it will always answer no to.
+		EnumFacing from = EnergyHelper.acceptingSide(sink, facing.getOpposite());
+		return from==null?0: EnergyHelper.insertFlux(sink, from, max, simulate);
 	}
 
 	// ------------------------------------------------------------------

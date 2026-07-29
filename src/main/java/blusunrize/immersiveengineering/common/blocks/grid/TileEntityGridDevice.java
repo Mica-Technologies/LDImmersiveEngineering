@@ -348,6 +348,12 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 		String hookup = describeWorldHookup();
 		if(hookup!=null)
 			lines.add(TextFormatting.YELLOW+hookup+TextFormatting.RESET);
+		else
+		{
+			String hint = describeWorldHookupHint();
+			if(hint!=null)
+				lines.add(TextFormatting.GRAY+hint+TextFormatting.RESET);
+		}
 		return lines;
 	}
 
@@ -360,6 +366,24 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 	 */
 	@Nullable
 	protected String describeWorldHookup()
+	{
+		return null;
+	}
+
+	/**
+	 * What the box does with the world when it <em>is</em> hooked up, or null to say nothing.
+	 * <p>
+	 * Separate from {@link #describeWorldHookup} because the two are not the same message and must
+	 * not read as the same message: that one is a fault, drawn in warning yellow, and this one is
+	 * how the block works, drawn in grey.
+	 * <p>
+	 * Worth having at all because the first person to play this fork could not find how to attach
+	 * anything to a Service Unit, with the fault line already written -- a rule you are only told
+	 * once you are stuck teaches nobody, and by the time it appears the usual conclusion is that
+	 * the block is broken rather than that it is waiting for something.
+	 */
+	@Nullable
+	protected String describeWorldHookupHint()
 	{
 		return null;
 	}

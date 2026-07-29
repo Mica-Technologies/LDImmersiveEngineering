@@ -29,7 +29,20 @@ wire-connector convention: it points at whatever the box is bolted to.
 **They exchange flux with the blocks they touch, not with wires.** A Service Unit bolted to a
 capacitor powers that capacitor; a Service Unit bolted to a post with an LV connector against it
 feeds a wire network. This is exactly how every IE machine behaves, but it is not obvious from
-looking at a box, so the in-world readout and the device panel both say so when nothing is moving.
+looking at a box, so the readout says what the box does with the world whether or not anything is
+moving — grey while it is working, yellow when nothing adjacent will take what it has.
+
+**A wire connector beside a Service Unit is fed whichever way it faces.** An IE connector accepts
+flux on exactly one side, the block it is bolted to, so a connector mounted on the *wall* next to a
+unit — the same gesture as far as a player is concerned, and often the only one the geometry leaves
+room for — used to touch a live unit and do nothing, silently. `EnergyHelper.acceptingSide` is
+where that exemption lives; the Substation goes through it too. Nothing but a connector gets it: on
+a machine the accepting face is a real configuration choice rather than an artefact of where there
+was room to put it.
+
+The Feed and Service Units carry a terminal post on the front, so the place wiring attaches is
+something you can see rather than something you have to be told. The Signal Unit deliberately does
+not — it moves no flux, and a terminal on it would be a lie.
 
 ### Segments
 

@@ -10,6 +10,8 @@ package blusunrize.immersiveengineering.common.util;
 
 import blusunrize.immersiveengineering.api.IEEnums.SideConfig;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.*;
+import blusunrize.immersiveengineering.api.energy.wires.IImmersiveConnectable;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectionalTile;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
@@ -116,6 +118,39 @@ public class EnergyHelper
 		if(tile.hasCapability(CapabilityEnergy.ENERGY, facing))
 			return tile.getCapability(CapabilityEnergy.ENERGY, facing).canReceive();
 		return false;
+	}
+
+	/**
+	 * Which side of a neighbour will actually take flux, given the side of it that touches you.
+	 * <p>
+	 * Normally that is the touching side and nothing more. A wire connector is the exception, and
+	 * it is an exception worth codifying: an IE connector accepts flux on exactly one side, the
+	 * block it is bolted to. Mount one on a grid box and it works. Mount one on the wall <em>beside</em>
+	 * that box -- the same gesture as far as a player is concerned, and often the only one the
+	 * geometry leaves room for -- and it faces the wall instead. It touches a live box, reports
+	 * itself as no kind of receiver, and does nothing, with nothing said about it anywhere.
+	 * <p>
+	 * So a connector is fed on whichever side it does accept. The rule that replaces "bolt it to
+	 * the box" is <em>a connector next to the box is fed by it</em>, which is easier both to state
+	 * and to see. Nothing but a connector gets the exemption: on a machine the accepting face is a
+	 * real configuration choice, not an artefact of where there was room.
+	 * <p>
+	 * A relay accepts on no side at all -- it carries wire rather than terminating it -- so this
+	 * finds nothing for one, which is correct.
+	 *
+	 * @return the side to hand energy to, or null if the neighbour will not take any
+	 */
+	@Nullable
+	public static EnumFacing acceptingSide(@Nullable TileEntity target, EnumFacing touching)
+	{
+		if(target==null)
+			return null;
+		if(isFluxReceiver(target, touching))
+			return touching;
+		if(!(target instanceof IImmersiveConnectable&&target instanceof IDirectionalTile))
+			return null;
+		EnumFacing mount = ((IDirectionalTile)target).getFacing();
+		return isFluxReceiver(target, mount)?mount: null;
 	}
 
 	public static int insertFlux(TileEntity tile, EnumFacing facing, int energy, boolean simulate)

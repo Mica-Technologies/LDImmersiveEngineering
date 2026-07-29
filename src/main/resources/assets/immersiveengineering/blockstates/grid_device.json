@@ -13,7 +13,8 @@
 	"variants": {
 		"inventory,type=feed_unit": [
 			{
-				"y": 180
+				"y": 180,
+				"model": "immersiveengineering:grid/utility_box_terminal"
 			}
 		],
 		"inventory,type=service_unit": [
@@ -21,7 +22,8 @@
 				"y": 180,
 				"textures": {
 					"front": "immersiveengineering:blocks/grid_device_service_front"
-				}
+				},
+				"model": "immersiveengineering:grid/utility_box_terminal"
 			}
 		],
 		"inventory,type=console_housing": [
@@ -41,11 +43,14 @@
 			}
 		],
 		"type": {
-			"feed_unit": {},
+			"feed_unit": {
+				"model": "immersiveengineering:grid/utility_box_terminal"
+			},
 			"service_unit": {
 				"textures": {
 					"front": "immersiveengineering:blocks/grid_device_service_front"
-				}
+				},
+				"model": "immersiveengineering:grid/utility_box_terminal"
 			},
 			"console_housing": {
 				"model": "cube_all",
