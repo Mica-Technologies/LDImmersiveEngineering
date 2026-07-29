@@ -234,6 +234,10 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 		tank.drainInternal(CityMode.petroleum()?Math.min(CITY_SIP, amount): amount, true);
 		lifetimeDispensed += amount;
 		markDirty();
+		//One block update per dispense, which is a discrete gesture -- somebody filling a container,
+		//once, with a sound to match -- rather than a per-tick cost. Without it the odometer in an
+		//open GUI sits still while fuel visibly leaves the tank.
+		markContainingBlockForUpdate(null);
 		if(world!=null)
 			world.playSound(null, getPos(), net.minecraft.init.SoundEvents.BLOCK_BREWING_STAND_BREW,
 					SoundCategory.BLOCKS, 0.6F, 1.4F);
@@ -276,6 +280,10 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 	{
 		lifetimeDispensed = 0;
 		markDirty();
+		//Resynced, exactly as setPrice does. Without this the server forgot the total and the client
+		//went on showing whatever it had, so the button that says "Reset meter" appeared to do
+		//nothing at all -- which is how it was reported.
+		markContainingBlockForUpdate(null);
 	}
 
 	//	=================================
@@ -427,8 +435,12 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 		nbt.setInteger("facing", facing.ordinal());
 		nbt.setInteger("price", price);
 		nbt.setTag("tank", tank.writeToNBT(new NBTTagCompound()));
-		if(!descPacket)
-			nbt.setLong("dispensed", lifetimeDispensed);
+		//Sent to the client as well as saved. It used to be save-only, on the reasoning that a
+		//lifetime total is bookkeeping rather than something the world needs -- but the pump's own
+		//GUI reads it, and the GUI is a client. The client's copy was therefore always zero, so the
+		//odometer read "0 mB dispensed" no matter how much fuel had gone through, and resetting it
+		//changed nothing visible because it was already showing the reset value.
+		nbt.setLong("dispensed", lifetimeDispensed);
 	}
 
 	@Override
@@ -437,7 +449,6 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 		facing = EnumFacing.byIndex(nbt.getInteger("facing"));
 		price = nbt.getInteger("price");
 		tank.readFromNBT(nbt.getCompoundTag("tank"));
-		if(!descPacket)
-			lifetimeDispensed = nbt.getLong("dispensed");
+		lifetimeDispensed = nbt.getLong("dispensed");
 	}
 }

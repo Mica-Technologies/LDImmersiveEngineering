@@ -1092,6 +1092,30 @@ public class Utils
 		return true;
 	}
 
+	/**
+	 * {@link #interactWithTank} against whatever tank a block exposes on the face that was clicked.
+	 *
+	 * @return true if the click is spent and the caller should not fall through to the item
+	 */
+	public static boolean interactWithTankAt(@Nullable TileEntity tile, @Nullable EnumFacing side,
+											 @Nonnull EntityPlayer player, @Nonnull EnumHand hand)
+	{
+		if(tile==null)
+			return false;
+		//The clicked face, so a block that only plumbs some of its sides is not quietly filled from
+		//a side it refuses everything else on.
+		if(!tile.hasCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side))
+			return false;
+		IFluidHandler handler = tile.getCapability(CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY, side);
+		if(handler==null||!interactWithTank(player, hand, handler))
+			return false;
+		//Marked dirty even when nothing moved. Blocks vary in whether their tank tells its owner it
+		//changed -- some do it in onContentsChanged, some rely on ticking -- and a redundant save flag
+		//costs a boolean, while a missing one costs whatever the player just poured in.
+		tile.markDirty();
+		return true;
+	}
+
 	public static boolean isFluidContainerFull(ItemStack stack)
 	{
 		if(stack.isEmpty())

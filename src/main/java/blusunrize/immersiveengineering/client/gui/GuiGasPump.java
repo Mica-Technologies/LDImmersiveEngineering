@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.client.gui;
 
 import blusunrize.immersiveengineering.ImmersiveEngineering;
+import blusunrize.immersiveengineering.client.ClientUtils;
 import blusunrize.immersiveengineering.client.gui.elements.GuiButtonFlat;
 import blusunrize.immersiveengineering.common.blocks.petroleum.TileEntityGasPump;
 import blusunrize.immersiveengineering.common.gui.ContainerGasPump;
@@ -16,6 +17,7 @@ import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.network.MessagePumpSettings;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraftforge.fluids.FluidStack;
 import org.lwjgl.input.Keyboard;
@@ -99,9 +101,35 @@ public class GuiGasPump extends GuiIEContainerBase
 		{
 			int span = WIDTH-16;
 			int filled = Math.max(1, span*held.amount/TileEntityGasPump.CAPACITY);
-			int colour = 0xFF000000|(held.getFluid()==null?0x808080: held.getFluid().getColor(held)&0xFFFFFF);
-			drawRect(guiLeft+8, guiTop+40, guiLeft+8+filled, guiTop+48, colour);
+			//The fluid's own texture rather than a flat rectangle in Fluid.getColor(). None of this
+			//fork's fluids call setColor, so getColor returns white for every one of them, and a
+			//white slab on a dark panel is a shape rather than a reading -- which is exactly how a
+			//playtester described it. The sprite tells gasoline from diesel from crude at a glance,
+			//and drawRepeatedFluidSprite applies the colour too for any fluid that does set one.
+			ClientUtils.drawRepeatedFluidSprite(held, guiLeft+8, guiTop+40, filled, 8);
+			GlStateManager.color(1, 1, 1, 1);
 		}
+		//An outline around the whole track, so an empty pump reads as an empty gauge rather than as
+		//a panel with nothing drawn on it, and a full one has an edge to end at.
+		drawOutline(guiLeft+7, guiTop+39, guiLeft+9+(WIDTH-16), guiTop+49, COL_FRAME);
+
+		//Here rather than in the foreground layer. The field was built with absolute coordinates, and
+		//the foreground layer draws inside a matrix already translated by guiLeft/guiTop -- so
+		//drawTextBox put it at roughly twice the offset, off the panel entirely. Clicking and typing
+		//kept working the whole time, because those take absolute coordinates too, which is exactly
+		//why it looked like "the field shows nothing" while the Set button worked.
+		priceField.drawTextBox();
+	}
+
+	/**
+	 * A one-pixel rectangle outline, which vanilla has no helper for.
+	 */
+	private void drawOutline(int left, int top, int right, int bottom, int colour)
+	{
+		drawRect(left, top, right, top+1, colour);
+		drawRect(left, bottom-1, right, bottom, colour);
+		drawRect(left, top, left+1, bottom, colour);
+		drawRect(right-1, top, right, bottom, colour);
 	}
 
 	@Override
@@ -122,7 +150,6 @@ public class GuiGasPump extends GuiIEContainerBase
 		}
 
 		fontRenderer.drawString("Price / bucket", 8, 62, COL_TEXT);
-		priceField.drawTextBox();
 
 		String meter = tile.getLifetimeDispensed()+" mB dispensed";
 		fontRenderer.drawString(meter, WIDTH-10-fontRenderer.getStringWidth(meter), 90,

@@ -440,6 +440,23 @@ public abstract class BlockIETileProvider<E extends Enum<E> & BlockIEBase.IBlock
 				CommonProxy.openGuiForTile(player, (TileEntity & IGuiTile)master);
 			return true;
 		}
+		//	=================================
+		//	Last, so a bucket never falls through to the item.
+		//	=================================
+		//
+		// A vanilla bucket answers a right-click on a block by placing its contents against the face
+		// you clicked. Any block that holds fluid and does not consume the click therefore turns
+		// "I tried to fill this" into a source block of fuel on the ground beside it -- which is how
+		// this fork's propane ended up spilled around every tank a playtester touched.
+		//
+		// Here rather than in each tile because it was never one block's bug: seventeen fluid-holding
+		// blocks in this fork had it at once, and the next one written would have had it too.
+		//
+		// After the interact and GUI branches, deliberately. Anything that already answers the click
+		// keeps answering it, so no existing gesture changes -- this only catches the case where the
+		// alternative was spilling.
+		if(Utils.interactWithTankAt(tile, side, player, hand))
+			return true;
 		return false;
 	}
 
