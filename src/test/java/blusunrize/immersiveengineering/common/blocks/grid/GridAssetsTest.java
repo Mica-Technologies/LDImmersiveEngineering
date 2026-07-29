@@ -288,7 +288,21 @@ class GridAssetsTest
 		@DisplayName("grid models parse and reference only declared textures")
 		void modelsParseAndResolveTextures()
 		{
-			for(String model : new String[]{"grid/utility_box", "grid/console_panel"})
+			//Collected from the blockstates rather than listed here. A hand-written list silently
+			//stops covering the model you just added, which is precisely how the terminal-post
+			//variant of the utility box arrived untested.
+			Set<String> models = new HashSet<>(), textures = new HashSet<>();
+			for(String name : BLOCKSTATES)
+				collectRefs(blockstate(name), models, textures);
+			Set<String> ours = new HashSet<>();
+			for(String reference : models)
+				if(reference.startsWith("immersiveengineering:"))
+					ours.add(reference.split(":", 2)[1]);
+			assertTrue(ours.contains("grid/utility_box_terminal"),
+					"the Feed and Service Units should be drawn with the terminal-post model, which is "
+							+"where a player is meant to see that wiring attaches");
+
+			for(String model : ours)
 			{
 				JsonObject json = read("models/block/"+model+".json");
 				Set<String> declared = new HashSet<>();
