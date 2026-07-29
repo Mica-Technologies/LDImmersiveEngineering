@@ -39,6 +39,10 @@ TUBE = (176, 176, 182, 255)
 TUBE_LIT = (208, 208, 214, 255)
 CLIP = (86, 86, 92, 255)
 CLIP_LIT = (108, 108, 114, 255)
+# The patch plate is deliberately near-white rather than steel: it is the one surface in this
+# feature whose whole job is to carry a tint, and a tint multiplies whatever is under it.
+PATCH_FILL = (236, 236, 238, 255)
+PATCH_SEAM = (198, 198, 202, 255)
 
 FACINGS = ["down", "up", "north", "south", "west", "east"]
 AXIS_OF = {"down": "y", "up": "y", "north": "z", "south": "z", "west": "x", "east": "x"}
@@ -223,16 +227,92 @@ def build_junction_box(assets, depth, half):
         },
         "elements": [{"from": frm, "to": to, "faces": faces}],
     })
-    # Multipart with a single unconditional part, even though the box has no connection state.
+    build_patch_models(assets, frm, to)
+    # Multipart: the box always, plus a coloured plate on each patched face.
     #
     # A `variants` file would have to resolve the *whole* property string the state mapper hands
     # it -- type, facing and all six sideconnection flags, because BlockConduit declares them for
     # every meta -- which in the Forge format means a submap per property or the variant simply
-    # does not resolve.  Multipart ignores the variant string entirely and reads the state, so one
+    # does not resolve.  Multipart ignores the variant string entirely and reads the state, so a
     # part with no `when` is both correct and the shorter thing to write.
+    #
+    # The plates reuse the same absolute sideconnection_* properties the run does; BlockConduit
+    # fills them from the patch table rather than from a connection mask when the tile is a box.
+    # Same properties, same file format, one meaning per block type.
+    parts = [{"apply": {"model": MODEL_REF % "junction_box"}}]
+    for face in FACINGS:
+        parts.append({
+            "when": {"sideconnection_%s" % face: "true"},
+            "apply": {"model": MODEL_REF % ("junction_patch_%s" % face)},
+        })
     write_json(os.path.join(assets, "blockstates", "conduit_junction_box.json"), {
-        "multipart": [{"apply": {"model": MODEL_REF % "junction_box"}}],
+        "multipart": parts,
     })
+
+
+# How far a patch plate stands off the face it marks, and how far in from the box's edge it
+# sits.  The lift is a quarter of a pixel: enough that it never z-fights with the box, small
+# enough that it reads as painted on rather than bolted on.
+PATCH_LIFT = 0.25
+PATCH_INSET = 2
+
+
+def patch_bounds(frm, to, face):
+    """The plate that marks one face of the box, derived from the box rather than written out.
+
+    Derived so the plates follow the box if its size ever changes.  A hand-written plate that
+    silently stopped lining up would be exactly the kind of thing nobody notices in a diff.
+    """
+    lo, hi = list(frm), list(to)
+    i = "xyz".index(AXIS_OF[face])
+    for j in range(3):
+        if j != i:
+            lo[j] += PATCH_INSET
+            hi[j] -= PATCH_INSET
+    if face in NEGATIVE:
+        hi[i], lo[i] = frm[i], frm[i] - PATCH_LIFT
+    else:
+        lo[i], hi[i] = to[i], to[i] + PATCH_LIFT
+    return lo, hi
+
+
+def build_patch_models(assets, frm, to):
+    """One plate model per face, each tinted through its own tint index.
+
+    Six models and six tint indices rather than ninety-six models, because the colour is not in
+    the model at all: the plate is painted near-white and `BlockConduit.getRenderColour` supplies
+    the dye per face at render time.  Enumerating six faces times sixteen colours as separate
+    models would be the other way to do this and would cost a hundred bakes to say the same thing.
+
+    The tint index is the face's ordinal in EnumFacing order, which is what FACINGS is, so the
+    Java side needs no mapping table -- it reads EnumFacing.byIndex(tintIndex) straight off.
+    """
+    out = os.path.join(assets, "models", "block", "conduit")
+    for index, face in enumerate(FACINGS):
+        lo, hi = patch_bounds(frm, to, face)
+        faces = {f: {"texture": "#patch", "tintindex": index} for f in FACINGS}
+        write_json(os.path.join(out, "junction_patch_%s.json" % face), {
+            "textures": {"patch": "immersiveengineering:blocks/conduit_patch"},
+            "elements": [{"from": lo, "to": hi, "faces": faces}],
+        })
+
+
+def build_patch_texture(assets):
+    """The plate a patched face wears: near-white, so the tint that multiplies it reads true.
+
+    A mid-grey plate would drag every dye toward mud -- tinting multiplies, so whatever the
+    texture is not, the result cannot be.  The dark border is what stops a white channel's plate
+    disappearing into the box's lit face.
+    """
+    img = Image.new("RGBA", (16, 16), PATCH_FILL)
+    px = img.load()
+    rect(px, 0, 0, 15, 15, OUTLINE)
+    rect(px, 1, 1, 14, 14, PATCH_FILL)
+    # A seam across the middle, so a plate still reads as hardware rather than as a paint splash.
+    rect(px, 2, 7, 13, 8, PATCH_SEAM)
+    out = os.path.join(assets, "textures", "blocks", "conduit_patch.png")
+    img.save(out, "PNG", optimize=True)
+    return out
 
 
 def build_junction_texture(assets):
@@ -329,6 +409,7 @@ def main():
     build_item_blockstate(args.assets)
     texture = build_texture(args.assets, depth)
     build_junction_texture(args.assets)
+    build_patch_texture(args.assets)
 
     print("depth=%d half_width=%d (read from ConduitBounds.java)" % (depth, half))
     print("wrote %d models, %d blockstate parts" % (len(models), len(parts)))

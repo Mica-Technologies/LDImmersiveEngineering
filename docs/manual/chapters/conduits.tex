@@ -17,6 +17,11 @@ One length of conduit carries \textbf{sixteen} independent conductors, named aft
 Place conduit against a wall, floor or ceiling and it clips to whatever you clicked. Lengths joined
 along the same surface make a \textbf{run}.
 
+To continue a run, click the end of it. A conduit placed against another conduit joins that
+conduit's surface rather than clipping to the conduit itself, so you can lay a corridor by clicking
+along the run instead of hunting for the bare wall between lengths. The first length off a junction
+box does the same thing --- it looks for the surface behind it rather than clipping to the box.
+
 \textbf{A run stays on one surface.} Conduit on a floor does not climb the wall by itself. That is
 deliberate: a plane change goes through a junction box, which is a real block and what you would put
 at a corner anyway.
@@ -40,6 +45,10 @@ A patch panel with six faces. Each face is one of three things:
       redstone, and emitting redstone.
 \item Sneak and right-click empty-handed: unpatches the face.
 \end{itemize}
+
+\textbf{A patched face wears a plate in its conductor's colour}, so a box tells you how it is wired
+from across the room: which faces break out, and which channel each one carries. A box with no
+plates on it is a box nobody has patched.
 
 Put an LV, MV or HV Connector against a power breakout and it picks up that conductor and nothing
 else. One bundle down a corridor can feed a lighting circuit, a workshop and a furnace, each on its

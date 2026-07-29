@@ -342,9 +342,13 @@ class ConduitAssetsTest
 		void modelAndTextureExist()
 		{
 			JsonArray parts = read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
-			assertEquals(1, parts.size(), "the box should be one unconditional part");
-			String model = parts.get(0).getAsJsonObject().getAsJsonObject("apply")
-					.get("model").getAsString();
+			//The unconditional one, rather than the only one: the box also carries a conditional
+			//plate per patched face, which PatchPlates below covers.
+			String model = null;
+			for(JsonElement element : parts)
+				if(!element.getAsJsonObject().has("when"))
+					model = element.getAsJsonObject().getAsJsonObject("apply").get("model").getAsString();
+			assertNotNull(model, "the box has no unconditional part, so an unpatched one draws nothing");
 			assertTrue(new File(ASSETS+modelPath(model)).isFile(),
 					"the box blockstate names a model nobody wrote: "+model);
 			assertTrue(new File(ASSETS+"textures/blocks/conduit_junction_box.png").isFile());
@@ -494,6 +498,135 @@ class ConduitAssetsTest
 					"an unnamed block shows its translation key in the creative tab");
 			assertTrue(lang.contains("tile.immersiveengineering.conduit.conduit_run.info="),
 					"JEI would render a blank description page");
+		}
+	}
+
+	@Nested
+	@DisplayName("the junction box's patch plates")
+	class PatchPlates
+	{
+		private JsonArray parts()
+		{
+			return read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
+		}
+
+		/**
+		 * @return the model a face's plate is drawn with, or null if the blockstate has no part for it
+		 */
+		private String plateModelFor(EnumFacing face)
+		{
+			String property = "sideconnection_"+face.getName();
+			for(JsonElement element : parts())
+			{
+				JsonObject part = element.getAsJsonObject();
+				if(!part.has("when"))
+					continue;
+				JsonObject when = part.getAsJsonObject("when");
+				if(when.has(property)&&"true".equals(when.get(property).getAsString()))
+					return part.getAsJsonObject("apply").get("model").getAsString();
+			}
+			return null;
+		}
+
+		@Test
+		@DisplayName("the box itself is still drawn unconditionally")
+		void boxIsAlwaysDrawn()
+		{
+			boolean unconditional = false;
+			for(JsonElement element : parts())
+				if(!element.getAsJsonObject().has("when"))
+					unconditional = true;
+			assertTrue(unconditional,
+					"every part is conditional, so an unpatched box would draw as nothing at all");
+		}
+
+		@Test
+		@DisplayName("every face has a plate")
+		void everyFaceIsCovered()
+		{
+			for(EnumFacing face : EnumFacing.VALUES)
+				assertNotNull(plateModelFor(face),
+						"no plate for "+face.getName()+": patching that face would change nothing you "
+								+"can see, which is the bug this whole thing exists to fix");
+		}
+
+		@Test
+		@DisplayName("every plate model exists")
+		void everyPlateModelExists()
+		{
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				String path = modelPath(plateModelFor(face));
+				assertTrue(new File(ASSETS+path).isFile(), "missing plate model: "+path);
+			}
+		}
+
+		@Test
+		@DisplayName("a plate's tint index is its face's ordinal")
+		void tintIndexMatchesFacingOrdinal()
+		{
+			//	=================================
+			//	The one that matters.
+			//	=================================
+			//
+			// BlockConduit.getRenderColour reads EnumFacing.byIndex(tintIndex) straight off, so the
+			// generator's face order and EnumFacing's have to agree. If they ever drift, every plate
+			// still draws and every plate is still coloured -- just the wrong colour on the wrong
+			// face, with nothing logged and nothing to see but a box that lies about its wiring.
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				JsonObject model = read(modelPath(plateModelFor(face)));
+				JsonObject faces = model.getAsJsonArray("elements").get(0).getAsJsonObject()
+						.getAsJsonObject("faces");
+				for(String key : keys(faces))
+					assertEquals(face.ordinal(), faces.getAsJsonObject(key).get("tintindex").getAsInt(),
+							"the plate for "+face.getName()+" is tinted as though it were "
+									+"EnumFacing.byIndex("+faces.getAsJsonObject(key).get("tintindex")
+											.getAsInt()+")");
+			}
+		}
+
+		@Test
+		@DisplayName("a plate stands proud of the face it marks and of no other")
+		void plateSitsOnItsOwnFace()
+		{
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				JsonObject element = read(modelPath(plateModelFor(face)))
+						.getAsJsonArray("elements").get(0).getAsJsonObject();
+				int axis = face.getAxis().ordinal();
+				double from = element.getAsJsonArray("from").get(axis).getAsDouble();
+				double to = element.getAsJsonArray("to").get(axis).getAsDouble();
+				//Thin along its own axis -- a plate, not a second box. Anything thicker would poke
+				//through the far side and mark two faces at once.
+				assertTrue(to-from > 0&&to-from <= 1,
+						"the plate for "+face.getName()+" is "+(to-from)+" pixels thick");
+				//And outside the box, so it is visible at all. The box runs 3..13 horizontally and
+				//0..8 vertically, so a plate on a negative face sits at or below its lower bound and
+				//one on a positive face at or above its upper.
+				if(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+					assertTrue(from < (face.getAxis()==EnumFacing.Axis.Y?0: 3)+0.001,
+							"the plate for "+face.getName()+" is buried inside the box");
+				else
+					assertTrue(to > (face.getAxis()==EnumFacing.Axis.Y?8: 13)-0.001,
+							"the plate for "+face.getName()+" is buried inside the box");
+			}
+		}
+
+		@Test
+		@DisplayName("the texture the plates name exists")
+		void plateTextureExists()
+		{
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				JsonObject textures = read(modelPath(plateModelFor(face))).getAsJsonObject("textures");
+				for(String key : keys(textures))
+				{
+					String reference = textures.get(key).getAsString();
+					String path = "textures/"+reference.substring(reference.indexOf(':')+1)+".png";
+					assertTrue(new File(ASSETS+path).isFile(), "missing plate texture: "+path);
+				}
+			}
 		}
 	}
 }

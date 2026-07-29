@@ -33,6 +33,12 @@ One length of conduit carries **sixteen** independent conductors, named after th
 A conduit clips to whatever face you clicked and runs in the plane of that face — four possible
 directions, turning in right angles, forming straights, corners, tees and crosses.
 
+**To continue a run, click the end of it.** A conduit placed against another conduit joins that
+conduit's surface rather than clipping to the conduit; the first length off a junction box looks
+for the surface behind it rather than clipping to the box. Clicking bare wall is unchanged, so this
+is a wider rule rather than a different one. See `ConduitPlacement`, which owns it and takes the
+world as an interface so the decision is tested against a drawn building.
+
 **A run stays on one surface.** Conduit on a floor does not climb the wall by itself. That is
 deliberate rather than a shortfall: a plane change goes through a junction box, which is a real
 block and what you would put at a corner anyway. It is also what keeps a run to an axis-aligned
@@ -51,6 +57,12 @@ A patch panel with six faces. Each face is one of three things:
 | A **dye** | That face breaks out the conductor of that colour |
 | **Redstone dust** (on a patched face) | Cycles that face: power → reads redstone → emits redstone |
 | **Nothing**, while sneaking | Unpatches the face |
+
+**A patched face wears a plate in its conductor's colour.** A box says how it is wired from across
+the room rather than only under the crosshair. The plate is painted near-white and tinted per face
+through `BlockConduit.getRenderColour`, so the sixteen colours cost six models rather than
+ninety-six; the tint index *is* the face's `EnumFacing` ordinal, and `ConduitAssetsTest` guards that
+because drift there would put the right colours on the wrong faces with nothing logged.
 
 **A colour lives on one face at a time.** Patching it somewhere new takes it off wherever it was —
 the same conductor arriving at two connectors would be a short, not a feature.

@@ -1,0 +1,45 @@
+{
+	"textures": {
+		"patch": "immersiveengineering:blocks/conduit_patch"
+	},
+	"elements": [
+		{
+			"from": [
+				2.75,
+				2,
+				5
+			],
+			"to": [
+				3,
+				6,
+				11
+			],
+			"faces": {
+				"down": {
+					"texture": "#patch",
+					"tintindex": 4
+				},
+				"up": {
+					"texture": "#patch",
+					"tintindex": 4
+				},
+				"north": {
+					"texture": "#patch",
+					"tintindex": 4
+				},
+				"south": {
+					"texture": "#patch",
+					"tintindex": 4
+				},
+				"west": {
+					"texture": "#patch",
+					"tintindex": 4
+				},
+				"east": {
+					"texture": "#patch",
+					"tintindex": 4
+				}
+			}
+		}
+	]
+}

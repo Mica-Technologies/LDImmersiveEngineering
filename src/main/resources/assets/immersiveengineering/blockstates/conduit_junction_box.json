@@ -4,6 +4,54 @@
 			"apply": {
 				"model": "immersiveengineering:conduit/junction_box"
 			}
+		},
+		{
+			"when": {
+				"sideconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_patch_down"
+			}
+		},
+		{
+			"when": {
+				"sideconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_patch_up"
+			}
+		},
+		{
+			"when": {
+				"sideconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_patch_north"
+			}
+		},
+		{
+			"when": {
+				"sideconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_patch_south"
+			}
+		},
+		{
+			"when": {
+				"sideconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_patch_west"
+			}
+		},
+		{
+			"when": {
+				"sideconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_patch_east"
+			}
 		}
 	]
 }

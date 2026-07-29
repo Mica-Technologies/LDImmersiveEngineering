@@ -9,7 +9,9 @@
 package blusunrize.immersiveengineering.common.blocks.conduit;
 
 import blusunrize.immersiveengineering.api.IEProperties;
+import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.BlockIETileProvider;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IColouredBlock;
 import blusunrize.immersiveengineering.common.blocks.ItemBlockIEBase;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyEnum;
@@ -20,6 +22,8 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+
+import javax.annotation.Nullable;
 
 /**
  * Surface-mounted conduit: the indoor counterpart to IE's catenary wires.
@@ -34,7 +38,7 @@ import net.minecraft.world.World;
  *
  * @author LDImmersiveEngineering -- conduits
  */
-public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit>
+public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implements IColouredBlock
 {
 	public BlockConduit()
 	{
@@ -79,16 +83,68 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit>
 	{
 		state = super.getActualState(state, world, pos);
 		TileEntity tile = world.getTileEntity(pos);
-		if(!(tile instanceof TileEntityConduit))
+		if(tile instanceof TileEntityConduit)
+		{
+			TileEntityConduit conduit = (TileEntityConduit)tile;
+			//Written out in absolute facings rather than as arm indices: the blockstate file reads far
+			//better as "sideconnection_north" than as "arm2", and the mapping between the two is
+			//exactly what ConduitGeometry.armIndex is for.
+			for(EnumFacing side : EnumFacing.VALUES)
+				state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
+						conduit.isConnected(side));
 			return state;
-		TileEntityConduit conduit = (TileEntityConduit)tile;
-		//Written out in absolute facings rather than as arm indices: the blockstate file reads far
-		//better as "sideconnection_north" than as "arm2", and the mapping between the two is
-		//exactly what ConduitGeometry.armIndex is for.
-		for(EnumFacing side : EnumFacing.VALUES)
-			state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
-					conduit.isConnected(side));
+		}
+		if(tile instanceof TileEntityJunctionBox)
+		{
+			//The same six properties, carrying "this face is patched" rather than "this face is
+			//joined". Two meanings for one property is worth a second look, but the two block types
+			//are drawn by different blockstate files and neither can see the other's, so there is
+			//nowhere for them to be confused -- and the alternative is six more properties on a block
+			//that already declares eight.
+			ConduitPatch patch = ((TileEntityJunctionBox)tile).getPatch();
+			for(EnumFacing side : EnumFacing.VALUES)
+				state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
+						patch.isPatched(side));
+		}
 		return state;
+	}
+
+	//	=================================
+	//		PATCH COLOURS
+	//	=================================
+
+	/**
+	 * A patched face wears a plate in its conductor's colour.
+	 * <p>
+	 * Before this the box was a featureless lid: patching it changed nothing you could see, so the
+	 * only way to find out which colour was on which face -- or whether the box was configured at
+	 * all -- was to point at each of the six in turn and read the overlay. Configuring something
+	 * invisible is most of what made the feature feel fiddly to the first person who built with it.
+	 * <p>
+	 * Tinted rather than modelled per colour. The plate is painted near-white and the dye arrives
+	 * here at render time, which is six models instead of ninety-six.
+	 */
+	@Override
+	public boolean hasCustomBlockColours()
+	{
+		return true;
+	}
+
+	@Override
+	public int getRenderColour(IBlockState state, @Nullable IBlockAccess world, @Nullable BlockPos pos,
+							   int tintIndex)
+	{
+		//White is the identity for a multiply, so anything this does not recognise comes out as the
+		//texture painted it -- which is the right answer for the box itself, the conduit run, and
+		//the item in a player's hand, none of which pass a face index.
+		if(world==null||pos==null||tintIndex < 0||tintIndex >= EnumFacing.VALUES.length)
+			return 0xffffff;
+		TileEntity tile = world.getTileEntity(pos);
+		if(!(tile instanceof TileEntityJunctionBox))
+			return 0xffffff;
+		//The tint index is the face's ordinal, which is how the generated models are numbered.
+		WireChannel channel = ((TileEntityJunctionBox)tile).getPatch().get(EnumFacing.byIndex(tintIndex));
+		return channel==null?0xffffff: channel.getColour();
 	}
 
 	@Override
