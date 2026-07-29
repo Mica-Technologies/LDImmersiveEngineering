@@ -335,6 +335,14 @@ public class ClientProxy extends CommonProxy
 				return new EntityRenderFluorescentTube(manager);
 			}
 		});
+		RenderingRegistry.registerEntityRenderingHandler(EntityHydraulicCrawler.class, new IRenderFactory<EntityHydraulicCrawler>()
+		{
+			@Override
+			public Render createRenderFor(RenderManager manager)
+			{
+				return new EntityRenderHydraulicCrawler(manager);
+			}
+		});
 		ModelLoaderRegistry.registerLoader(new ConnLoader());
 		ModelLoaderRegistry.registerLoader(new FeedthroughLoader());
 		ModelLoaderRegistry.registerLoader(new ModelConfigurableSides.Loader());

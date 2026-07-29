@@ -227,6 +227,8 @@ public class IEContent
 	public static Item itemPowerpack;
 	public static ItemIEBase itemShield;
 	public static ItemIEBase itemMaintenanceKit;
+	/** The Hydraulic Crawler, carried. Becomes {@code EntityHydraulicCrawler} where you put it down. */
+	public static ItemIEBase itemHydraulicCrawler;
 	public static ItemSteelArmor[] itemsSteelArmor = new ItemSteelArmor[4];
 
 	public static ItemIEBase itemFakeIcons;
@@ -417,6 +419,7 @@ public class IEContent
 			itemsFaradaySuit[i] = new ItemFaradaySuit(EntityEquipmentSlot.values()[2+i]);
 		itemFluorescentTube = new ItemFluorescentTube();
 		itemPowerpack = new ItemPowerpack();
+		itemHydraulicCrawler = new ItemHydraulicCrawler();
 		itemShield = new ItemIEShield();
 		itemMaintenanceKit = new ItemMaintenanceKit();
 		ItemSteelArmor.mat = EnumHelper.addArmorMaterial("IMMERSIVEENGINEERING:STEEL", "immersiveengineering:steelArmor", 21, new int[]{2, 6, 7, 2}, 10, SoundEvents.ITEM_ARMOR_EQUIP_IRON, 1.0f).setRepairItem(new ItemStack(itemMetal,1,8));
@@ -872,6 +875,18 @@ public class IEContent
 		EntityRegistry.registerModEntity(new ResourceLocation(ImmersiveEngineering.MODID, "revolverShotFlare"), EntityRevolvershotFlare.class, "revolverShotFlare", i++, ImmersiveEngineering.instance, 64, 1, true);
 		EntityRegistry.registerModEntity(new ResourceLocation(ImmersiveEngineering.MODID, "explosive"), EntityIEExplosive.class, "explosive", i++, ImmersiveEngineering.instance, 64, 1, true);
 		EntityRegistry.registerModEntity(new ResourceLocation(ImmersiveEngineering.MODID, "fluorescentTube"), EntityFluorescentTube.class, "fluorescentTube", i++, ImmersiveEngineering.instance, 64, 1, true);
+		//	=================================
+		//	Appended, and it has to stay appended.
+		//	=================================
+		//
+		// That `i++` is a network ID baked into save data. Inserting a registration anywhere above
+		// this line renumbers every entity after it, and every one already in a world becomes a
+		// different entity -- the same frozen-ordinal trap block metadata has, with no test to catch
+		// it. New entities go here, at the bottom.
+		//
+		// Tracked every tick rather than every third: it is a big thing a player is sitting in, and
+		// its position, heading and slew all matter continuously.
+		EntityRegistry.registerModEntity(new ResourceLocation(ImmersiveEngineering.MODID, "hydraulicCrawler"), EntityHydraulicCrawler.class, "hydraulicCrawler", i++, ImmersiveEngineering.instance, 96, 1, true);
 		CapabilityShader.register();
 		CapabilitySkyhookData.register();
 		ShaderRegistry.itemShader = IEContent.itemShader;

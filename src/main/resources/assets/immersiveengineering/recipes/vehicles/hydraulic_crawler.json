@@ -1,0 +1,29 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:hydraulic_crawler"
+	},
+	"pattern": [
+		"SCS",
+		"EHE",
+		"BBB"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"C": {
+			"item": "#componentSteel"
+		},
+		"E": {
+			"item": "immersiveengineering:metal_device1",
+			"data": 6
+		},
+		"H": {
+			"item": "#blockSteel"
+		},
+		"B": {
+			"item": "#blockSheetmetalSteel"
+		}
+	}
+}
