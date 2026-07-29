@@ -10,14 +10,17 @@ package blusunrize.immersiveengineering.common.blocks.petroleum;
 
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.ITileDrop;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.common.capabilities.Capability;
@@ -44,7 +47,7 @@ import javax.annotation.Nullable;
  * @author LDImmersiveEngineering -- petroleum
  */
 public class TileEntityPropaneCylinder extends TileEntityIEBase implements ITileDrop,
-		IBlockOverlayText, IComparatorOverride
+		IBlockOverlayText, IComparatorOverride, IPlayerInteraction
 {
 	/**
 	 * Four buckets. Enough to be worth carrying, small enough that it is a bottle rather than a
@@ -82,6 +85,34 @@ public class TileEntityPropaneCylinder extends TileEntityIEBase implements ITile
 		if(capability==CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY)
 			return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(tank);
 		return super.getCapability(capability, facing);
+	}
+
+	//	=================================
+	//		FILLING IT BY HAND
+	//	=================================
+
+	/**
+	 * A bottle is the one tank in this feature you are meant to fill by hand, so this is the one
+	 * place the gesture absolutely had to work -- and it was the one place it silently did not.
+	 * <p>
+	 * With no handler the click reached the held item instead, and a vanilla bucket answers a
+	 * right-click on a block by placing its contents against the clicked face. Every attempt to fill
+	 * a cylinder therefore put a source block of propane on the ground next to it, and propane is
+	 * flammable and flows.
+	 * <p>
+	 * Through {@link Utils#interactWithTank} rather than Forge's helper directly, because this
+	 * cylinder refuses everything that is not propane: a bucket of diesel moves no fluid, and a
+	 * transfer that moved no fluid must still swallow the click or the bucket spills on the refusal.
+	 */
+	@Override
+	public boolean interact(EnumFacing side, EntityPlayer player, EnumHand hand, ItemStack heldItem,
+							float hitX, float hitY, float hitZ)
+	{
+		if(!Utils.interactWithTank(player, hand, tank))
+			return false;
+		markDirty();
+		markContainingBlockForUpdate(null);
+		return true;
 	}
 
 	//	=================================

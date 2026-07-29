@@ -1065,6 +1065,33 @@ public class Utils
 
 	}
 
+	/**
+	 * Right-clicking a tank with something you pour out of, done so that failing is safe.
+	 * <p>
+	 * {@link FluidUtil#interactWithFluidHandler} on its own returns false when nothing moved -- the
+	 * tank was full, or it holds diesel and you offered propane -- and a tile that returns false
+	 * lets the click reach the held item. A vanilla bucket answers a click on a block by placing its
+	 * contents against the face you clicked, so "this tank would not take it" comes out as a source
+	 * block of fuel on the ground beside the tank. That is how the propane tanks came to spill
+	 * everywhere instead of filling.
+	 * <p>
+	 * So the rule here is: <strong>if the thing in your hand is a fluid container at all, the tank
+	 * has answered the click</strong>, whether or not any fluid moved. Anything that is not a
+	 * container still falls through, which is what leaves hammers, wrenches and the rest working.
+	 *
+	 * @return true if the click is spent and the caller should not fall through to the item
+	 */
+	public static boolean interactWithTank(@Nonnull EntityPlayer player, @Nonnull EnumHand hand,
+										   @Nonnull IFluidHandler tank)
+	{
+		ItemStack held = player.getHeldItem(hand);
+		//getFluidHandler copies the stack, so this asks "is this a container" without emptying it.
+		if(held.isEmpty()||FluidUtil.getFluidHandler(held)==null)
+			return false;
+		FluidUtil.interactWithFluidHandler(player, hand, tank);
+		return true;
+	}
+
 	public static boolean isFluidContainerFull(ItemStack stack)
 	{
 		if(stack.isEmpty())

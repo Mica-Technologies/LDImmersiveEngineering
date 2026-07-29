@@ -69,6 +69,14 @@ public class TileEntityStorageTank extends TileEntityIEBase implements IComparat
 	@Nullable
 	public CityModeTank tank;
 
+	/**
+	 * The fluid last sent to the client, so the tank can tell a change worth a packet from the
+	 * hundreds of millibucket-sized ones a pipe makes. Transient: it describes what the client has
+	 * been told, which is nothing at all after a reload.
+	 */
+	@Nullable
+	private transient String syncedKind;
+
 	public boolean isMaster()
 	{
 		return master!=null&&master.equals(getPos());
@@ -109,11 +117,48 @@ public class TileEntityStorageTank extends TileEntityIEBase implements IComparat
 		//Kept rather than replaced when a tank is re-formed at the same size, so hammering a tank
 		//you have just enlarged does not pour its contents on the floor.
 		FluidStack existing = tank==null?null: tank.getFluid();
-		this.tank = new CityModeTank(capacity);
+		this.tank = newTank(capacity);
 		if(existing!=null)
 			this.tank.fill(existing, true);
 		markDirty();
 		markContainingBlockForUpdate(null);
+	}
+
+	/**
+	 * The master's tank, wired so that changing it saves and shows.
+	 * <p>
+	 * The override is not decoration. {@link #getCapability} hands this tank straight out, so a pipe
+	 * or a Fluid Outlet filling the tank mutates it with nothing else in the call: without an
+	 * {@code onContentsChanged} the chunk was never marked dirty, and a tank filled only by pipe
+	 * could go back to disk empty. The client copy went equally stale, so the level in the readout
+	 * stopped moving until something else happened to resend the block.
+	 */
+	private CityModeTank newTank(int capacity)
+	{
+		return new CityModeTank(capacity)
+		{
+			@Override
+			protected void onContentsChanged()
+			{
+				markDirty();
+				//Guarded, because readCustomNBT builds the tank and then reads into it, which lands
+				//here with no world attached yet -- and markContainingBlockForUpdate dereferences it.
+				if(world==null||world.isRemote)
+					return;
+				//Only when what it holds changes kind, not every millibucket. A pipe filling this
+				//tank changes the amount on most ticks, and a block update per tick for a number
+				//nothing draws is exactly the per-tick cost the rest of this feature avoids. The
+				//buried tanks throttle to gauge divisions for the same reason; they have a gauge to
+				//draw and this has not.
+				FluidStack now = getFluid();
+				String kind = now==null||now.amount <= 0||now.getFluid()==null
+						?null: now.getFluid().getName();
+				if(java.util.Objects.equals(kind, syncedKind))
+					return;
+				syncedKind = kind;
+				markContainingBlockForUpdate(null);
+			}
+		};
 	}
 
 	public void formAsWall(BlockPos master)
@@ -179,7 +224,7 @@ public class TileEntityStorageTank extends TileEntityIEBase implements IComparat
 							float hitX, float hitY, float hitZ)
 	{
 		if(!Utils.isHammer(heldItem))
-			return false;
+			return fillFromHeld(player, hand);
 		if(world.isRemote)
 			return true;
 		if(isFormed())
@@ -204,6 +249,28 @@ public class TileEntityStorageTank extends TileEntityIEBase implements IComparat
 				new TextComponentTranslation(Lib.CHAT_INFO+"petroleum.tankFormed",
 						found.width+"x"+found.height+"x"+found.depth, found.capacity()));
 		return true;
+	}
+
+	/**
+	 * Bucket, can or any other fluid container, against any wall of a formed tank.
+	 * <p>
+	 * Without this the click falls through to the item, and a vanilla bucket answers a right-click
+	 * on a block by placing its contents against the face you clicked. Filling a tank by hand is the
+	 * obvious first thing anybody tries, and what it did instead was pour a source block of propane
+	 * down the outside of the tank -- once per attempt. The Sheetmetal Tank this sits beside has
+	 * always handled the gesture; not handling it here was the whole of the bug.
+	 *
+	 * @return true if the held item was a container this tank did something with
+	 */
+	private boolean fillFromHeld(EntityPlayer player, EnumHand hand)
+	{
+		TileEntityStorageTank head = getMaster();
+		if(head==null||head.tank==null)
+			return false;
+		//Through Utils rather than Forge's helper directly, so a tank that is full or already holds
+		//something else still swallows the click instead of letting the bucket empty itself onto the
+		//wall. Saving and resync are the tank's own job -- see newTank.
+		return Utils.interactWithTank(player, hand, head.tank);
 	}
 
 	/**
@@ -339,7 +406,7 @@ public class TileEntityStorageTank extends TileEntityIEBase implements IComparat
 		width = clampSide(nbt.getInteger("width"));
 		height = clampSide(nbt.getInteger("height"));
 		depth = clampSide(nbt.getInteger("depth"));
-		tank = new CityModeTank(StorageTankGeometry.capacity(width, height, depth));
+		tank = newTank(StorageTankGeometry.capacity(width, height, depth));
 		if(nbt.hasKey("tank"))
 			tank.readFromNBT(nbt.getCompoundTag("tank"));
 	}

@@ -15,13 +15,16 @@ import blusunrize.immersiveengineering.common.blocks.BlockTypes_MetalsAll;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IActiveState;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IUsesBooleanProperty;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BuriedTankGeometry.Tier;
+import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fluids.FluidStack;
@@ -53,7 +56,8 @@ import javax.annotation.Nullable;
  * @author LDImmersiveEngineering -- petroleum
  */
 public abstract class TileEntityBuriedTank<T extends TileEntityBuriedTank<T>>
-		extends TileEntityMultiblockPart<T> implements IBlockOverlayText, IComparatorOverride, IActiveState
+		extends TileEntityMultiblockPart<T> implements IBlockOverlayText, IComparatorOverride, IActiveState,
+		IPlayerInteraction
 {
 	private static final IFluidTank[] NO_TANKS = new IFluidTank[0];
 
@@ -170,6 +174,32 @@ public abstract class TileEntityBuriedTank<T extends TileEntityBuriedTank<T>>
 	protected boolean canDrainTankFrom(int iTank, EnumFacing side)
 	{
 		return isCap();
+	}
+
+	/**
+	 * A bucket or can, against the fill cap.
+	 * <p>
+	 * The cap is where every other kind of hookup happens, so it is where this happens too -- a
+	 * buried wall block still refuses, which keeps the cap from becoming decorative.
+	 * <p>
+	 * Handling it at all is the fix for a bug worth naming: with no handler here the click fell
+	 * through to the item, and a vanilla bucket answers a right-click on a block by placing its
+	 * contents against the clicked face. Trying to fill a tank by hand therefore poured a source
+	 * block of fuel onto the ground beside it, every time, and the tank stayed empty. Propane is
+	 * flammable and spreads, so the failure was also loud.
+	 */
+	@Override
+	public boolean interact(EnumFacing side, EntityPlayer player, EnumHand hand, ItemStack heldItem,
+							float hitX, float hitY, float hitZ)
+	{
+		if(!formed||!isCap())
+			return false;
+		T master = master();
+		if(master==null)
+			return false;
+		//No markDirty or resync afterwards: the master's tank carries an onContentsChanged that
+		//already does both, and doing it again here would be a second place for the two to disagree.
+		return Utils.interactWithTank(player, hand, master.tank);
 	}
 
 	//	=================================
