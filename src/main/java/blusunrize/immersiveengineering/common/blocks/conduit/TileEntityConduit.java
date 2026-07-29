@@ -101,6 +101,14 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		if(!world.isBlockLoaded(neighbour))
 			return false;
 		TileEntity te = world.getTileEntity(neighbour);
+		//A box is the far end of a run, so the arm pointing at one is drawn like any other. Without
+		//this every run rendered as two loose stubs with a gap at each box -- the run worked, since
+		//ConduitRoute walks the world rather than this mask, but it read as broken while you built
+		//it, which is worse than broken in a feature nobody has used before.
+		if(te instanceof TileEntityJunctionBox)
+			//dir came out of inPlane(facing), so the step already runs along this conduit's surface:
+			//the same rule ConduitRoute applies from the box's side.
+			return true;
 		if(!(te instanceof TileEntityConduit))
 			return false;
 		return ConduitGeometry.connects(facing, ((TileEntityConduit)te).facing, dir);
