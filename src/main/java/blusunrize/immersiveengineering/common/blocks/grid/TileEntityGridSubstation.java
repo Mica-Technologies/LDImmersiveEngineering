@@ -243,7 +243,34 @@ public class TileEntityGridSubstation extends TileEntityMultiblockPart<TileEntit
 		lines.add(TextFormatting.GOLD+"Substation"+TextFormatting.RESET);
 		describe(lines, "Feed", SubstationGeometry.FEED_INDEX);
 		describe(lines, "Service", SubstationGeometry.SERVICE_INDEX);
+		//	=================================
+		//	Where the two ends actually are.
+		//	=================================
+		//
+		// The yard is twelve identical blocks. Nothing about it says which end takes power and which
+		// gives it, or that either of them only talks to the block directly in front -- so the first
+		// person to build one reported being unable to find the inputs and outputs at all, which is
+		// a fair description of a featureless box.
+		//
+		// Said in the terms somebody standing in front of it can act on: an end, a side, and the one
+		// block that matters.
+		lines.add(TextFormatting.GRAY+"Facing "+facing.getName()+": feed is the "
+				+endName(SubstationGeometry.FEED_INDEX)+" end, service the "
+				+endName(SubstationGeometry.SERVICE_INDEX)+" end."+TextFormatting.RESET);
+		lines.add(TextFormatting.GRAY+"Each exchanges power with the single block in front of it. "
+				+"A wire connector there is fed whichever way it faces."+TextFormatting.RESET);
 		return lines;
+	}
+
+	/**
+	 * @return "left" or "right" as seen by somebody standing in front of the yard
+	 */
+	private String endName(int index)
+	{
+		//Column zero is the left-hand one seen from the front, the same convention the console's
+		//screen halves use. Naming it rather than giving a coordinate is the point: the player is
+		//looking at the thing.
+		return index%SubstationGeometry.WIDTH==0?"left": "right";
 	}
 
 	private void describe(List<String> lines, String label, int index)
