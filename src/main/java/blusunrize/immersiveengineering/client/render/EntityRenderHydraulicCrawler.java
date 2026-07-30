@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.client.render;
 
 import blusunrize.immersiveengineering.client.models.ModelHydraulicCrawler;
+import blusunrize.immersiveengineering.common.entities.CrawlerGeometry;
 import blusunrize.immersiveengineering.common.entities.EntityHydraulicCrawler;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.entity.Render;
@@ -56,15 +57,39 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 		GlStateManager.translate(x, y, z);
 
 		//	=================================
-		//	Sixteen units to the block, upside down.
+		//	Sixteen units to the block, upside down, and half again as big.
 		//	=================================
 		//
 		// A ModelBase is authored in pixels with -Y as up, which is the convention every vanilla mob
 		// model uses. Scaling by -1/16 on Y and Z converts both at once; without it the machine is
-		// sixteen blocks tall and standing on its head.
-		GlStateManager.scale(0.0625F, -0.0625F, -0.0625F);
-		//The undercarriage's heading. The house's slew is applied inside the model, relative to this.
-		GlStateManager.rotate(180F-entityYaw, 0, 1, 0);
+		// sixteen blocks tall and standing on its head. CrawlerGeometry.SCALE is the enlargement, and
+		// it is shared with the collision box and the seat so the three cannot drift apart.
+		float unit = (float)CrawlerGeometry.UNIT;
+		GlStateManager.scale(unit, -unit, -unit);
+
+		//	=================================
+		//	The heading, and why it is not 180 minus the yaw.
+		//	=================================
+		//
+		// Vanilla mob renderers use 180-yaw, and copying that here was wrong, because they also negate
+		// X where this negates Z. Working the transform through: the arm is model -Z, and with a
+		// rotation of A this scale sends it to (-sin A, cos A) in the world -- which is exactly
+		// CrawlerGeometry.heading(A). The machine drives along heading(rotationYaw). So A has to be
+		// rotationYaw, full stop.
+		//
+		// With 180-yaw it was heading(180-yaw) = (-sin y, -cos y): the same as the true heading in X
+		// and opposite in Z. Not a rotation of the machine -- a reflection of it. Every symptom
+		// reported followed from that one line:
+		//
+		//   * the arm and cab pointed the wrong way, so a seated operator had their back to the arm;
+		//   * W and S "did not respect the angle", because the machine drove along its real heading
+		//     while being drawn along a reflected one, agreeing at some yaws and opposing at others;
+		//   * A and D felt inverted, because a reflection reverses the apparent direction of a turn.
+		//
+		// It was also worse than a constant error: the house's own slew is applied inside the model
+		// relative to this, so the total came to 180 + slew - 2*yaw. The yaw appeared twice, and the
+		// arm pointed somewhere unrelated to either the tracks or the operator's view.
+		GlStateManager.rotate(entityYaw, 0, 1, 0);
 
 		bindEntityTexture(crawler);
 		model.setPose(

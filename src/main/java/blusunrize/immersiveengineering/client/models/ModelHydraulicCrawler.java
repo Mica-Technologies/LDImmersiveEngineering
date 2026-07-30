@@ -51,6 +51,16 @@ public class ModelHydraulicCrawler extends ModelBase
 	public static final float STICK_LENGTH = 20F;
 	public static final float TOOL_LENGTH = 10F;
 
+	/**
+	 * How far each arm section reaches back past its own pivot, into the section it hangs off.
+	 * <p>
+	 * It buys two things: no coplanar faces at the joint, so nothing z-fights; and a joint that looks
+	 * pinned rather than balanced end to end. It does <em>not</em> change any section's length -- the
+	 * pivot spacing is still BOOM_LENGTH and STICK_LENGTH, so the geometry that decides where the
+	 * bucket is stays exactly what the picture shows.
+	 */
+	public static final int JOINT_OVERLAP = 2;
+
 	/** Where the boom is pinned to the house. */
 	public static final float BOOM_PIVOT_X = -5F;
 	public static final float BOOM_PIVOT_Y = -10F;
@@ -132,21 +142,35 @@ public class ModelHydraulicCrawler extends ModelBase
 		//	=================================
 		//Each section is pinned at the end of the one before and drawn forward from its own pin, so an
 		//angle on a joint sweeps everything downstream of it.
+		//
+		//	=================================
+		//	Tapered, and each section buried in the last.
+		//	=================================
+		//
+		// The first version butted each section's end flush against the next one's start, which put two
+		// coplanar faces at every joint -- and coplanar faces at the same depth are what z-fighting is.
+		// It showed up in game as the joints flickering between two textures.
+		//
+		// Two changes fix it together and neither is a hack. Each section is a size smaller in
+		// cross-section than the one it hangs off, so the child fits inside the parent rather than
+		// meeting it edge to edge, which is also how real steel is pinned. And each section's box
+		// starts JOINT_OVERLAP units *behind* its own pivot, so its near end is buried inside the
+		// parent and there is no near face to fight with anything.
 		boom = new ModelRenderer(this, 0, 158);
 		boom.setRotationPoint(BOOM_PIVOT_X, BOOM_PIVOT_Y, BOOM_PIVOT_Z);
-		boom.addBox(-3F, -3F, -BOOM_LENGTH, 6, 7, (int)BOOM_LENGTH);
+		boom.addBox(-3.5F, -4F, -BOOM_LENGTH, 7, 8, (int)BOOM_LENGTH);
 		house.addChild(boom);
 
-		stick = new ModelRenderer(this, 66, 158);
+		stick = new ModelRenderer(this, 68, 158);
 		stick.setRotationPoint(0, 0, -BOOM_LENGTH);
-		stick.addBox(-2F, -2F, -STICK_LENGTH, 5, 6, (int)STICK_LENGTH);
+		stick.addBox(-3F, -3.5F, -STICK_LENGTH, 6, 7, (int)STICK_LENGTH+JOINT_OVERLAP);
 		boom.addChild(stick);
 
 		//A plain stub on purpose. The attachments replace what hangs here, and drawing a bucket now
 		//would mean drawing one the machine might not have fitted.
-		tool = new ModelRenderer(this, 118, 158);
+		tool = new ModelRenderer(this, 126, 158);
 		tool.setRotationPoint(0, 0, -STICK_LENGTH);
-		tool.addBox(-3F, -2F, -TOOL_LENGTH, 7, 7, (int)TOOL_LENGTH);
+		tool.addBox(-2.5F, -3F, -TOOL_LENGTH, 5, 6, (int)TOOL_LENGTH+JOINT_OVERLAP);
 		stick.addChild(tool);
 	}
 

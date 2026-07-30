@@ -114,6 +114,37 @@ class CrawlerGeometryTest
 		}
 
 		@Test
+		@DisplayName("the seat is actually inside the cab")
+		void seatIsInsideTheCab()
+		{
+			//	=================================
+			//	The one that shipped wrong.
+			//	=================================
+			//
+			// The seat's offsets and the cab's box were independent numbers, both of which looked about
+			// right, and the seat was outside the cab. Nothing in the game reports that: a passenger
+			// hanging in the air beside a machine looks exactly like a passenger positioned badly on
+			// purpose. Both are now read off the model's cab box, and this is what says so.
+			double[] seat = CrawlerGeometry.cabOffset(0);
+			assertTrue(seat[0] >= CrawlerGeometry.CAB_MIN_X&&seat[0] <= CrawlerGeometry.CAB_MAX_X,
+					"the seat is at x="+seat[0]+", outside the cab's "
+							+CrawlerGeometry.CAB_MIN_X+".."+CrawlerGeometry.CAB_MAX_X);
+			assertTrue(seat[1] >= CrawlerGeometry.CAB_MIN_Z&&seat[1] <= CrawlerGeometry.CAB_MAX_Z,
+					"the seat is at z="+seat[1]+", outside the cab's "
+							+CrawlerGeometry.CAB_MIN_Z+".."+CrawlerGeometry.CAB_MAX_Z);
+		}
+
+		@Test
+		@DisplayName("the seat is not on the machine's centreline, because the cab is not")
+		void seatIsOffCentre()
+		{
+			//Every excavator's cab is offset to one side. A seat on the centreline would mean the two
+			//had been derived from different things again.
+			assertTrue(CrawlerGeometry.CAB_SIDE > 0.2,
+					"the seat is nearly on the centreline; the cab is offset and the seat should be too");
+		}
+
+		@Test
 		@DisplayName("a full turn returns it to where it started")
 		void fullTurnIsIdentity()
 		{

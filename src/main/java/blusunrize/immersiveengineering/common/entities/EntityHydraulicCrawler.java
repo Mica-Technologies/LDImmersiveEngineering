@@ -54,18 +54,6 @@ import javax.annotation.Nullable;
  */
 public class EntityHydraulicCrawler extends Entity
 {
-	/**
-	 * The collision footprint, and it is <strong>square on purpose</strong>.
-	 * <p>
-	 * A 1.12 entity has exactly one collision box and it is axis-aligned: it cannot be rotated, and
-	 * there is no second box to describe an undercarriage pointing one way and a house pointing
-	 * another. A square footprint is the way out -- it is the same box at every angle, so steering
-	 * and slewing cannot make it wrong. The tracks being visibly longer than the machine is wide is a
-	 * modelling detail and not a collision one.
-	 */
-	public static final float WIDTH = 3.0F;
-	public static final float HEIGHT = 3.0F;
-
 	/** Blocks per tick at full throttle. Slow, because a tracked machine is slow. */
 	private static final double DRIVE_SPEED = 0.11;
 	/** Reverse is slower still, as it is on anything with tracks. */
@@ -102,7 +90,9 @@ public class EntityHydraulicCrawler extends Entity
 	public EntityHydraulicCrawler(World world)
 	{
 		super(world);
-		setSize(WIDTH, HEIGHT);
+		//Both from CrawlerGeometry, so the box, the seat and the drawing cannot disagree about how
+		//big the machine is.
+		setSize((float)CrawlerGeometry.WIDTH, (float)CrawlerGeometry.HEIGHT);
 		//A machine is something you climb on, not something that gets shoved about, and nothing
 		//should spawn inside it.
 		this.preventEntitySpawning = true;

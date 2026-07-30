@@ -49,9 +49,12 @@ REGIONS = [
     ("counterweight", 0, 118, 26, 16, 10, "hazard"),
     ("cab", 74, 118, 14, 18, 18, "cab"),
     ("exhaust", 140, 118, 4, 8, 4, "steel"),
-    ("boom", 0, 158, 6, 7, 26, "yellow"),
-    ("stick", 66, 158, 5, 6, 20, "yellow"),
-    ("tool", 118, 158, 7, 7, 10, "steel"),
+    # The arm tapers, and each section's box is JOINT_OVERLAP longer than its pivot spacing so
+    # that it buries itself in the section it hangs off -- see ModelHydraulicCrawler. Both are
+    # why no joint z-fights, and both change the box sizes, so they change these footprints too.
+    ("boom", 0, 158, 7, 8, 26, "yellow"),
+    ("stick", 68, 158, 6, 7, 22, "yellow"),
+    ("tool", 126, 158, 5, 6, 12, "steel"),
 ]
 
 

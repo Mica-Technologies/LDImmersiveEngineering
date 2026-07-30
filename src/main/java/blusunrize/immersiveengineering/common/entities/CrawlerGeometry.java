@@ -29,15 +29,60 @@ public final class CrawlerGeometry
 	}
 
 	/**
+	 * How much bigger than one-to-one the machine is drawn.
+	 * <p>
+	 * The model is authored at Minecraft's usual sixteen units to the block, and then rendered half
+	 * again as large: at one-to-one it read as a mini-digger rather than as something intimidating.
+	 * Scaling at render time rather than by enlarging every box keeps the texture layout untouched --
+	 * a box's UV footprint is a function of its size, so growing the boxes would mean relaying out
+	 * the whole sheet and finding room for it. The cost is that each texel covers more of the screen,
+	 * which on panelled steel reads as bigger panel lines and is if anything a gain.
+	 * <p>
+	 * <strong>Everything dimensional here is derived from this.</strong> The collision box, the seat
+	 * and the model all have to agree about how big the machine is, and three independent copies of
+	 * "one and a half" would eventually be two different numbers.
+	 */
+	public static final double SCALE = 1.5;
+
+	/** Blocks per model unit. */
+	public static final double UNIT = SCALE/16;
+
+	/**
+	 * The collision footprint, in blocks, and it is <strong>square on purpose</strong>.
+	 * <p>
+	 * A 1.12 entity has exactly one collision box and it is axis-aligned: it cannot rotate, and there
+	 * is no second box to describe an undercarriage pointing one way and a house pointing another. A
+	 * square footprint is the same box at every angle, so neither steering nor slewing can make it
+	 * wrong. Taken from the outer edges of the tracks, which span 48 model units.
+	 */
+	public static final double WIDTH = 48*UNIT;
+
+	/** Ground to the top of the cab, 46 model units. The arm may go higher; the collider need not. */
+	public static final double HEIGHT = 46*UNIT;
+
+	/**
 	 * Where the operator sits, relative to the centre of the machine.
 	 * <p>
-	 * The cab is on the house, not on the tracks, so the seat travels round with the slew. Getting
-	 * this wrong does not look wrong -- it puts the player three metres to the left of the machine,
-	 * in the air, which reads as the seat being broken rather than as a sign error.
+	 * <strong>Read off the model's cab box rather than guessed.</strong> The cab spans model x 1 to 15
+	 * and z -14 to 4, so its centre is at (8, -5); the seat's floor is its lower edge, 28 units above
+	 * the tracks. The first version of these numbers was three values that looked about right and were
+	 * not any part of the model -- which put the seat outside the cab it was supposed to be inside.
+	 * <p>
+	 * The cab is on the house, not on the tracks, so the seat travels round with the slew.
 	 */
-	public static final double CAB_SIDE = 0.85;
-	public static final double CAB_FORWARD = 0.35;
-	public static final double CAB_HEIGHT = 1.9;
+	public static final double CAB_SIDE = 8*UNIT;
+	public static final double CAB_FORWARD = 5*UNIT;
+	public static final double CAB_HEIGHT = 28*UNIT;
+
+	/**
+	 * The cab's walls, in blocks, as world offsets at zero slew -- the box the seat has to be inside.
+	 * <p>
+	 * Here so a test can say so. The seat and the cab were independent numbers once and the seat was
+	 * outside the cab; nothing in the game reports that, because a passenger positioned in mid-air
+	 * beside a machine looks exactly like a passenger positioned badly on purpose.
+	 */
+	public static final double CAB_MIN_X = 1*UNIT, CAB_MAX_X = 15*UNIT;
+	public static final double CAB_MIN_Z = -4*UNIT, CAB_MAX_Z = 14*UNIT;
 
 	/**
 	 * The seat's horizontal offset from the machine's centre at a given slew.

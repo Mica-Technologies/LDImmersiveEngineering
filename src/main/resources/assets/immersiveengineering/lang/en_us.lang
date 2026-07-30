@@ -1952,6 +1952,6 @@ ie.manual.entry.virtualGrid12=Twelve frames in a yard three wide, two deep and t
 tile.immersiveengineering.petroleum_device.storage_tank_wall.name=Storage Tank Wall
 tile.immersiveengineering.petroleum_device.storage_tank_wall.info=Build a hollow box of these -- any rectangular shape from 3x3x3 up to 16x16x16 -- and strike any wall with an Engineer's Hammer. It becomes one tank holding 16 buckets per enclosed block, so a 5x5x5 holds 432,000 mB and a 9x9x9 holds 5,488,000. Walls only: the inside must be empty. Pipe into any wall block, not just one fitting. Hammer it again to take it apart without losing the contents.
 chat.immersiveengineering.info.petroleum.tankFormed=Storage Tank formed: %s, %s mB
-chat.immersiveengineering.info.crawlerNoRoom=Not enough room -- the Crawler needs a clear 3x3x3.
+chat.immersiveengineering.info.crawlerNoRoom=Not enough room -- the Crawler needs a clear five blocks across.
 chat.immersiveengineering.info.petroleum.tankDisassembled=Storage Tank taken apart. Its contents are kept.
 chat.immersiveengineering.info.petroleum.tankNotAShell=That is not a hollow box. A Storage Tank needs complete walls from 3 to 16 blocks a side, and nothing inside it.
