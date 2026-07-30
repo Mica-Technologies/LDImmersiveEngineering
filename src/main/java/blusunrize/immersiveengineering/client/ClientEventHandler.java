@@ -42,7 +42,9 @@ import blusunrize.immersiveengineering.common.util.IEPotions;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
+import blusunrize.immersiveengineering.common.entities.EntityHydraulicCrawler;
 import blusunrize.immersiveengineering.common.util.network.MessageChemthrowerSwitch;
+import blusunrize.immersiveengineering.common.util.network.MessageCrawlerInput;
 import blusunrize.immersiveengineering.common.util.network.MessageMagnetEquip;
 import blusunrize.immersiveengineering.common.util.network.MessageRequestBlockUpdate;
 import blusunrize.immersiveengineering.common.util.network.MessageRevolverRotate;
@@ -208,10 +210,48 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 //		}
 	}
 
+	/** The Crawler control state last sent, so an idle machine costs no packets at all. */
+	private byte lastCrawlerFlags;
+
 	@SubscribeEvent
 	public void onClientTick(TickEvent.ClientTickEvent event)
 	{
 		FAILED_CONNECTIONS.entrySet().removeIf(entry -> entry.getValue().getValue().decrementAndGet() <= 0);
+		if(event.phase==TickEvent.Phase.END)
+			sendCrawlerControls();
+	}
+
+	/**
+	 * Tell the server which of the Crawler's controls the operator is holding.
+	 * <p>
+	 * The only input this machine needs a packet for. Driving and slewing ride on the rider's movement
+	 * input and yaw, which vanilla already synchronises; a key that is not a movement key does not
+	 * exist as far as the server is concerned, so it has to be sent.
+	 * <p>
+	 * Repeated every tick while anything is held, rather than sent once on press. That is what lets the
+	 * server expire a stale control -- a client that said "raising" and then disconnected would
+	 * otherwise leave the arm climbing against its stop forever. Nothing is sent while nothing is held,
+	 * so a parked machine, or a player nowhere near one, costs nothing.
+	 */
+	private void sendCrawlerControls()
+	{
+		EntityPlayer player = ClientUtils.mc().player;
+		if(player==null||!(player.getRidingEntity() instanceof EntityHydraulicCrawler))
+		{
+			lastCrawlerFlags = 0;
+			return;
+		}
+		byte flags = 0;
+		if(ClientProxy.keybind_crawlerArmUp.isKeyDown())
+			flags |= EntityHydraulicCrawler.FLAG_ARM_UP;
+		if(ClientProxy.keybind_crawlerArmDown.isKeyDown())
+			flags |= EntityHydraulicCrawler.FLAG_ARM_DOWN;
+		//Send while held, and once more on release so the server stops immediately rather than waiting
+		//out the timeout -- a control that took a third of a second to let go of would feel broken.
+		if(flags==0&&lastCrawlerFlags==0)
+			return;
+		lastCrawlerFlags = flags;
+		ImmersiveEngineering.packetHandler.sendToServer(new MessageCrawlerInput(flags));
 	}
 
 	@SubscribeEvent

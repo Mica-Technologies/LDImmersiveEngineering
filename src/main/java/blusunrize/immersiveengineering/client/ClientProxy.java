@@ -177,6 +177,17 @@ public class ClientProxy extends CommonProxy
 	public static boolean stencilBufferEnabled = false;
 	public static KeyBinding keybind_magnetEquip = new KeyBinding("key.immersiveengineering.magnetEquip", Keyboard.KEY_S, "key.categories.gameplay");
 	public static KeyBinding keybind_chemthrowerSwitch = new KeyBinding("key.immersiveengineering.chemthrowerSwitch", 0, "key.categories.gameplay");
+	/**
+	 * The Hydraulic Crawler's arm, raise and lower.
+	 * <p>
+	 * On R and F, which are free in vanilla and sit under the hand already on WASD. Two keys rather
+	 * than the operator's view: tying the arm's height to where they are looking meant they could not
+	 * look at what they were digging while digging it, which is how it felt the first time it was
+	 * driven. The slew stays on the view, because turning to face the work and slewing towards it are
+	 * the same gesture.
+	 */
+	public static KeyBinding keybind_crawlerArmUp = new KeyBinding("key.immersiveengineering.crawlerArmUp", Keyboard.KEY_R, "key.categories.gameplay");
+	public static KeyBinding keybind_crawlerArmDown = new KeyBinding("key.immersiveengineering.crawlerArmDown", Keyboard.KEY_F, "key.categories.gameplay");
 
 	@Override
 	public void preInit()
@@ -485,6 +496,12 @@ public class ClientProxy extends CommonProxy
 
 		keybind_chemthrowerSwitch.setKeyConflictContext(KeyConflictContext.IN_GAME);
 		ClientRegistry.registerKeyBinding(keybind_chemthrowerSwitch);
+
+		for(KeyBinding arm : new KeyBinding[]{keybind_crawlerArmUp, keybind_crawlerArmDown})
+		{
+			arm.setKeyConflictContext(KeyConflictContext.IN_GAME);
+			ClientRegistry.registerKeyBinding(arm);
+		}
 
 		//		revolverTextureMap = new TextureMap("textures/revolvers",true);
 		//		revolverTextureMap.setMipmapLevels(Minecraft.getMinecraft().gameSettings.mipmapLevels);

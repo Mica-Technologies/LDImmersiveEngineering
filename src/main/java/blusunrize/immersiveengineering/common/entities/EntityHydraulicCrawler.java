@@ -100,6 +100,14 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
 	private static final DataParameter<Float> TOOL = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
+	/**
+	 * How high the arm is being aimed, in degrees of depression.
+	 * <p>
+	 * Synced because the HUD will want to show it, and saved because a machine left with its arm down
+	 * should still have it down tomorrow.
+	 */
+	private static final DataParameter<Float> AIM = EntityDataManager
+			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
 
 	/**
 	 * The pose the arm sits in with nobody aiming it -- folded in, the way a machine is left at the
@@ -111,6 +119,40 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 
 	/** Interpolated on the client so the house does not snap between sync packets. */
 	public float prevSlew;
+
+	//	=================================
+	//		CONTROLS
+	//	=================================
+
+	public static final byte FLAG_ARM_UP = 1;
+	public static final byte FLAG_ARM_DOWN = 2;
+
+	/**
+	 * Which controls the operator is holding down.
+	 * <p>
+	 * Transient, and deliberately expiring -- see {@link #CONTROL_TIMEOUT}.
+	 */
+	private byte controlFlags;
+	private int controlAge;
+
+	/**
+	 * How long a held control survives without being renewed.
+	 * <p>
+	 * The client repeats the message while anything is held, so this only matters when the repeats
+	 * stop arriving: a disconnect, a crash, a chunk unload mid-press. Without it, a client that said
+	 * "raising" and then went away would leave the arm rising against its stop forever, and the next
+	 * person to climb in would find a machine that would not obey them.
+	 */
+	private static final int CONTROL_TIMEOUT = 6;
+
+	/** Degrees of aim per tick under a held control. */
+	private static final double AIM_RATE = 1.6;
+
+	public void setControlFlags(byte flags)
+	{
+		this.controlFlags = flags;
+		this.controlAge = 0;
+	}
 
 	public EntityHydraulicCrawler(World world)
 	{
@@ -221,6 +263,19 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		dataManager.register(BOOM, PARKED_BOOM);
 		dataManager.register(STICK, PARKED_STICK);
 		dataManager.register(TOOL, PARKED_TOOL);
+		//Level, which is the arm out in front rather than folded: the pose somebody climbing in would
+		//expect to start from.
+		dataManager.register(AIM, 0F);
+	}
+
+	public float getArmAim()
+	{
+		return dataManager.get(AIM);
+	}
+
+	public void setArmAim(float degrees)
+	{
+		dataManager.set(AIM, degrees);
 	}
 
 	//	=================================
@@ -422,11 +477,18 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	}
 
 	/**
-	 * The house and the arm follow the operator's head.
+	 * The house follows the operator's head; the arm follows the controls.
 	 * <p>
-	 * Straight off the rider's synced yaw and pitch, which is the decision the whole feature rests on
-	 * -- see the class comment. With nobody aboard the machine holds its last pose, because a parked
-	 * machine neither spins nor waves its arm about.
+	 * <strong>The slew comes off the rider's yaw and the arm does not come off their pitch, and that
+	 * split was learned by driving it.</strong> Turning to look at what you are working on is the same
+	 * gesture as slewing the house towards it, so yaw is free and feels right. Pitch is not: the arm's
+	 * height and the operator's view are two things somebody needs to set independently, and tying them
+	 * together means you cannot look at what you are digging while you dig it. So the arm keeps a held
+	 * aim of its own, worked by two controls.
+	 * <p>
+	 * The solver is untouched by that change. It always took a single aim parameter, so moving where
+	 * that number comes from cost nothing -- which is the payoff for having made the arm aimed rather
+	 * than jointed in the first place.
 	 * <p>
 	 * The arm is stepped towards its solved pose rather than set to it. Hydraulics have a speed, and
 	 * beyond looking right it is what keeps the tool's path continuous -- an arm that could snap to a
@@ -437,9 +499,24 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	{
 		Entity rider = getControllingPassenger();
 		if(rider==null)
+		{
+			//Nothing aboard: drop any held control rather than leaving the arm creeping on its own.
+			controlFlags = 0;
 			return;
+		}
 		setSlew(rider.rotationYaw);
-		double[] target = CrawlerArm.solve(rider.rotationPitch);
+
+		if(++controlAge > CONTROL_TIMEOUT)
+			controlFlags = 0;
+		double aim = getArmAim();
+		if((controlFlags&FLAG_ARM_DOWN)!=0)
+			aim += AIM_RATE;
+		if((controlFlags&FLAG_ARM_UP)!=0)
+			aim -= AIM_RATE;
+		setArmAim((float)CrawlerGeometry.clamp(aim,
+				CrawlerArm.MIN_DEPRESSION, CrawlerArm.MAX_DEPRESSION));
+
+		double[] target = CrawlerArm.solve(getArmAim());
 		double[] next = CrawlerArm.step(
 				new double[]{getBoomAngle(), getStickAngle(), getToolAngle()}, target);
 		setArm((float)next[0], (float)next[1], (float)next[2]);
@@ -501,6 +578,8 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	{
 		setSlew(nbt.getFloat("slew"));
 		setArm(nbt.getFloat("boom"), nbt.getFloat("stick"), nbt.getFloat("tool"));
+		setArmAim((float)CrawlerGeometry.clamp(nbt.getFloat("aim"),
+				CrawlerArm.MIN_DEPRESSION, CrawlerArm.MAX_DEPRESSION));
 	}
 
 	@Override
@@ -510,5 +589,6 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		nbt.setFloat("boom", getBoomAngle());
 		nbt.setFloat("stick", getStickAngle());
 		nbt.setFloat("tool", getToolAngle());
+		nbt.setFloat("aim", getArmAim());
 	}
 }
