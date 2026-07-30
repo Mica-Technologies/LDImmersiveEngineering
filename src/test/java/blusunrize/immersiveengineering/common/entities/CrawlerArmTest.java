@@ -236,6 +236,95 @@ class CrawlerArmTest
 	}
 
 	@Nested
+	@DisplayName("points along the arm")
+	class AlongTheArm
+	{
+		@Test
+		@DisplayName("zero is the pivot and the full length is the tip")
+		void endpointsAgree()
+		{
+			double[] pose = CrawlerArm.solve(30);
+			double[] base = CrawlerArm.alongArm(pose[0], pose[1], pose[2], 0);
+			assertEquals(0, base[0], 1e-9);
+			assertEquals(0, base[1], 1e-9);
+
+			double[] tip = CrawlerArm.tipInPlane(pose[0], pose[1], pose[2]);
+			double[] end = CrawlerArm.alongArm(pose[0], pose[1], pose[2], CrawlerArm.TOTAL_LENGTH);
+			assertEquals(tip[0], end[0], 1e-9, "the far end is not where tipInPlane says the tip is");
+			assertEquals(tip[1], end[1], 1e-9);
+		}
+
+		@Test
+		@DisplayName("it stays on the steel rather than cutting the corner")
+		void followsTheBend()
+		{
+			//	=================================
+			//	Why this walks the sections.
+			//	=================================
+			//
+			// The arm's hitboxes hang off this. Interpolating between the pivot and the tip would be a
+			// straight line, and a folded arm is not a straight line -- the boxes would sit in mid-air
+			// across the inside of the elbow, so the boom would hit things it was nowhere near and miss
+			// things it was through. With the arm well folded, the midpoint of the steel must be
+			// measurably off the chord.
+			double boom = -40, stick = 110, tool = 20;
+			double[] tip = CrawlerArm.tipInPlane(boom, stick, tool);
+			double half = CrawlerArm.TOTAL_LENGTH/2;
+			double[] mid = CrawlerArm.alongArm(boom, stick, tool, half);
+			//The chord's midpoint, which is what a naive implementation would have returned.
+			double chordX = tip[0]/2, chordY = tip[1]/2;
+			assertTrue(Math.hypot(mid[0]-chordX, mid[1]-chordY) > 2,
+					"the arm's midpoint sat on the straight line to its tip, so it is not following "
+							+"the bend");
+		}
+
+		@Test
+		@DisplayName("distances outside the arm clamp to its ends")
+		void clampsToTheArm()
+		{
+			double[] pose = CrawlerArm.solve(10);
+			double[] before = CrawlerArm.alongArm(pose[0], pose[1], pose[2], -50);
+			assertEquals(0, before[0], 1e-9, "a negative distance escaped behind the pivot");
+			double[] past = CrawlerArm.alongArm(pose[0], pose[1], pose[2],
+					CrawlerArm.TOTAL_LENGTH+50);
+			double[] tip = CrawlerArm.tipInPlane(pose[0], pose[1], pose[2]);
+			assertEquals(tip[0], past[0], 1e-9, "a distance past the tip kept going");
+		}
+
+		@Test
+		@DisplayName("consecutive points are close together, so a hitbox chain has no gaps")
+		void isContinuous()
+		{
+			//A jump between neighbouring points would be a hole in the arm's coverage, and a hole is
+			//something the boom passes through without noticing.
+			double[] pose = CrawlerArm.solve(45);
+			double[] previous = CrawlerArm.alongArm(pose[0], pose[1], pose[2], 0);
+			for(double d = 0.5; d <= CrawlerArm.TOTAL_LENGTH; d += 0.5)
+			{
+				double[] here = CrawlerArm.alongArm(pose[0], pose[1], pose[2], d);
+				assertTrue(Math.hypot(here[0]-previous[0], here[1]-previous[1]) <= 0.51,
+						"the arm jumped between "+(d-0.5)+" and "+d);
+				previous = here;
+			}
+		}
+
+		@Test
+		@DisplayName("every point sits along the house's heading, like the tip does")
+		void pointsFollowTheHouse()
+		{
+			double[] pose = CrawlerArm.solve(25);
+			for(double d = 4; d <= CrawlerArm.TOTAL_LENGTH; d += 4)
+			{
+				double[] offset = CrawlerArm.armPointOffset(90, pose[0], pose[1], pose[2], d);
+				double[] facing = CrawlerGeometry.heading(90);
+				double horizontal = Math.hypot(offset[0], offset[2]);
+				assertEquals(facing[0], offset[0]/horizontal, 1e-9, "at "+d+" along the arm");
+				assertEquals(facing[1], offset[2]/horizontal, 1e-9, "at "+d+" along the arm");
+			}
+		}
+	}
+
+	@Nested
 	@DisplayName("hydraulic speed")
 	class Stepping
 	{

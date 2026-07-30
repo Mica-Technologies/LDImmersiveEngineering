@@ -974,6 +974,8 @@ recipe.immersiveengineering.hammerCrushing=Crushing
 
 #DEATH
 death.attack.ieRevolver_casull=%1$s was shot by %2$s
+death.attack.ieCrawlerArm=%1$s was caught by a Hydraulic Crawler
+death.attack.ieCrawlerArm.player=%1$s got in the way of %2$s's Hydraulic Crawler
 death.attack.ieRevolver_casull.item=%1$s was shot by %2$s using %3$s
 death.attack.ieRevolver_casull.turret=%1$s was shot by a turret
 death.attack.ieRevolver_armorPiercing=%1$s was shot by %2$s

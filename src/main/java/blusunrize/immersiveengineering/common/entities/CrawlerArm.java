@@ -148,16 +148,61 @@ public final class CrawlerArm
 	 */
 	public static double[] tipInPlane(double boom, double stick, double tool)
 	{
-		double a1 = Math.toRadians(boom);
-		double a2 = Math.toRadians(boom+stick);
-		double a3 = Math.toRadians(boom+stick+tool);
-		double out = CrawlerGeometry.BOOM_LENGTH*Math.cos(a1)
-				+CrawlerGeometry.STICK_LENGTH*Math.cos(a2)
-				+CrawlerGeometry.TOOL_LENGTH*Math.cos(a3);
-		double down = CrawlerGeometry.BOOM_LENGTH*Math.sin(a1)
-				+CrawlerGeometry.STICK_LENGTH*Math.sin(a2)
-				+CrawlerGeometry.TOOL_LENGTH*Math.sin(a3);
+		return alongArm(boom, stick, tool, TOTAL_LENGTH);
+	}
+
+	/** Pivot to tool tip, following the steel rather than the straight line. */
+	public static final double TOTAL_LENGTH =
+			CrawlerGeometry.BOOM_LENGTH+CrawlerGeometry.STICK_LENGTH+CrawlerGeometry.TOOL_LENGTH;
+
+	/**
+	 * A point some distance along the arm's centreline, measured from the boom's pivot and following
+	 * each section in turn.
+	 * <p>
+	 * The general case of {@link #tipInPlane}, and what the arm's hitboxes are hung off: a folded arm
+	 * is a shape, not a line, so knowing only where the tip is says nothing about where the middle of
+	 * the boom went. Walking the sections is also the only way to get points that stay on the steel
+	 * when the arm bends -- interpolating between the pivot and the tip would put them in mid-air
+	 * across the inside of the elbow.
+	 *
+	 * @param distance along the arm in model units, clamped to the arm
+	 *
+	 * @return {@code {out, down}} in model units
+	 */
+	public static double[] alongArm(double boom, double stick, double tool, double distance)
+	{
+		double remaining = CrawlerGeometry.clamp(distance, 0, TOTAL_LENGTH);
+		double out = 0, down = 0;
+		double[] angles = {boom, boom+stick, boom+stick+tool};
+		double[] lengths = {CrawlerGeometry.BOOM_LENGTH, CrawlerGeometry.STICK_LENGTH,
+				CrawlerGeometry.TOOL_LENGTH};
+		for(int i = 0; i < 3&&remaining > 0; i++)
+		{
+			double span = Math.min(remaining, lengths[i]);
+			double radians = Math.toRadians(angles[i]);
+			out += span*Math.cos(radians);
+			down += span*Math.sin(radians);
+			remaining -= span;
+		}
 		return new double[]{out, down};
+	}
+
+	/**
+	 * A point along the arm as an offset from the entity's position, in blocks.
+	 *
+	 * @return {@code {x, y, z}}
+	 */
+	public static double[] armPointOffset(double slewDegrees, double boom, double stick, double tool,
+										  double distance)
+	{
+		double[] plane = alongArm(boom, stick, tool, distance);
+		double out = CrawlerGeometry.BOOM_PIVOT_OUT+plane[0];
+		double height = CrawlerGeometry.BOOM_PIVOT_HEIGHT-plane[1];
+		double[] facing = CrawlerGeometry.heading(slewDegrees);
+		return new double[]{
+				facing[0]*out*CrawlerGeometry.UNIT,
+				height*CrawlerGeometry.UNIT,
+				facing[1]*out*CrawlerGeometry.UNIT};
 	}
 
 	/**

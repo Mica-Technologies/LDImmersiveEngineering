@@ -9,10 +9,13 @@
 package blusunrize.immersiveengineering.common.entities;
 
 import blusunrize.immersiveengineering.common.IEContent;
+import blusunrize.immersiveengineering.common.util.IEDamageSources;
 import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.IEntityMultiPart;
 import net.minecraft.entity.MoverType;
+import net.minecraft.entity.MultiPartEntityPart;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -52,8 +55,30 @@ import javax.annotation.Nullable;
  *
  * @author LDImmersiveEngineering -- vehicles
  */
-public class EntityHydraulicCrawler extends Entity
+public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 {
+	/**
+	 * Where the arm's hitboxes sit, as distances along its centreline in model units, and how big each
+	 * is in blocks.
+	 * <p>
+	 * Spread along the steel rather than concentrated at the tip, because a swinging boom hits things
+	 * with its middle. The tool's box is the largest: it is the business end, and it is the one that
+	 * will decide what gets dug or broken.
+	 */
+	private static final double[] PART_ALONG = {13, 26, 36, 46, 53};
+	private static final float[] PART_SIZE = {0.9F, 0.9F, 0.8F, 0.9F, 1.1F};
+
+	/** How fast the tool has to be moving before touching it hurts, in blocks per tick. */
+	private static final double CONTACT_SPEED = 0.08;
+	/** Ticks between one entity taking a knock and the next. */
+	private static final int CONTACT_COOLDOWN = 10;
+	private static final float CONTACT_DAMAGE = 6F;
+
+	private final EntityCrawlerPart[] parts;
+	/** Where the tool was last tick, so the arm knows whether it is swinging or resting. */
+	private Vec3d lastToolTip;
+	private int contactCooldown;
+
 	/** Blocks per tick at full throttle. Slow, because a tracked machine is slow. */
 	private static final double DRIVE_SPEED = 0.11;
 	/** Reverse is slower still, as it is on anything with tracks. */
@@ -98,6 +123,95 @@ public class EntityHydraulicCrawler extends Entity
 		this.preventEntitySpawning = true;
 		//A block of step, so it climbs a kerb instead of stopping at one. Tracks would.
 		this.stepHeight = 1.0F;
+
+		parts = new EntityCrawlerPart[PART_ALONG.length];
+		for(int i = 0; i < parts.length; i++)
+			//Named, because a part's name is what shows up when something goes wrong with one.
+			parts[i] = new EntityCrawlerPart(this, "arm"+i, PART_SIZE[i], PART_SIZE[i]);
+	}
+
+	//	=================================
+	//		THE ARM'S HITBOXES
+	//	=================================
+
+	@Nullable
+	@Override
+	public Entity[] getParts()
+	{
+		//This is the whole mechanism: World's entity queries walk getParts() on everything they find,
+		//so returning them here is what makes the arm hittable without spawning five more entities.
+		return parts;
+	}
+
+	@Override
+	public World getWorld()
+	{
+		return world;
+	}
+
+	@Override
+	public boolean attackEntityFromPart(MultiPartEntityPart part, DamageSource source, float damage)
+	{
+		//The arm is the machine. Hitting the boom has to do what hitting the tracks does, or the
+		//dismantle gesture works on some of the machine and silently not on the rest of it.
+		return attackEntityFrom(source, damage);
+	}
+
+	/**
+	 * Put every hitbox where its piece of steel actually is.
+	 * <p>
+	 * On both sides, not just the server. The client is what ray traces a player's crosshair, so parts
+	 * left unpositioned on the client are an arm you cannot click even though the server thinks you can.
+	 */
+	private void positionParts()
+	{
+		float boom = getBoomAngle(), stick = getStickAngle(), tool = getToolAngle();
+		float slew = getSlew();
+		for(int i = 0; i < parts.length; i++)
+		{
+			double[] offset = CrawlerArm.armPointOffset(slew, boom, stick, tool, PART_ALONG[i]);
+			EntityCrawlerPart part = parts[i];
+			//prevPos kept in step, or anything interpolating a part's position between ticks -- a
+			//particle, a debug box -- smears it across the machine.
+			part.prevPosX = part.posX;
+			part.prevPosY = part.posY;
+			part.prevPosZ = part.posZ;
+			part.setLocationAndAngles(posX+offset[0], posY+offset[1]-part.height/2,
+					posZ+offset[2], 0, 0);
+		}
+	}
+
+	/**
+	 * A swinging arm hurts whatever it catches.
+	 * <p>
+	 * Gated on the tool actually moving, because a parked arm resting against a cow should not grind it
+	 * down. Gated on a cooldown as well: the arm intersects a given entity for as long as it is passing
+	 * through, and damage every tick of that would be a mob deleter rather than a machine.
+	 */
+	private void bumpEntities()
+	{
+		if(contactCooldown > 0)
+		{
+			contactCooldown--;
+			return;
+		}
+		Vec3d tip = getToolTip();
+		double speed = lastToolTip==null?0: tip.distanceTo(lastToolTip);
+		if(speed < CONTACT_SPEED)
+			return;
+
+		Entity rider = getControllingPassenger();
+		for(EntityCrawlerPart part : parts)
+			for(Entity hit : world.getEntitiesWithinAABBExcludingEntity(this,
+					part.getEntityBoundingBox().grow(0.1)))
+			{
+				//Never the machine's own parts, and never the operator: an arm that swept its own cab
+				//would kill whoever was driving it the first time they used it.
+				if(hit==rider||hit instanceof EntityCrawlerPart||hit==this)
+					continue;
+				if(hit.attackEntityFrom(IEDamageSources.crawlerArm, CONTACT_DAMAGE))
+					contactCooldown = CONTACT_COOLDOWN;
+			}
 	}
 
 	@Override
@@ -285,6 +399,14 @@ public class EntityHydraulicCrawler extends Entity
 		{
 			followOperatorsView();
 			drive();
+		}
+		//Positioned on both sides -- see positionParts -- and before the contact check, so the arm is
+		//tested where it is now rather than where it was last tick.
+		positionParts();
+		if(!world.isRemote)
+		{
+			bumpEntities();
+			lastToolTip = getToolTip();
 		}
 
 		//Gravity, then a single move: a machine this heavy does not need airborne control, and

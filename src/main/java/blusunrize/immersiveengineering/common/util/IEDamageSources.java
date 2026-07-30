@@ -147,6 +147,9 @@ public class IEDamageSources
 
 	public static DamageSource razorWire = new IEDamageSource(Lib.DMG_RazorWire);
 
+	/** Caught by a Hydraulic Crawler's arm while it was moving. */
+	public static DamageSource crawlerArm = new IEDamageSource(Lib.DMG_CrawlerArm);
+
 	public static DamageSource razorShock = new IEDamageSource(Lib.DMG_RazorShock);
 
 	// DO NOT USE EXCEPT FOR CHECKING WHETHER AN ENTITY IS VULNERABLE
