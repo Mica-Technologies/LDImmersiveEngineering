@@ -691,11 +691,22 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		// this machine can do to somebody is run dry mid-demolition, hundreds of blocks from home, in a
 		// thing that cannot be pushed and cannot be picked up without a hammer. The reserve is enough
 		// to drive back with.
-		if(fuel.getFluidAmount() <= CrawlerConfig.fuelReserve)
+		if(!CrawlerConfig.canWork(fuel.getFluidAmount()))
 		{
+			//	=================================
+			//	Empty and low are different problems.
+			//	=================================
+			//
+			// They were one message, and it said "running on reserve" -- which on a machine that has
+			// never been fuelled is not true and does not tell anybody what to do. A brand new Crawler
+			// arrives with a dry tank, so this was the first thing every operator met: a trigger that
+			// did nothing, on every block, with an explanation that described a situation they were
+			// not in. It read as the attachment being broken, which is exactly how it was reported.
 			if(rider instanceof EntityPlayer)
 				ChatUtils.sendServerNoSpamMessages((EntityPlayer)rider,
-						new TextComponentTranslation(Lib.CHAT_INFO+"crawlerReserve"));
+						new TextComponentTranslation(Lib.CHAT_INFO
+								+(CrawlerConfig.isDry(fuel.getFluidAmount())?"crawlerNoFuel"
+								: "crawlerReserve")));
 			return;
 		}
 		burn(CrawlerConfig.fuelWorking);
@@ -825,7 +836,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 */
 	public boolean hasWorkingFuel()
 	{
-		return fuel.getFluidAmount() > CrawlerConfig.fuelReserve;
+		return CrawlerConfig.canWork(fuel.getFluidAmount());
 	}
 
 	//	=================================

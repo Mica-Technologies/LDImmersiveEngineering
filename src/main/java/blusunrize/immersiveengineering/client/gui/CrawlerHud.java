@@ -161,8 +161,24 @@ public class CrawlerHud
 			Gui.drawRect(x, y, x+filled, y+6, crawler.hasWorkingFuel()?FUEL: GAUGE_LIMIT);
 
 		FontRenderer font = ClientUtils.mc().fontRenderer;
+		//	=================================
+		//	An empty bar has to say what it is.
+		//	=================================
+		//
+		// Unlabelled, the fuel gauge on a machine that has never been fuelled is an empty dark
+		// rectangle -- indistinguishable from a decorative panel line, and giving no clue that it is
+		// the reason the attachment does nothing. The label appears only when it matters, so a fuelled
+		// machine keeps a clean panel.
+		if(!crawler.hasWorkingFuel())
+		{
+			String warning = I18n.format(crawler.getFuel() <= 0
+					?"gui.immersiveengineering.crawler.noFuel"
+					: "gui.immersiveengineering.crawler.reserve");
+			font.drawString(warning, x, y+8, GAUGE_LIMIT);
+		}
 		//The bucket's fill, only when there is anything in it. A permanent "0/9" is noise on the two
-		//attachments out of three that never put anything there.
+		//attachments out of three that never put anything there. Right-aligned, so it and the fuel
+		//warning share the line without colliding.
 		if(crawler.getBucketFill() > 0)
 		{
 			String load = crawler.getBucketFill()+"/"+crawler.getBucketSize();

@@ -629,6 +629,8 @@ gui.immersiveengineering.crawler.legendTool=%s works the tool, %s changes it
 gui.immersiveengineering.crawler.attachment.bucket=Bucket
 gui.immersiveengineering.crawler.attachment.grapple=Grapple
 gui.immersiveengineering.crawler.attachment.breaker=Breaker
+gui.immersiveengineering.crawler.noFuel=NO DIESEL
+gui.immersiveengineering.crawler.reserve=RESERVE
 
 desc.immersiveengineering.info.attachedTo=Linking from %1$s, %2$s, %3$s
 desc.immersiveengineering.info.attachedToDim=Linking from %1$s, %2$s, %3$s in Dimension %4$s
@@ -1970,5 +1972,6 @@ chat.immersiveengineering.info.crawlerNoRoom=Not enough room -- the Crawler need
 chat.immersiveengineering.info.crawlerAttachment=Fitted: %s
 chat.immersiveengineering.info.crawlerBucketDumped=Bucket emptied.
 chat.immersiveengineering.info.crawlerReserve=Running on reserve -- refuel before working.
+chat.immersiveengineering.info.crawlerNoFuel=No diesel. Right-click the Crawler with a container of diesel to refuel it.
 chat.immersiveengineering.info.petroleum.tankDisassembled=Storage Tank taken apart. Its contents are kept.
 chat.immersiveengineering.info.petroleum.tankNotAShell=That is not a hollow box. A Storage Tank needs complete walls from 3 to 16 blocks a side, and nothing inside it.

@@ -55,4 +55,30 @@ public final class CrawlerConfig
 	 * hammer and cannot be pushed. The reserve is enough to drive back.
 	 */
 	public static int fuelReserve = 400;
+
+	/**
+	 * @return whether there is enough diesel to work the attachment, as opposed to only enough to
+	 * drive home on
+	 * <p>
+	 * <strong>Here, as a function of a number, because this decision shipped wrong.</strong> It lived
+	 * inline on the entity, where nothing could reach it, and it was written as a single comparison
+	 * that treated an empty tank and a nearly empty one as the same situation. A new Crawler arrives
+	 * dry, so every machine anybody built refused to break anything, and the explanation it offered
+	 * described a state the operator was not in. Every other decision in this feature was pulled out
+	 * into a pure function precisely so this could not happen to it; this one was not, and it is the
+	 * one that broke.
+	 */
+	public static boolean canWork(int fuelAmount)
+	{
+		return fuelAmount > fuelReserve;
+	}
+
+	/**
+	 * @return whether the tank is empty rather than merely low -- a different problem, needing a
+	 * different thing said about it
+	 */
+	public static boolean isDry(int fuelAmount)
+	{
+		return fuelAmount <= 0;
+	}
 }
