@@ -180,14 +180,18 @@ public class ClientProxy extends CommonProxy
 	/**
 	 * The Hydraulic Crawler's arm, raise and lower.
 	 * <p>
-	 * On R and F, which are free in vanilla and sit under the hand already on WASD. Two keys rather
-	 * than the operator's view: tying the arm's height to where they are looking meant they could not
-	 * look at what they were digging while digging it, which is how it felt the first time it was
-	 * driven. The slew stays on the view, because turning to face the work and slewing towards it are
-	 * the same gesture.
+	 * Two keys rather than the operator's view: tying the arm's height to where they are looking meant
+	 * they could not look at what they were digging while digging it, which is how it felt the first
+	 * time it was driven. The slew stays on the view, because turning to face the work and slewing
+	 * towards it are the same gesture.
+	 * <p>
+	 * <strong>Lower is C, not F.</strong> F is vanilla's swap-hands, so every press of it also
+	 * shuffled the operator's offhand -- harmless, and exactly the sort of small wrongness that makes
+	 * a machine feel unfinished. C is free, sits under the same hand, and is the last unclaimed key
+	 * near WASD once this feature's other five are placed.
 	 */
 	public static KeyBinding keybind_crawlerArmUp = new KeyBinding("key.immersiveengineering.crawlerArmUp", Keyboard.KEY_R, "key.categories.gameplay");
-	public static KeyBinding keybind_crawlerArmDown = new KeyBinding("key.immersiveengineering.crawlerArmDown", Keyboard.KEY_F, "key.categories.gameplay");
+	public static KeyBinding keybind_crawlerArmDown = new KeyBinding("key.immersiveengineering.crawlerArmDown", Keyboard.KEY_C, "key.categories.gameplay");
 	/**
 	 * Work the attachment, and change it.
 	 * <p>

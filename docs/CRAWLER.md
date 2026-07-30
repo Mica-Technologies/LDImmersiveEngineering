@@ -17,7 +17,7 @@ would make every sentence about either one ambiguous.
 | **W / S** | Throttle, forward and back |
 | **A / D** | Steer the tracks — skid steer, so it turns on the spot |
 | **Mouse** | Slews the house, cab and arm included |
-| **R / F** | Raise and lower the arm |
+| **R / C** | Raise and lower the arm |
 | **X / Z** | Extend and retract it |
 | **V** | Work the attachment |
 | **Sneak + V** | Tip the bucket out |
