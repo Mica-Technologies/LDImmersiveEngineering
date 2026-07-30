@@ -37,28 +37,41 @@ public final class CrawlerArm
 	{
 	}
 
-	/** How far the operator may look up and still be aiming the arm rather than the sky. */
-	public static final double MIN_DEPRESSION = -40;
+	/**
+	 * How far up and down the arm can be aimed.
+	 * <p>
+	 * Wide, because the first version was not: {@code -40} put the tool barely head height, and a
+	 * machine that cannot lift above a wall is no use for taking one down.
+	 */
+	public static final double MIN_DEPRESSION = -62;
 	/** And down. Steeper than this and the machine would be digging under its own tracks. */
-	public static final double MAX_DEPRESSION = 70;
+	public static final double MAX_DEPRESSION = 75;
 
 	/**
-	 * Where the arm aims at the two ends of the operator's view, in the plane's own axes.
+	 * How far the elbow is held from the boom's pivot -- a constant, so the arm sweeps an arc.
 	 * <p>
-	 * <strong>Two independent axes rather than a reach and an angle</strong>, and that was a
-	 * correction. Aiming at a polar target -- a distance at the angle you are looking -- reads well
-	 * and does not work: with reach shrinking as the view drops, the target's <em>height</em> is
+	 * <strong>This has now been all three shapes, and the reasoning is worth keeping.</strong>
+	 * <p>
+	 * A reach that <em>shrank</em> with depression came first. It broke: the target's height is
 	 * {@code reach * sin(depression)}, whose derivative goes negative once the shrinking outpaces the
-	 * angle. Past about sixty degrees, looking further down raised the bucket. Nothing about that is
-	 * visible in the formula, and a test asserting the obvious contract -- look lower, dig lower --
-	 * is what found it.
+	 * angle, so past about sixty degrees looking further down <em>raised</em> the bucket.
 	 * <p>
-	 * A straight line from "far out and high" to "close in and deep" is monotonic in both axes by
-	 * construction, so the contract holds without needing to be checked against a curve. It is also
-	 * the sweep an operator actually makes.
+	 * A straight line from "far out and high" to "close in and deep" fixed that by being monotonic in
+	 * both axes by construction. But a straight line between two points that are both close in is
+	 * close in all the way along, so widening the range to reach higher gave up most of the horizontal
+	 * reach in the middle -- the arm could go up and it could go down and it could no longer stretch
+	 * out.
+	 * <p>
+	 * A constant reach is the shape that gives all three. Height is {@code REACH * sin(depression)},
+	 * monotonic for any angle inside a quarter turn because the reach no longer varies to fight it;
+	 * the arm is furthest out at level, which is where an operator wants the stretch; and the range is
+	 * limited only by the angles, so it can be as wide as the boom can swing. It is also what the
+	 * machine actually does -- an arm on one control traces an arc.
+	 * <p>
+	 * Forty-two against an arm of forty-six: nearly straight out at level, which is both the most
+	 * reach available and how a real one looks doing it.
 	 */
-	public static final double OUT_HIGH = 40, DOWN_HIGH = -16;
-	public static final double OUT_LOW = 16, DOWN_LOW = 34;
+	public static final double REACH = 42;
 
 	/** Degrees a joint may move in one tick. Hydraulics are not instant. */
 	public static final double JOINT_RATE = 4.0;
@@ -129,11 +142,9 @@ public final class CrawlerArm
 	 */
 	public static double[] targetFor(double pitchDegrees)
 	{
-		double t = CrawlerGeometry.clamp(
-				(pitchDegrees-MIN_DEPRESSION)/(MAX_DEPRESSION-MIN_DEPRESSION), 0, 1);
-		return new double[]{
-				OUT_HIGH+(OUT_LOW-OUT_HIGH)*t,
-				DOWN_HIGH+(DOWN_LOW-DOWN_HIGH)*t};
+		double depression = CrawlerGeometry.clamp(pitchDegrees, MIN_DEPRESSION, MAX_DEPRESSION);
+		double radians = Math.toRadians(depression);
+		return new double[]{REACH*Math.cos(radians), REACH*Math.sin(radians)};
 	}
 
 	/**

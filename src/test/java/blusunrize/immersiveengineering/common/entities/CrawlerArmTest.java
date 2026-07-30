@@ -84,22 +84,74 @@ class CrawlerArmTest
 		}
 
 		@Test
-		@DisplayName("looking further down brings the tool in closer, at every step")
-		void lowerViewDigsCloser()
+		@DisplayName("the arm sweeps an arc: furthest out at level, drawn in at both extremes")
+		void reachesFurthestAtLevel()
 		{
-			//Reach shortens with depression, which is how an operator works: level is the far side of
-			//the trench, steep is your own feet. Checked all the way along rather than just at the ends,
-			//because the version of this that shipped first was monotonic at the ends and not in the
-			//middle -- which is exactly the shape of bug that endpoints miss.
-			double previous = Double.POSITIVE_INFINITY;
-			for(double pitch = CrawlerArm.MIN_DEPRESSION; pitch <= CrawlerArm.MAX_DEPRESSION; pitch += 1)
+			//	=================================
+			//	Replaces "always closer as you look down".
+			//	=================================
+			//
+			// That was true of the straight-line target and is not true of an arc, which is deliberate:
+			// a straight line between two close-in points is close in all the way along, so it could
+			// not both reach high and stretch out. The arc gives the stretch back, at the cost of `out`
+			// no longer being monotonic -- it peaks at level, which is where an operator wants it.
+			double level = elbowOut(0);
+			assertTrue(elbowOut(CrawlerArm.MIN_DEPRESSION) < level,
+					"the arm reached as far out with the boom up as it did level");
+			assertTrue(elbowOut(CrawlerArm.MAX_DEPRESSION) < level,
+					"the arm reached as far out digging as it did level");
+		}
+
+		private double elbowOut(double pitch)
+		{
+			double[] pose = CrawlerArm.solve(pitch);
+			return CrawlerArm.alongArm(pose[0], pose[1], pose[2],
+					CrawlerGeometry.BOOM_LENGTH+CrawlerGeometry.STICK_LENGTH)[0];
+		}
+
+		@Test
+		@DisplayName("the elbow stays a constant distance from the pivot")
+		void constantReach()
+		{
+			//The arc's defining property, and the reason the height is monotonic without needing to be
+			//checked against a varying reach: nothing is left to fight the angle.
+			for(double pitch = CrawlerArm.MIN_DEPRESSION; pitch <= CrawlerArm.MAX_DEPRESSION; pitch += 2)
 			{
 				double[] pose = CrawlerArm.solve(pitch);
-				double out = CrawlerArm.tipInPlane(pose[0], pose[1], pose[2])[0];
-				assertTrue(out <= previous+TOLERANCE,
-						"the tool reached further out when the view went down, at pitch "+pitch);
-				previous = out;
+				double[] elbow = CrawlerArm.alongArm(pose[0], pose[1], pose[2],
+						CrawlerGeometry.BOOM_LENGTH+CrawlerGeometry.STICK_LENGTH);
+				assertEquals(CrawlerArm.REACH, Math.hypot(elbow[0], elbow[1]), TOLERANCE,
+						"the elbow left the arc at pitch "+pitch);
 			}
+		}
+
+		@Test
+		@DisplayName("it lifts the tool well clear of the machine")
+		void liftsHigh()
+		{
+			//	=================================
+			//	The requirement, written down.
+			//	=================================
+			//
+			// The first range put the tool barely head height, and a machine that cannot get its bucket
+			// above a wall is no use for taking one down. Asserted in blocks above the tracks, which is
+			// the number somebody standing next to it would judge it by.
+			double[] pose = CrawlerArm.solve(CrawlerArm.MIN_DEPRESSION);
+			double[] tip = CrawlerArm.tipOffset(0, pose[0], pose[1], pose[2]);
+			assertTrue(tip[1] > 4.0,
+					"at full lift the tool was only "+tip[1]+" blocks above the machine's base");
+		}
+
+		@Test
+		@DisplayName("it still stretches out at level")
+		void stretchesOut()
+		{
+			//The thing the straight-line target gave up. Guarded so a future change to the range cannot
+			//quietly trade the horizontal reach away again.
+			double[] pose = CrawlerArm.solve(0);
+			double[] tip = CrawlerArm.tipOffset(0, pose[0], pose[1], pose[2]);
+			assertTrue(Math.hypot(tip[0], tip[2]) > 3.5,
+					"level, the tool only reached "+Math.hypot(tip[0], tip[2])+" blocks out");
 		}
 
 		@Test

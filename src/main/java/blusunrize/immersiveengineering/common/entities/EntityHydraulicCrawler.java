@@ -145,8 +145,15 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 */
 	private static final int CONTROL_TIMEOUT = 6;
 
-	/** Degrees of aim per tick under a held control. */
-	private static final double AIM_RATE = 1.6;
+	/**
+	 * Degrees of aim per tick under a held control.
+	 * <p>
+	 * Sized against the range, not chosen in isolation: at two degrees a tick the arm sweeps its whole
+	 * hundred and thirty-seven degrees in about three and a half seconds, which is deliberate and slow.
+	 * It also has to stay under CrawlerArm.JOINT_RATE, or the aim would run away from the joints trying
+	 * to follow it and the arm would lag behind its own control.
+	 */
+	private static final double AIM_RATE = 2.0;
 
 	public void setControlFlags(byte flags)
 	{
