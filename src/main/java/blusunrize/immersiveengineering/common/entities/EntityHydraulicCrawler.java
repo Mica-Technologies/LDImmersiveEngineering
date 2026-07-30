@@ -8,9 +8,16 @@
 
 package blusunrize.immersiveengineering.common.entities;
 
+import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.common.IEContent;
+import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.IEDamageSources;
 import blusunrize.immersiveengineering.common.util.Utils;
+import net.minecraft.block.state.IBlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.text.TextComponentTranslation;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.world.BlockEvent;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.IEntityMultiPart;
@@ -108,6 +115,9 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 */
 	private static final DataParameter<Float> AIM = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
+	/** Which tool is fitted. Synced so the HUD can name it, and so the model can eventually draw it. */
+	private static final DataParameter<Byte> ATTACHMENT = EntityDataManager
+			.createKey(EntityHydraulicCrawler.class, DataSerializers.BYTE);
 
 	/**
 	 * The pose the arm sits in with nobody aiming it -- folded in, the way a machine is left at the
@@ -126,6 +136,10 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 
 	public static final byte FLAG_ARM_UP = 1;
 	public static final byte FLAG_ARM_DOWN = 2;
+	/** Held: work the attachment. */
+	public static final byte FLAG_TRIGGER = 4;
+	/** Held, but acted on only as it goes down: change the attachment. */
+	public static final byte FLAG_SWAP = 8;
 
 	/**
 	 * Which controls the operator is holding down.
@@ -133,7 +147,14 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 * Transient, and deliberately expiring -- see {@link #CONTROL_TIMEOUT}.
 	 */
 	private byte controlFlags;
+	/**
+	 * What was held last tick, so a control can be acted on as it goes down rather than for as long as
+	 * it is held. Swapping the attachment sixty times a second would otherwise be one keypress.
+	 */
+	private byte previousFlags;
 	private int controlAge;
+	/** Ticks until the Breaker may take another bite. */
+	private int breakCooldown;
 
 	/**
 	 * How long a held control survives without being renewed.
@@ -273,6 +294,17 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		//Level, which is the arm out in front rather than folded: the pose somebody climbing in would
 		//expect to start from.
 		dataManager.register(AIM, 0F);
+		dataManager.register(ATTACHMENT, (byte)CrawlerAttachment.BUCKET.ordinal());
+	}
+
+	public CrawlerAttachment getAttachment()
+	{
+		return CrawlerAttachment.byOrdinal(dataManager.get(ATTACHMENT));
+	}
+
+	public void setAttachment(CrawlerAttachment attachment)
+	{
+		dataManager.set(ATTACHMENT, (byte)attachment.ordinal());
 	}
 
 	public float getArmAim()
@@ -527,6 +559,88 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		double[] next = CrawlerArm.step(
 				new double[]{getBoomAngle(), getStickAngle(), getToolAngle()}, target);
 		setArm((float)next[0], (float)next[1], (float)next[2]);
+
+		//On the way down, not while held: otherwise one keypress cycles the attachment every tick it
+		//is held and the operator can never land on the one they wanted.
+		if((controlFlags&FLAG_SWAP)!=0&&(previousFlags&FLAG_SWAP)==0)
+		{
+			setAttachment(getAttachment().next());
+			//Said in chat as well as shown on the panel: the panel's legend has faded out by the time
+			//anybody thinks to change tools, and swapping to the Breaker by accident should be
+			//something you are told rather than something you discover by demolishing a wall.
+			if(rider instanceof EntityPlayer)
+				ChatUtils.sendServerNoSpamMessages((EntityPlayer)rider,
+						new TextComponentTranslation(Lib.CHAT_INFO+"crawlerAttachment",
+								new TextComponentTranslation(getAttachment().getTranslationKey())));
+		}
+		previousFlags = controlFlags;
+
+		if((controlFlags&FLAG_TRIGGER)!=0)
+			workAttachment(rider);
+	}
+
+	//	=================================
+	//		THE ATTACHMENT AT WORK
+	//	=================================
+
+	/**
+	 * Pull the trigger with whatever is fitted.
+	 * <p>
+	 * Only the Breaker does anything yet. The Bucket and the Grapple are named so the machine can be
+	 * fitted with them and so the framework is not shaped around a single tool, but they are P7 and P8.
+	 */
+	private void workAttachment(Entity rider)
+	{
+		if(breakCooldown > 0)
+		{
+			breakCooldown--;
+			return;
+		}
+		if(!getAttachment().breaksBlocks())
+			return;
+		//	=================================
+		//	Somebody has to be responsible.
+		//	=================================
+		//
+		// Every broken block is attributed to the operator, and with no operator nothing breaks. That
+		// is not a formality: BreakEvent needs a player, and it is what lets claim mods, protection
+		// plugins and grief logs treat this exactly as they would treat somebody swinging a pick. A
+		// demolition machine that bypassed all of that could not be allowed on a server, and would be
+		// the single most destructive thing in the mod.
+		if(!(rider instanceof EntityPlayer))
+			return;
+		EntityPlayer operator = (EntityPlayer)rider;
+		Vec3d tip = getToolTip();
+		boolean bit = false;
+		for(BlockPos pos : CrawlerDemolition.targetsAround(tip.x, tip.y, tip.z,
+				CrawlerDemolition.REACH, CrawlerDemolition.BUDGET))
+			if(breakBlock(operator, pos))
+				bit = true;
+		if(bit)
+			breakCooldown = CrawlerDemolition.COOLDOWN;
+	}
+
+	/**
+	 * @return true if the block came out
+	 */
+	private boolean breakBlock(EntityPlayer operator, BlockPos pos)
+	{
+		IBlockState state = world.getBlockState(pos);
+		if(state.getBlock().isAir(state, world, pos))
+			return false;
+		if(!CrawlerDemolition.withinHardnessLimit(state.getBlockHardness(world, pos)))
+			return false;
+		//isBlockModifiable covers spawn protection and the world border; the event covers everything
+		//else anybody has ever written. Both, because they catch different things.
+		if(!world.isBlockModifiable(operator, pos))
+			return false;
+		BlockEvent.BreakEvent event = new BlockEvent.BreakEvent(world, pos, state, operator);
+		if(MinecraftForge.EVENT_BUS.post(event)||event.isCanceled())
+			return false;
+		//Dropped rather than kept: the Breaker is for taking a building down, and the Bucket is the one
+		//that collects. Somebody demolishing a house does not want its cobblestone in a hopper.
+		world.destroyBlock(pos, true);
+		return true;
 	}
 
 	/**
@@ -587,6 +701,10 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		setArm(nbt.getFloat("boom"), nbt.getFloat("stick"), nbt.getFloat("tool"));
 		setArmAim((float)CrawlerGeometry.clamp(nbt.getFloat("aim"),
 				CrawlerArm.MIN_DEPRESSION, CrawlerArm.MAX_DEPRESSION));
+		//byOrdinal rather than values()[..]: this came off disk and may be from a version with a
+		//different set of tools, and an out-of-range ordinal should fit the wrong tool rather than
+		//throw on chunk load.
+		setAttachment(CrawlerAttachment.byOrdinal(nbt.getByte("attachment")));
 	}
 
 	@Override
@@ -597,5 +715,6 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		nbt.setFloat("stick", getStickAngle());
 		nbt.setFloat("tool", getToolAngle());
 		nbt.setFloat("aim", getArmAim());
+		nbt.setByte("attachment", (byte)getAttachment().ordinal());
 	}
 }

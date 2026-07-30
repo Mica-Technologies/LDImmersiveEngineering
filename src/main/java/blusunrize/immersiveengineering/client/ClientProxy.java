@@ -188,6 +188,15 @@ public class ClientProxy extends CommonProxy
 	 */
 	public static KeyBinding keybind_crawlerArmUp = new KeyBinding("key.immersiveengineering.crawlerArmUp", Keyboard.KEY_R, "key.categories.gameplay");
 	public static KeyBinding keybind_crawlerArmDown = new KeyBinding("key.immersiveengineering.crawlerArmDown", Keyboard.KEY_F, "key.categories.gameplay");
+	/**
+	 * Work the attachment, and change it.
+	 * <p>
+	 * Deliberately <em>not</em> the attack key, tempting as that was. The arm's own hitboxes are
+	 * clickable, so a creative-mode operator holding attack to demolish would delete their own machine
+	 * the moment the crosshair crossed the boom. A dedicated key cannot do that.
+	 */
+	public static KeyBinding keybind_crawlerAction = new KeyBinding("key.immersiveengineering.crawlerAction", Keyboard.KEY_V, "key.categories.gameplay");
+	public static KeyBinding keybind_crawlerSwap = new KeyBinding("key.immersiveengineering.crawlerSwap", Keyboard.KEY_G, "key.categories.gameplay");
 
 	@Override
 	public void preInit()
@@ -497,7 +506,8 @@ public class ClientProxy extends CommonProxy
 		keybind_chemthrowerSwitch.setKeyConflictContext(KeyConflictContext.IN_GAME);
 		ClientRegistry.registerKeyBinding(keybind_chemthrowerSwitch);
 
-		for(KeyBinding arm : new KeyBinding[]{keybind_crawlerArmUp, keybind_crawlerArmDown})
+		for(KeyBinding arm : new KeyBinding[]{keybind_crawlerArmUp, keybind_crawlerArmDown,
+				keybind_crawlerAction, keybind_crawlerSwap})
 		{
 			arm.setKeyConflictContext(KeyConflictContext.IN_GAME);
 			ClientRegistry.registerKeyBinding(arm);

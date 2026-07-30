@@ -76,7 +76,7 @@ public class CrawlerHud
 		int left = 6;
 		//Anchored to the bottom left. The hotbar owns the bottom centre and status effects the top
 		//right; this is the corner nothing else in vanilla claims.
-		int lines = legendAlpha() > 0?3: 0;
+		int lines = legendAlpha() > 0?4: 0;
 		int height = 30+lines*10;
 		int top = resolution.getScaledHeight()-height-6;
 
@@ -84,6 +84,11 @@ public class CrawlerHud
 		drawFrame(left, top, left+width, top+height);
 
 		font.drawString(I18n.format("gui.immersiveengineering.crawler.title"), left+6, top+6, TEXT);
+		//The fitted tool, right-aligned against the title. An operator needs to know what is on the end
+		//of the arm before they pull the trigger, not after -- one of the three destroys buildings.
+		String tool = I18n.format(crawler.getAttachment().getTranslationKey());
+		font.drawString(tool, left+width-6-font.getStringWidth(tool), top+6,
+				crawler.getAttachment().breaksBlocks()?GAUGE_LIMIT: DIM);
 		drawAimGauge(crawler, left+6, top+18, width-12);
 
 		int alpha = legendAlpha();
@@ -96,6 +101,9 @@ public class CrawlerHud
 			font.drawString(legendLine("crawler.legendArm",
 					ClientProxy.keybind_crawlerArmUp), left+6, y+10, faded);
 			font.drawString(legendLine("crawler.legendSlew", null), left+6, y+20, faded);
+			font.drawString(I18n.format("gui.immersiveengineering.crawler.legendTool",
+					ClientProxy.keybind_crawlerAction.getDisplayName(),
+					ClientProxy.keybind_crawlerSwap.getDisplayName()), left+6, y+30, faded);
 		}
 	}
 

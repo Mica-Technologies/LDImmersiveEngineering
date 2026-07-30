@@ -250,6 +250,12 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 			flags |= EntityHydraulicCrawler.FLAG_ARM_UP;
 		if(ClientProxy.keybind_crawlerArmDown.isKeyDown())
 			flags |= EntityHydraulicCrawler.FLAG_ARM_DOWN;
+		if(ClientProxy.keybind_crawlerAction.isKeyDown())
+			flags |= EntityHydraulicCrawler.FLAG_TRIGGER;
+		//Sent as held even though the server acts on the edge: the server needs to see the release to
+		//arm the next press, and level state is the only thing this channel carries reliably.
+		if(ClientProxy.keybind_crawlerSwap.isKeyDown())
+			flags |= EntityHydraulicCrawler.FLAG_SWAP;
 		//Send while held, and once more on release so the server stops immediately rather than waiting
 		//out the timeout -- a control that took a third of a second to let go of would feel broken.
 		if(flags==0&&lastCrawlerFlags==0)
