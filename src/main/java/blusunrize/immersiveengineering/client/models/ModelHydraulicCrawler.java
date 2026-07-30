@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.client.models;
 
+import blusunrize.immersiveengineering.common.entities.CrawlerGeometry;
 import net.minecraft.client.model.ModelBase;
 import net.minecraft.client.model.ModelRenderer;
 import net.minecraft.entity.Entity;
@@ -40,16 +41,17 @@ import net.minecraftforge.fml.relauncher.SideOnly;
 public class ModelHydraulicCrawler extends ModelBase
 {
 	/**
-	 * The arm's section lengths.
+	 * The arm's section lengths, <strong>read from {@link CrawlerGeometry} rather than declared here</strong>.
 	 * <p>
-	 * Public because the geometry that decides where the bucket <em>is</em> has to agree with the
-	 * picture of where it looks. A solver working from different lengths than the model draws would
-	 * destroy blocks the player is not pointing at, which is the one failure in this feature nobody
-	 * would forgive.
+	 * The solver that decides where the bucket <em>is</em> lives on the common side, because the server
+	 * is what destroys blocks and it cannot see a client-only class. So the numbers live there and the
+	 * picture reads them. Two copies would eventually be two lengths, and an arm drawn shorter than it
+	 * reaches would destroy blocks the operator is not pointing at -- the one failure in this feature
+	 * nobody would forgive.
 	 */
-	public static final float BOOM_LENGTH = 26F;
-	public static final float STICK_LENGTH = 20F;
-	public static final float TOOL_LENGTH = 10F;
+	public static final float BOOM_LENGTH = (float)CrawlerGeometry.BOOM_LENGTH;
+	public static final float STICK_LENGTH = (float)CrawlerGeometry.STICK_LENGTH;
+	public static final float TOOL_LENGTH = (float)CrawlerGeometry.TOOL_LENGTH;
 
 	/**
 	 * How far each arm section reaches back past its own pivot, into the section it hangs off.

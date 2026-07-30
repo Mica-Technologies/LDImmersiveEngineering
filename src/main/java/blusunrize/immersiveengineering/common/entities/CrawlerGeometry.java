@@ -47,6 +47,31 @@ public final class CrawlerGeometry
 	/** Blocks per model unit. */
 	public static final double UNIT = SCALE/16;
 
+	//	=================================
+	//		THE ARM, IN MODEL UNITS
+	//	=================================
+
+	/**
+	 * The arm's section lengths -- the spacing between pivots, not the length of the boxes drawn.
+	 * <p>
+	 * <strong>Here rather than on the model, because the model is client-only.</strong> The server
+	 * decides where the bucket is and therefore which blocks it destroys; it cannot ask a
+	 * {@code @SideOnly(CLIENT)} class how long the boom is. The model reads these instead, so the
+	 * picture and the arithmetic are the same numbers by construction rather than by agreement.
+	 */
+	public static final double BOOM_LENGTH = 26;
+	public static final double STICK_LENGTH = 20;
+	public static final double TOOL_LENGTH = 10;
+
+	/**
+	 * Height of the boom's pivot above the tracks, in model units: the slew ring at 14 plus the
+	 * boom's mounting at 10 above that.
+	 */
+	public static final double BOOM_PIVOT_HEIGHT = 24;
+
+	/** How far forward of the machine's centre the boom is pinned. */
+	public static final double BOOM_PIVOT_OUT = 16;
+
 	/**
 	 * The collision footprint, in blocks, and it is <strong>square on purpose</strong>.
 	 * <p>
@@ -129,5 +154,31 @@ public final class CrawlerGeometry
 		if(delta < -180)
 			delta += 360;
 		return delta;
+	}
+
+	/**
+	 * Move an angle towards a target by at most {@code maxStep} degrees.
+	 * <p>
+	 * Hydraulics have a speed. Snapping a joint straight to its solved angle would look like a glitch
+	 * rather than a machine, and it matters for more than looks: the moment the tool destroys what it
+	 * touches, an arm that can teleport is an arm that reaches through a wall in one tick and takes
+	 * the far side of it. Rate limiting is what makes the tip's path continuous, and a continuous path
+	 * is the only kind that can be swept for what it passes through.
+	 */
+	public static double approach(double current, double target, double maxStep)
+	{
+		double delta = shortestTurn(current, target);
+		if(Math.abs(delta) <= maxStep)
+			return target;
+		return current+Math.signum(delta)*maxStep;
+	}
+
+	/**
+	 * Clamp, spelled out because {@code Math.min(Math.max(..))} at three arguments reads as noise at
+	 * every call site and this is called at most of them.
+	 */
+	public static double clamp(double value, double min, double max)
+	{
+		return value < min?min: value > max?max: value;
 	}
 }

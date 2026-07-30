@@ -300,17 +300,42 @@ public class EntityHydraulicCrawler extends Entity
 	}
 
 	/**
-	 * The house follows the operator's head.
+	 * The house and the arm follow the operator's head.
 	 * <p>
-	 * Straight off the rider's synced yaw, which is the decision the whole feature rests on -- see
-	 * the class comment. With nobody aboard the house holds its last position, because a parked
-	 * machine does not spin.
+	 * Straight off the rider's synced yaw and pitch, which is the decision the whole feature rests on
+	 * -- see the class comment. With nobody aboard the machine holds its last pose, because a parked
+	 * machine neither spins nor waves its arm about.
+	 * <p>
+	 * The arm is stepped towards its solved pose rather than set to it. Hydraulics have a speed, and
+	 * beyond looking right it is what keeps the tool's path continuous -- an arm that could snap to a
+	 * new angle in one tick could reach through a wall and take the far side of it, which will matter
+	 * a great deal once the tool breaks what it touches.
 	 */
 	private void followOperatorsView()
 	{
 		Entity rider = getControllingPassenger();
-		if(rider!=null)
-			setSlew(rider.rotationYaw);
+		if(rider==null)
+			return;
+		setSlew(rider.rotationYaw);
+		double[] target = CrawlerArm.solve(rider.rotationPitch);
+		double[] next = CrawlerArm.step(
+				new double[]{getBoomAngle(), getStickAngle(), getToolAngle()}, target);
+		setArm((float)next[0], (float)next[1], (float)next[2]);
+	}
+
+	/**
+	 * @return where the tool's tip is right now, in world coordinates
+	 * <p>
+	 * Nothing uses this yet. It is the number the attachments will work from -- the point whose
+	 * surroundings get dug, grabbed or broken -- and it is here rather than in the attachment code
+	 * because there is exactly one right answer to "where is the bucket" and every attachment needs
+	 * the same one.
+	 */
+	public Vec3d getToolTip()
+	{
+		double[] offset = CrawlerArm.tipOffset(getSlew(), getBoomAngle(), getStickAngle(),
+				getToolAngle());
+		return new Vec3d(posX+offset[0], posY+offset[1], posZ+offset[2]);
 	}
 
 	private void drive()
