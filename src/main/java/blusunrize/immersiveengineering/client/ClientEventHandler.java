@@ -22,6 +22,7 @@ import blusunrize.immersiveengineering.api.tool.IDrillHead;
 import blusunrize.immersiveengineering.api.tool.ZoomHandler;
 import blusunrize.immersiveengineering.api.tool.ZoomHandler.IZoomTool;
 import blusunrize.immersiveengineering.client.fx.ParticleFractal;
+import blusunrize.immersiveengineering.client.gui.CrawlerHud;
 import blusunrize.immersiveengineering.client.gui.GuiBlastFurnace;
 import blusunrize.immersiveengineering.client.gui.GuiRevolver;
 import blusunrize.immersiveengineering.client.gui.GuiToolbox;
@@ -218,7 +219,10 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 	{
 		FAILED_CONNECTIONS.entrySet().removeIf(entry -> entry.getValue().getValue().decrementAndGet() <= 0);
 		if(event.phase==TickEvent.Phase.END)
+		{
 			sendCrawlerControls();
+			CrawlerHud.tick(ClientUtils.mc().player);
+		}
 	}
 
 	/**
@@ -570,6 +574,12 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 		if(ClientUtils.mc().player!=null&&event.getType()==RenderGameOverlayEvent.ElementType.TEXT)
 		{
 			EntityPlayer player = ClientUtils.mc().player;
+
+			//On the TEXT pass, so the panel sits over the world and under nothing that matters, and in
+			//Post so it is not drawn while something else has the GL state part-way set up.
+			if(player.getRidingEntity() instanceof EntityHydraulicCrawler)
+				CrawlerHud.render(event.getResolution(),
+						(EntityHydraulicCrawler)player.getRidingEntity());
 
 			for(EnumHand hand : EnumHand.values())
 				if(!player.getHeldItem(hand).isEmpty())

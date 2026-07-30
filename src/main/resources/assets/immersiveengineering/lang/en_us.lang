@@ -619,6 +619,10 @@ key.immersiveengineering.magnetEquip=Magnetic Shield Glove (doubletap)
 key.immersiveengineering.chemthrowerSwitch=Switch Chemthrower Tanks
 key.immersiveengineering.crawlerArmUp=Crawler: Raise Arm
 key.immersiveengineering.crawlerArmDown=Crawler: Lower Arm
+gui.immersiveengineering.crawler.title=HYDRAULIC CRAWLER
+gui.immersiveengineering.crawler.legendDrive=W/S drive, A/D steer tracks
+gui.immersiveengineering.crawler.legendArm=%s and its pair raise/lower the arm
+gui.immersiveengineering.crawler.legendSlew=Look around to slew the house
 
 desc.immersiveengineering.info.attachedTo=Linking from %1$s, %2$s, %3$s
 desc.immersiveengineering.info.attachedToDim=Linking from %1$s, %2$s, %3$s in Dimension %4$s
