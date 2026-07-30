@@ -168,6 +168,9 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	/** Which tool is fitted. Synced so the HUD can name it, and so the model can eventually draw it. */
 	private static final DataParameter<Byte> ATTACHMENT = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.BYTE);
+	/** How far the arm is extended, in model units. The second aiming axis. */
+	private static final DataParameter<Float> EXTENSION = EntityDataManager
+			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
 
 	/**
 	 * The pose the arm sits in with nobody aiming it -- folded in, the way a machine is left at the
@@ -190,6 +193,9 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	public static final byte FLAG_TRIGGER = 4;
 	/** Held, but acted on only as it goes down: change the attachment. */
 	public static final byte FLAG_SWAP = 8;
+	/** Reach further out, and draw back in. */
+	public static final byte FLAG_EXTEND = 16;
+	public static final byte FLAG_RETRACT = 32;
 
 	/**
 	 * Which controls the operator is holding down.
@@ -225,6 +231,15 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 * to follow it and the arm would lag behind its own control.
 	 */
 	private static final double AIM_RATE = 2.0;
+
+	/**
+	 * Model units of extension per tick under a held control.
+	 * <p>
+	 * Twenty-one units of travel at three quarters of a unit a tick is about a second and a half end
+	 * to end -- quicker than the elevation, because extending is the fine adjustment of the two and a
+	 * fine adjustment that takes as long as a coarse one is not one anybody uses.
+	 */
+	private static final double REACH_RATE = 0.75;
 
 	public void setControlFlags(byte flags)
 	{
@@ -345,6 +360,17 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		//expect to start from.
 		dataManager.register(AIM, 0F);
 		dataManager.register(ATTACHMENT, (byte)CrawlerAttachment.BUCKET.ordinal());
+		dataManager.register(EXTENSION, (float)CrawlerArm.REACH);
+	}
+
+	public float getArmReach()
+	{
+		return dataManager.get(EXTENSION);
+	}
+
+	public void setArmReach(float reach)
+	{
+		dataManager.set(EXTENSION, reach);
 	}
 
 	public CrawlerAttachment getAttachment()
@@ -623,7 +649,16 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		setArmAim((float)CrawlerGeometry.clamp(aim,
 				CrawlerArm.MIN_DEPRESSION, CrawlerArm.MAX_DEPRESSION));
 
-		double[] target = CrawlerArm.solve(getArmAim());
+		//The second axis. Elevation says which way the arm points and this says how far along that
+		//line the tool sits, which between them reach the whole band rather than a single arc.
+		double reach = getArmReach();
+		if((controlFlags&FLAG_EXTEND)!=0)
+			reach += REACH_RATE;
+		if((controlFlags&FLAG_RETRACT)!=0)
+			reach -= REACH_RATE;
+		setArmReach((float)CrawlerGeometry.clamp(reach, CrawlerArm.MIN_REACH, CrawlerArm.MAX_REACH));
+
+		double[] target = CrawlerArm.solve(getArmAim(), getArmReach());
 		double[] next = CrawlerArm.step(
 				new double[]{getBoomAngle(), getStickAngle(), getToolAngle()}, target);
 		setArm((float)next[0], (float)next[1], (float)next[2]);
@@ -1057,6 +1092,12 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		setArm(nbt.getFloat("boom"), nbt.getFloat("stick"), nbt.getFloat("tool"));
 		setArmAim((float)CrawlerGeometry.clamp(nbt.getFloat("aim"),
 				CrawlerArm.MIN_DEPRESSION, CrawlerArm.MAX_DEPRESSION));
+		//Defaulted rather than clamped from zero: a machine saved before the arm had a second axis has
+		//no "reach" tag at all, and clamping the zero that comes back would fold every existing
+		//Crawler's arm all the way in the first time it loaded.
+		setArmReach((float)CrawlerGeometry.clamp(
+				nbt.hasKey("reach")?nbt.getFloat("reach"): CrawlerArm.REACH,
+				CrawlerArm.MIN_REACH, CrawlerArm.MAX_REACH));
 		//byOrdinal rather than values()[..]: this came off disk and may be from a version with a
 		//different set of tools, and an out-of-range ordinal should fit the wrong tool rather than
 		//throw on chunk load.
@@ -1075,6 +1116,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		nbt.setFloat("stick", getStickAngle());
 		nbt.setFloat("tool", getToolAngle());
 		nbt.setFloat("aim", getArmAim());
+		nbt.setFloat("reach", getArmReach());
 		nbt.setByte("attachment", (byte)getAttachment().ordinal());
 		nbt.setTag("inventory", inventory.serializeNBT());
 		//A carried block is saved; a carried entity is not. The block only exists inside this machine

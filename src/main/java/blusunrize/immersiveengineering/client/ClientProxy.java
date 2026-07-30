@@ -197,6 +197,14 @@ public class ClientProxy extends CommonProxy
 	 */
 	public static KeyBinding keybind_crawlerAction = new KeyBinding("key.immersiveengineering.crawlerAction", Keyboard.KEY_V, "key.categories.gameplay");
 	public static KeyBinding keybind_crawlerSwap = new KeyBinding("key.immersiveengineering.crawlerSwap", Keyboard.KEY_G, "key.categories.gameplay");
+	/**
+	 * Extend and retract the arm: the second aiming axis.
+	 * <p>
+	 * On Z and X, which are free in vanilla and sit next to each other under the left hand, so the
+	 * pair reads as one control the way R and F do.
+	 */
+	public static KeyBinding keybind_crawlerExtend = new KeyBinding("key.immersiveengineering.crawlerExtend", Keyboard.KEY_X, "key.categories.gameplay");
+	public static KeyBinding keybind_crawlerRetract = new KeyBinding("key.immersiveengineering.crawlerRetract", Keyboard.KEY_Z, "key.categories.gameplay");
 
 	@Override
 	public void preInit()
@@ -507,7 +515,8 @@ public class ClientProxy extends CommonProxy
 		ClientRegistry.registerKeyBinding(keybind_chemthrowerSwitch);
 
 		for(KeyBinding arm : new KeyBinding[]{keybind_crawlerArmUp, keybind_crawlerArmDown,
-				keybind_crawlerAction, keybind_crawlerSwap})
+				keybind_crawlerAction, keybind_crawlerSwap, keybind_crawlerExtend,
+				keybind_crawlerRetract})
 		{
 			arm.setKeyConflictContext(KeyConflictContext.IN_GAME);
 			ClientRegistry.registerKeyBinding(arm);

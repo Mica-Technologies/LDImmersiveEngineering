@@ -73,6 +73,23 @@ public final class CrawlerArm
 	 */
 	public static final double REACH = 42;
 
+	/**
+	 * How far in and out the operator may extend the arm.
+	 * <p>
+	 * <strong>The second axis, and the one that turns a line into an area.</strong> With the elevation
+	 * alone the tool could only ever be somewhere on a single arc: everything nearer or further than
+	 * forty-two units was unreachable no matter where the machine stood, so working on anything meant
+	 * driving until the arc happened to cross it. Two axes give the whole band between these radii at
+	 * every angle, which is most of what a real arm can do and a great deal more of what is worth
+	 * doing.
+	 * <p>
+	 * The outer limit stays a whisker inside full stretch, and the inner one well clear of the fold:
+	 * both are where a two-link solve turns singular, and the margin is what keeps a rounding error
+	 * from becoming a NaN in the position that decides which blocks are destroyed.
+	 */
+	public static final double MIN_REACH = 24;
+	public static final double MAX_REACH = 45;
+
 	/** Degrees a joint may move in one tick. Hydraulics are not instant. */
 	public static final double JOINT_RATE = 4.0;
 
@@ -95,7 +112,20 @@ public final class CrawlerArm
 	 */
 	public static double[] solve(double pitchDegrees)
 	{
-		double[] target = targetFor(pitchDegrees);
+		return solve(pitchDegrees, REACH);
+	}
+
+	/**
+	 * Solve the arm for an elevation and an extension.
+	 *
+	 * @param pitchDegrees how high the arm is aimed
+	 * @param reach        how far out, in model units, clamped to what the arm can span
+	 *
+	 * @return {@code {boom, stick, tool}} in degrees, as the model's rotateAngleX wants them
+	 */
+	public static double[] solve(double pitchDegrees, double reach)
+	{
+		double[] target = targetFor(pitchDegrees, reach);
 		double bearing = Math.toDegrees(Math.atan2(target[1], target[0]));
 
 		double l1 = CrawlerGeometry.BOOM_LENGTH;
@@ -142,9 +172,25 @@ public final class CrawlerArm
 	 */
 	public static double[] targetFor(double pitchDegrees)
 	{
+		return targetFor(pitchDegrees, REACH);
+	}
+
+	/**
+	 * Where the elbow is being aimed, for an elevation and an extension.
+	 * <p>
+	 * Still polar, so height is {@code reach * sin(depression)} and is monotonic in the elevation for
+	 * any fixed extension -- the property the single-axis version was rebuilt twice to get. Changing
+	 * the extension moves the tool in and out along the line it is already pointing down, which is
+	 * the one direction that cannot disturb that.
+	 *
+	 * @return {@code {out, down}} in model units
+	 */
+	public static double[] targetFor(double pitchDegrees, double reach)
+	{
 		double depression = CrawlerGeometry.clamp(pitchDegrees, MIN_DEPRESSION, MAX_DEPRESSION);
+		double extension = CrawlerGeometry.clamp(reach, MIN_REACH, MAX_REACH);
 		double radians = Math.toRadians(depression);
-		return new double[]{REACH*Math.cos(radians), REACH*Math.sin(radians)};
+		return new double[]{extension*Math.cos(radians), extension*Math.sin(radians)};
 	}
 
 	/**

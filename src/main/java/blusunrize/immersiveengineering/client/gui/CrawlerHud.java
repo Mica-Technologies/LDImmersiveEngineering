@@ -16,33 +16,34 @@ import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.client.settings.KeyBinding;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The operator's panel, drawn while riding a Hydraulic Crawler.
  * <p>
- * Two jobs, and they have opposite lifetimes. The <strong>gauge</strong> answers "where is the arm",
- * which a player wants continuously and cannot otherwise read -- the arm is behind and above the
- * camera at most aims. The <strong>legend</strong> answers "which keys work this thing", which a
- * player wants exactly once. So the legend fades out after a few seconds aboard and the gauge stays.
+ * Two gauges and a list of controls. The gauges answer questions the world cannot: at most aims the
+ * boom is above and behind the camera, so "how high is the arm" and "how far out" are unanswerable by
+ * looking, and an empty fuel tank is the reason the trigger does nothing.
  * <p>
- * That split is the whole design. A permanent legend is clutter on every ride after the first; a
- * legend behind a help key is a legend nobody ever reads, and the controls here are not guessable --
- * nothing else in Minecraft is driven with WASD while a separate pair of keys works an arm.
+ * <strong>The panel measures itself against its text.</strong> Every string here is translated and
+ * carries a key name that a player may have rebound, so its width is not knowable in advance -- a
+ * fixed panel is one that fits in English with the default bindings and overflows everywhere else,
+ * which is exactly how the first version behaved.
+ * <p>
+ * <strong>The controls do not fade.</strong> They did, on the theory that a legend is read once and
+ * is clutter thereafter. In use it read as the panel breaking: the controls were there, and then they
+ * were not, with nothing having been pressed. Six keys is more than anybody holds in their head
+ * between sessions, and a machine is a thing you come back to.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
 @SideOnly(Side.CLIENT)
 public class CrawlerHud
 {
-	/** How long the control legend stays up after climbing in, in ticks. */
-	private static final int LEGEND_TICKS = 160;
-	/** And how long it takes to fade once that is up. */
-	private static final int FADE_TICKS = 40;
-
 	private static final int PANEL = 0xC0101014;
 	private static final int FRAME = 0xFF3A3A42;
 	private static final int TEXT = 0xFFE0E0E0;
@@ -52,138 +53,189 @@ public class CrawlerHud
 	private static final int GAUGE_LIMIT = 0xFFB0483A;
 	private static final int FUEL = 0xFF6F8F3E;
 
-	/** Ticks since the operator climbed in, or -1 while not riding one. */
-	private static int ticksAboard = -1;
-
+	private static final int MARGIN = 6;
+	private static final int LINE = 10;
+	private static final int GAUGE_HEIGHT = 6;
 	/**
-	 * Count time aboard, so the legend knows when to get out of the way.
+	 * Room for a gauge's name before its track starts.
 	 * <p>
-	 * Reset by leaving rather than by a timer, so stepping out and back in shows the controls again --
-	 * which is the behaviour somebody who has forgotten them will discover by accident.
+	 * One number for all three, so the tracks line up down the panel. Measured against the longest of
+	 * the labels at render time rather than guessed, for the same reason the panel is: these are
+	 * translated strings.
 	 */
-	public static void tick(EntityPlayer player)
+	private static int LABEL_WIDTH = 30;
+
+	/** Kept so a machine left running still shows a panel; nothing depends on it any more. */
+	public static void tick(net.minecraft.entity.player.EntityPlayer player)
 	{
-		boolean riding = player!=null&&player.getRidingEntity() instanceof EntityHydraulicCrawler;
-		if(!riding)
-			ticksAboard = -1;
-		else if(ticksAboard < Integer.MAX_VALUE-1)
-			ticksAboard++;
 	}
 
 	public static void render(ScaledResolution resolution, EntityHydraulicCrawler crawler)
 	{
 		FontRenderer font = ClientUtils.mc().fontRenderer;
-		int width = 108;
-		int left = 6;
-		//Anchored to the bottom left. The hotbar owns the bottom centre and status effects the top
-		//right; this is the corner nothing else in vanilla claims.
-		int lines = legendAlpha() > 0?4: 0;
-		int height = 42+lines*10;
-		int top = resolution.getScaledHeight()-height-6;
+		String title = I18n.format("gui.immersiveengineering.crawler.title");
+		String tool = I18n.format(crawler.getAttachment().getTranslationKey());
+		List<String> legend = legend();
+
+		//	=================================
+		//	Sized to what is in it.
+		//	=================================
+		//
+		// The title and the tool share a line with a gap between them, so that pair sets one minimum
+		// and the longest control line sets another. Taking the larger is what stops the text running
+		// out through the frame -- which it did, because the panel was a number somebody typed and the
+		// strings are translated and name rebindable keys.
+		//The gauge labels set where every track starts, so they are measured too -- otherwise a
+		//translation with a longer word for "fuel" pushes its own track off the end of the panel.
+		LABEL_WIDTH = 4;
+		for(String key : new String[]{"gaugeArm", "gaugeReach", "gaugeFuel", "noFuel", "reserve"})
+			LABEL_WIDTH = Math.max(LABEL_WIDTH,
+					font.getStringWidth(I18n.format("gui.immersiveengineering.crawler."+key))+4);
+
+		int content = font.getStringWidth(title)+MARGIN+font.getStringWidth(tool);
+		for(String line : legend)
+			content = Math.max(content, font.getStringWidth(line));
+		//A gauge needs its label plus a track worth looking at; a panel sized only by the text could
+		//otherwise leave three pixels of track.
+		content = Math.max(content, LABEL_WIDTH+60);
+		int width = content+MARGIN*2;
+		int height = MARGIN+LINE+3*LINE+legend.size()*LINE+MARGIN;
+
+		int left = MARGIN;
+		//Anchored to the bottom left: the hotbar owns the bottom centre and status effects the top
+		//right, and that corner is the one vanilla leaves alone.
+		int top = resolution.getScaledHeight()-height-MARGIN;
 
 		Gui.drawRect(left, top, left+width, top+height, PANEL);
 		drawFrame(left, top, left+width, top+height);
 
-		font.drawString(I18n.format("gui.immersiveengineering.crawler.title"), left+6, top+6, TEXT);
-		//The fitted tool, right-aligned against the title. An operator needs to know what is on the end
-		//of the arm before they pull the trigger, not after -- one of the three destroys buildings.
-		String tool = I18n.format(crawler.getAttachment().getTranslationKey());
-		font.drawString(tool, left+width-6-font.getStringWidth(tool), top+6,
+		int y = top+MARGIN;
+		font.drawString(title, left+MARGIN, y, TEXT);
+		//Right-aligned against the panel's own edge, so it moves with the width instead of assuming it.
+		font.drawString(tool, left+width-MARGIN-font.getStringWidth(tool), y,
 				crawler.getAttachment().breaksBlocks()?GAUGE_LIMIT: DIM);
-		drawAimGauge(crawler, left+6, top+18, width-12);
-		drawFuelGauge(crawler, left+6, top+28, width-12);
+		y += LINE;
 
-		int alpha = legendAlpha();
-		if(alpha > 0)
+		int gaugeWidth = width-MARGIN*2;
+		drawAimGauge(crawler, left+MARGIN, y, gaugeWidth);
+		y += LINE;
+		drawReachGauge(crawler, left+MARGIN, y, gaugeWidth);
+		y += LINE;
+		drawFuelGauge(crawler, left+MARGIN, y, gaugeWidth);
+		y += LINE;
+
+		for(String line : legend)
 		{
-			//Alpha in the high byte, so the legend dissolves rather than vanishing between two frames.
-			int faded = (alpha << 24)|(DIM&0xFFFFFF);
-			int y = top+44;
-			font.drawString(legendLine("crawler.legendDrive", null), left+6, y, faded);
-			font.drawString(legendLine("crawler.legendArm",
-					ClientProxy.keybind_crawlerArmUp), left+6, y+10, faded);
-			font.drawString(legendLine("crawler.legendSlew", null), left+6, y+20, faded);
-			font.drawString(I18n.format("gui.immersiveengineering.crawler.legendTool",
-					ClientProxy.keybind_crawlerAction.getDisplayName(),
-					ClientProxy.keybind_crawlerSwap.getDisplayName()), left+6, y+30, faded);
+			font.drawString(line, left+MARGIN, y, DIM);
+			y += LINE;
 		}
 	}
 
 	/**
-	 * A legend line, with the key's <em>current</em> binding substituted rather than the default.
+	 * The control list, with each key's <em>current</em> binding.
 	 * <p>
-	 * Because it will not be the default for everybody: R and F are free in vanilla but not in a
-	 * modpack, and a panel confidently naming a key that does nothing is worse than no panel.
+	 * Because it will not be the default for everybody: these keys are free in vanilla but not in
+	 * every modpack, and a panel confidently naming a key that does nothing is worse than no panel.
 	 */
-	private static String legendLine(String key, KeyBinding binding)
+	private static List<String> legend()
 	{
-		String name = binding==null?"": binding.getDisplayName();
-		return I18n.format("gui.immersiveengineering."+key, name);
+		List<String> lines = new ArrayList<>();
+		lines.add(I18n.format("gui.immersiveengineering.crawler.legendDrive"));
+		lines.add(I18n.format("gui.immersiveengineering.crawler.legendSlew"));
+		lines.add(I18n.format("gui.immersiveengineering.crawler.legendArm",
+				ClientProxy.keybind_crawlerArmUp.getDisplayName(),
+				ClientProxy.keybind_crawlerArmDown.getDisplayName()));
+		lines.add(I18n.format("gui.immersiveengineering.crawler.legendReach",
+				ClientProxy.keybind_crawlerExtend.getDisplayName(),
+				ClientProxy.keybind_crawlerRetract.getDisplayName()));
+		lines.add(I18n.format("gui.immersiveengineering.crawler.legendTool",
+				ClientProxy.keybind_crawlerAction.getDisplayName(),
+				ClientProxy.keybind_crawlerSwap.getDisplayName()));
+		return lines;
 	}
 
 	/**
-	 * How far up or down the arm is aimed, as a bar with a marker.
-	 * <p>
-	 * The arm's aim is the one piece of state an operator cannot see: at most positions the boom is
-	 * above and behind the camera, so "am I at full lift or nearly there" is unanswerable by looking.
-	 * The ends of the track turn red at the limits, which is what stops somebody holding a key that
-	 * has stopped doing anything and concluding the machine is stuck.
+	 * How high the arm is aimed. Left is raised, right is dug in.
 	 */
 	private static void drawAimGauge(EntityHydraulicCrawler crawler, int x, int y, int width)
 	{
-		Gui.drawRect(x, y, x+width, y+6, GAUGE_TRACK);
 		double span = CrawlerArm.MAX_DEPRESSION-CrawlerArm.MIN_DEPRESSION;
-		//Inverted, so up on the machine is up... along a horizontal bar, which means left. Aim runs
-		//from raised (negative) to dug in (positive), and the bar reads left-to-right as high-to-low.
 		double fraction = (crawler.getArmAim()-CrawlerArm.MIN_DEPRESSION)/span;
-		int mark = x+(int)Math.round(fraction*(width-3));
-
 		boolean atLimit = crawler.getArmAim() <= CrawlerArm.MIN_DEPRESSION+0.01
 				||crawler.getArmAim() >= CrawlerArm.MAX_DEPRESSION-0.01;
-		Gui.drawRect(mark, y-1, mark+3, y+7, atLimit?GAUGE_LIMIT: GAUGE_MARK);
-		//A tick at the middle, so level is findable without staring.
-		int centre = x+(width-1)/2;
-		Gui.drawRect(centre, y+2, centre+1, y+4, DIM);
+		drawMarkedGauge(x, y, width, fraction, atLimit,
+				I18n.format("gui.immersiveengineering.crawler.gaugeArm"));
 	}
 
 	/**
-	 * Diesel remaining, and how full the bucket is.
+	 * How far the arm is extended -- the second aiming axis, and the one with no other readout at all:
+	 * from the cab, an arm reaching four blocks and one reaching five look much the same.
+	 */
+	private static void drawReachGauge(EntityHydraulicCrawler crawler, int x, int y, int width)
+	{
+		double span = CrawlerArm.MAX_REACH-CrawlerArm.MIN_REACH;
+		double fraction = (crawler.getArmReach()-CrawlerArm.MIN_REACH)/span;
+		boolean atLimit = crawler.getArmReach() <= CrawlerArm.MIN_REACH+0.01
+				||crawler.getArmReach() >= CrawlerArm.MAX_REACH-0.01;
+		drawMarkedGauge(x, y, width, fraction, atLimit,
+				I18n.format("gui.immersiveengineering.crawler.gaugeReach"));
+	}
+
+	/**
+	 * A track with a slider on it, and its name in the track.
 	 * <p>
-	 * The fuel bar turns red below the reserve -- the point at which the attachment stops working but
-	 * the tracks keep turning. Without saying so, an operator whose Breaker has quietly stopped
-	 * concludes the machine is broken; with it, they know they are on the fuel that gets them home.
+	 * The ends turn red at the limits: without that, an operator holding a key that has quietly
+	 * stopped doing anything concludes the machine is stuck.
+	 */
+	private static void drawMarkedGauge(int x, int y, int width, double fraction, boolean atLimit,
+										String label)
+	{
+		FontRenderer font = ClientUtils.mc().fontRenderer;
+		//Label beside the track rather than over it. Six pixels of track is shorter than the font, so
+		//text drawn inside one sits half outside it and reads as a rendering fault.
+		font.drawString(label, x, y, DIM);
+		int trackLeft = x+LABEL_WIDTH;
+		int trackWidth = width-LABEL_WIDTH;
+		int trackTop = y+1;
+		Gui.drawRect(trackLeft, trackTop, trackLeft+trackWidth, trackTop+GAUGE_HEIGHT, GAUGE_TRACK);
+		int mark = trackLeft+(int)Math.round(clamp01(fraction)*(trackWidth-3));
+		Gui.drawRect(mark, trackTop-1, mark+3, trackTop+GAUGE_HEIGHT+1,
+				atLimit?GAUGE_LIMIT: GAUGE_MARK);
+	}
+
+	/** A clamp, so a value slightly outside its range cannot draw the marker outside the panel. */
+	private static double clamp01(double fraction)
+	{
+		return fraction < 0?0: fraction > 1?1: fraction;
+	}
+
+	/**
+	 * Diesel remaining.
+	 * <p>
+	 * Labelled when it is low or gone, because an unlabelled empty bar is a dark rectangle
+	 * indistinguishable from a panel line -- and on a machine that has never been fuelled it is the
+	 * reason the attachment does nothing.
 	 */
 	private static void drawFuelGauge(EntityHydraulicCrawler crawler, int x, int y, int width)
 	{
-		Gui.drawRect(x, y, x+width, y+6, GAUGE_TRACK);
-		int filled = (int)Math.round(width*crawler.getFuel()/(double)crawler.getFuelCapacity());
-		if(filled > 0)
-			Gui.drawRect(x, y, x+filled, y+6, crawler.hasWorkingFuel()?FUEL: GAUGE_LIMIT);
-
 		FontRenderer font = ClientUtils.mc().fontRenderer;
-		//	=================================
-		//	An empty bar has to say what it is.
-		//	=================================
-		//
-		// Unlabelled, the fuel gauge on a machine that has never been fuelled is an empty dark
-		// rectangle -- indistinguishable from a decorative panel line, and giving no clue that it is
-		// the reason the attachment does nothing. The label appears only when it matters, so a fuelled
-		// machine keeps a clean panel.
-		if(!crawler.hasWorkingFuel())
-		{
-			String warning = I18n.format(crawler.getFuel() <= 0
-					?"gui.immersiveengineering.crawler.noFuel"
-					: "gui.immersiveengineering.crawler.reserve");
-			font.drawString(warning, x, y+8, GAUGE_LIMIT);
-		}
-		//The bucket's fill, only when there is anything in it. A permanent "0/9" is noise on the two
-		//attachments out of three that never put anything there. Right-aligned, so it and the fuel
-		//warning share the line without colliding.
-		if(crawler.getBucketFill() > 0)
-		{
-			String load = crawler.getBucketFill()+"/"+crawler.getBucketSize();
-			font.drawString(load, x+width-font.getStringWidth(load), y+8, DIM);
-		}
+		boolean healthy = crawler.hasWorkingFuel();
+		String label = healthy
+				?I18n.format("gui.immersiveengineering.crawler.gaugeFuel")
+				: I18n.format(crawler.getFuel() <= 0
+				?"gui.immersiveengineering.crawler.noFuel"
+				: "gui.immersiveengineering.crawler.reserve");
+		font.drawString(label, x, y, healthy?DIM: GAUGE_LIMIT);
+
+		int trackLeft = x+LABEL_WIDTH;
+		int trackWidth = width-LABEL_WIDTH;
+		int trackTop = y+1;
+		Gui.drawRect(trackLeft, trackTop, trackLeft+trackWidth, trackTop+GAUGE_HEIGHT, GAUGE_TRACK);
+		int filled = (int)Math.round(trackWidth*clamp01(
+				crawler.getFuel()/(double)crawler.getFuelCapacity()));
+		if(filled > 0)
+			Gui.drawRect(trackLeft, trackTop, trackLeft+filled, trackTop+GAUGE_HEIGHT,
+					healthy?FUEL: GAUGE_LIMIT);
 	}
 
 	private static void drawFrame(int left, int top, int right, int bottom)
@@ -192,22 +244,5 @@ public class CrawlerHud
 		Gui.drawRect(left, bottom-1, right, bottom, FRAME);
 		Gui.drawRect(left, top, left+1, bottom, FRAME);
 		Gui.drawRect(right-1, top, right, bottom, FRAME);
-	}
-
-	/**
-	 * @return the legend's opacity, 0 once it has faded out entirely
-	 */
-	private static int legendAlpha()
-	{
-		if(ticksAboard < 0)
-			return 0;
-		if(ticksAboard < LEGEND_TICKS)
-			return 0xFF;
-		int fading = ticksAboard-LEGEND_TICKS;
-		if(fading >= FADE_TICKS)
-			return 0;
-		//Floored at a value that is still visible, so the last frame of the fade is not a smear of
-		//invisible text sitting in a panel that has already resized around it.
-		return Math.max(8, 0xFF-(int)(0xFF*(fading/(double)FADE_TICKS)));
 	}
 }

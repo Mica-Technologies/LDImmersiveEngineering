@@ -18,6 +18,7 @@ would make every sentence about either one ambiguous.
 | **A / D** | Steer the tracks — skid steer, so it turns on the spot |
 | **Mouse** | Slews the house, cab and arm included |
 | **R / F** | Raise and lower the arm |
+| **X / Z** | Extend and retract it |
 | **V** | Work the attachment |
 | **Sneak + V** | Tip the bucket out |
 | **G** | Change attachment |
@@ -28,12 +29,15 @@ would make every sentence about either one ambiguous.
 machine, which is authentic and is also the sort of thing that has to be said rather than
 discovered.
 
-**The arm is aimed, not jointed.** One pair of keys sets how high it reaches, and the boom and stick
-solve their own angles to get there. That is a deliberate choice over six per-joint keys, and it paid
-for itself: when playtesting moved the arm off the view and onto keys, the solver did not change at
-all, because it always took a single aim parameter and never knew where that number came from.
+**The arm is aimed, not jointed.** Two pairs of keys say which way it points and how far along that
+line the tool sits; the boom and stick solve their own angles to get there. That is a deliberate
+choice over six per-joint keys, and it has now paid for itself twice — first when playtesting moved
+the arm off the view and onto keys, and again when the second axis was added. Neither change touched
+the solver, because it takes an elevation and an extension and does not care where either comes from.
 
-The working envelope is about **4.8 blocks up, 2.5 below the tracks, and 5.4 out** at level.
+The working envelope is a **band**, not an arc: roughly **2.1 to 5.7 blocks out**, and from **2.8
+blocks below the tracks to 5.0 above** them. With elevation alone the tool could only ever be
+somewhere on a single circle, so reaching anything meant driving until that circle crossed it.
 
 ## The attachments
 

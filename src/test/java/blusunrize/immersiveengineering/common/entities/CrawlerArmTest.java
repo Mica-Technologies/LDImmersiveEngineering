@@ -288,6 +288,107 @@ class CrawlerArmTest
 	}
 
 	@Nested
+	@DisplayName("the second axis: extending and retracting")
+	class Extension
+	{
+		private double[] elbow(double aim, double reach)
+		{
+			double[] pose = CrawlerArm.solve(aim, reach);
+			return CrawlerArm.alongArm(pose[0], pose[1], pose[2],
+					CrawlerGeometry.BOOM_LENGTH+CrawlerGeometry.STICK_LENGTH);
+		}
+
+		@Test
+		@DisplayName("extending puts the tool further out without changing where it points")
+		void extendsAlongTheSameLine()
+		{
+			//	=================================
+			//	What the second axis is for.
+			//	=================================
+			//
+			// With elevation alone the tool could only be somewhere on one arc: anything nearer or
+			// further than a single radius was unreachable wherever the machine stood. Extension moves
+			// it along the line it is already pointing down, which reaches the whole band -- and moving
+			// along that line is the one direction that cannot disturb the monotonic height the
+			// elevation axis was rebuilt twice to get.
+			for(double aim = -60; aim <= 70; aim += 10)
+			{
+				double[] in = elbow(aim, CrawlerArm.MIN_REACH);
+				double[] out = elbow(aim, CrawlerArm.MAX_REACH);
+				assertTrue(Math.hypot(out[0], out[1]) > Math.hypot(in[0], in[1])+5,
+						"extending did not reach further at aim "+aim);
+				//Same bearing from the pivot: only the distance changed.
+				assertEquals(Math.atan2(in[1], in[0]), Math.atan2(out[1], out[0]), 1e-6,
+						"extending changed the direction the arm points, at aim "+aim);
+			}
+		}
+
+		@Test
+		@DisplayName("it reaches every distance between its limits")
+		void coversTheBand()
+		{
+			for(double reach = CrawlerArm.MIN_REACH; reach <= CrawlerArm.MAX_REACH; reach += 1)
+			{
+				double[] at = elbow(0, reach);
+				assertEquals(reach, Math.hypot(at[0], at[1]), TOLERANCE,
+						"the arm did not reach "+reach+" when asked to");
+			}
+		}
+
+		@Test
+		@DisplayName("extension past the limits clamps rather than tearing the arm off")
+		void clampsBeyondItsLimits()
+		{
+			//The outer limit is inside full stretch and the inner one clear of the fold, because both
+			//are where a two-link solve turns singular. Asking for more than the arm has must land on
+			//the limit, not on a NaN in the position that decides which blocks are destroyed.
+			double[] tooFar = elbow(0, CrawlerArm.MAX_REACH+500);
+			assertEquals(CrawlerArm.MAX_REACH, Math.hypot(tooFar[0], tooFar[1]), TOLERANCE);
+			double[] tooClose = elbow(0, -500);
+			assertEquals(CrawlerArm.MIN_REACH, Math.hypot(tooClose[0], tooClose[1]), TOLERANCE);
+		}
+
+		@Test
+		@DisplayName("no aim and extension together produce a broken angle")
+		void neverProducesNaNAcrossTheWholeEnvelope()
+		{
+			//Every corner of the two-dimensional envelope, not just the middle of each axis: the
+			//singularities live at the corners, and a solve that is finite along both edges separately
+			//can still be NaN where they meet.
+			for(double aim = CrawlerArm.MIN_DEPRESSION-20; aim <= CrawlerArm.MAX_DEPRESSION+20; aim += 5)
+				for(double reach = CrawlerArm.MIN_REACH-10; reach <= CrawlerArm.MAX_REACH+10; reach += 2)
+				{
+					double[] pose = CrawlerArm.solve(aim, reach);
+					for(int i = 0; i < 3; i++)
+						assertFalse(Double.isNaN(pose[i])||Double.isInfinite(pose[i]),
+								"joint "+i+" broke at aim "+aim+", reach "+reach);
+				}
+		}
+
+		@Test
+		@DisplayName("the default extension is what the single-argument solve uses")
+		void defaultMatchesTheOneAxisSolve()
+		{
+			//The one-argument form is the whole existing test suite's entry point, so the two have to
+			//agree or those tests are covering something the machine no longer does.
+			double[] oneAxis = CrawlerArm.solve(25);
+			double[] twoAxis = CrawlerArm.solve(25, CrawlerArm.REACH);
+			for(int i = 0; i < 3; i++)
+				assertEquals(oneAxis[i], twoAxis[i], 1e-9);
+		}
+
+		@Test
+		@DisplayName("fully extended and level is further than the old fixed arc managed")
+		void widensTheEnvelope()
+		{
+			double[] pose = CrawlerArm.solve(0, CrawlerArm.MAX_REACH);
+			double[] tip = CrawlerArm.tipOffset(0, pose[0], pose[1], pose[2]);
+			assertTrue(Math.hypot(tip[0], tip[2]) > 3.5,
+					"fully extended, the tool only reached "+Math.hypot(tip[0], tip[2])+" blocks out");
+		}
+	}
+
+	@Nested
 	@DisplayName("points along the arm")
 	class AlongTheArm
 	{
