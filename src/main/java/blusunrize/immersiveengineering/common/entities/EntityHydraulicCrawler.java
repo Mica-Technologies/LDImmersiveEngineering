@@ -13,11 +13,22 @@ import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.IEDamageSources;
 import blusunrize.immersiveengineering.common.util.Utils;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.NonNullList;
 import net.minecraft.util.text.TextComponentTranslation;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.util.BlockSnapshot;
+import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.world.BlockEvent;
+import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidTank;
+import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
+import net.minecraftforge.items.CapabilityItemHandler;
+import net.minecraftforge.items.ItemStackHandler;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.IEntityMultiPart;
@@ -36,6 +47,7 @@ import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 
 import javax.annotation.Nullable;
 
@@ -80,6 +92,44 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	/** Ticks between one entity taking a knock and the next. */
 	private static final int CONTACT_COOLDOWN = 10;
 	private static final float CONTACT_DAMAGE = 6F;
+
+	/**
+	 * What the Bucket has dug.
+	 * <p>
+	 * Nine slots -- a chest row. Exposed as a capability as well as tipped out by hand, so a pipe or a
+	 * conveyor can unload the machine where somebody has built for that, and the sneak gesture is for
+	 * everywhere else.
+	 */
+	private final ItemStackHandler inventory = new ItemStackHandler(9);
+
+	/**
+	 * The fuel tank. Diesel and nothing else.
+	 * <p>
+	 * Diesel because this fork has a whole petroleum chain and almost nothing that burns its diesel at
+	 * a personal scale -- a machine you refuel at your own Gas Station Pump closes that loop without
+	 * inventing an economy for it. Refused for anything else, so the tank cannot be filled with water
+	 * and then jam.
+	 */
+	private final FluidTank fuel = new FluidTank(CrawlerConfig.fuelCapacity)
+	{
+		@Override
+		public boolean canFillFluidType(FluidStack incoming)
+		{
+			return incoming!=null&&incoming.getFluid()!=null
+					&&"ie_diesel".equals(incoming.getFluid().getName());
+		}
+	};
+
+	/**
+	 * What the Grapple has hold of: a block state id, or the id of an entity, or neither.
+	 * <p>
+	 * A state id rather than an ItemStack, so a block goes back down as exactly what came up --
+	 * a stair keeps its facing, a slab its half. Blocks with a tile entity are refused rather than
+	 * carried, because none of that survives the trip.
+	 */
+	private int carriedState;
+	@Nullable
+	private java.util.UUID carriedEntity;
 
 	private final EntityCrawlerPart[] parts;
 	/** Where the tool was last tick, so the arm knows whether it is swinging or resting. */
@@ -392,6 +442,11 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		//would make the two a coin toss.
 		if(player.isSneaking())
 			return dismantle(player, hand);
+		//A can of diesel refuels it rather than mounting it. Through Utils.interactWithTank, which is
+		//the same guard every tank in this fork now uses: a container that moves nothing still spends
+		//the click, or a bucket of the wrong fluid empties itself onto the machine instead.
+		if(Utils.interactWithTank(player, hand, fuel))
+			return true;
 		if(!world.isRemote&&getControllingPassenger()==null)
 			player.startRiding(this);
 		//True on both sides regardless, or the click falls through to the held item and the operator
@@ -412,6 +467,15 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			return false;
 		if(!world.isRemote)
 		{
+			//The bucket's contents come out with it. Folding nine slots into the item's NBT is possible
+			//and would mean a dropped machine that quietly holds a chest's worth of stone -- easy to
+			//lose track of, and easy to duplicate if the item is ever stacked by mistake.
+			for(int slot = 0; slot < inventory.getSlots(); slot++)
+			{
+				ItemStack held = inventory.extractItem(slot, Integer.MAX_VALUE, false);
+				if(!held.isEmpty())
+					entityDropItem(held, 0.5F);
+			}
 			if(!player.capabilities.isCreativeMode)
 				entityDropItem(new ItemStack(IEContent.itemHydraulicCrawler), 0.5F);
 			world.playSound(null, posX, posY, posZ, net.minecraft.init.SoundEvents.BLOCK_ANVIL_LAND,
@@ -499,6 +563,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		positionParts();
 		if(!world.isRemote)
 		{
+			carryAlong();
 			bumpEntities();
 			lastToolTip = getToolTip();
 		}
@@ -544,6 +609,9 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			return;
 		}
 		setSlew(rider.rotationYaw);
+		//The engine burns while somebody is aboard, whether or not they are doing anything. A machine
+		//that cost nothing to sit in would be a machine nobody ever switched off.
+		burn(CrawlerConfig.fuelIdle);
 
 		if(++controlAge > CONTROL_TIMEOUT)
 			controlFlags = 0;
@@ -596,8 +664,41 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			breakCooldown--;
 			return;
 		}
+		//Sneak and pull the trigger to tip the bucket out. Checked before anything else, so a full
+		//bucket can always be emptied even while the tool is buried in something.
+		if(rider.isSneaking())
+		{
+			if(rider instanceof EntityPlayer&&getAttachment().keepsDrops())
+			{
+				dumpBucket((EntityPlayer)rider);
+				breakCooldown = CrawlerDemolition.COOLDOWN;
+			}
+			return;
+		}
+		if(getAttachment()==CrawlerAttachment.GRAPPLE)
+		{
+			if(rider instanceof EntityPlayer&&workGrapple((EntityPlayer)rider))
+				breakCooldown = CrawlerDemolition.COOLDOWN;
+			return;
+		}
 		if(!getAttachment().breaksBlocks())
 			return;
+		//	=================================
+		//	The reserve.
+		//	=================================
+		//
+		// The attachment stops well before the tank does, and the tracks keep going. The worst thing
+		// this machine can do to somebody is run dry mid-demolition, hundreds of blocks from home, in a
+		// thing that cannot be pushed and cannot be picked up without a hammer. The reserve is enough
+		// to drive back with.
+		if(fuel.getFluidAmount() <= CrawlerConfig.fuelReserve)
+		{
+			if(rider instanceof EntityPlayer)
+				ChatUtils.sendServerNoSpamMessages((EntityPlayer)rider,
+						new TextComponentTranslation(Lib.CHAT_INFO+"crawlerReserve"));
+			return;
+		}
+		burn(CrawlerConfig.fuelWorking);
 		//	=================================
 		//	Somebody has to be responsible.
 		//	=================================
@@ -637,10 +738,254 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		BlockEvent.BreakEvent event = new BlockEvent.BreakEvent(world, pos, state, operator);
 		if(MinecraftForge.EVENT_BUS.post(event)||event.isCanceled())
 			return false;
-		//Dropped rather than kept: the Breaker is for taking a building down, and the Bucket is the one
-		//that collects. Somebody demolishing a house does not want its cobblestone in a hopper.
-		world.destroyBlock(pos, true);
+
+		if(!getAttachment().keepsDrops())
+		{
+			//The Breaker: straight on the floor. Somebody taking a house down does not want its
+			//cobblestone anywhere but out of the way.
+			world.destroyBlock(pos, true);
+			return true;
+		}
+		//The Bucket keeps what it digs, so the drops are worked out here and the block removed without
+		//them -- destroyBlock(pos, true) would scatter them on the ground first and leave this picking
+		//its own spoil back up off the floor.
+		NonNullList<ItemStack> drops = NonNullList.create();
+		state.getBlock().getDrops(drops, world, pos, state, 0);
+		float chance = ForgeEventFactory.fireBlockHarvesting(drops, world, pos, state, 0, 1F, false,
+				operator);
+		world.destroyBlock(pos, false);
+		for(ItemStack drop : drops)
+			if(world.rand.nextFloat() <= chance)
+				keepOrDrop(drop);
 		return true;
+	}
+
+	/**
+	 * Put a dug item in the bucket, or on the floor if the bucket is full.
+	 * <p>
+	 * Never voided. A machine that quietly ate what it dug the moment its bucket filled would be a
+	 * machine nobody could trust to dig anything they cared about, and "it stopped when full" is a
+	 * worse answer than a small pile on the ground.
+	 */
+	private void keepOrDrop(ItemStack stack)
+	{
+		ItemStack left = stack;
+		for(int slot = 0; slot < inventory.getSlots()&&!left.isEmpty(); slot++)
+			left = inventory.insertItem(slot, left, false);
+		if(!left.isEmpty())
+			entityDropItem(left, 0.5F);
+	}
+
+	/**
+	 * Tip the bucket out at the machine's feet.
+	 * <p>
+	 * On sneak plus the trigger, because the bucket has no window on it and there is otherwise no way
+	 * to get anything back out short of dismantling the machine. It is also the gesture nobody presses
+	 * by accident: sneaking is already how the machine is dismantled, so the operator is in "doing
+	 * something deliberate" mode already.
+	 */
+	private void dumpBucket(EntityPlayer operator)
+	{
+		boolean anything = false;
+		for(int slot = 0; slot < inventory.getSlots(); slot++)
+		{
+			ItemStack stack = inventory.extractItem(slot, Integer.MAX_VALUE, false);
+			if(!stack.isEmpty())
+			{
+				entityDropItem(stack, 0.6F);
+				anything = true;
+			}
+		}
+		if(anything)
+			ChatUtils.sendServerNoSpamMessages(operator,
+					new TextComponentTranslation(Lib.CHAT_INFO+"crawlerBucketDumped"));
+	}
+
+	//	=================================
+	//		FUEL
+	//	=================================
+
+	private void burn(int amount)
+	{
+		fuel.drainInternal(amount, true);
+	}
+
+	public int getFuel()
+	{
+		return fuel.getFluidAmount();
+	}
+
+	public int getFuelCapacity()
+	{
+		return fuel.getCapacity();
+	}
+
+	/**
+	 * @return true if there is enough left to work with, as opposed to only enough to drive home on
+	 */
+	public boolean hasWorkingFuel()
+	{
+		return fuel.getFluidAmount() > CrawlerConfig.fuelReserve;
+	}
+
+	//	=================================
+	//		THE GRAPPLE
+	//	=================================
+
+	/**
+	 * One press: take hold. The next: let go.
+	 * <p>
+	 * A grab is tried against entities before blocks, because an entity standing in a doorway is
+	 * plainly the thing being aimed at and the doorway plainly is not. Carrying holds it at the tool,
+	 * so the arm moves it -- which is the whole point of a grapple and is also why it is on the same
+	 * gesture as putting it down: the operator's hands are on the arm, not on an inventory.
+	 *
+	 * @return true if the grapple did something worth a cooldown
+	 */
+	private boolean workGrapple(EntityPlayer operator)
+	{
+		if(isCarrying())
+			return release(operator);
+		return grabEntity()||grabBlock(operator);
+	}
+
+	private boolean isCarrying()
+	{
+		return carriedState!=0||carriedEntity!=null;
+	}
+
+	/**
+	 * Take hold of whatever is at the tool.
+	 * <p>
+	 * The machine's own parts and its operator are excluded, or the first press picks up the arm doing
+	 * the picking.
+	 */
+	private boolean grabEntity()
+	{
+		Vec3d tip = getToolTip();
+		AxisAlignedBB reach = new AxisAlignedBB(tip.x, tip.y, tip.z, tip.x, tip.y, tip.z)
+				.grow(CrawlerDemolition.REACH);
+		for(Entity candidate : world.getEntitiesWithinAABBExcludingEntity(this, reach))
+		{
+			if(candidate instanceof EntityCrawlerPart||candidate==getControllingPassenger())
+				continue;
+			//Nothing that is already being ridden or carried: two machines passing the same cow back
+			//and forth would be a fight neither can win.
+			if(candidate.isRiding()||candidate.isBeingRidden())
+				continue;
+			carriedEntity = candidate.getUniqueID();
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Lift the block at the tool out of the world.
+	 * <p>
+	 * Through the same permission checks the Breaker uses, because taking a block out of a wall is
+	 * taking a block out of a wall regardless of whether you intend to put it back.
+	 */
+	private boolean grabBlock(EntityPlayer operator)
+	{
+		for(BlockPos pos : CrawlerDemolition.targetsAround(getToolTip().x, getToolTip().y,
+				getToolTip().z, CrawlerDemolition.REACH, 1))
+		{
+			IBlockState state = world.getBlockState(pos);
+			if(state.getBlock().isAir(state, world, pos))
+				continue;
+			if(!CrawlerDemolition.withinHardnessLimit(state.getBlockHardness(world, pos)))
+				continue;
+			if(state.getBlock().hasTileEntity(state))
+				//A tile entity's contents would not survive being carried as a block state, and a chest
+				//that came back empty is worse than one that could not be picked up.
+				continue;
+			if(!world.isBlockModifiable(operator, pos))
+				continue;
+			BlockEvent.BreakEvent event = new BlockEvent.BreakEvent(world, pos, state, operator);
+			if(MinecraftForge.EVENT_BUS.post(event)||event.isCanceled())
+				continue;
+			carriedState = Block.getStateId(state);
+			world.setBlockToAir(pos);
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Put down whatever is being carried.
+	 */
+	private boolean release(EntityPlayer operator)
+	{
+		if(carriedEntity!=null)
+		{
+			carriedEntity = null;
+			return true;
+		}
+		Vec3d tip = getToolTip();
+		BlockPos at = new BlockPos(tip.x, tip.y, tip.z);
+		IBlockState existing = world.getBlockState(at);
+		//Only into somewhere there is room. Replacing a block would make the grapple a second, quieter
+		//way of destroying things, and one with none of the Breaker's checks in front of it.
+		if(!existing.getBlock().isReplaceable(world, at))
+			return false;
+		IBlockState state = Block.getStateById(carriedState);
+		if(!world.isBlockModifiable(operator, at))
+			return false;
+		//Place, then post, then put it back if anybody objected. That is Forge's own order for this --
+		//a PlaceEvent describes a placement that has happened, and a snapshot taken beforehand is what
+		//makes undoing it exact rather than approximate.
+		BlockSnapshot before = BlockSnapshot.getBlockSnapshot(world, at);
+		world.setBlockState(at, state);
+		BlockEvent.PlaceEvent event = new BlockEvent.PlaceEvent(before, existing, operator,
+				EnumHand.MAIN_HAND);
+		if(MinecraftForge.EVENT_BUS.post(event)||event.isCanceled())
+		{
+			before.restore(true, false);
+			return false;
+		}
+		carriedState = 0;
+		return true;
+	}
+
+	/**
+	 * Keep whatever is being carried at the tool.
+	 * <p>
+	 * Position rather than a passenger relationship, because a carried entity is being <em>held</em> --
+	 * riding would let it steer, and would put a cow in the driving seat of a machine that had just
+	 * picked it up.
+	 */
+	private void carryAlong()
+	{
+		if(carriedEntity==null)
+			return;
+		Entity held = ((WorldServer)world).getEntityFromUuid(carriedEntity);
+		if(held==null||held.isDead)
+		{
+			carriedEntity = null;
+			return;
+		}
+		Vec3d tip = getToolTip();
+		held.setPosition(tip.x, tip.y-held.height/2, tip.z);
+		//Falling reset each tick, so being set down from a height is not fatal to whatever was carried.
+		held.fallDistance = 0;
+		held.motionX = held.motionY = held.motionZ = 0;
+	}
+
+	/**
+	 * @return how many of the bucket's slots hold something, for the panel
+	 */
+	public int getBucketFill()
+	{
+		int used = 0;
+		for(int slot = 0; slot < inventory.getSlots(); slot++)
+			if(!inventory.getStackInSlot(slot).isEmpty())
+				used++;
+		return used;
+	}
+
+	public int getBucketSize()
+	{
+		return inventory.getSlots();
 	}
 
 	/**
@@ -705,6 +1050,10 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		//different set of tools, and an out-of-range ordinal should fit the wrong tool rather than
 		//throw on chunk load.
 		setAttachment(CrawlerAttachment.byOrdinal(nbt.getByte("attachment")));
+		if(nbt.hasKey("inventory"))
+			inventory.deserializeNBT(nbt.getCompoundTag("inventory"));
+		carriedState = nbt.getInteger("carried");
+		fuel.readFromNBT(nbt.getCompoundTag("fuel"));
 	}
 
 	@Override
@@ -716,5 +1065,37 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		nbt.setFloat("tool", getToolAngle());
 		nbt.setFloat("aim", getArmAim());
 		nbt.setByte("attachment", (byte)getAttachment().ordinal());
+		nbt.setTag("inventory", inventory.serializeNBT());
+		//A carried block is saved; a carried entity is not. The block only exists inside this machine
+		//and would be destroyed by not saving it, while the entity exists perfectly well on its own and
+		//is simply let go of when the world reloads -- which is also the right behaviour, since it may
+		//not be anywhere near the machine when the chunk comes back.
+		nbt.setInteger("carried", carriedState);
+		nbt.setTag("fuel", fuel.writeToNBT(new NBTTagCompound()));
+	}
+
+	//	=================================
+	//		UNLOADING BY MACHINE
+	//	=================================
+
+	@Override
+	public boolean hasCapability(net.minecraftforge.common.capabilities.Capability<?> capability,
+								 @Nullable EnumFacing facing)
+	{
+		return capability==CapabilityItemHandler.ITEM_HANDLER_CAPABILITY
+				||capability==CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY
+				||super.hasCapability(capability, facing);
+	}
+
+	@Nullable
+	@Override
+	public <T> T getCapability(net.minecraftforge.common.capabilities.Capability<T> capability,
+							   @Nullable EnumFacing facing)
+	{
+		if(capability==CapabilityItemHandler.ITEM_HANDLER_CAPABILITY)
+			return CapabilityItemHandler.ITEM_HANDLER_CAPABILITY.cast(inventory);
+		if(capability==CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY)
+			return CapabilityFluidHandler.FLUID_HANDLER_CAPABILITY.cast(fuel);
+		return super.getCapability(capability, facing);
 	}
 }

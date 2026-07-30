@@ -50,6 +50,7 @@ public class CrawlerHud
 	private static final int GAUGE_TRACK = 0xFF26262C;
 	private static final int GAUGE_MARK = 0xFFE9762B;
 	private static final int GAUGE_LIMIT = 0xFFB0483A;
+	private static final int FUEL = 0xFF6F8F3E;
 
 	/** Ticks since the operator climbed in, or -1 while not riding one. */
 	private static int ticksAboard = -1;
@@ -77,7 +78,7 @@ public class CrawlerHud
 		//Anchored to the bottom left. The hotbar owns the bottom centre and status effects the top
 		//right; this is the corner nothing else in vanilla claims.
 		int lines = legendAlpha() > 0?4: 0;
-		int height = 30+lines*10;
+		int height = 42+lines*10;
 		int top = resolution.getScaledHeight()-height-6;
 
 		Gui.drawRect(left, top, left+width, top+height, PANEL);
@@ -90,13 +91,14 @@ public class CrawlerHud
 		font.drawString(tool, left+width-6-font.getStringWidth(tool), top+6,
 				crawler.getAttachment().breaksBlocks()?GAUGE_LIMIT: DIM);
 		drawAimGauge(crawler, left+6, top+18, width-12);
+		drawFuelGauge(crawler, left+6, top+28, width-12);
 
 		int alpha = legendAlpha();
 		if(alpha > 0)
 		{
 			//Alpha in the high byte, so the legend dissolves rather than vanishing between two frames.
 			int faded = (alpha << 24)|(DIM&0xFFFFFF);
-			int y = top+32;
+			int y = top+44;
 			font.drawString(legendLine("crawler.legendDrive", null), left+6, y, faded);
 			font.drawString(legendLine("crawler.legendArm",
 					ClientProxy.keybind_crawlerArmUp), left+6, y+10, faded);
@@ -142,6 +144,30 @@ public class CrawlerHud
 		//A tick at the middle, so level is findable without staring.
 		int centre = x+(width-1)/2;
 		Gui.drawRect(centre, y+2, centre+1, y+4, DIM);
+	}
+
+	/**
+	 * Diesel remaining, and how full the bucket is.
+	 * <p>
+	 * The fuel bar turns red below the reserve -- the point at which the attachment stops working but
+	 * the tracks keep turning. Without saying so, an operator whose Breaker has quietly stopped
+	 * concludes the machine is broken; with it, they know they are on the fuel that gets them home.
+	 */
+	private static void drawFuelGauge(EntityHydraulicCrawler crawler, int x, int y, int width)
+	{
+		Gui.drawRect(x, y, x+width, y+6, GAUGE_TRACK);
+		int filled = (int)Math.round(width*crawler.getFuel()/(double)crawler.getFuelCapacity());
+		if(filled > 0)
+			Gui.drawRect(x, y, x+filled, y+6, crawler.hasWorkingFuel()?FUEL: GAUGE_LIMIT);
+
+		FontRenderer font = ClientUtils.mc().fontRenderer;
+		//The bucket's fill, only when there is anything in it. A permanent "0/9" is noise on the two
+		//attachments out of three that never put anything there.
+		if(crawler.getBucketFill() > 0)
+		{
+			String load = crawler.getBucketFill()+"/"+crawler.getBucketSize();
+			font.drawString(load, x+width-font.getStringWidth(load), y+8, DIM);
+		}
 	}
 
 	private static void drawFrame(int left, int top, int right, int bottom)

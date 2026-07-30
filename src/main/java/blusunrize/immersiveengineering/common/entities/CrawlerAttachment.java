@@ -20,9 +20,9 @@ package blusunrize.immersiveengineering.common.entities;
  */
 public enum CrawlerAttachment
 {
-	/** Digs and keeps what it digs. Not yet implemented -- see the plan's P7. */
-	BUCKET("bucket", false),
-	/** Picks a block up and puts it down again. Not yet implemented -- see the plan's P8. */
+	/** Digs, and keeps what it digs. */
+	BUCKET("bucket", true),
+	/** Picks one block up and puts it down again, and carries whatever it catches. */
 	GRAPPLE("grapple", false),
 	/** Destroys what it touches, and drops it on the floor. */
 	BREAKER("breaker", true);
@@ -49,6 +49,18 @@ public enum CrawlerAttachment
 	public boolean breaksBlocks()
 	{
 		return breaksBlocks;
+	}
+
+	/**
+	 * @return whether what it breaks is kept rather than dropped
+	 * <p>
+	 * The one difference between the Bucket and the Breaker, and it is the whole difference: both take
+	 * a block out of the world, and only one of them expects you to want it. Somebody demolishing a
+	 * house does not want its cobblestone; somebody digging a foundation does.
+	 */
+	public boolean keepsDrops()
+	{
+		return this==BUCKET;
 	}
 
 	public String getTranslationKey()

@@ -1968,5 +1968,7 @@ tile.immersiveengineering.petroleum_device.storage_tank_wall.info=Build a hollow
 chat.immersiveengineering.info.petroleum.tankFormed=Storage Tank formed: %s, %s mB
 chat.immersiveengineering.info.crawlerNoRoom=Not enough room -- the Crawler needs a clear five blocks across.
 chat.immersiveengineering.info.crawlerAttachment=Fitted: %s
+chat.immersiveengineering.info.crawlerBucketDumped=Bucket emptied.
+chat.immersiveengineering.info.crawlerReserve=Running on reserve -- refuel before working.
 chat.immersiveengineering.info.petroleum.tankDisassembled=Storage Tank taken apart. Its contents are kept.
 chat.immersiveengineering.info.petroleum.tankNotAShell=That is not a hollow box. A Storage Tank needs complete walls from 3 to 16 blocks a side, and nothing inside it.
