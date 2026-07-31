@@ -152,7 +152,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	{
 		if(world==null||world.isRemote)
 			return;
-		Map<BlockPos, Integer> peers = ConduitRoute.junctionsFrom(getPos(), new WorldProbe());
+		Map<BlockPos, Integer> peers = ConduitRoute.junctionsFrom(getPos(), new ConduitWorldProbe(world));
 		Set<BlockPos> wanted = new HashSet<>(peers.keySet());
 
 		//Drop what is no longer reachable first, so a run rerouted onto a different wall does not
@@ -201,36 +201,6 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(connection.isBundle())
 				out.add(connection);
 		return out;
-	}
-
-	/**
-	 * The world, in the shape {@link ConduitRoute} asks for.
-	 */
-	private class WorldProbe implements ConduitRoute.Probe
-	{
-		@Override
-		public ConduitRoute.Node nodeAt(BlockPos pos)
-		{
-			//Unloaded means "not there" rather than "look": asking would generate the chunk, and a
-			//run along a border would drag chunks in behind it forever.
-			if(!world.isBlockLoaded(pos))
-				return ConduitRoute.Node.NOTHING;
-			TileEntity te = world.getTileEntity(pos);
-			if(te instanceof TileEntityConduit)
-				return ConduitRoute.Node.CONDUIT;
-			if(te instanceof TileEntityJunctionBox)
-				return ConduitRoute.Node.JUNCTION;
-			return ConduitRoute.Node.NOTHING;
-		}
-
-		@Override
-		public EnumFacing mountAt(BlockPos pos)
-		{
-			if(!world.isBlockLoaded(pos))
-				return null;
-			TileEntity te = world.getTileEntity(pos);
-			return te instanceof TileEntityConduit?((TileEntityConduit)te).facing: null;
-		}
 	}
 
 	// ------------------------------------------------------------------

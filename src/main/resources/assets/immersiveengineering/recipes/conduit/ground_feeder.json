@@ -1,0 +1,22 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:conduit",
+		"data": 2,
+		"count": 1
+	},
+	"pattern": [
+		"P",
+		"C",
+		"P"
+	],
+	"key": {
+		"P": {
+			"item": "#plateAluminum"
+		},
+		"C": {
+			"item": "immersiveengineering:conduit",
+			"data": 0
+		}
+	}
+}

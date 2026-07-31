@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.client;
 
+import blusunrize.immersiveengineering.client.models.smart.ConduitDisguiseModel;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IColouredBlock;
 import blusunrize.immersiveengineering.common.items.IEItemInterfaces.IColouredItem;
 import net.minecraft.block.state.IBlockState;
@@ -29,6 +30,12 @@ public class IEDefaultColourHandlers implements IItemColor, IBlockColor
 	@Override
 	public int colorMultiplier(IBlockState state, @Nullable IBlockAccess worldIn, @Nullable BlockPos pos, int tintIndex)
 	{
+		//A ground feeder is drawn with another block's quads, so it has to be tinted with that
+		//block's colours or a feeder buried in a lawn is a grey square in the middle of it. Asked
+		//before the IColouredBlock branch because BlockConduit is one, and answers white.
+		Integer worn = ConduitDisguiseModel.disguiseColour(worldIn, pos, tintIndex);
+		if(worn!=null)
+			return worn;
 		if(state.getBlock() instanceof IColouredBlock)
 			return ((IColouredBlock)state.getBlock()).getRenderColour(state, worldIn, pos, tintIndex);
 		return 0xffffff;

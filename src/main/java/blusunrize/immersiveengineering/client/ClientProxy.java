@@ -36,6 +36,7 @@ import blusunrize.immersiveengineering.client.models.obj.IEOBJLoader;
 import blusunrize.immersiveengineering.client.models.smart.ConnLoader;
 import blusunrize.immersiveengineering.client.models.smart.ConnModelReal;
 import blusunrize.immersiveengineering.client.models.smart.ConnModelReal.ExtBlockstateAdapter;
+import blusunrize.immersiveengineering.client.models.smart.ConduitDisguiseLoader;
 import blusunrize.immersiveengineering.client.models.smart.FeedthroughLoader;
 import blusunrize.immersiveengineering.client.models.smart.FeedthroughModel;
 import blusunrize.immersiveengineering.client.render.*;
@@ -377,6 +378,7 @@ public class ClientProxy extends CommonProxy
 		});
 		ModelLoaderRegistry.registerLoader(new ConnLoader());
 		ModelLoaderRegistry.registerLoader(new FeedthroughLoader());
+		ModelLoaderRegistry.registerLoader(new ConduitDisguiseLoader());
 		ModelLoaderRegistry.registerLoader(new ModelConfigurableSides.Loader());
 		ModelLoaderRegistry.registerLoader(new MultiLayerLoader());
 		ConveyorChute.clientInit();
@@ -871,7 +873,11 @@ public class ClientProxy extends CommonProxy
 								BlockTypes_Conduit.JUNCTION_BOX.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "conduits4"),
 				new ManualPages.Text(ManualHelper.getManual(), "conduits5"),
-				new ManualPages.Text(ManualHelper.getManual(), "conduits6"));
+				new ManualPages.Text(ManualHelper.getManual(), "conduits6"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "conduits7",
+						new ItemStack(IEContent.blockConduit, 1,
+								BlockTypes_Conduit.GROUND_FEEDER.getMeta())),
+				new ManualPages.Text(ManualHelper.getManual(), "conduits8"));
 		//Petroleum. In CAT_ENERGY because the whole chain ends in fuel: everything a player builds
 		//out here is on the way to a diesel generator, a turbine or a firebox, and the chapter only
 		//makes sense read next to those.

@@ -401,6 +401,173 @@ class ConduitAssetsTest
 	}
 
 	@Nested
+	@DisplayName("the ground feeder")
+	class GroundFeeder
+	{
+		/** The one part of its blockstate, which is where the smart model is named. */
+		private String smartModelReference()
+		{
+			JsonArray parts = read("blockstates/conduit_ground_feeder.json").getAsJsonArray("multipart");
+			assertEquals(1, parts.size(), "the feeder should be one unconditional part and no more");
+			JsonObject part = parts.get(0).getAsJsonObject();
+			assertFalse(part.has("when"),
+					"the feeder's only part is conditional, so a feeder would draw as nothing at all");
+			return part.getAsJsonObject("apply").get("model").getAsString();
+		}
+
+		@Test
+		@DisplayName("its blockstate is where the state mapper points")
+		void blockstateExists()
+		{
+			//A third meta means a third custom mapping, and a mapping with no file is silent.
+			assertTrue(new File(ASSETS+"blockstates/conduit_ground_feeder.json").isFile(),
+					"BlockConduit maps the feeder's meta to conduit_ground_feeder, which does not exist");
+		}
+
+		@Test
+		@DisplayName("it is multipart, so it does not have to resolve the property string")
+		void isMultipart()
+		{
+			//Same reason as the junction box: BlockConduit hands every meta facing and six
+			//sideconnection flags, and a `variants` file would need a submap for each or fail to
+			//resolve -- silently, and as a purple block.
+			assertTrue(read("blockstates/conduit_ground_feeder.json").has("multipart"));
+		}
+
+		@Test
+		@DisplayName("the model it names is the one the loader claims")
+		void blockstateAndLoaderAgree()
+		{
+			//	=================================
+			//	The one that matters.
+			//	=================================
+			//
+			// There is deliberately no file behind this reference: ConduitDisguiseLoader claims the
+			// location and builds the model in code. That makes the usual "does the file exist" check
+			// useless here and replaces it with a worse failure mode -- if the loader's path string
+			// and the blockstate's reference ever drift apart, the loader simply never gets asked,
+			// Minecraft looks for a file nobody wrote, and every feeder in the save is purple with
+			// nothing in the log. So the two strings are compared directly.
+			String claimed = grepConstant(
+					"src/main/java/blusunrize/immersiveengineering/client/models/smart/"
+							+"ConduitDisguiseLoader.java",
+					"RESOURCE_LOCATION");
+			assertEquals(claimed+".json", modelPath(smartModelReference()),
+					"the blockstate and ConduitDisguiseLoader disagree about where the smart model "
+							+"lives, so the loader will never be asked for it");
+		}
+
+		@Test
+		@DisplayName("nobody has written a file over the smart model's location")
+		void smartModelHasNoFile()
+		{
+			//The other half of the same trap. A real file at that path would be loaded in preference
+			//to nothing at all and the disguise would quietly stop working, leaving a feeder that is
+			//permanently whatever the file says.
+			assertFalse(new File(ASSETS+modelPath(smartModelReference())).isFile(),
+					"a file now exists where ConduitDisguiseLoader builds the model in code");
+		}
+
+		@Test
+		@DisplayName("its bare model is a whole cube")
+		void bareModelIsAFullCube()
+		{
+			//A feeder is part of a floor: it is solid, it blocks light and things stand on it. A
+			//model smaller than its block would be a visible dent in the ground somebody walked into.
+			JsonObject model = read("models/block/conduit/ground_feeder.json");
+			JsonArray elements = model.getAsJsonArray("elements");
+			assertEquals(1, elements.size());
+			JsonObject box = elements.get(0).getAsJsonObject();
+			for(int i = 0; i < 3; i++)
+			{
+				assertEquals(0, box.getAsJsonArray("from").get(i).getAsInt());
+				assertEquals(16, box.getAsJsonArray("to").get(i).getAsInt());
+			}
+			assertEquals(6, keys(box.getAsJsonObject("faces")).size(),
+					"a feeder can be seen from any side, so all six faces have to be textured");
+		}
+
+		@Test
+		@DisplayName("its texture exists and is not the tube's")
+		void hasItsOwnTexture()
+		{
+			//A bare feeder is a whole block; reusing the tube tile would stretch a thin stripe across
+			//a full cube and read as a texture error rather than as hardware.
+			JsonObject textures = read("models/block/conduit/ground_feeder.json")
+					.getAsJsonObject("textures");
+			String texture = textures.get("feeder").getAsString();
+			assertNotEquals("immersiveengineering:blocks/conduit", texture);
+			assertTrue(new File(ASSETS+"textures/blocks/conduit_ground_feeder.png").isFile());
+		}
+
+		@Test
+		@DisplayName("its item shows the bare cube, not the smart model")
+		void itemVariantExists()
+		{
+			//An item has no surroundings, so there is nothing for a disguise to be. Pointing the item
+			//at the smart model would ask it what a feeder in a player's hand looks like, and the
+			//answer would come back with no tile entity behind it.
+			JsonObject variants = read("blockstates/conduit.json").getAsJsonObject("variants");
+			assertTrue(keys(variants).contains("inventory,type=ground_feeder"),
+					"no inventory variant for the ground feeder; found "+keys(variants));
+			String model = variants.getAsJsonArray("inventory,type=ground_feeder").get(0)
+					.getAsJsonObject().get("model").getAsString();
+			assertTrue(new File(ASSETS+modelPath(model)).isFile(),
+					"the feeder item names a model nobody wrote: "+model);
+		}
+
+		@Test
+		@DisplayName("it has a recipe naming its own meta")
+		void recipeExists()
+		{
+			JsonObject result = read("recipes/conduit/ground_feeder.json").getAsJsonObject("result");
+			assertEquals("immersiveengineering:conduit", result.get("item").getAsString());
+			assertTrue(result.has("data"),
+					"the result does not state a meta, so Forge will drop the recipe");
+			assertEquals(2, result.get("data").getAsInt(),
+					"the recipe makes the wrong meta of conduit");
+		}
+
+		@Test
+		@DisplayName("it has a name, a description and its status message")
+		void langEntriesExist()
+		{
+			String lang = lang();
+			assertTrue(lang.contains("tile.immersiveengineering.conduit.ground_feeder.name="),
+					"an unnamed block shows its translation key in the creative tab");
+			assertTrue(lang.contains("tile.immersiveengineering.conduit.ground_feeder.info="),
+					"JEI would render a blank description page");
+			//Sent when a player hands a pinned feeder back to the survey. A missing key here is a raw
+			//translation string across the middle of the screen.
+			assertTrue(lang.contains("chat.immersiveengineering.info.groundFeeder.auto="));
+		}
+	}
+
+	/**
+	 * Read a {@code public static final String} out of a source file.
+	 * <p>
+	 * Reading the source rather than loading the class, the same way the manual check reads
+	 * ClientProxy: these tests run without Minecraft started, and the classes this needs to compare
+	 * against are client-side model loaders.
+	 */
+	private static String grepConstant(String path, String name)
+	{
+		String source;
+		try
+		{
+			source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
+					java.nio.charset.StandardCharsets.UTF_8);
+		} catch(IOException e)
+		{
+			throw new AssertionError("could not read "+path, e);
+		}
+		java.util.regex.Matcher matcher = java.util.regex.Pattern
+				.compile(name+"\\s*=\\s*\"([^\"]*)\"").matcher(source);
+		assertTrue(matcher.find(), "no constant called "+name+" in "+path);
+		return matcher.group(1);
+	}
+
+	@Nested
 	@DisplayName("the manual chapter")
 	class Manual
 	{

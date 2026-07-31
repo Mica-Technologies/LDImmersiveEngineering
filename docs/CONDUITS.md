@@ -23,6 +23,8 @@ tubing.
    there is no coil and no linking tool.
 4. Right-click a box's face with a **dye**: the conductor of that colour leaves by that face.
 5. Put an **LV / MV / HV Connector** against that face. It picks up that conductor and nothing else.
+6. To get a run through a floor without a box showing, set a **Ground Feeder** into it. It wears
+   whatever is around it.
 
 One length of conduit carries **sixteen** independent conductors, named after the sixteen dyes.
 
@@ -102,6 +104,99 @@ the run off.
 
 ---
 
+## The ground feeder
+
+A junction box is the right way to leave a surface indoors, where it reads as hardware bolted to a
+wall. Outdoors it is wrong twice over: a steel box sitting in a lawn is the most conspicuous object
+for a hundred blocks, and there is no surface to change *to* until the run is already underground.
+
+The **Ground Feeder** is the other answer. It is a whole cube that fills a hole in a floor, a wall or
+the ground, passes a bundle straight through along one axis, and **draws itself as whatever is around
+it**.
+
+### What it wears
+
+Placed, or when its surroundings change, a feeder surveys the twenty-six blocks around it and puts on
+the one it finds most of — but *most of* is scored rather than counted, and that distinction is the
+whole rule.
+
+The obvious implementation gets the single most important case wrong. A feeder set into a grass field
+has eight grass blocks around it at its own level and nine dirt blocks underneath, so a plain count
+wears **dirt, in the middle of a lawn**. The count is not wrong about the numbers; it is wrong about
+which blocks are the surroundings. So a candidate is weighted twice:
+
+| Weighting | Multiplier | Why |
+|---|---|---|
+| The block is **exposed** — some face of it touches something that is not a solid block | ×3 | Buried dirt is not part of what anyone sees. The ring of turf *is* the lawn. |
+| The block **shares a face** with the feeder rather than meeting it at a corner | ×2 | What you touch is a stronger claim than what you nearly touch. |
+
+The lawn then comes out grass, 36 to 10, and a feeder in bedrock still comes out stone, because down
+there the stone is what is exposed to the shaft. `ConduitCamouflage` owns this and takes the world as
+an interface, so the lawn is tested as a lawn drawn out of strings.
+
+**Full opaque cubes only.** A feeder is a cube and always will be, so wearing a fence's model would
+draw a fence with a solid hitbox and wearing a chest's would draw a chest whose lid never opens —
+both worse than the bare block, because both look like a bug rather than a disguise. Anything with a
+tile entity, anything not drawn by an ordinary model, and the conduit block itself are all refused.
+
+**Right-click it with any full block to pin that block instead**; sneak and right-click it
+empty-handed to hand it back to the survey. A pinned feeder stops surveying, because a guess that
+overrules the person who corrected it is not a feature.
+
+**A survey that finds nothing changes nothing.** The survey cannot tell a feeder hanging in open air
+from one whose neighbours are not loaded yet, so "nothing" is never taken as an instruction to
+undress: a feeder keeps its last look until it has something better to put on. Without that, a feeder
+at a chunk edge would come up bare on some loads and not others, and nothing would ever put it back —
+settled terrain never fires another neighbour change. For the same reason a feeder only re-surveys on
+load if it never found anything in the first place.
+
+### What it does to a run
+
+**Nothing, as far as the graph is concerned.** A feeder is never a node in the wire graph, holds no
+energy, has no `update` and does nothing per tick. `ConduitRoute` slides straight through it, so a run
+crossing four feeders is still one `Connection` between the same two junction boxes — four blocks
+longer, and no more expensive. Everything that makes conduit cheap stays true with feeders in it.
+
+It carries the **whole bundle** and splits nothing. A patched face on a box wears a plate in its
+conductor's colour so the box says how it is wired from across the room; hiding a box would throw
+exactly that away and leave a base whose wiring could only be found by digging. If you want a
+conductor out, that is what the box is for, and it stays where you can see it.
+
+Two rules follow from the axis:
+
+- **A run passes through along one axis only.** An Engineer's Hammer turns it. A feeder laid across
+  the grain of a run stops it exactly as a stone block would — and stops it *visibly*, because the
+  conduit draws its arm on the same test the walk uses, so a run halted by a sideways feeder also
+  looks halted.
+- **Crossing a feeder is the one place a run may change surface.** The conduit on the far side still
+  has to have the crossing in its own plane — the same thing a junction box asks — so a feeder
+  licenses a plane change without licensing a conduit facing the wrong way entirely.
+
+### Waking the boxes
+
+A junction box rebuilds its runs when one of its *own* neighbours changes. That covers every gesture
+that finishes a run **at** a box, which is how conduit is normally laid: outward from one box until
+the last length lands against the far one.
+
+Dropping a feeder into a floor with conduit already above and below it is the other gesture — it
+finishes a run in the **middle**, where neither box is anywhere near the block that did it. Before
+this the run would be joined on the wall and absent from the graph until something else happened to
+poke a box or the chunk reloaded, which reads as the feature intermittently not working.
+
+`ConduitRoute.junctionsAround` walks out from a length of run and reports the boxes on it, and
+`TileEntityConduit` calls it whenever its connection mask actually changes. That is once per building
+action and never otherwise. It fixes the same latent case for plain conduit joined in the middle.
+
+### What it does not do
+
+- **Particles are metal, not turf.** The particle texture belongs to the model rather than to a
+  position, so breaking or hitting a feeder shows bare steel whatever it is wearing. Arguably the
+  better failure: it tells somebody who has forgotten where they buried one that they have found it.
+- **The disguise does not survive being picked up.** Break a feeder and it drops a feeder; place it
+  again and it surveys again. A pinned one is one right-click to restore.
+
+---
+
 ## Performance
 
 The claim this whole design rests on: **a bundle must not cost more per tick than the wires it
@@ -146,6 +241,7 @@ Turning the master `cityMode` switch off always restores stock behaviour.
 |---|---|
 | Conduit (×8) | Aluminium plate / copper wire / aluminium plate, in three rows |
 | Junction Box | A conduit surrounded by four aluminium plates |
+| Ground Feeder | A conduit between two aluminium plates, in a column |
 
 ## Configuration
 

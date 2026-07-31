@@ -111,6 +111,11 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 			//dir came out of inPlane(facing), so the step already runs along this conduit's surface:
 			//the same rule ConduitRoute applies from the box's side.
 			return true;
+		//A feeder is the far end of a run too, but only along its own axis. Drawing the arm on that
+		//test and no other is what makes a feeder laid the wrong way round visible: the conduit
+		//stops short of it instead of joining, which is exactly what the run does.
+		if(te instanceof TileEntityGroundFeeder)
+			return ((TileEntityGroundFeeder)te).getAxis()==dir.getAxis();
 		if(!(te instanceof TileEntityConduit))
 			return false;
 		return ConduitGeometry.connects(facing, ((TileEntityConduit)te).facing, dir);
@@ -122,15 +127,46 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		if(world==null||world.isRemote)
 			return;
 		if(refreshConnections())
+		{
 			markContainingBlockForUpdate(null);
+			wakeBoxes();
+		}
 	}
 
 	@Override
 	public void onLoad()
 	{
 		super.onLoad();
+		//No wakeBoxes here: on a chunk load every box on the run runs rebuildRuns from its own
+		//onLoad already, and a hundred conduits each walking the same run to reach the same two
+		//boxes would be a hundred walks to learn what two walks already knew.
 		if(world!=null&&!world.isRemote&&refreshConnections())
 			markContainingBlockForUpdate(null);
+	}
+
+	/**
+	 * Tell every junction box on this run that its shape changed.
+	 * <p>
+	 * A box rebuilds when one of its <em>own</em> neighbours changes, which covers every gesture
+	 * that finishes a run at a box -- lay conduit outward until the last length lands against the
+	 * far box, and that box walks the run and makes the connection. It does not cover finishing a
+	 * run in the <em>middle</em>: joining two half-runs, or dropping a ground feeder into a floor
+	 * with conduit already above and below it. Neither box is anywhere near the block that did it,
+	 * so neither ever hears, and the run is joined on the wall and absent from the graph until
+	 * something else pokes a box or the chunk reloads.
+	 * <p>
+	 * Hung off the connection mask actually changing rather than off every neighbour update, so it
+	 * costs a walk when somebody builds something and nothing at all the rest of the time -- the
+	 * same bargain {@link TileEntityJunctionBox#rebuildRuns} makes.
+	 */
+	private void wakeBoxes()
+	{
+		for(BlockPos box : ConduitRoute.junctionsAround(getPos(), new ConduitWorldProbe(world)))
+		{
+			TileEntity te = Utils.getExistingTileEntity(world, box);
+			if(te instanceof TileEntityJunctionBox)
+				((TileEntityJunctionBox)te).rebuildRuns();
+		}
 	}
 
 	@Override
@@ -202,6 +238,14 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		public boolean isJunctionAt(BlockPos at)
 		{
 			return Utils.getExistingTileEntity(world, at) instanceof TileEntityJunctionBox;
+		}
+
+		@Nullable
+		@Override
+		public EnumFacing.Axis feederAxisAt(BlockPos at)
+		{
+			TileEntity te = Utils.getExistingTileEntity(world, at);
+			return te instanceof TileEntityGroundFeeder?((TileEntityGroundFeeder)te).getAxis(): null;
 		}
 
 		@Override

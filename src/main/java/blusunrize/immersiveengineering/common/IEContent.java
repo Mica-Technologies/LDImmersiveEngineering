@@ -835,6 +835,7 @@ public class IEContent
 		registerTile(TileEntityFluidConsole.class);
 		registerTile(TileEntityConduit.class);
 		registerTile(TileEntityJunctionBox.class);
+		registerTile(TileEntityGroundFeeder.class);
 		registerTile(TileEntityWellhead.class);
 		registerTile(TileEntityDerrick.class);
 		registerTile(TileEntityPumpjack.class);

@@ -38,6 +38,7 @@ class ConduitRouteTest
 	{
 		private final Map<BlockPos, Node> nodes = new HashMap<>();
 		private final Map<BlockPos, EnumFacing> mounts = new HashMap<>();
+		private final Map<BlockPos, EnumFacing.Axis> axes = new HashMap<>();
 		int probes;
 
 		Map3D conduit(int x, int y, int z, EnumFacing mount)
@@ -54,6 +55,14 @@ class ConduitRouteTest
 			return this;
 		}
 
+		Map3D feeder(int x, int y, int z, EnumFacing.Axis axis)
+		{
+			BlockPos pos = new BlockPos(x, y, z);
+			nodes.put(pos, Node.PASS_THROUGH);
+			axes.put(pos, axis);
+			return this;
+		}
+
 		@Override
 		public Node nodeAt(BlockPos pos)
 		{
@@ -66,6 +75,12 @@ class ConduitRouteTest
 		public EnumFacing mountAt(BlockPos pos)
 		{
 			return mounts.get(pos);
+		}
+
+		@Override
+		public EnumFacing.Axis axisAt(BlockPos pos)
+		{
+			return axes.get(pos);
 		}
 	}
 
@@ -318,8 +333,214 @@ class ConduitRouteTest
 				world.conduit(0, 0, z, EnumFacing.DOWN);
 			world.junction(0, 0, ConduitRoute.MAX_NODES+64);
 			assertTrue(from(0, 0, 0).isEmpty(), "a run past the cap should simply not connect");
-			assertTrue(world.probes < ConduitRoute.MAX_NODES*6+64,
+			//Two probes per step rather than one, since feeders arrived: one to slide through
+			//whatever is in the way, and one to look at what the step landed on. The number is a
+			//sanity bound on "proportional to MAX_NODES" rather than an exact count -- the assertion
+			//that actually pins the behaviour is the one above.
+			assertTrue(world.probes < ConduitRoute.MAX_NODES*10,
 					"the walk examined far more than its own bound");
+		}
+	}
+
+	@Nested
+	@DisplayName("ground feeders")
+	class Feeders
+	{
+		/**
+		 * The shape the block exists for: a run comes down a wall, crosses a floor through a feeder,
+		 * and carries on down the wall of the shaft below.
+		 */
+		private void wallRunThroughAFloor(EnumFacing above, EnumFacing below, EnumFacing.Axis axis)
+		{
+			world.junction(0, 5, 0);
+			world.conduit(0, 4, 0, above);
+			world.conduit(0, 3, 0, above);
+			world.feeder(0, 2, 0, axis);
+			world.conduit(0, 1, 0, below);
+			world.conduit(0, 0, 0, below);
+			world.junction(0, -1, 0);
+		}
+
+		@Test
+		@DisplayName("a run crosses a feeder and joins the boxes either side of it")
+		void runCrossesAFeeder()
+		{
+			wallRunThroughAFloor(EnumFacing.NORTH, EnumFacing.NORTH, EnumFacing.Axis.Y);
+			Map<BlockPos, Integer> found = from(0, 5, 0);
+			assertEquals(1, found.size(), "the feeder broke the run instead of passing it through");
+			assertEquals(6, found.get(new BlockPos(0, -1, 0)),
+					"the feeder should count toward the run's length -- it is a block the run goes "
+							+"through, not a teleport");
+		}
+
+		@Test
+		@DisplayName("crossing a feeder is the one place a run may change surface")
+		void feederLicensesAPlaneChange()
+		{
+			//The same run, but the conduit below the floor is clipped to a different wall. Two
+			//conduits meeting like this anywhere else do not join -- see surfaceChangeBreaksTheRun --
+			//and that a feeder makes it legal is the whole reason it can replace a junction box
+			//outdoors.
+			wallRunThroughAFloor(EnumFacing.NORTH, EnumFacing.EAST, EnumFacing.Axis.Y);
+			assertEquals(1, from(0, 5, 0).size(),
+					"a feeder should let a run come out on a different surface");
+		}
+
+		@Test
+		@DisplayName("the far conduit still has to have the crossing in its own plane")
+		void feederDoesNotLicenseAnyMounting()
+		{
+			//A feeder relaxes "same surface", not "on a surface the run can travel". A conduit lying
+			//flat on the floor of the shaft runs horizontally, so a run arriving vertically cannot
+			//continue into it any more than it could into one below a junction box.
+			wallRunThroughAFloor(EnumFacing.NORTH, EnumFacing.DOWN, EnumFacing.Axis.Y);
+			assertTrue(from(0, 5, 0).isEmpty(),
+					"the run continued into a conduit whose surface it cannot travel");
+		}
+
+		@Test
+		@DisplayName("a feeder laid the wrong way round is a wall")
+		void wrongAxisStopsTheRun()
+		{
+			//The failure has to be visible rather than clever: TileEntityConduit draws the arm on
+			//exactly this test, so a run stopped by a sideways feeder also looks stopped.
+			wallRunThroughAFloor(EnumFacing.NORTH, EnumFacing.NORTH, EnumFacing.Axis.X);
+			assertTrue(from(0, 5, 0).isEmpty(), "the run crossed a feeder against its grain");
+		}
+
+		@Test
+		@DisplayName("a feeder beside a run is not part of it")
+		void feederOffTheAxisIsIgnored()
+		{
+			//A floor run passing a feeder set into the floor next to it. The feeder conducts up and
+			//down; the run is going east and west; they have nothing to do with each other.
+			world.junction(2, 2, 0);
+			world.conduit(1, 2, 0, EnumFacing.DOWN);
+			world.feeder(0, 2, 0, EnumFacing.Axis.Y);
+			world.conduit(-1, 2, 0, EnumFacing.DOWN);
+			world.junction(-2, 2, 0);
+			assertTrue(from(2, 2, 0).isEmpty());
+		}
+
+		@Test
+		@DisplayName("a thick floor is several feeders and still one crossing")
+		void stackedFeedersCross()
+		{
+			world.junction(0, 4, 0);
+			world.conduit(0, 3, 0, EnumFacing.NORTH);
+			for(int y = 0; y < 3; y++)
+				world.feeder(0, 2-y, 0, EnumFacing.Axis.Y);
+			world.conduit(0, -1, 0, EnumFacing.NORTH);
+			world.junction(0, -2, 0);
+
+			Map<BlockPos, Integer> found = from(0, 4, 0);
+			assertEquals(1, found.size(), "a two-block floor should not break a run");
+			assertEquals(6, found.get(new BlockPos(0, -2, 0)),
+					"every block the run passes through counts toward its length");
+		}
+
+		@Test
+		@DisplayName("a bored tunnel of feeders stops at the cap")
+		void tooManyStackedFeedersRefuse()
+		{
+			//The cap is there so a feeder cannot be used as a free wire across a mountain. Well past
+			//any floor, and finite.
+			int deep = ConduitRoute.MAX_STACKED_FEEDERS+1;
+			world.junction(0, 1, 0);
+			world.conduit(0, 0, 0, EnumFacing.NORTH);
+			for(int y = 1; y <= deep; y++)
+				world.feeder(0, -y, 0, EnumFacing.Axis.Y);
+			world.conduit(0, -deep-1, 0, EnumFacing.NORTH);
+			world.junction(0, -deep-2, 0);
+			assertTrue(from(0, 1, 0).isEmpty());
+		}
+
+		@Test
+		@DisplayName("a box, a feeder and a box are joined with no conduit at all")
+		void boxFeederBoxJoins()
+		{
+			//A floor with a box either side of it. The feeder is a length of run, so this is a run.
+			world.junction(0, 1, 0);
+			world.feeder(0, 0, 0, EnumFacing.Axis.Y);
+			world.junction(0, -1, 0);
+
+			Map<BlockPos, Integer> found = from(0, 1, 0);
+			assertEquals(1, found.size());
+			assertEquals(2, found.get(new BlockPos(0, -1, 0)));
+		}
+
+		@Test
+		@DisplayName("two boxes touching each other are still not joined")
+		void adjacentBoxesStayApart()
+		{
+			//The rule the case above must not have relaxed. A run ends at the first box it meets, and
+			//a box is not a length of conduit.
+			world.junction(0, 1, 0);
+			world.junction(0, 0, 0);
+			assertTrue(from(0, 1, 0).isEmpty());
+		}
+	}
+
+	@Nested
+	@DisplayName("waking the boxes on a run")
+	class Waking
+	{
+		private java.util.Set<BlockPos> around(int x, int y, int z)
+		{
+			return ConduitRoute.junctionsAround(new BlockPos(x, y, z), world);
+		}
+
+		@Test
+		@DisplayName("a conduit in the middle of a run finds the boxes at both ends")
+		void conduitFindsBothEnds()
+		{
+			//This is what stops a run joined in the middle from being invisible to the graph: neither
+			//box is anywhere near the block that closed it, so the block that closed it has to say so.
+			world.junction(0, 0, 0);
+			for(int z = 1; z <= 5; z++)
+				world.conduit(0, 0, z, EnumFacing.DOWN);
+			world.junction(0, 0, 6);
+
+			assertEquals(2, around(0, 0, 3).size());
+		}
+
+		@Test
+		@DisplayName("a feeder finds the boxes at both ends too")
+		void feederFindsBothEnds()
+		{
+			world.junction(0, 5, 0);
+			world.conduit(0, 4, 0, EnumFacing.NORTH);
+			world.feeder(0, 3, 0, EnumFacing.Axis.Y);
+			world.conduit(0, 2, 0, EnumFacing.NORTH);
+			world.junction(0, 1, 0);
+
+			assertEquals(2, around(0, 3, 0).size(), "dropping this feeder in joins two half-runs, and "
+					+"neither box would otherwise ever hear about it");
+		}
+
+		@Test
+		@DisplayName("it wakes the boxes on this run and not the ones past them")
+		void wakingStopsAtTheFirstBox()
+		{
+			//A box beyond the two ends of this run holds a run of its own that this change cannot
+			//have touched. Waking it would be a walk to discover nothing, and on a corridor with a
+			//box at every corner it would be a walk per box per placement.
+			world.junction(0, 0, 0);
+			world.conduit(0, 0, 1, EnumFacing.DOWN);
+			world.junction(0, 0, 2);
+			world.conduit(0, 0, 3, EnumFacing.DOWN);
+			world.junction(0, 0, 4);
+
+			assertEquals(2, around(0, 0, 1).size());
+			assertFalse(around(0, 0, 1).contains(new BlockPos(0, 0, 4)));
+		}
+
+		@Test
+		@DisplayName("a feeder joined to nothing wakes nothing")
+		void loneFeederWakesNothing()
+		{
+			world.feeder(0, 0, 0, EnumFacing.Axis.Y);
+			assertTrue(around(0, 0, 0).isEmpty());
 		}
 	}
 }

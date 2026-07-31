@@ -58,6 +58,16 @@ public final class ConduitPlacement
 		boolean isJunctionAt(BlockPos pos);
 
 		/**
+		 * @return the axis a ground feeder at that position passes a run along, or null if there is
+		 * no feeder there
+		 */
+		@Nullable
+		default EnumFacing.Axis feederAxisAt(BlockPos pos)
+		{
+			return null;
+		}
+
+		/**
 		 * @return true if a conduit could clip to the block at that position, on the given face --
 		 * that is, whether there is a surface there to mount against at all
 		 */
@@ -98,6 +108,29 @@ public final class ConduitPlacement
 		if(neighbour!=null&&ConduitGeometry.isInPlane(neighbour, clickedSide)
 				&&around.isMountable(placed.offset(neighbour), neighbour.getOpposite()))
 			return neighbour;
+
+		//	=================================
+		//	Starting a run off a ground feeder
+		//	=================================
+		//A feeder has no surface to inherit either, and picking one for itself the way the box rule
+		//does would get the commonest case exactly wrong: clicking the top of a feeder set into a
+		//floor would find the feeder's own top face and lay the new conduit flat on it, in the one
+		//plane that cannot reach the feeder underneath. A run passes through a feeder along the
+		//feeder's axis, so the conduit has to be clipped to a face whose plane contains that axis --
+		//which is to say, a wall.
+		//
+		//isInPlane says exactly that on its own: an end face of the feeder was clicked, so
+		//clickedSide already lies along the feeder's axis, and every face still in the running is
+		//one the run can travel that axis on. Clicking a feeder's *side* is not this gesture at all
+		//-- nothing there is on the pass-through path -- so it falls through to the wall rule below.
+		EnumFacing.Axis axis = around.feederAxisAt(clicked);
+		if(axis!=null&&clickedSide.getAxis()==axis)
+		{
+			for(EnumFacing face : PREFERENCE)
+				if(ConduitGeometry.isInPlane(face, clickedSide)
+						&&around.isMountable(placed.offset(face), face.getOpposite()))
+					return face;
+		}
 
 		//	=================================
 		//	Starting a run off a box

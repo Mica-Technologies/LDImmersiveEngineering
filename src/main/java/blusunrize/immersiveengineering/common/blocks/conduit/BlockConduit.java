@@ -46,15 +46,33 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 				ItemBlockIEBase.class, IEProperties.FACING_ALL,
 				IEProperties.SIDECONNECTION[0], IEProperties.SIDECONNECTION[1],
 				IEProperties.SIDECONNECTION[2], IEProperties.SIDECONNECTION[3],
-				IEProperties.SIDECONNECTION[4], IEProperties.SIDECONNECTION[5]);
+				IEProperties.SIDECONNECTION[4], IEProperties.SIDECONNECTION[5],
+				//Unlisted, and the only way the ground feeder's model can find out what it is
+				//supposed to look like: the disguise lives on the tile entity, not in the state.
+				IEProperties.TILEENTITY_PASSTHROUGH);
 		this.setHardness(2.0F);
 		this.setResistance(10.0F);
 		this.lightOpacity = 0;
 		for(BlockTypes_Conduit type : BlockTypes_Conduit.values())
 		{
+			//The ground feeder is the exception to every line in this loop, because it is the one
+			//meta that is a whole cube: it fills its block, it blocks light, it suffocates, and
+			//neighbouring blocks may cull their faces against it. All of that has to be true or a
+			//feeder set into a floor would be a lit, see-through hole in the shape of a dirt block.
+			if(type==BlockTypes_Conduit.GROUND_FEEDER)
+				continue;
 			this.setNotNormalBlock(type.getMeta());
 			this.setMetaBlockLayer(type.getMeta(), BlockRenderLayer.CUTOUT);
 		}
+		//A feeder wears whatever is around it, and which layer that block draws in is not knowable
+		//until somebody places one -- grass is cutout-mipped, stone is solid. So it offers itself in
+		//all three and the model draws nothing in the layers its disguise does not use. Not
+		//translucent: it can only wear opaque cubes, so that pass would never have anything in it.
+		this.setMetaBlockLayer(BlockTypes_Conduit.GROUND_FEEDER.getMeta(), BlockRenderLayer.SOLID,
+				BlockRenderLayer.CUTOUT_MIPPED, BlockRenderLayer.CUTOUT);
+		//lightOpacity above is set for the whole block and is right for tubing. A feeder is a hole
+		//somebody filled in, so it stops light like the floor it is part of.
+		this.setMetaLightOpacity(BlockTypes_Conduit.GROUND_FEEDER.getMeta(), 255);
 	}
 
 	@Override
@@ -74,8 +92,13 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		//silent causes of a purple block in 1.12, and neither reports an error.
 		if(itemBlock)
 			return null;
-		//The box has an ordinary variants blockstate of its own; only the run needs multipart.
-		return meta==BlockTypes_Conduit.JUNCTION_BOX.getMeta()?"junction_box": "run";
+		//One file per meta. The box and the feeder are drawn by nothing the run's multipart could
+		//express -- one has coloured plates per patched face, the other has no fixed model at all.
+		if(meta==BlockTypes_Conduit.JUNCTION_BOX.getMeta())
+			return "junction_box";
+		if(meta==BlockTypes_Conduit.GROUND_FEEDER.getMeta())
+			return "ground_feeder";
+		return "run";
 	}
 
 	@Override
@@ -150,7 +173,11 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 	@Override
 	public boolean isSideSolid(IBlockState state, IBlockAccess world, BlockPos pos, EnumFacing side)
 	{
-		return false;
+		//A feeder is a whole cube and has to report so: it is part of a floor, things stand on it,
+		//and -- the reason it matters here -- ConduitPlacement asks exactly this question to decide
+		//whether there is a surface for a conduit to clip to. A feeder that answered false would be
+		//a floor with a conduit-shaped hole nothing could be mounted in.
+		return getMetaFromState(state)==BlockTypes_Conduit.GROUND_FEEDER.getMeta();
 	}
 
 	@Override
@@ -162,7 +189,15 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 	@Override
 	public TileEntity createBasicTE(World world, BlockTypes_Conduit type)
 	{
-		return type==BlockTypes_Conduit.JUNCTION_BOX?new TileEntityJunctionBox(): new TileEntityConduit();
+		switch(type)
+		{
+			case JUNCTION_BOX:
+				return new TileEntityJunctionBox();
+			case GROUND_FEEDER:
+				return new TileEntityGroundFeeder();
+			default:
+				return new TileEntityConduit();
+		}
 	}
 
 	@Override

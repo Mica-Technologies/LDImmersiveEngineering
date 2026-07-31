@@ -40,6 +40,7 @@ class ConduitPlacementTest
 	{
 		private final Map<BlockPos, EnumFacing> conduits = new HashMap<>();
 		private final Set<BlockPos> junctions = new HashSet<>();
+		private final Map<BlockPos, EnumFacing.Axis> feeders = new HashMap<>();
 		private final Set<BlockPos> solid = new HashSet<>();
 
 		Map3D conduit(int x, int y, int z, EnumFacing mount)
@@ -51,6 +52,14 @@ class ConduitPlacementTest
 		Map3D junction(int x, int y, int z)
 		{
 			junctions.add(new BlockPos(x, y, z));
+			return this;
+		}
+
+		/** A ground feeder. Unlike the other conduit hardware it is a whole solid cube. */
+		Map3D feeder(int x, int y, int z, EnumFacing.Axis axis)
+		{
+			feeders.put(new BlockPos(x, y, z), axis);
+			solid.add(new BlockPos(x, y, z));
 			return this;
 		}
 
@@ -80,6 +89,12 @@ class ConduitPlacementTest
 		public boolean isJunctionAt(BlockPos pos)
 		{
 			return junctions.contains(pos);
+		}
+
+		@Override
+		public EnumFacing.Axis feederAxisAt(BlockPos pos)
+		{
+			return feeders.get(pos);
 		}
 
 		@Override
@@ -257,6 +272,69 @@ class ConduitPlacementTest
 			//every side non-solid, and the drawn world matches, so there is nothing to mount to.
 			world.junction(0, 5, 0).conduit(0, 4, -1, EnumFacing.DOWN);
 			assertEquals(EnumFacing.SOUTH, place(0, 5, -1, EnumFacing.NORTH));
+		}
+	}
+
+	@Nested
+	@DisplayName("starting a run off a ground feeder")
+	class OffAFeeder
+	{
+		@Test
+		@DisplayName("clicking the top of a feeder in a floor clips the conduit to a wall, not to the feeder")
+		void feederEndFaceFindsAWall()
+		{
+			//	=================================
+			//	The one this branch exists for.
+			//	=================================
+			//
+			// A feeder set into a floor at the foot of a north wall, clicked on its top face. The
+			// naive answer -- and the one the junction box rule would give, since it tries floors
+			// first -- is DOWN: lay the new length flat on the feeder's own lid. That length runs
+			// horizontally, so the step down onto the feeder is off its surface and it cannot reach
+			// the feeder at all. It would look placed and carry nothing.
+			world.floor(0).feeder(0, 0, 0, EnumFacing.Axis.Y).wall(0, 1, -1);
+			assertEquals(EnumFacing.NORTH, place(0, 1, 0, EnumFacing.UP),
+					"the conduit was laid flat on the feeder, in the one plane that cannot reach it");
+		}
+
+		@Test
+		@DisplayName("the same from below, so a run continues down the shaft")
+		void feederBottomFaceFindsAWall()
+		{
+			world.feeder(0, 0, 0, EnumFacing.Axis.Y).wall(0, -1, -1);
+			assertEquals(EnumFacing.NORTH, place(0, -1, 0, EnumFacing.DOWN));
+		}
+
+		@Test
+		@DisplayName("a feeder through a wall is no different, only turned")
+		void horizontalFeederFindsAFloor()
+		{
+			//Axis Z, clicked on its north face. The new length has to be on a surface whose plane
+			//contains Z, and the floor beneath it is the first one the preference order offers.
+			world.feeder(0, 0, 0, EnumFacing.Axis.Z).wall(0, -1, -1);
+			assertEquals(EnumFacing.DOWN, place(0, 0, -1, EnumFacing.NORTH));
+		}
+
+		@Test
+		@DisplayName("clicking a feeder's side is not this gesture at all")
+		void feederSideFallsThroughToTheWallRule()
+		{
+			//Nothing to the side of a vertical feeder is on the pass-through path, so there is no run
+			//to continue and the plain rule stands: clip to the face that was clicked. Getting this
+			//wrong would silently reorient conduit placed against a feeder that is merely in the way.
+			world.floor(0).feeder(0, 1, 0, EnumFacing.Axis.Y).wall(0, 0, -1);
+			assertEquals(EnumFacing.SOUTH, place(0, 1, -1, EnumFacing.NORTH),
+					"clicking the side of a feeder was treated as continuing a run through it");
+		}
+
+		@Test
+		@DisplayName("with no surface anywhere it falls back to the clicked face")
+		void noWallLeavesTheOldAnswer()
+		{
+			//A feeder floating in the air. There is nothing to clip to, so the rule declines rather
+			//than inventing a mounting -- exactly as the box rule does.
+			world.feeder(0, 0, 0, EnumFacing.Axis.Y);
+			assertEquals(EnumFacing.DOWN, place(0, 1, 0, EnumFacing.UP));
 		}
 	}
 }

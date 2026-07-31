@@ -65,6 +65,55 @@ because the same conductor arriving at two connectors is a short.
 A box passes the whole bundle through whatever is patched, so one dropped in to turn a corner or
 change surface needs no configuration at all.
 
+\section{The Ground Feeder}
+
+A junction box is the right way to leave a surface indoors, where it reads as hardware bolted to a
+wall. Out in a field it is a steel box sitting in a lawn, and there is no surface to change
+\emph{to} until the run is already underground.
+
+The \textbf{Ground Feeder} is the other answer: a whole cube that fills a hole in a floor, a wall or
+the ground, passes a bundle straight through along one axis, and \textbf{draws itself as whatever is
+around it}.
+
+\textbf{It looks at what is visible rather than at what is merely nearby.} A feeder set into a grass
+field has eight grass blocks around it and nine dirt blocks underneath, so counting neighbours would
+put dirt in the middle of a lawn. Instead a block scores triple if any face of it can be seen at all,
+and double if it shares a face with the feeder rather than meeting it at a corner. Turf wins on a
+lawn; stone wins in a cellar wall, because down there the stone is what is exposed to the shaft.
+
+Right-click a feeder with any full block to pin that block instead. Sneak and right-click it
+empty-handed to hand it back to the survey.
+
+\begin{ietip}
+It can only wear full, opaque, ordinary cubes. A feeder is a cube and always will be, so wearing a
+fence would draw a fence with a solid hitbox and wearing a chest would draw a chest whose lid never
+opens --- both read as a bug rather than as a disguise.
+\end{ietip}
+
+A run passes through along \textbf{one axis}, which an Engineer's Hammer turns. A feeder laid across
+the grain of a run stops it exactly as a stone block would, and stops it visibly: the conduit does
+not draw its arm into one it cannot enter.
+
+\textbf{Crossing a feeder is the one place a run may change surface without a box.} The conduit on
+the far side still has to have the crossing in its own plane --- the same thing a junction box asks
+--- so a run can come down a north wall and continue down an east one, but it cannot continue into
+conduit lying flat on the floor of the shaft.
+
+\begin{mbplan}{A run leaving a building, seen from the side}{C = conduit on a wall, G = ground
+feeder, J = junction box. The feeder fills the floor; the run crosses it and carries on below.}
+\mblayer{}{J;C;G;C;J}
+\end{mbplan}
+
+A feeder \textbf{splits nothing} --- it carries the whole bundle. A breakout is a thing you should be
+able to see, and a patched box wearing coloured plates is exactly that; hiding one would leave a base
+whose wiring could only be found by digging.
+
+\begin{ietip}
+A feeder is scenery, not hardware. It is never a node in the wire graph, holds no energy and costs
+nothing per tick --- a run crossing four of them is still one connection between the same two boxes,
+four blocks longer.
+\end{ietip}
+
 \section{Redstone channels}
 
 A face set to \textbf{read} puts the signal arriving at it onto its conductor; a face set to

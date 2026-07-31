@@ -13,9 +13,15 @@
 				"model": "immersiveengineering:conduit/junction_box"
 			}
 		],
+		"inventory,type=ground_feeder": [
+			{
+				"model": "immersiveengineering:conduit/ground_feeder"
+			}
+		],
 		"type": {
 			"conduit_run": {},
-			"junction_box": {}
+			"junction_box": {},
+			"ground_feeder": {}
 		}
 	}
 }

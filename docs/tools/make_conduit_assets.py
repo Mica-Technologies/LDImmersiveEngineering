@@ -339,6 +339,75 @@ def build_junction_texture(assets):
     return out
 
 
+def build_ground_feeder(assets):
+    """The ground feeder: a whole cube, and the blockstate that hands it to the smart model.
+
+    Almost nothing is written here, and that is the point.  A feeder in the world is drawn as
+    whatever block is around it -- the quads come from that block's own baked model at render
+    time, so there is no model here to generate for the case anybody will actually see.
+
+    What *is* generated is the bare form: what a feeder wears when it has found nothing to
+    copy, and what the item shows in a creative tab where there are no surroundings at all.
+    A plain steel cube with a port through it, so an undisguised one reads as hardware
+    somebody has yet to bury rather than as a missing texture.
+    """
+    faces = {}
+    for face in FACINGS:
+        faces[face] = {"texture": "#feeder"}
+    write_json(os.path.join(assets, "models", "block", "conduit", "ground_feeder.json"), {
+        "textures": {
+            "feeder": "immersiveengineering:blocks/conduit_ground_feeder",
+            "particle": "immersiveengineering:blocks/conduit_ground_feeder",
+        },
+        "elements": [{"from": [0, 0, 0], "to": [16, 16, 16], "faces": faces}],
+    })
+    # Multipart with a single unconditional part, for the reason the junction box is multipart:
+    # BlockConduit declares facing and six sideconnection flags for every meta, so a `variants`
+    # file would have to carry a submap for each or fail to resolve.  Multipart ignores the
+    # variant string and reads the state.
+    #
+    # The model reference is NOT one of the generated ones.  `smartmodel/conduit_disguise` is
+    # claimed by ConduitDisguiseLoader, which builds the model in code -- there is no file behind
+    # it and there must not be one.
+    write_json(os.path.join(assets, "blockstates", "conduit_ground_feeder.json"), {
+        "multipart": [{
+            "apply": {"model": "immersiveengineering:smartmodel/conduit_disguise"},
+        }],
+    })
+
+
+def build_feeder_texture(assets):
+    """The bare feeder's face: a steel plate with a conduit port through the middle of it.
+
+    The same tile on all six faces, which is right for a block whose whole idea is that a run
+    goes in one side and out the other.  Only ever seen on a feeder that has not found anything
+    to wear yet, or in the creative tab.
+    """
+    img = Image.new("RGBA", (16, 16), CLIP_LIT)
+    px = img.load()
+    rect(px, 0, 0, 15, 15, CLIP_LIT)
+    # A bevel, lit from the top left, so a bare feeder does not read as a flat grey square.
+    rect(px, 0, 0, 15, 0, TUBE_SHADE)
+    rect(px, 0, 0, 0, 15, TUBE_SHADE)
+    rect(px, 0, 15, 15, 15, OUTLINE)
+    rect(px, 15, 0, 15, 15, OUTLINE)
+    for bx, by in ((2, 2), (13, 2), (2, 13), (13, 13)):
+        px[bx, by] = TUBE_LIT
+    # The port: an octagonal hole, with a length of tube sitting in it.  Octagonal rather than
+    # square because a square hole in a square face reads as a panel, not as something passing
+    # through.
+    rect(px, 5, 4, 10, 11, OUTLINE)
+    rect(px, 4, 5, 11, 10, OUTLINE)
+    rect(px, 6, 5, 9, 10, TUBE)
+    rect(px, 5, 6, 10, 9, TUBE)
+    rect(px, 6, 5, 9, 5, TUBE_LIT)
+    rect(px, 6, 10, 9, 10, TUBE_SHADE)
+    out = os.path.join(assets, "textures", "blocks", "conduit_ground_feeder.png")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    img.save(out, "PNG", optimize=True)
+    return out
+
+
 def build_item_blockstate(assets):
     """The item form, in the Forge blockstate format IE looks the item model up through.
 
@@ -357,7 +426,12 @@ def build_item_blockstate(assets):
             "inventory,type=junction_box": [{
                 "model": MODEL_REF % "junction_box",
             }],
-            "type": {"conduit_run": {}, "junction_box": {}},
+            # The item shows the bare cube rather than the smart model: an item has no
+            # surroundings, so there is nothing for a disguise to be.
+            "inventory,type=ground_feeder": [{
+                "model": MODEL_REF % "ground_feeder",
+            }],
+            "type": {"conduit_run": {}, "junction_box": {}, "ground_feeder": {}},
         },
     })
 
@@ -406,10 +480,12 @@ def main():
     models = build_models(args.assets, depth, half)
     parts = build_blockstate(args.assets)
     build_junction_box(args.assets, depth, half)
+    build_ground_feeder(args.assets)
     build_item_blockstate(args.assets)
     texture = build_texture(args.assets, depth)
     build_junction_texture(args.assets)
     build_patch_texture(args.assets)
+    build_feeder_texture(args.assets)
 
     print("depth=%d half_width=%d (read from ConduitBounds.java)" % (depth, half))
     print("wrote %d models, %d blockstate parts" % (len(models), len(parts)))

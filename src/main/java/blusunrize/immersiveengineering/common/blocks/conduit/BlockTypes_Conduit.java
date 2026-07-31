@@ -16,9 +16,6 @@ import java.util.Locale;
 /**
  * Metas of the {@code conduit} block.
  * <p>
- * Only the run itself so far. The junction box that splits a bundle out to coloured stubs is a
- * separate phase and will be a separate meta here.
- * <p>
  * Metas are persisted in world saves, so constants may only be appended.
  *
  * @author LDImmersiveEngineering -- conduits
@@ -32,7 +29,12 @@ public enum BlockTypes_Conduit implements IStringSerializable, BlockIEBase.IBloc
 	/**
 	 * Where a bundle splits. Dye a face and that conductor leaves by it.
 	 */
-	JUNCTION_BOX;
+	JUNCTION_BOX,
+	/**
+	 * A hole through a floor or a wall, wearing whatever is around it. Carries a bundle straight
+	 * through along one axis and splits nothing -- the invisible counterpart to the box.
+	 */
+	GROUND_FEEDER;
 
 	@Override
 	public String getName()

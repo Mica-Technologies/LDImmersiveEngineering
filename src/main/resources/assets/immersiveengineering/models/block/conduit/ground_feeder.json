@@ -1,0 +1,40 @@
+{
+	"textures": {
+		"feeder": "immersiveengineering:blocks/conduit_ground_feeder",
+		"particle": "immersiveengineering:blocks/conduit_ground_feeder"
+	},
+	"elements": [
+		{
+			"from": [
+				0,
+				0,
+				0
+			],
+			"to": [
+				16,
+				16,
+				16
+			],
+			"faces": {
+				"down": {
+					"texture": "#feeder"
+				},
+				"up": {
+					"texture": "#feeder"
+				},
+				"north": {
+					"texture": "#feeder"
+				},
+				"south": {
+					"texture": "#feeder"
+				},
+				"west": {
+					"texture": "#feeder"
+				},
+				"east": {
+					"texture": "#feeder"
+				}
+			}
+		}
+	]
+}
