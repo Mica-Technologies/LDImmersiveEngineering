@@ -10,6 +10,7 @@ package blusunrize.immersiveengineering.client;
 
 import blusunrize.immersiveengineering.api.IEProperties;
 import blusunrize.immersiveengineering.api.Lib;
+import blusunrize.immersiveengineering.api.energy.wires.CatenarySplit;
 import blusunrize.immersiveengineering.api.energy.wires.IImmersiveConnectable;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Connection;
 import blusunrize.immersiveengineering.client.models.SmartLightingQuad;
@@ -1432,17 +1433,11 @@ public class ClientUtils
 			if(rgb[3]==0)
 				rgb[3] = 1;
 			float radius = (float)(conn.cableType.getRenderDiameter()/2);
-			List<Integer> crossings = new ArrayList<>();
-			for(int i = 1; i < f.length; i++)
-				if(crossesChunkBoundary(f[i], f[i-1], conn.start))
-					crossings.add(i);
-			int index = crossings.size()/2;
-			boolean greater = conn.start.compareTo(conn.end) > 0;
-			if(crossings.size()%2==0&&greater)
-				index--;
-			int max = (crossings.size() > 0?
-					(crossings.get(index)+(greater?1: 2)):
-					(greater?f.length+1: 0));
+			//Where this end stops and the other end takes over. Chosen from the two block positions
+			//rather than from the curve drawn here, because the curve drawn here is not necessarily
+			//the curve the far end drew -- see CatenarySplit, which is where the wires-with-holes-in
+			//bug lived.
+			int max = CatenarySplit.drawUpTo(conn.start, conn.end, conn.cableType.getSlack());
 			for(int i = 1; i < max&&i < f.length; i++)
 			{
 				boolean fading = i==max-1;
@@ -1634,18 +1629,15 @@ public class ClientUtils
 			}
 	}
 
+	/**
+	 * @deprecated moved to {@link CatenarySplit#crossesChunkBoundary}, which is world-free and can
+	 * therefore be tested. Kept as a delegate so there is one implementation rather than two that
+	 * can drift.
+	 */
+	@Deprecated
 	public static boolean crossesChunkBoundary(Vec3d start, Vec3d end, BlockPos offset)
 	{
-		if(crossesChunkBorderSingleDim(start.x, end.x, offset.getX()))
-			return true;
-		if(crossesChunkBorderSingleDim(start.y, end.y, offset.getY()))
-			return true;
-		return crossesChunkBorderSingleDim(start.z, end.z, offset.getZ());
-	}
-
-	private static boolean crossesChunkBorderSingleDim(double a, double b, int offset)
-	{
-		return ((int)Math.floor(a+offset)) >> 4!=((int)Math.floor(b+offset)) >> 4;
+		return CatenarySplit.crossesChunkBoundary(start, end, offset);
 	}
 
 	public static void renderQuads(Collection<BakedQuad> quads, float brightness, float red, float green, float blue)

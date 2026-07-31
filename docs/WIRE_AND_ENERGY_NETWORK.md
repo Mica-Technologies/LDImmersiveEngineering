@@ -309,6 +309,52 @@ re-render.
 
 ---
 
+## Wire rendering: the two halves, and where they meet
+
+A wire is drawn **twice**, once from each end, and each half is baked into the chunk section of the
+connector that drew it (`ClientUtils.convertConnectionFromBlockstate`). That is what stops a whole
+wire disappearing when the chunk at one end is culled: each end owns the part of the wire nearest
+itself. The halves meet on a chunk boundary, so that a half whose far end never arrives fades out at
+a chunk edge rather than in mid-air — hence the `fading` alpha on the last segment.
+
+A catenary is always **17 segments regardless of length** (`Connection.vertices`), so on a long run
+each segment covers several blocks.
+
+### The bug this had (fixed 2026-07-31)
+
+**Both ends have to choose the same meeting point, and they used to choose it independently.** Each
+counted the chunk boundaries crossed by the curve *it* had computed and took the middle crossing.
+
+That is only consistent if both ends compute the same curve, and they do not always. Each end builds
+the whole catenary itself, which needs the attachment offset of the connector at **both** ends —
+and `ApiUtils.getVecForIICAt` quietly answers `Vec3d.ZERO` when the tile entity it is asking about is
+not loaded, because `toIIC` bails on `!world.isBlockLoaded`. An end that bakes while the far end's
+chunk is absent therefore computes a curve displaced by about half a block, counts a different
+number of crossings, and picks a different meeting point from the one the far end picked. Everything
+between the two choices was drawn by neither.
+
+The symptom was a long wire with a hole in the middle of it. Nothing logged, nothing to see but
+missing wire, and it appeared to fix itself whenever anything forced the near chunk to bake again —
+because by then the far end had usually loaded. Measured over several thousand endpoint geometries,
+a disagreement cost up to **eight of the seventeen segments**.
+
+**The fix** is `CatenarySplit.drawUpTo`, which chooses the meeting point from the two **block
+positions** and the slack — all of which both ends have exactly and identically — rather than from
+the curve either end drew. The half-block attachment offsets are deliberately left out: they are the
+one input that can differ, and the meeting point does not need to be accurate, only identical. Each
+end still draws its own vertices and simply stops at matching indices, so even when one end has
+guessed an endpoint the two halves still meet. The worst remaining symptom is a wire drawn about
+half a block off until the far end loads.
+
+Using integer positions also keeps the catenary maths off its own degenerate case: the horizontal
+distance is now either zero, which is handled separately, or at least one whole block.
+
+`CatenarySplitTest` sweeps a few thousand geometries and asserts the invariant that matters — **the
+two halves together cover every segment** — and is verified to fail against the old behaviour rather
+than merely agree with the new.
+
+---
+
 ## How to extend
 
 ### Add a new connector tile entity
