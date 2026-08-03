@@ -409,17 +409,13 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 	@Override
 	public int getComparatorInputOverride()
 	{
-		if(device==null||!device.isLinked())
+		if(device==null)
 			return 0;
 		FluidMain main = VirtualFluidNet.INSTANCE.getMain(device.getMain());
-		if(main==null||!main.isOperational())
-			return 0;
-		if(CityMode.petroleum())
-			return main.isPressurised()?15: 0;
-		int cap = device.getTransferCap();
-		if(cap <= 0)
-			return 0;
-		return Math.min(15, (int)Math.ceil(15.0*device.getLastThroughput()/cap));
+		return FluidNetDeviceLogic.comparatorLevel(device.isLinked(),
+				main!=null&&main.isOperational(), CityMode.petroleum(),
+				main!=null&&main.isPressurised(), device.getLastThroughput(),
+				device.getTransferCap());
 	}
 
 	//	=================================
@@ -533,7 +529,7 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 	 */
 	public int getMainColour()
 	{
-		return clientState==STATE_UNLINKED?0xFFFFFF: clientMainColor;
+		return FluidNetDeviceLogic.mainColour(clientState==STATE_UNLINKED, clientMainColor);
 	}
 
 	public int getClientState()

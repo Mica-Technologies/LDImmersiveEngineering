@@ -442,7 +442,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	private int credit(WireChannel channel, int amount)
 	{
 		int index = channel.ordinal();
-		int taken = Math.max(0, Math.min(CHANNEL_CAPACITY-held[index], amount));
+		int taken = JunctionBoxLogic.credit(held[index], amount, CHANNEL_CAPACITY);
 		if(taken <= 0)
 			return 0;
 		held[index] += taken;
@@ -507,12 +507,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	{
 		//The busiest conductor, not the total: a bundle where one channel is saturated and fifteen
 		//are idle is a bundle with a problem, and an average would hide it.
-		int busiest = 0;
-		for(int value : held)
-			busiest = Math.max(busiest, value);
-		if(busiest <= 0)
-			return 0;
-		return Math.max(1, Math.min(15, busiest*15/CHANNEL_CAPACITY));
+		return JunctionBoxLogic.comparatorLevel(held, CHANNEL_CAPACITY);
 	}
 
 	@Override
@@ -610,16 +605,19 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(world==null||world.isRemote)
 			return;
 		List<TileEntityJunctionBox> run = boxesOnRun();
-		int[] strongest = new int[WireChannel.VALUES.length];
+		//Gathered first, resolved second: the "strongest wins per channel" rule lives in
+		//JunctionBoxLogic so it can be asserted without a run of real boxes to drive it.
+		List<int[]> inputs = new ArrayList<>();
 		for(TileEntityJunctionBox box : run)
 			for(EnumFacing face : EnumFacing.VALUES)
 			{
 				WireChannel channel = box.patch.get(face);
 				if(channel==null||box.patch.modeOf(face)!=ConduitPatch.Mode.REDSTONE_IN)
 					continue;
-				int index = channel.ordinal();
-				strongest[index] = Math.max(strongest[index], box.readInput(face));
+				inputs.add(new int[]{channel.ordinal(), box.readInput(face)});
 			}
+		int[] strongest = JunctionBoxLogic.strongestPerChannel(WireChannel.VALUES.length,
+				inputs.toArray(new int[0][]));
 		for(TileEntityJunctionBox box : run)
 			box.applySignals(strongest);
 	}

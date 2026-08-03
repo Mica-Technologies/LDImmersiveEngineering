@@ -62,11 +62,40 @@ public final class BlockEnumTestSupport
 	 */
 	public static <E extends Enum<E> & IBlockEnum> void assertFitsInBlockMetadata(E[] values)
 	{
+		//The message says what to do instead, because the person who trips this is mid-way through
+		//adding a block and the obvious next move -- deleting something to make room -- is the one
+		//that corrupts every existing world.
 		assertTrue(values.length <= MAX_META,
-				"enum has "+values.length+" constants but block metadata only holds "+MAX_META);
+				"this enum has "+values.length+" constants but block metadata is four bits, so only "
+						+MAX_META+" fit. The new one cannot be placed, saved or read back. Give it its "
+						+"own block instead, the way the Grid Management Console became "
+						+"grid_multiblock when metal_multiblock filled up -- and do NOT remove a "
+						+"constant to make room unless it is the last one, because renumbering the "
+						+"rest silently turns already-placed blocks into other blocks.");
 		for(E value : values)
 			assertTrue(value.getMeta() < MAX_META,
 					value.name()+" has meta "+value.getMeta()+", which does not fit in four bits");
+	}
+
+	/**
+	 * Reports how many metadata values an enum has left, so a nearly-full one is visible before
+	 * somebody tries to add to it rather than after.
+	 *
+	 * @return spare slots, 0 when the enum is exactly full
+	 */
+	public static <E extends Enum<E> & IBlockEnum> int headroom(E[] values)
+	{
+		return Math.max(0, MAX_META-values.length);
+	}
+
+	/**
+	 * As {@link #headroom(Enum[])}, for a caller holding the enums as plain {@link IBlockEnum}
+	 * arrays -- which is how a test that walks <em>every</em> block enum at once has to hold them,
+	 * since they share no common enum type.
+	 */
+	public static int headroom(IBlockEnum[] values)
+	{
+		return Math.max(0, MAX_META-values.length);
 	}
 
 	/**
