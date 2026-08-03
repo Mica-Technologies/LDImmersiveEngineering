@@ -22,7 +22,7 @@ would make every sentence about either one ambiguous.
 | **V** | Work the attachment |
 | **Sneak + V** | Tip the bucket out |
 | **G** | Change attachment |
-| **Sneak + right-click, holding a hammer** | Take the machine away again |
+| **Sneak + right-click, holding a hammer** | Take the machine away again — its diesel comes with it |
 | **Right-click with a can of diesel** | Refuel |
 
 **Turning your head slews the house.** The operator cannot look around independently of the
@@ -89,6 +89,20 @@ costs, and driving about is nearly free by comparison.
 somebody is run dry mid-demolition, hundreds of blocks from home, in a thing that cannot be pushed
 and cannot be picked up without a hammer. The last four hundred millibuckets are for driving back.
 
+**Only a container with fuel in it counts as refuelling.** An empty one is let through to the seat.
+The obvious guard — `Utils.interactWithTank`, which every tank *block* in this fork uses — spends
+the click for anything that merely *is* a container, and on a machine you climb into that meant
+holding an empty bucket made the Crawler silently refuse to open. Draining fuel back out by hand is
+deliberately not offered either: it would siphon a bucket out of a fuelled machine when somebody
+meant to get in. Dismantling is how you get diesel back, and it hands over the lot.
+
+**The fuel level and the bucket's load are both synced parameters, not fields.** An entity's
+`FluidTank` and `ItemStackHandler` are ordinary fields: they go to disk and never to a client, so
+the panel — which is drawn client-side off `getRidingEntity()` — read its own empty copies and
+reported an empty tank on a full machine. Both now mirror into `DataParameter`s from
+`onContentsChanged`, with the NBT paths topped up by hand because neither `FluidTank.readFromNBT`
+nor `ItemStackHandler.deserializeNBT` fires that hook.
+
 ---
 
 ## How it is put together
@@ -106,6 +120,14 @@ and cannot be picked up without a hammer. The last four hundred millibuckets are
 | The operator's panel | `client/gui/CrawlerHud.java` |
 | Control input | `common/util/network/MessageCrawlerInput.java` |
 | Textures, generated | `docs/tools/make_crawler_textures.py` |
+| The in-game manual chapter | `ie.manual.entry.crawler0`–`crawler4`, registered in `ClientProxy` |
+
+**The manual chapter is not decoration.** This machine has six keybinds, two sneak gestures, three
+attachments, a fuel it will not substitute and a reserve that stops the tool but not the tracks —
+none of it guessable. All of it lived only in this file, which no player opens, so the chapter sits
+next to the Excavator's in `CAT_HEAVYMACHINES`: they are the two things in the mod that dig, they
+are constantly confused by name, and a reader who has just met one is exactly the reader who needs
+telling it is not the other.
 
 ### Decisions worth not re-litigating
 

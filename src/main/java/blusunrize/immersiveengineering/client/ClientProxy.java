@@ -1175,6 +1175,22 @@ public class ClientProxy extends CommonProxy
 				new ManualPageMultiblock(ManualHelper.getManual(), "", MultiblockExcavatorDemo.instance),
 				new ManualPages.Text(ManualHelper.getManual(), "excavator1"));
 
+		//The Hydraulic Crawler. Deliberately filed next to the Excavator: they are the two things in
+		//this mod that dig, they are constantly confused for one another by name, and a reader who
+		//has just met one is exactly the reader who needs to be told it is not the other.
+		//
+		//This chapter is not decoration. The machine has six keybinds, two sneak gestures, three
+		//attachments, a fuel it will not substitute and a reserve that stops the tool but not the
+		//tracks -- none of which is guessable, and all of which lived only in docs/CRAWLER.md, a
+		//file no player opens.
+		ManualHelper.addEntry("crawler", ManualHelper.CAT_HEAVYMACHINES,
+				new ManualPages.Crafting(ManualHelper.getManual(), "crawler0",
+						new ItemStack(IEContent.itemHydraulicCrawler)),
+				new ManualPages.Text(ManualHelper.getManual(), "crawler1"),
+				new ManualPages.Text(ManualHelper.getManual(), "crawler2"),
+				new ManualPages.Text(ManualHelper.getManual(), "crawler3"),
+				new ManualPages.Text(ManualHelper.getManual(), "crawler4"));
+
 
 		ClientCommandHandler.instance.registerCommand(new CommandHandler(true));
 	}

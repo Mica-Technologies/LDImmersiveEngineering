@@ -9,7 +9,6 @@
 package blusunrize.immersiveengineering.common.blocks.metal;
 
 import blusunrize.immersiveengineering.common.blocks.BlockEnumTestSupport;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,7 +40,6 @@ class BlockTypesMetalMultiblockTest
 	}
 
 	@Test
-	@Disabled("a 17th constant was added to an enum that already filled all 16 metadata values")
 	@DisplayName("every variant still addresses a legal block metadata value")
 	void fitsInBlockMetadata()
 	{

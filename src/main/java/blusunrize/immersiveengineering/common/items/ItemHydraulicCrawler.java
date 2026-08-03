@@ -8,7 +8,10 @@
 
 package blusunrize.immersiveengineering.common.items;
 
+import blusunrize.immersiveengineering.common.entities.CrawlerConfig;
 import blusunrize.immersiveengineering.common.entities.EntityHydraulicCrawler;
+import net.minecraft.client.resources.I18n;
+import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumActionResult;
@@ -18,6 +21,11 @@ import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
+
+import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * The Hydraulic Crawler, folded up small enough to carry.
@@ -63,12 +71,33 @@ public class ItemHydraulicCrawler extends ItemIEBase
 			return EnumActionResult.FAIL;
 		}
 
+		//Before it is spawned, so the machine is never briefly in the world with a tank the item
+		//was still holding -- and so the first sync a client sees already has the right level on it.
+		crawler.readFuelFromItem(player.getHeldItem(hand));
 		world.spawnEntity(crawler);
 		world.playSound(null, at, net.minecraft.init.SoundEvents.BLOCK_ANVIL_PLACE,
 				SoundCategory.NEUTRAL, 0.7F, 0.7F);
 		if(!player.capabilities.isCreativeMode)
 			player.getHeldItem(hand).shrink(1);
 		return EnumActionResult.SUCCESS;
+	}
+
+	/**
+	 * Say how much diesel it is carrying.
+	 * <p>
+	 * Because a dismantled machine keeps its fuel, and fuel you cannot see is fuel you assume is
+	 * gone -- which is the complaint the tag was added to answer, not a new one to introduce.
+	 */
+	@Override
+	@SideOnly(Side.CLIENT)
+	public void addInformation(ItemStack stack, @Nullable World world, List<String> tooltip,
+							   ITooltipFlag flag)
+	{
+		super.addInformation(stack, world, tooltip, flag);
+		int fuel = EntityHydraulicCrawler.fuelOnItem(stack);
+		if(fuel > 0)
+			tooltip.add(I18n.format("desc.immersiveengineering.info.crawlerFuel", fuel,
+					CrawlerConfig.fuelCapacity));
 	}
 
 	/**

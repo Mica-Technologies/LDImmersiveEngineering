@@ -26,7 +26,9 @@ import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTank;
+import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
+import net.minecraftforge.fluids.capability.IFluidHandlerItem;
 import net.minecraftforge.items.CapabilityItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import net.minecraft.entity.Entity;
@@ -100,7 +102,19 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 * conveyor can unload the machine where somebody has built for that, and the sneak gesture is for
 	 * everywhere else.
 	 */
-	private final ItemStackHandler inventory = new ItemStackHandler(9);
+	private final ItemStackHandler inventory = new ItemStackHandler(9)
+	{
+		/**
+		 * Mirror the fill to the client, for the same reason the tank does: an entity's item handler
+		 * is an ordinary field and never reaches a client, so a panel reading it off the ridden
+		 * entity would read its own empty copy and report an empty bucket on a full machine.
+		 */
+		@Override
+		protected void onContentsChanged(int slot)
+		{
+			syncBucket();
+		}
+	};
 
 	/**
 	 * The fuel tank. Diesel and nothing else.
@@ -116,9 +130,53 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		public boolean canFillFluidType(FluidStack incoming)
 		{
 			return incoming!=null&&incoming.getFluid()!=null
-					&&"ie_diesel".equals(incoming.getFluid().getName());
+					&&FUEL_FLUID.equals(incoming.getFluid().getName());
+		}
+
+		/**
+		 * The one hook every path through a tank passes: filling by hand, filling through the
+		 * capability, and burning. Mirroring the level here rather than at each call site is what
+		 * stops a pipe-fed machine having a gauge that only moves when somebody uses a bucket.
+		 */
+		@Override
+		protected void onContentsChanged()
+		{
+			syncFuel();
 		}
 	};
+
+	/** The only thing it burns. Named once, because the tank guard and the refusal message must agree. */
+	public static final String FUEL_FLUID = "ie_diesel";
+
+	/** Where a dismantled machine's diesel rides on the item until it is put down again. */
+	public static final String TAG_FUEL = "fuel";
+
+	/**
+	 * Take the fuel off the item this machine was just placed from.
+	 * <p>
+	 * The other half of {@code dismantle}: without it the tag would be written, carried and then
+	 * quietly dropped, which is the same lost diesel by a longer route.
+	 */
+	public void readFuelFromItem(ItemStack stack)
+	{
+		NBTTagCompound tag = stack.getTagCompound();
+		if(tag==null||!tag.hasKey(TAG_FUEL))
+			return;
+		fuel.readFromNBT(tag.getCompoundTag(TAG_FUEL));
+		syncFuel();
+	}
+
+	/**
+	 * @return how much diesel an undeployed machine is carrying, for the item's tooltip
+	 */
+	public static int fuelOnItem(ItemStack stack)
+	{
+		NBTTagCompound tag = stack.getTagCompound();
+		if(tag==null||!tag.hasKey(TAG_FUEL))
+			return 0;
+		FluidStack held = FluidStack.loadFluidStackFromNBT(tag.getCompoundTag(TAG_FUEL));
+		return held==null?0: held.amount;
+	}
 
 	/**
 	 * What the Grapple has hold of: a block state id, or the id of an entity, or neither.
@@ -171,6 +229,25 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	/** How far the arm is extended, in model units. The second aiming axis. */
 	private static final DataParameter<Float> EXTENSION = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
+	/**
+	 * How much diesel is aboard, in millibuckets.
+	 * <p>
+	 * <strong>Synced, because the panel is drawn on the client and the tank is not.</strong> An
+	 * entity's {@code FluidTank} is an ordinary field: it goes to disk and it never goes to a
+	 * client, so a HUD reading it off {@code getRidingEntity()} reads the client's own copy, which
+	 * nothing has ever filled. The gauge therefore sat at zero on a full machine and the panel said
+	 * NO FUEL to every operator -- which is exactly the message the trigger was taught to stop
+	 * giving falsely, arriving instead from the one readout that was meant to explain it.
+	 * <p>
+	 * The tank stays the authority; this only mirrors it. {@link #syncFuel()} is called wherever the
+	 * amount can change, rather than every tick, because {@code EntityDataManager} only sends a
+	 * parameter whose value actually differs.
+	 */
+	private static final DataParameter<Integer> FUEL = EntityDataManager
+			.createKey(EntityHydraulicCrawler.class, DataSerializers.VARINT);
+	/** How many of the bucket's nine slots hold something. Synced for the panel, same as the fuel. */
+	private static final DataParameter<Byte> BUCKET = EntityDataManager
+			.createKey(EntityHydraulicCrawler.class, DataSerializers.BYTE);
 
 	/**
 	 * The pose the arm sits in with nobody aiming it -- folded in, the way a machine is left at the
@@ -344,6 +421,21 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 				//would kill whoever was driving it the first time they used it.
 				if(hit==rider||hit instanceof EntityCrawlerPart||hit==this)
 					continue;
+				//	=================================
+				//	Only things that can be hurt.
+				//	=================================
+				//
+				// A boom sweeping through a pile of cobble does not delete it, and this did. An
+				// EntityItem has five health against six damage, so one touch destroyed a whole
+				// stack -- and its attackEntityFrom returns false whatever happens, so the cooldown
+				// below never engaged and every item in reach died on every tick the arm moved.
+				//
+				// The Breaker drops its rubble at the tool tip, which is the middle of the very
+				// hitbox doing the sweeping, so the machine ate its own spoil. It only fired while
+				// the arm was moving, which is what made it read as random loss rather than as this.
+				// XP orbs went the same way.
+				if(!(hit instanceof EntityLivingBase))
+					continue;
 				if(hit.attackEntityFrom(IEDamageSources.crawlerArm, CONTACT_DAMAGE))
 					contactCooldown = CONTACT_COOLDOWN;
 			}
@@ -361,6 +453,35 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		dataManager.register(AIM, 0F);
 		dataManager.register(ATTACHMENT, (byte)CrawlerAttachment.BUCKET.ordinal());
 		dataManager.register(EXTENSION, (float)CrawlerArm.REACH);
+		dataManager.register(FUEL, 0);
+		dataManager.register(BUCKET, (byte)0);
+	}
+
+	/** @see #syncFuel() */
+	private void syncBucket()
+	{
+		if(world!=null&&!world.isRemote)
+		{
+			int used = 0;
+			for(int slot = 0; slot < inventory.getSlots(); slot++)
+				if(!inventory.getStackInSlot(slot).isEmpty())
+					used++;
+			dataManager.set(BUCKET, (byte)used);
+		}
+	}
+
+	/**
+	 * Push the tank's level out to whoever is watching.
+	 * <p>
+	 * Called from every place the amount can move -- burning it, filling it, loading it off disk --
+	 * rather than from {@link #onUpdate}. Idle costs nothing either way, since the data manager
+	 * suppresses a write that does not change the value, but doing it at the source means a tank
+	 * filled by a pipe capability is covered as well as one filled by hand.
+	 */
+	private void syncFuel()
+	{
+		if(!world.isRemote)
+			dataManager.set(FUEL, fuel.getFluidAmount());
 	}
 
 	public float getArmReach()
@@ -468,15 +589,80 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		//would make the two a coin toss.
 		if(player.isSneaking())
 			return dismantle(player, hand);
-		//A can of diesel refuels it rather than mounting it. Through Utils.interactWithTank, which is
-		//the same guard every tank in this fork now uses: a container that moves nothing still spends
-		//the click, or a bucket of the wrong fluid empties itself onto the machine instead.
-		if(Utils.interactWithTank(player, hand, fuel))
+		//A can of diesel refuels it rather than mounting it.
+		if(refuel(player, hand))
 			return true;
 		if(!world.isRemote&&getControllingPassenger()==null)
 			player.startRiding(this);
 		//True on both sides regardless, or the click falls through to the held item and the operator
 		//places a block against the machine they were trying to get into.
+		return true;
+	}
+
+	/**
+	 * Try to move diesel between the operator's container and the tank.
+	 * <p>
+	 * <strong>An empty container must not block the door.</strong> The obvious guard --
+	 * {@code Utils.interactWithTank}, which every tank block in this fork uses -- spends the click
+	 * for anything that <em>is</em> a container, whether or not a drop moved, and it discards
+	 * {@code interactWithFluidHandler}'s answer to do it. On a block that is right: the click had
+	 * nowhere else to go. On a machine you climb into it is not, because the click had somewhere
+	 * very obvious to go, and the result was that holding an empty bucket -- or a water bucket, or
+	 * any of the fork's seventeen fluids -- made the Crawler silently refuse to open. Nothing
+	 * happened, nothing was said, and the machine read as broken.
+	 * <p>
+	 * So the answer is used, and only a container with fluid in it is treated as an attempt to
+	 * refuel at all. What is kept from the original guard is the half that mattered: such a
+	 * container still spends the click even when refused, because falling through reaches
+	 * {@code ItemBucket.onItemRightClick}, which ray traces past the machine and pours the fluid
+	 * onto the ground behind it. That is the defect the guard was written for, and it only ever
+	 * applied to a full container.
+	 *
+	 * @return true if the click is spent and the machine should not be mounted
+	 */
+	private boolean refuel(EntityPlayer player, EnumHand hand)
+	{
+		ItemStack held = player.getHeldItem(hand);
+		if(held.isEmpty())
+			return false;
+		//Against a copy, so asking what is in it cannot empty it.
+		IFluidHandlerItem container = FluidUtil.getFluidHandler(held.copy());
+		if(container==null)
+			return false;
+
+		//	=================================
+		//	Filling only, never emptying.
+		//	=================================
+		//
+		// An empty container is not an attempt to refuel, it is somebody walking up to their machine
+		// holding a bucket. Letting the generic exchange run would siphon a bucket of diesel out of
+		// a fuelled Crawler instead of opening the door -- which is the same "the machine will not
+		// let me in" complaint as before, just narrower and harder to explain.
+		//
+		// Nothing is lost by refusing to drain: a dismantled machine now hands its diesel back with
+		// the item, so there is a way to recover fuel, and it is a deliberate gesture rather than an
+		// accident of what was in your hand.
+		FluidStack offered = container.drain(Integer.MAX_VALUE, false);
+		if(offered==null||offered.amount <= 0)
+			return false;
+
+		//Anything that actually moved needs nothing said about it: the gauge is the feedback.
+		if(FluidUtil.interactWithFluidHandler(player, hand, fuel))
+			return true;
+
+		//Refused, and said so. Which of the two reasons it is matters: "wrong fuel" on a machine
+		//whose tank is simply full would send somebody looking for the wrong problem.
+		//
+		// The click is still spent, and that half of the original guard is the half worth keeping:
+		// falling through reaches ItemBucket.onItemRightClick, which ray traces past the machine and
+		// pours the fluid onto the ground behind it.
+		if(!world.isRemote)
+		{
+			boolean rightFluid = offered.getFluid()!=null
+					&&FUEL_FLUID.equals(offered.getFluid().getName());
+			ChatUtils.sendServerNoSpamMessages(player, new TextComponentTranslation(
+					Lib.CHAT_INFO+(rightFluid?"crawlerTankFull": "crawlerWrongFuel")));
+		}
 		return true;
 	}
 
@@ -503,7 +689,29 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 					entityDropItem(held, 0.5F);
 			}
 			if(!player.capabilities.isCreativeMode)
-				entityDropItem(new ItemStack(IEContent.itemHydraulicCrawler), 0.5F);
+			{
+				//	=================================
+				//	The diesel travels with the machine.
+				//	=================================
+				//
+				// It used to be destroyed in silence: a machine dismantled with seven buckets
+				// aboard gave back the item and nothing else, and said nothing about the rest.
+				//
+				// On the item rather than poured out as cans, because there is no can -- the fork
+				// has no portable diesel container to pour it into, and inventing one to solve a
+				// dismantle would be the tail wagging the dog. The objection that sank doing this
+				// for the *bucket's* contents does not apply here: that was nine slots of arbitrary
+				// items, easy to lose track of and worth duplicating; this is one number that a
+				// player already expects a vehicle to keep.
+				ItemStack machine = new ItemStack(IEContent.itemHydraulicCrawler);
+				if(fuel.getFluidAmount() > 0)
+				{
+					NBTTagCompound tag = new NBTTagCompound();
+					tag.setTag(TAG_FUEL, fuel.writeToNBT(new NBTTagCompound()));
+					machine.setTagCompound(tag);
+				}
+				entityDropItem(machine, 0.5F);
+			}
 			world.playSound(null, posX, posY, posZ, net.minecraft.init.SoundEvents.BLOCK_ANVIL_LAND,
 					SoundCategory.NEUTRAL, 0.6F, 0.8F);
 			setDead();
@@ -581,6 +789,11 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 
 		if(!world.isRemote)
 		{
+			//Counted down here rather than inside workAttachment, which only runs while the trigger
+			//is held: a cooldown that only expired while working stayed latched the moment somebody
+			//let go, so the next press waited out a delay it had already served.
+			if(breakCooldown > 0)
+				breakCooldown--;
 			followOperatorsView();
 			drive();
 		}
@@ -695,10 +908,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	private void workAttachment(Entity rider)
 	{
 		if(breakCooldown > 0)
-		{
-			breakCooldown--;
 			return;
-		}
 		//Sneak and pull the trigger to tip the bucket out. Checked before anything else, so a full
 		//bucket can always be emptied even while the tool is buried in something.
 		if(rider.isSneaking())
@@ -726,7 +936,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		// this machine can do to somebody is run dry mid-demolition, hundreds of blocks from home, in a
 		// thing that cannot be pushed and cannot be picked up without a hammer. The reserve is enough
 		// to drive back with.
-		if(!CrawlerConfig.canWork(fuel.getFluidAmount()))
+		if(!hasWorkingFuel())
 		{
 			//	=================================
 			//	Empty and low are different problems.
@@ -740,7 +950,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			if(rider instanceof EntityPlayer)
 				ChatUtils.sendServerNoSpamMessages((EntityPlayer)rider,
 						new TextComponentTranslation(Lib.CHAT_INFO
-								+(CrawlerConfig.isDry(fuel.getFluidAmount())?"crawlerNoFuel"
+								+(CrawlerConfig.isDry(getFuel())?"crawlerNoFuel"
 								: "crawlerReserve")));
 			return;
 		}
@@ -856,9 +1066,15 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		fuel.drainInternal(amount, true);
 	}
 
+	/**
+	 * @return millibuckets aboard -- off the tank on the server, off the synced mirror on the client
+	 * <p>
+	 * Both, rather than always the mirror, so server-side logic keeps reading the authority and
+	 * cannot be made wrong by a sync that has not gone out yet within the same tick.
+	 */
 	public int getFuel()
 	{
-		return fuel.getFluidAmount();
+		return world.isRemote?dataManager.get(FUEL): fuel.getFluidAmount();
 	}
 
 	public int getFuelCapacity()
@@ -871,7 +1087,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 */
 	public boolean hasWorkingFuel()
 	{
-		return CrawlerConfig.canWork(fuel.getFluidAmount());
+		return CrawlerConfig.canWork(getFuel());
 	}
 
 	//	=================================
@@ -1022,11 +1238,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 */
 	public int getBucketFill()
 	{
-		int used = 0;
-		for(int slot = 0; slot < inventory.getSlots(); slot++)
-			if(!inventory.getStackInSlot(slot).isEmpty())
-				used++;
-		return used;
+		return dataManager.get(BUCKET);
 	}
 
 	public int getBucketSize()
@@ -1104,8 +1316,15 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		setAttachment(CrawlerAttachment.byOrdinal(nbt.getByte("attachment")));
 		if(nbt.hasKey("inventory"))
 			inventory.deserializeNBT(nbt.getCompoundTag("inventory"));
+		//deserializeNBT replaces the stacks wholesale without firing onContentsChanged, so the
+		//mirror is set by hand -- the same gap FluidTank.readFromNBT leaves.
+		syncBucket();
 		carriedState = nbt.getInteger("carried");
 		fuel.readFromNBT(nbt.getCompoundTag("fuel"));
+		//FluidTank.readFromNBT is the one path that does not fire onContentsChanged, so the mirror
+		//is set by hand here. Without it a machine that came off disk full would show an empty gauge
+		//until the first millibucket was burnt.
+		syncFuel();
 	}
 
 	@Override

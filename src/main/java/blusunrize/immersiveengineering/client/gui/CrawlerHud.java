@@ -88,9 +88,14 @@ public class CrawlerHud
 		//The gauge labels set where every track starts, so they are measured too -- otherwise a
 		//translation with a longer word for "fuel" pushes its own track off the end of the panel.
 		LABEL_WIDTH = 4;
-		for(String key : new String[]{"gaugeArm", "gaugeReach", "gaugeFuel", "noFuel", "reserve"})
+		for(String key : new String[]{"gaugeArm", "gaugeReach", "gaugeFuel", "noFuel", "reserve",
+				"gaugeBucket", "bucketFull"})
 			LABEL_WIDTH = Math.max(LABEL_WIDTH,
 					font.getStringWidth(I18n.format("gui.immersiveengineering.crawler."+key))+4);
+
+		//Only when the Bucket is fitted: the Breaker drops everything and the Grapple carries nothing,
+		//so on those two a load gauge would be a row that never moved.
+		boolean showBucket = crawler.getAttachment().keepsDrops();
 
 		int content = font.getStringWidth(title)+MARGIN+font.getStringWidth(tool);
 		for(String line : legend)
@@ -99,7 +104,8 @@ public class CrawlerHud
 		//otherwise leave three pixels of track.
 		content = Math.max(content, LABEL_WIDTH+60);
 		int width = content+MARGIN*2;
-		int height = MARGIN+LINE+3*LINE+legend.size()*LINE+MARGIN;
+		int gauges = showBucket?4: 3;
+		int height = MARGIN+LINE+gauges*LINE+legend.size()*LINE+MARGIN;
 
 		int left = MARGIN;
 		//Anchored to the bottom left: the hotbar owns the bottom centre and status effects the top
@@ -123,6 +129,11 @@ public class CrawlerHud
 		y += LINE;
 		drawFuelGauge(crawler, left+MARGIN, y, gaugeWidth);
 		y += LINE;
+		if(showBucket)
+		{
+			drawBucketGauge(crawler, left+MARGIN, y, gaugeWidth);
+			y += LINE;
+		}
 
 		for(String line : legend)
 		{
@@ -151,6 +162,11 @@ public class CrawlerHud
 		lines.add(I18n.format("gui.immersiveengineering.crawler.legendTool",
 				ClientProxy.keybind_crawlerAction.getDisplayName(),
 				ClientProxy.keybind_crawlerSwap.getDisplayName()));
+		//The one gesture nothing else could tell you. There is no window on the bucket and no other
+		//way to unload it by hand, so an operator who has not been told this has a machine that
+		//fills up and then starts dropping its spoil on the floor for no reason they can see.
+		lines.add(I18n.format("gui.immersiveengineering.crawler.legendDump",
+				ClientProxy.keybind_crawlerAction.getDisplayName()));
 		return lines;
 	}
 
@@ -236,6 +252,34 @@ public class CrawlerHud
 		if(filled > 0)
 			Gui.drawRect(trackLeft, trackTop, trackLeft+filled, trackTop+GAUGE_HEIGHT,
 					healthy?FUEL: GAUGE_LIMIT);
+	}
+
+	/**
+	 * How much the Bucket is holding.
+	 * <p>
+	 * There is no window on it and no way to look inside, so without this the first sign that it is
+	 * full is spoil appearing on the ground -- which reads as the machine having stopped keeping
+	 * what it digs rather than as a bucket that needs tipping out. Labelled when full for the same
+	 * reason the fuel gauge is labelled when empty: that is the reading that needs an action.
+	 */
+	private static void drawBucketGauge(EntityHydraulicCrawler crawler, int x, int y, int width)
+	{
+		FontRenderer font = ClientUtils.mc().fontRenderer;
+		int slots = crawler.getBucketSize();
+		int used = crawler.getBucketFill();
+		boolean full = slots > 0&&used >= slots;
+		font.drawString(I18n.format(full?"gui.immersiveengineering.crawler.bucketFull"
+				: "gui.immersiveengineering.crawler.gaugeBucket"), x, y, full?GAUGE_LIMIT: DIM);
+
+		int trackLeft = x+LABEL_WIDTH;
+		int trackWidth = width-LABEL_WIDTH;
+		int trackTop = y+1;
+		Gui.drawRect(trackLeft, trackTop, trackLeft+trackWidth, trackTop+GAUGE_HEIGHT, GAUGE_TRACK);
+		int filled = slots <= 0?0
+				: (int)Math.round(trackWidth*clamp01(used/(double)slots));
+		if(filled > 0)
+			Gui.drawRect(trackLeft, trackTop, trackLeft+filled, trackTop+GAUGE_HEIGHT,
+					full?GAUGE_LIMIT: GAUGE_MARK);
 	}
 
 	private static void drawFrame(int left, int top, int right, int bottom)
