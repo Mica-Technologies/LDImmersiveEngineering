@@ -81,22 +81,22 @@ public class CommandGrid extends CommandTreeBase
 	public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender,
 										  String[] args, BlockPos pos)
 	{
-		//Every subcommand except create/list takes a segment name first.
-		if(args.length==2&&!"create".equals(args[0])&&!"list".equals(args[0]))
+		//Every subcommand except create/list takes a segment name first. The routing itself lives in
+		//CommandCompletion, shared with /ie fluidnet: the two are mirrors, and two copies of an
+		//argument index drift apart without anything failing.
+		if(CommandCompletion.completesSubjectName(args, "create", "list"))
 			return completeSegmentNames(args[1]);
-		if(args.length==3&&("link".equals(args[0])||"unlink".equals(args[0])))
+		if(CommandCompletion.completesSecondName(args, "link", "unlink"))
 			return completeSegmentNames(args[2]);
 		return super.getTabCompletions(server, sender, args, pos);
 	}
 
 	private static List<String> completeSegmentNames(String prefix)
 	{
-		List<String> out = new ArrayList<>();
-		String lower = prefix.toLowerCase(Locale.ENGLISH);
+		List<String> names = new ArrayList<>();
 		for(GridSegment segment : VirtualGrid.INSTANCE.getSegments())
-			if(segment.getName().toLowerCase(Locale.ENGLISH).startsWith(lower))
-				out.add(segment.getName());
-		return out;
+			names.add(segment.getName());
+		return CommandCompletion.matchingPrefix(names, prefix);
 	}
 
 	/**
@@ -121,7 +121,12 @@ public class CommandGrid extends CommandTreeBase
 		sender.sendMessage(new TextComponentString(text));
 	}
 
-	private static String describeState(GridSegment segment)
+	/**
+	 * Package-private rather than private so the precedence below can be asserted. The order is the
+	 * decision: a tripped segment that is also scheduled off has to read as tripped, or the command
+	 * that exists to end this confusion becomes another source of it.
+	 */
+	static String describeState(GridSegment segment)
 	{
 		if(segment.isTripped())
 			return TextFormatting.RED+"TRIPPED"+TextFormatting.RESET;

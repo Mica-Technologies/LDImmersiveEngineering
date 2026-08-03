@@ -57,6 +57,7 @@ public class CommandFluidNet extends CommandTreeBase
 		addSubcommand(new SubLink());
 		addSubcommand(new SubUnlink());
 		addSubcommand(new SubDevices());
+		addSubcommand(new SubSchedule());
 		addSubcommand(new CommandTreeHelp(this));
 	}
 
@@ -85,34 +86,31 @@ public class CommandFluidNet extends CommandTreeBase
 	public List<String> getTabCompletions(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender,
 										  String[] args, BlockPos pos)
 	{
-		//Every subcommand except create/list takes a main name first.
-		if(args.length==2&&!"create".equals(args[0])&&!"list".equals(args[0]))
+		//Every subcommand except create/list takes a main name first. The routing itself lives in
+		//CommandCompletion, shared with /ie grid: the two are mirrors, and two copies of an argument
+		//index drift apart without anything failing.
+		if(CommandCompletion.completesSubjectName(args, "create", "list"))
 			return completeMainNames(args[1]);
-		if(args.length==3&&("link".equals(args[0])||"unlink".equals(args[0])))
+		if(CommandCompletion.completesSecondName(args, "link", "unlink"))
 			return completeMainNames(args[2]);
-		if(args.length==3&&"fluid".equals(args[0]))
+		//The one argument the grid has no counterpart for: a main carries a named fluid where a
+		//segment carries undifferentiated flux.
+		if(CommandCompletion.completesThirdArgOf(args, "fluid"))
 			return completeFluidNames(args[2]);
 		return super.getTabCompletions(server, sender, args, pos);
 	}
 
 	private static List<String> completeMainNames(String prefix)
 	{
-		List<String> out = new ArrayList<>();
-		String lower = prefix.toLowerCase(Locale.ENGLISH);
+		List<String> names = new ArrayList<>();
 		for(FluidMain main : VirtualFluidNet.INSTANCE.getMains())
-			if(main.getName().toLowerCase(Locale.ENGLISH).startsWith(lower))
-				out.add(main.getName());
-		return out;
+			names.add(main.getName());
+		return CommandCompletion.matchingPrefix(names, prefix);
 	}
 
 	private static List<String> completeFluidNames(String prefix)
 	{
-		List<String> out = new ArrayList<>();
-		String lower = prefix.toLowerCase(Locale.ENGLISH);
-		for(String name : FluidRegistry.getRegisteredFluids().keySet())
-			if(name.toLowerCase(Locale.ENGLISH).startsWith(lower))
-				out.add(name);
-		return out;
+		return CommandCompletion.matchingPrefix(FluidRegistry.getRegisteredFluids().keySet(), prefix);
 	}
 
 	/**
@@ -137,7 +135,11 @@ public class CommandFluidNet extends CommandTreeBase
 		sender.sendMessage(new TextComponentString(text));
 	}
 
-	private static String describeState(FluidMain main)
+	/**
+	 * Package-private rather than private so the precedence below can be asserted, and so it can be
+	 * held against {@code CommandGrid.describeState}'s -- the two are mirrors and must stay so.
+	 */
+	static String describeState(FluidMain main)
 	{
 		if(main.isTripped())
 			return TextFormatting.RED+"TRIPPED"+TextFormatting.RESET;
@@ -614,6 +616,82 @@ public class CommandFluidNet extends CommandTreeBase
 						+(device.getType().movesFluid()
 						?", "+device.getLastThroughput()+" / "+device.getTransferCap()+" mB/t": "")
 						+(device.isEnabled()?"": TextFormatting.RED+" [disabled]"+TextFormatting.RESET));
+		}
+	}
+
+	/**
+	 * The mirror of {@code /ie grid schedule}, and it was missing.
+	 * <p>
+	 * <strong>A main's schedule could be switched on but its window could never be set.</strong>
+	 * {@link FluidPolicy} carries {@code scheduleEnabled}, {@code scheduleOn} and
+	 * {@code scheduleOff} and serialises all three; {@code MessageFluidNetAction} reads the times
+	 * if they are sent. But the fluid console's tab has only the on/off toggle -- the grid console's
+	 * two time fields have no counterpart there -- and there was no command either. Enabling a
+	 * schedule therefore locked a main to the default dusk window for good.
+	 * <p>
+	 * The console still cannot set the times; that is a layout change to a nine-hundred-line screen
+	 * and wants doing deliberately. This closes the half that can be closed exactly, by mirroring
+	 * the grid's subcommand line for line.
+	 */
+	private class SubSchedule extends CommandBase
+	{
+		@Nonnull
+		@Override
+		public String getName()
+		{
+			return "schedule";
+		}
+
+		@Nonnull
+		@Override
+		public String getUsage(@Nonnull ICommandSender sender)
+		{
+			return "/ie fluidnet schedule <main> [off | <onTime> <offTime>]";
+		}
+
+		@Override
+		public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender, @Nonnull String[] args)
+				throws CommandException
+		{
+			if(args.length < 1)
+				throw new CommandException(getUsage(sender));
+			FluidMain main = requireMain(args[0]);
+			FluidPolicy policy = main.getPolicy();
+
+			if(args.length==1)
+			{
+				if(!policy.isScheduleEnabled())
+					msg(sender, "\""+main.getName()+"\" flows whenever it is open.");
+				else
+					msg(sender, "\""+main.getName()+"\" flows from "+policy.getScheduleOn()
+							+" to "+policy.getScheduleOff()+" -- currently "
+							+(main.isScheduleSuppressed()?TextFormatting.GRAY+"asleep"
+							: TextFormatting.GREEN+"awake")+TextFormatting.RESET);
+				return;
+			}
+
+			if("off".equalsIgnoreCase(args[1]))
+			{
+				policy.setScheduleEnabled(false);
+				FluidNetSaveData.setDirty();
+				msg(sender, "Schedule disabled for \""+main.getName()+"\"");
+				return;
+			}
+			if(args.length < 3)
+				throw new CommandException(getUsage(sender));
+			int on = parseInt(args[1], 0, FluidPolicy.DAY_LENGTH-1);
+			int off = parseInt(args[2], 0, FluidPolicy.DAY_LENGTH-1);
+			//Equal endpoints mean a window that never opens -- deliberate in the policy, because an
+			//always-open window is indistinguishable from no schedule and would hide the typo. Here
+			//it is refused outright rather than silently closing somebody's main.
+			if(on==off)
+				throw new CommandException("On and off must differ -- equal times would mean a window that never opens");
+			policy.setScheduleOn(on);
+			policy.setScheduleOff(off);
+			policy.setScheduleEnabled(true);
+			FluidNetSaveData.setDirty();
+			msg(sender, "\""+main.getName()+"\" now flows from "+on+" to "+off
+					+(on > off?" (across midnight)": ""));
 		}
 	}
 }

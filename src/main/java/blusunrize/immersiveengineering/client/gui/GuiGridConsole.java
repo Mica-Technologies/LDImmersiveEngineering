@@ -850,24 +850,12 @@ public class GuiGridConsole extends GuiIEContainerBase
 
 	private static int parseInt(String text, int fallback)
 	{
-		try
-		{
-			return Integer.parseInt(text.trim());
-		} catch(NumberFormatException e)
-		{
-			return fallback;
-		}
+		return ConsoleFormat.parseIntOr(text, fallback);
 	}
 
 	private static double parseDouble(String text, double fallback)
 	{
-		try
-		{
-			return Double.parseDouble(text.trim());
-		} catch(NumberFormatException e)
-		{
-			return fallback;
-		}
+		return ConsoleFormat.parseDoubleOr(text, fallback);
 	}
 
 	private void send(Op op, @Nullable UUID segment, NBTTagCompound args)
@@ -1257,16 +1245,13 @@ public class GuiGridConsole extends GuiIEContainerBase
 
 	/**
 	 * Compact energy figure, so a lifetime meter does not run off the panel.
+	 * <p>
+	 * The arithmetic lives in {@link ConsoleFormat}, shared with the Fluid Control Console, which
+	 * was printing the same kind of figure raw.
 	 */
 	static String formatEnergy(long value)
 	{
-		if(value < 1000)
-			return value+" IF";
-		if(value < 1000000)
-			return String.format(Locale.ENGLISH, "%.1fk IF", value/1000.0);
-		if(value < 1000000000L)
-			return String.format(Locale.ENGLISH, "%.1fM IF", value/1000000.0);
-		return String.format(Locale.ENGLISH, "%.1fG IF", value/1000000000.0);
+		return ConsoleFormat.energy(value);
 	}
 
 	private static String stateLabel(GridSegment segment)

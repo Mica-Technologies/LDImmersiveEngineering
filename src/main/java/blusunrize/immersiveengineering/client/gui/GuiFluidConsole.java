@@ -378,13 +378,7 @@ public class GuiFluidConsole extends GuiIEContainerBase
 
 	private static int parseIntOr(String text, int fallback)
 	{
-		try
-		{
-			return Integer.parseInt(text.trim());
-		} catch(NumberFormatException e)
-		{
-			return fallback;
-		}
+		return ConsoleFormat.parseIntOr(text, fallback);
 	}
 
 	//	=================================
@@ -626,7 +620,7 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		fontRenderer.drawString(fontRenderer.trimStringToWidth(line, BODY_W), BODY_X, 128, COL_TEXT);
 		if(device.getType().movesFluid())
 			fontRenderer.drawString("cap "+device.getTransferCap()+" mB/t   priority "
-					+device.getPriority()+"   meter "+device.getLifetimeThroughput()+" mB",
+					+device.getPriority()+"   meter "+ConsoleFormat.volume(device.getLifetimeThroughput()),
 					BODY_X, 196, COL_DIM);
 	}
 
@@ -642,8 +636,12 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		graph.draw(main.getStats().getHistoryIn(), main.getStats().getHistoryOut(), COL_IN, COL_OUT);
 		fontRenderer.drawString("peak in  "+main.getStats().getPeakIn()+" mB/s", BODY_X, 118, COL_DIM);
 		fontRenderer.drawString("peak out "+main.getStats().getPeakOut()+" mB/s", BODY_X, 130, COL_DIM);
-		fontRenderer.drawString("lifetime in  "+main.getStats().getLifetimeIn()+" mB", BODY_X, 148, COL_DIM);
-		fontRenderer.drawString("lifetime out "+main.getStats().getLifetimeOut()+" mB", BODY_X, 160, COL_DIM);
+		//Compacted, as the grid console's have always been. A main that has moved a few million
+		//millibuckets wrote its total straight through the edge of the window before this.
+		fontRenderer.drawString("lifetime in  "+ConsoleFormat.volume(main.getStats().getLifetimeIn()),
+				BODY_X, 148, COL_DIM);
+		fontRenderer.drawString("lifetime out "+ConsoleFormat.volume(main.getStats().getLifetimeOut()),
+				BODY_X, 160, COL_DIM);
 	}
 
 	//	=================================

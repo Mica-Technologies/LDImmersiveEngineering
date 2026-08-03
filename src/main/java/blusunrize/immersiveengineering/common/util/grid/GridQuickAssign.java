@@ -147,7 +147,7 @@ public final class GridQuickAssign
 		{
 			//The segment was deleted while the tool still held it.
 			ItemNBTHelper.remove(stack, KEY);
-		ItemNBTHelper.remove(stack, KEY_NAME);
+			ItemNBTHelper.remove(stack, KEY_NAME);
 			say(player, TextFormatting.RED+"That segment no longer exists. Voltmeter cleared.");
 			return true;
 		}
