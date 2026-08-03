@@ -59,20 +59,7 @@ import java.util.Locale;
 public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInteraction,
 		IBlockOverlayText, IComparatorOverride, INeighbourChangeTile
 {
-	/**
-	 * Buffer between production passes, sized to two of them at the configured peak rate: big
-	 * enough that a pass is never wasted for want of room, small enough that a well nobody has
-	 * plumbed yet does not quietly bank a tank's worth of oil.
-	 * <p>
-	 * Read from the config rather than hard-coded, or raising {@code peakFlowRate} would leave
-	 * the buffer behind and the well would throttle itself against a tank it had outgrown.
-	 */
-	public static int capacityFor(int peakFlowRate)
-	{
-		return Math.max(1000, 2*PetroleumTickHandler.PRODUCTION_INTERVAL*Math.max(1, peakFlowRate));
-	}
-
-	public final FluidTank tank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate))
+	public final FluidTank tank = new FluidTank(WellheadFlow.capacityFor(PetroleumConfig.peakFlowRate))
 	{
 		@Override
 		public boolean canFillFluidType(FluidStack fluid)
@@ -89,7 +76,7 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	 * gas, so this fills on its own and, with nothing plumbed to it, backs up and stops the
 	 * well. That is the pressure a flare stack exists to relieve.
 	 */
-	public final FluidTank gasTank = new FluidTank(capacityFor(PetroleumConfig.peakFlowRate))
+	public final FluidTank gasTank = new FluidTank(WellheadFlow.capacityFor(PetroleumConfig.peakFlowRate))
 	{
 		@Override
 		public boolean canFillFluidType(FluidStack fluid)
@@ -221,11 +208,9 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 		//Gas comes up with the oil whether or not there is anywhere to put it, so a full gas
 		//tank throttles the whole well. Without this the excess would be quietly destroyed and
 		//a flare stack or a scrubber would be decoration rather than a requirement.
-		int room = tank.getCapacity()-tank.getFluidAmount();
-		double gasRatio = PetroleumConfig.associatedGasRatio;
-		if(gasRatio > 0)
-			room = Math.min(room,
-					(int)Math.floor((gasTank.getCapacity()-gasTank.getFluidAmount())/gasRatio));
+		int room = WellheadFlow.drawRoom(tank.getCapacity()-tank.getFluidAmount(),
+				gasTank.getCapacity()-gasTank.getFluidAmount(),
+				PetroleumConfig.associatedGasRatio);
 		if(room > 0)
 		{
 			int drawn = ReservoirModel.extract(reservoir, room, elapsedTicks, pumped,
@@ -255,10 +240,7 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 	 */
 	private void produceAssociatedGas(int crude)
 	{
-		double ratio = PetroleumConfig.associatedGasRatio;
-		if(ratio <= 0||crude <= 0)
-			return;
-		int gas = (int)Math.floor(crude*ratio);
+		int gas = WellheadFlow.associatedGas(crude, PetroleumConfig.associatedGasRatio);
 		if(gas <= 0)
 			return;
 		Fluid sour = FluidRegistry.getFluid("ie_sour_gas");

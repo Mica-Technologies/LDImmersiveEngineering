@@ -216,10 +216,11 @@ public class TileEntityReinjectionWell extends TileEntityIEBase implements ITick
 		}
 		if(recoverable <= 0)
 		{
-			//Two different nothings, and the overlay has to tell them apart: a field that will take
-			//no more is permanent, while a well holding less injectant than one millibucket of
-			//recovery costs is simply waiting for a delivery.
-			status = allowance <= 0?STATUS_SPENT: STATUS_IDLE;
+			//Idle, not spent: the exhausted-allowance case returned above, so reaching here means the
+			//allowance is positive and the well is simply holding less injectant than one millibucket
+			//of recovery costs -- it is waiting for a delivery, and saying "spent" would send somebody
+			//looking for a permanent problem that is not there.
+			status = STATUS_IDLE;
 			return;
 		}
 

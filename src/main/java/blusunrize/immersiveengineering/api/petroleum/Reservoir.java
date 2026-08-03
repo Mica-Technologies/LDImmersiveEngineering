@@ -146,8 +146,7 @@ public class Reservoir
 	}
 
 	/**
-	 * @return how much of the original pool is left, 0..1. An exhausted deposit reads 0 but is
-	 * still capable of a residual seep -- see {@link ReservoirModel#flowRate}.
+	 * @return the carried sub-millibucket remainder, 0..1
 	 */
 	public double getPending()
 	{
@@ -163,6 +162,10 @@ public class Reservoir
 		this.pending = pending < 0?0: pending > 1?1: pending;
 	}
 
+	/**
+	 * @return how much of the original pool is left, 0..1. An exhausted deposit reads 0 but is
+	 * still capable of a residual seep -- see {@link ReservoirModel#flowRate}.
+	 */
 	public double getFraction()
 	{
 		if(originalCapacity <= 0)
