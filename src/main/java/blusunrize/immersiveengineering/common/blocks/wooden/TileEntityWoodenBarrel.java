@@ -42,7 +42,12 @@ import javax.annotation.Nullable;
 public class TileEntityWoodenBarrel extends TileEntityIEBase implements ITickable, IBlockOverlayText, IConfigurableSides, IPlayerInteraction, ITileDrop, IComparatorOverride
 {
 	public int[] sideConfig = {1, 0};
-	public FluidTank tank = new FluidTank(12000);
+	/**
+	 * Named because the Waila tooltip needs it too, and was carrying its own copy of the number --
+	 * so changing the barrel's size would have left the tooltip confidently reporting the old one.
+	 */
+	public static final int CAPACITY = 12000;
+	public FluidTank tank = new FluidTank(CAPACITY);
 	public static final int IGNITION_TEMPERATURE = 573;
 
 	@Override

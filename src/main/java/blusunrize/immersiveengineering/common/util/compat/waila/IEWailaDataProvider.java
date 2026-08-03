@@ -102,11 +102,19 @@ public class IEWailaDataProvider implements IWailaDataProvider
 		else if(tile instanceof TileEntityWoodenBarrel)
 		{
 			NBTTagCompound tank = accessor.getNBTData().getCompoundTag("tank");
-			if(!tank.hasKey("Empty")&&!tank.isEmpty())
-			{
-				FluidStack fluid = FluidStack.loadFluidStackFromNBT(tank);
-				currenttip.add(String.format("%s: %d / %d mB", fluid.getLocalizedName(), Integer.valueOf(fluid.amount), 12000));
-			}
+			FluidStack fluid = tank.hasKey("Empty")||tank.isEmpty()
+					?null: FluidStack.loadFluidStackFromNBT(tank);
+			//	=================================
+			//	loadFluidStackFromNBT answers null.
+			//	=================================
+			//
+			// A non-empty tag is not a loadable fluid: the name in it is resolved against the
+			// registry, and a barrel holding something from a mod that has since been removed reads
+			// back as null. The tag passes both checks above and the tooltip then dereferenced it,
+			// so looking at that barrel threw on every frame it was under the crosshair.
+			if(fluid!=null)
+				currenttip.add(String.format("%s: %d / %d mB", fluid.getLocalizedName(),
+						fluid.amount, TileEntityWoodenBarrel.CAPACITY));
 			else
 				currenttip.add(I18n.format("hud.msg.empty"));
 		}

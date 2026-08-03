@@ -91,7 +91,12 @@ public class OneProbeHelper extends IECompatModule implements Function<ITheOnePr
 			TileEntity te = world.getTileEntity(data.getPos());
 			if(te instanceof TileEntitySheetmetalTank)
 			{
+				//master() is @Nullable and answers null for an orphaned part -- one whose master has
+				//gone while this half has not, which happens mid-break and at a chunk edge. The probe
+				//dereferenced it immediately, so looking at the wrong block at the wrong moment threw.
 				TileEntitySheetmetalTank master = ((TileEntitySheetmetalTank)te).master();
+				if(master==null)
+					return;
 				int current = master.tank.getFluidAmount();
 				int max = master.tank.getCapacity();
 
@@ -175,8 +180,18 @@ public class OneProbeHelper extends IECompatModule implements Function<ITheOnePr
 			{
 				int[] curTicks = ((IEBlockInterfaces.IProcessTile)te).getCurrentProcessesStep();
 				int[] maxTicks = ((IEBlockInterfaces.IProcessTile)te).getCurrentProcessesMax();
-				int h = Math.max(4, (int)Math.ceil(12/(float)curTicks.length));
-				for(int i = 0; i < curTicks.length; i++)
+				//Hardening rather than a found bug: every IProcessTile in this mod builds both arrays
+				//from the same processQueue on the same tick, so they always agree. But IProcessTile
+				//is public and two separate calls are two separate answers -- an addon whose queue
+				//changes between them, or which returns null for an idle machine, would have this
+				//provider throwing inside somebody else's tooltip.
+				if(curTicks==null||maxTicks==null)
+					return;
+				int count = Math.min(curTicks.length, maxTicks.length);
+				if(count <= 0)
+					return;
+				int h = Math.max(4, (int)Math.ceil(12/(float)count));
+				for(int i = 0; i < count; i++)
 					if(maxTicks[i] > 0)
 					{
 						float f = curTicks[i]/(float)maxTicks[i]*100;

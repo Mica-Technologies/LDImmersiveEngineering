@@ -1950,6 +1950,16 @@ public class ClientProxy extends CommonProxy
 		IEApi.renderCacheClearers.add(IESmartObjModel.cachedBakedItemModels::invalidateAll);
 		IEApi.renderCacheClearers.add(ConnModelReal.cache::invalidateAll);
 		IEApi.renderCacheClearers.add(ModelConveyor.modelCache::clear);
+		//	=================================
+		//	The conveyor's *item* models were missing.
+		//	=================================
+		//
+		// modelCache above holds the block quads and has always been cleared here; itemModelCache
+		// holds whole baked models for the item form, and those hold TextureAtlasSprites. A texture
+		// re-stitch invalidates every sprite, so an uncleared item model goes on drawing with UVs
+		// into an atlas that has been rebuilt underneath it -- garbled conveyor items after a
+		// resource pack reload, and the old sprites kept alive besides.
+		IEApi.renderCacheClearers.add(ModelConveyor.itemModelCache::clear);
 		IEApi.renderCacheClearers.add(ModelConfigurableSides.modelCache::clear);
 		IEApi.renderCacheClearers.add(TileEntityFluidPipe.cachedOBJStates::clear);
 		IEApi.renderCacheClearers.add(TileRenderBelljar::reset);
@@ -1961,6 +1971,12 @@ public class ClientProxy extends CommonProxy
 		IEApi.renderCacheClearers.add(ModelPowerpack.catenaryCacheLeft::invalidateAll);
 		IEApi.renderCacheClearers.add(ModelPowerpack.catenaryCacheRight::invalidateAll);
 		IEApi.renderCacheClearers.add(FeedthroughModel.CACHE::invalidateAll);
+		//The Auto Workbench traces the blueprint outline out of the output item's *texture*, so the
+		//lines it caches are only correct for the atlas they were read from. Left uncleared, a
+		//resource pack swap leaves every workbench drawing the previous pack's blueprint. It also
+		//keys on BlueprintCraftingRecipe, which is rebuilt on a recipe reload, so the old entries
+		//were unreachable and never collected.
+		IEApi.renderCacheClearers.add(TileRenderAutoWorkbench.blueprintCache::clear);
 	}
 
 	@Override

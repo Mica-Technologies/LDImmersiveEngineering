@@ -371,7 +371,11 @@ public class ModelConveyor implements IBakedModel
 		return overrideList;
 	}
 
-	static HashMap<String, IBakedModel> itemModelCache = new HashMap<String, IBakedModel>();
+	/**
+	 * Public so {@code ClientProxy} can register it for clearing alongside {@link #modelCache}.
+	 * These models hold texture sprites and must not outlive a re-stitch.
+	 */
+	public static HashMap<String, IBakedModel> itemModelCache = new HashMap<String, IBakedModel>();
 	ItemOverrideList overrideList = new ItemOverrideList(new ArrayList())
 	{
 		@Override
