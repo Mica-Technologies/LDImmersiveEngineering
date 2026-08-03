@@ -93,8 +93,9 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 	{
 		if(stack==null||stack.getFluid()==null)
 			return false;
-		String name = stack.getFluid().getName();
-		return "ie_sour_gas".equals(name)||"natural_gas".equals(name)||"propane".equals(name);
+		//The rule itself lives in FlareStackRules, keyed by name: there is no FluidRegistry in the
+		//test JVM, so a rule stated against a Fluid is a rule nothing can check.
+		return FlareStackRules.isFlarable(stack.getFluid().getName());
 	}
 
 	/**
@@ -108,8 +109,8 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 		//City mode keeps the spectacle and drops the accounting: the gas is not consumed and the
 		//flame does not expire, so a flare in a city build burns forever off one delivery. Being
 		//a skyline is the entire job there.
-		FluidStack drained = CityMode.petroleum()
-				?tank.drainInternal(1, true): tank.drainInternal(BURN_RATE, true);
+		FluidStack drained = tank.drainInternal(
+				FlareStackRules.burnAmount(tank.getFluidAmount(), CityMode.petroleum()), true);
 		if(drained==null||drained.amount <= 0)
 			return;
 		lifetimeBurned += drained.amount;
@@ -127,7 +128,7 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 
 	public boolean isLit()
 	{
-		return flameTicks > 0;
+		return FlareStackRules.isLit(flameTicks);
 	}
 
 	public long getLifetimeBurned()
@@ -151,7 +152,7 @@ public class TileEntityFlareStack extends TileEntityIEBase implements IBlockOver
 	@Override
 	public int getLightValue()
 	{
-		return isLit()?14: 0;
+		return FlareStackRules.lightValue(flameTicks);
 	}
 
 	//	=================================

@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.common.items;
 
+import blusunrize.immersiveengineering.common.blocks.petroleum.GasPumpAccounting;
 import blusunrize.immersiveengineering.common.blocks.petroleum.TileEntityGasPump;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.Utils;
@@ -337,7 +338,8 @@ public class ItemPetroleum extends ItemIEBase
 		}
 		//Squared distance, so a diagonal reach is the same as a straight one -- a hose does not
 		//care which way it is pointing.
-		if(pumpPos.distanceSq(target) > (double)TileEntityGasPump.NOZZLE_RANGE*TileEntityGasPump.NOZZLE_RANGE)
+		if(!GasPumpAccounting.withinNozzleRange(pumpPos.getX(), pumpPos.getY(), pumpPos.getZ(),
+				target.getX(), target.getY(), target.getZ(), TileEntityGasPump.NOZZLE_RANGE))
 		{
 			if(!world.isRemote)
 				say(player, TextFormatting.YELLOW+"The hose will not reach that far."+TextFormatting.RESET);

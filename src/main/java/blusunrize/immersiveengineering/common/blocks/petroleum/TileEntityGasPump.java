@@ -209,14 +209,13 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 	 */
 	private int authorise(EntityPlayer player, FluidStack available, int wanted, @Nullable String target)
 	{
-		int capped = Math.min(wanted, available.amount);
+		int capped = GasPumpAccounting.requested(wanted, available.amount);
 		if(capped <= 0||world==null||world.isRemote)
 			return 0;
 		String name = available.getFluid()==null?"": available.getFluid().getName();
 		FuelDispensedEvent event = new FuelDispensedEvent(player, getPos(), name, capped, price, target);
-		if(MinecraftForge.EVENT_BUS.post(event))
-			return 0;
-		return Math.min(event.getAmount(), available.amount);
+		boolean cancelled = MinecraftForge.EVENT_BUS.post(event);
+		return GasPumpAccounting.granted(event.getAmount(), available.amount, cancelled);
 	}
 
 	/**
@@ -231,8 +230,8 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 	{
 		if(amount <= 0)
 			return;
-		tank.drainInternal(CityMode.petroleum()?Math.min(CITY_SIP, amount): amount, true);
-		lifetimeDispensed += amount;
+		tank.drainInternal(GasPumpAccounting.tankDebit(amount, CityMode.petroleum()), true);
+		lifetimeDispensed += GasPumpAccounting.odometerAdvance(amount);
 		markDirty();
 		//One block update per dispense, which is a discrete gesture -- somebody filling a container,
 		//once, with a sound to match -- rather than a per-tick cost. Without it the odometer in an
@@ -266,7 +265,7 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 
 	public void setPrice(int price)
 	{
-		this.price = Math.max(0, Math.min(1000000, price));
+		this.price = GasPumpAccounting.clampPrice(price);
 		markDirty();
 		markContainingBlockForUpdate(null);
 	}
@@ -355,9 +354,7 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 	@Override
 	public int getComparatorInputOverride()
 	{
-		if(tank.getFluidAmount() <= 0)
-			return 0;
-		return Math.max(1, Math.min(15, 15*tank.getFluidAmount()/CAPACITY));
+		return GasPumpAccounting.comparatorLevel(tank.getFluidAmount(), CAPACITY);
 	}
 
 	//	=================================

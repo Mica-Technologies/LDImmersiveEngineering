@@ -73,8 +73,12 @@ public class Lib
 	public static final int GUIID_Manual = GUIID_Base_Item+0;
 	public static final int GUIID_Revolver = GUIID_Base_Item+1;
 	public static final int GUIID_Toolbox = GUIID_Base_Item+2;
-	public static final int GUIID_NetworkTerminal = GUIID_Base_Item+3;
-	public static final int GUIID_MaintenanceKit= GUIID_Base_Item+3;
+	//+4 rather than +3, which is the Maintenance Kit's and was taken. The two collided from the day
+	//the terminal was added: both windows answered to id 67, and only the instanceof guard beside
+	//each one in CommonProxy.getServerGuiElement kept them apart. That guard is not the id's job,
+	//and the next item GUI written against "the ids are unique" would have opened the wrong window.
+	public static final int GUIID_NetworkTerminal = GUIID_Base_Item+4;
+	public static final int GUIID_MaintenanceKit = GUIID_Base_Item+3;
 
 	public static final String NBT_Earmuffs = "IE:Earmuffs";
 	public static final String NBT_EarmuffColour = "IE:EarmuffColour";
