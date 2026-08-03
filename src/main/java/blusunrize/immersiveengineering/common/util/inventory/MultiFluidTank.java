@@ -15,6 +15,7 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTankInfo;
 import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.fluids.capability.FluidTankProperties;
 import net.minecraftforge.fluids.capability.IFluidTankProperties;
 
 import javax.annotation.Nullable;
@@ -43,7 +44,10 @@ public class MultiFluidTank implements IFluidTank, IFluidHandler
 			for(int i = 0; i < tagList.tagCount(); i++)
 			{
 				FluidStack fs = FluidStack.loadFluidStackFromNBT(tagList.getCompoundTagAt(i));
-				if(fs!=null)
+				//Empties dropped on the way in, which clears the zero-amount entries older saves
+				//accumulated from filling a full tank. Nothing writes them any more, but a world
+				//that already has them should shed them rather than carry them forever.
+				if(fs!=null&&fs.amount > 0)
 					this.fluids.add(fs);
 			}
 		}
@@ -101,7 +105,23 @@ public class MultiFluidTank implements IFluidTank, IFluidHandler
 	@Override
 	public IFluidTankProperties[] getTankProperties()
 	{
-		return new IFluidTankProperties[0];
+		//	=================================
+		//	An empty array means "I hold nothing you can see".
+		//	=================================
+		//
+		// This is the only window external automation has into a tank. Returning nothing left every
+		// pipe, storage bus and probe reading this block convinced it was empty however full it
+		// was -- and, worse, unable to tell that it would accept a fill.
+		//
+		// One entry per fluid held, all sharing the one capacity, because that is what this tank is:
+		// several fluids in one space rather than several tanks. An empty tank still reports one
+		// entry so its capacity and its willingness to be filled are both visible.
+		if(fluids.isEmpty())
+			return new IFluidTankProperties[]{new FluidTankProperties(null, capacity, true, true)};
+		IFluidTankProperties[] properties = new IFluidTankProperties[fluids.size()];
+		for(int i = 0; i < fluids.size(); i++)
+			properties[i] = new FluidTankProperties(fluids.get(i), capacity, true, true);
+		return properties;
 	}
 
 	@Override
@@ -111,6 +131,16 @@ public class MultiFluidTank implements IFluidTank, IFluidHandler
 		int toFill = Math.min(resource.amount, space);
 		if(!doFill)
 			return toFill;
+		//	=================================
+		//	Nothing moved means nothing stored.
+		//	=================================
+		//
+		// Without this, pushing a fluid at a full tank fell through to the add below and stored a
+		// zero-amount stack -- which writeToNBT then serialised, permanently. Every distinct fluid
+		// anybody tried against a full tank added another entry, and nothing ever removed them: a
+		// save file growing without bound from an operation that visibly did nothing.
+		if(toFill <= 0)
+			return 0;
 		for(FluidStack fs : this.fluids)
 			if(fs.isFluidEqual(resource))
 			{

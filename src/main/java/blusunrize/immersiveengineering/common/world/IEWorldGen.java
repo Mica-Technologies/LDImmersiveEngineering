@@ -101,7 +101,19 @@ public class IEWorldGen implements IWorldGenerator
 	{
 		if(!oreDimBlacklist.contains(world.provider.getDimension()))
 			for(OreGen gen : orespawnList)
-				if(newGeneration||retrogenMap.get("retrogen_"+gen.name))
+				//	=================================
+				//	The map only knows IE's own ores.
+				//	=================================
+				//
+				// retrogenMap is populated from the config, which lists the six ores this mod ships.
+				// An ore registered by an addon is absent, so get() answered null and the unboxing
+				// in this condition threw -- but only on the retrogen path, because newGeneration
+				// short-circuits it during ordinary worldgen. That threw inside the retrogen loop
+				// and left that dimension's queue stalled for the rest of the session.
+				//
+				// Absent now reads as false: an ore nobody has configured retrogen for is an ore
+				// that does not retrogen, which is both the safe answer and the expected one.
+				if(newGeneration||Boolean.TRUE.equals(retrogenMap.get("retrogen_"+gen.name)))
 					gen.generate(world, random, chunkX*16, chunkZ*16);
 	}
 

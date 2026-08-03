@@ -208,4 +208,31 @@ public class ContainerModWorkbench extends ContainerIEBase<TileEntityModWorkbenc
 			detectAndSendChanges();
 		return ret;
 	}
+
+	/**
+	 * Let go of the workbench when the window closes.
+	 * <p>
+	 * <strong>The tool's item handler holds {@code tile::markDirty}, and only taking the tool out
+	 * released it.</strong> {@code IESlot.ModWorkbench.onTake} clears it, so a player who removes
+	 * their drill is fine -- but closing the window with the tool still in the slot left the stack
+	 * holding a strong reference to this tile, and through it to the whole World. The stack outlives
+	 * the window, and can be piped out of the bench and carried anywhere.
+	 * <p>
+	 * Both sibling containers already do exactly this: {@code ContainerRevolver} and
+	 * {@code ContainerInternalStorageItem} each pair their {@code setInventoryForUpdate} with a null
+	 * on close. This one simply never had the matching half.
+	 */
+	@Override
+	public void onContainerClosed(EntityPlayer player)
+	{
+		super.onContainerClosed(player);
+		if(inventorySlots.isEmpty())
+			return;
+		ItemStack tool = getSlot(0).getStack();
+		if(tool.isEmpty())
+			return;
+		IItemHandler handler = tool.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null);
+		if(handler instanceof IEItemStackHandler)
+			((IEItemStackHandler)handler).setTile(null);
+	}
 }

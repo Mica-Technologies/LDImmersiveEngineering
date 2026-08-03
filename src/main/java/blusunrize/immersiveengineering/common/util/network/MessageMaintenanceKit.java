@@ -20,6 +20,8 @@ import net.minecraftforge.fml.common.network.simpleimpl.IMessage;
 import net.minecraftforge.fml.common.network.simpleimpl.IMessageHandler;
 import net.minecraftforge.fml.common.network.simpleimpl.MessageContext;
 
+import javax.annotation.Nullable;
+
 public class MessageMaintenanceKit implements IMessage
 {
 	EntityEquipmentSlot slot;
@@ -38,14 +40,39 @@ public class MessageMaintenanceKit implements IMessage
 	@Override
 	public void fromBytes(ByteBuf buf)
 	{
-		this.slot = EntityEquipmentSlot.fromString(ByteBufUtils.readUTF8String(buf));
+		//	=================================
+		//	fromString throws, and this runs on the netty thread.
+		//	=================================
+		//
+		// EntityEquipmentSlot.fromString raises IllegalArgumentException for anything it does not
+		// recognise, so a one-character change to this string was an exception in the network
+		// pipeline rather than a rejected action. Resolved by hand instead, answering null for an
+		// unknown name -- which costs nothing, because the handler never reads this field.
+		this.slot = slotByName(ByteBufUtils.readUTF8String(buf));
 		this.nbt = ByteBufUtils.readTag(buf);
+	}
+
+	/**
+	 * @return the slot of that name, or null if there is none
+	 */
+	@Nullable
+	private static EntityEquipmentSlot slotByName(@Nullable String name)
+	{
+		if(name==null)
+			return null;
+		for(EntityEquipmentSlot slot : EntityEquipmentSlot.values())
+			if(slot.getName().equals(name))
+				return slot;
+		return null;
 	}
 
 	@Override
 	public void toBytes(ByteBuf buf)
 	{
-		ByteBufUtils.writeUTF8String(buf, this.slot.getName());
+		//The field is nullable now that decoding no longer throws on an unknown name, so the send
+		//path has to tolerate one rather than NPE on the way out.
+		ByteBufUtils.writeUTF8String(buf,
+				this.slot==null?EntityEquipmentSlot.MAINHAND.getName(): this.slot.getName());
 		ByteBufUtils.writeTag(buf, this.nbt);
 	}
 

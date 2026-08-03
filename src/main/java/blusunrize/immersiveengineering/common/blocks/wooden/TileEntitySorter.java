@@ -136,7 +136,27 @@ public class TileEntitySorter extends TileEntityIEBase implements IGuiTile
 	public void receiveMessageFromClient(NBTTagCompound message)
 	{
 		if(message.hasKey("sideConfig"))
-			this.sideFilter = message.getIntArray("sideConfig");
+			this.sideFilter = normaliseFilter(message.getIntArray("sideConfig"));
+	}
+
+	/**
+	 * Force a filter array to exactly one entry per side.
+	 * <p>
+	 * <strong>Both places this array is read in from are outside the block's control.</strong> The
+	 * network path takes whatever length the client sent, and the NBT path takes whatever is on
+	 * disk. Every use site bounds-checks, so a short array never threw -- it silently reported "no
+	 * filter set" for the sides that fell off the end, which is a sorter quietly ignoring settings
+	 * the player can still see in the GUI.
+	 * <p>
+	 * Copied rather than aliased, so the tile does not go on holding a reference to an array that
+	 * came off a packet.
+	 */
+	private static int[] normaliseFilter(int[] incoming)
+	{
+		int[] filter = new int[6];
+		if(incoming!=null)
+			System.arraycopy(incoming, 0, filter, 0, Math.min(incoming.length, filter.length));
+		return filter;
 	}
 
 	public EnumFacing[][] getValidOutputs(EnumFacing inputSide, ItemStack stack)
@@ -301,7 +321,7 @@ public class TileEntitySorter extends TileEntityIEBase implements IGuiTile
 	@Override
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
-		sideFilter = nbt.getIntArray("sideFilter");
+		sideFilter = normaliseFilter(nbt.getIntArray("sideFilter"));
 		if(!descPacket)
 		{
 			NBTTagList filterList = nbt.getTagList("filter", 10);
