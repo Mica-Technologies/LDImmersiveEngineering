@@ -19,6 +19,7 @@ import blusunrize.immersiveengineering.common.util.network.MessageFluidNetAction
 import blusunrize.immersiveengineering.common.util.network.MessageFluidNetAction.Op;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiTextField;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.nbt.NBTTagCompound;
 import org.lwjgl.input.Keyboard;
@@ -113,6 +114,22 @@ public class GuiFluidConsole extends GuiIEContainerBase
 
 	private GuiTextField nameField, inputField, outputField, leakField, packField;
 	private GuiTextField fluidField;
+	/**
+	 * The schedule window's two ends, in day-time ticks.
+	 * <p>
+	 * These were missing, and their absence was not cosmetic: the tab has always carried a
+	 * "Sched: on/off" toggle, so a main's schedule could be switched <em>on</em> and its window
+	 * could never be set. It ran on {@link FluidPolicy#DEFAULT_ON} to {@link FluidPolicy#DEFAULT_OFF}
+	 * for good. The grid console has had the same pair since it shipped.
+	 */
+	private GuiTextField schedOnField, schedOffField;
+
+	/** Every field on the Mains tab, in tab order -- one list, so none can be missed by one of them. */
+	private GuiTextField[] mainsFields()
+	{
+		return new GuiTextField[]{nameField, fluidField, inputField, outputField, leakField,
+				packField, schedOnField, schedOffField};
+	}
 
 	private final List<UUID> listOrder = new ArrayList<>();
 	private UUID fieldsLoadedFor;
@@ -212,6 +229,97 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		String signature = structureSignature();
 		if(!signature.equals(lastSignature))
 			initGui();
+		refreshWidgets();
+	}
+
+	/**
+	 * Re-reads the model into the captions and toggle states of the widgets that already exist, so a
+	 * click is reflected as soon as the server's answer arrives.
+	 * <p>
+	 * <strong>This screen had none, and the grid console has had one since it shipped.</strong>
+	 * Every toggle here was baked at {@link #initGui} time and none of their states are in
+	 * {@link #structureSignature}, so nothing ever rebuilt them: clicking "Sched: off" sent the
+	 * packet, the server flipped the flag and sent it back, and the caption went on saying "off"
+	 * until the player changed tabs. Lock, Backup, Chunkload, Critical, Enabled and both Valve
+	 * controls were all stuck the same way -- a screen full of switches that appeared not to work.
+	 * <p>
+	 * Putting the states into the signature instead would have worked and been wrong: a rebuild
+	 * recreates the text fields, so the panel would have eaten the player's caret every time any
+	 * toggle anywhere changed. The signature is for the <em>set</em> of widgets; this is for their
+	 * contents.
+	 */
+	private void refreshWidgets()
+	{
+		FluidMain main = selectedMain();
+		FluidDevice device = selectedDeviceRecord();
+		for(GuiButton button : this.buttonList)
+		{
+			if(button.id >= ID_SWATCH_BASE&&button.id < ID_SWATCH_BASE+FluidMain.PALETTE.length)
+			{
+				if(main!=null&&button instanceof GuiColourSwatch)
+					((GuiColourSwatch)button).active =
+							FluidMain.PALETTE[button.id-ID_SWATCH_BASE]==main.getColor();
+				continue;
+			}
+			switch(button.id)
+			{
+				case ID_TOGGLE:
+					if(main!=null&&button instanceof GuiToggleSwitch)
+					{
+						((GuiToggleSwitch)button).state = main.isEnabled();
+						((GuiToggleSwitch)button).tripped = main.isTripped();
+					}
+					break;
+				case ID_LOCK:
+					if(main!=null)
+						setToggle(button, main.isLocked(), "Locked", "Unlocked");
+					break;
+				case ID_SCHEDULE:
+					if(main!=null)
+						setToggle(button, main.getPolicy().isScheduleEnabled(),
+								"Sched: on", "Sched: off");
+					break;
+				case ID_TOPUP:
+					if(main!=null)
+						setToggle(button, main.getPolicy().isFailoverTopUp(),
+								"Backup: any", "Backup: outage");
+					break;
+				case ID_FILTER:
+					setToggle(button, showUnlinked, "Show: unlinked", "Show: this main");
+					break;
+				case ID_VALVE_MODE:
+					if(device!=null)
+						setToggle(button, device.isValveOutput(),
+								"Indicator: main -> RS", "Shut-off: RS -> main");
+					break;
+				case ID_VALVE_INVERT:
+					if(device!=null)
+						setToggle(button, device.isValveInverted(), "Inverted", "Normal");
+					break;
+				case ID_CRITICAL:
+					if(device!=null)
+						setToggle(button, device.isCritical(), "Critical", "Normal");
+					break;
+				case ID_CHUNKLOAD:
+					if(device!=null)
+						setToggle(button, device.isChunkLoadRequested(),
+								"Chunkload on", "Chunkload off");
+					break;
+				case ID_DEV_ENABLED:
+					if(device!=null)
+						setToggle(button, device.isEnabled(), "Enabled", "Disabled");
+					break;
+				default:
+					break;
+			}
+		}
+	}
+
+	private static void setToggle(GuiButton button, boolean on, String onLabel, String offLabel)
+	{
+		button.displayString = on?onLabel: offLabel;
+		if(button instanceof GuiButtonFlat)
+			((GuiButtonFlat)button).active = on;
 	}
 
 	/**
@@ -255,6 +363,33 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		return widget;
 	}
 
+	/**
+	 * Draw text fields from inside the foreground layer.
+	 * <p>
+	 * <strong>Undoing the container's translate, which is not decoration.</strong> Everything else
+	 * on this screen is drawn from {@code drawGuiContainerForegroundLayer}, and vanilla's
+	 * {@code GuiContainer} translates by {@code (guiLeft, guiTop)} before calling it -- so the
+	 * relative coordinates every {@code drawString} here uses are correct. A {@link GuiTextField}
+	 * is not drawn that way: it stores its own position and {@code drawTextBox()} renders at it,
+	 * and these were built with absolute coordinates so that {@code mouseClicked} -- which is
+	 * handed absolute mouse coordinates -- would find them.
+	 * <p>
+	 * Absolute coordinates drawn inside a translated matrix land at {@code guiLeft*2}, half a screen
+	 * down and to the right of the panel, while the field stays clickable where it always was. That
+	 * is precisely the Gas Station Pump's price field, reported as "the box shows nothing but Set
+	 * works". Cancelling the translate for exactly these widgets keeps both halves right, and keeps
+	 * the fix to the one place it belongs rather than converting every string on the screen.
+	 */
+	private void drawFields(GuiTextField... fields)
+	{
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(-guiLeft, -guiTop, 0);
+		for(GuiTextField field : fields)
+			if(field!=null)
+				field.drawTextBox();
+		GlStateManager.popMatrix();
+	}
+
 	private GuiTextField makeField(int x, int y, int w, int maxLength)
 	{
 		GuiTextField field = new GuiTextField(0, this.fontRenderer, x, y, w, 9);
@@ -296,6 +431,15 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		outputField = makeField(guiLeft+EDITOR_X+48, guiTop+124, 67, 9);
 		leakField = makeField(guiLeft+EDITOR_X+48, guiTop+138, 67, 9);
 		packField = makeField(guiLeft+EDITOR_X+48, guiTop+152, 67, 9);
+		//Day-time ticks rather than a clock widget, exactly as the grid console does it: it is the
+		//unit /time set speaks and every redstone contraption already agrees with, so the two need
+		//no conversion between them.
+		//
+		//Side by side on one row where the grid console stacks them, because this editor column is
+		//four rows taller than the grid's -- a main carries a fluid, which a segment does not -- and
+		//stacking would have pushed the buttons below off the bottom of the panel.
+		schedOnField = makeField(guiLeft+EDITOR_X+48, guiTop+166, 30, 5);
+		schedOffField = makeField(guiLeft+EDITOR_X+85, guiTop+166, 30, 5);
 		fieldsLoadedFor = null;
 		loadFieldsFrom(main);
 
@@ -313,15 +457,31 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		this.buttonList.add(toggle(ID_TOPUP, BODY_X+2, 194, 70, 14,
 				main.getPolicy().isFailoverTopUp()?"Backup: any": "Backup: outage",
 				main.getPolicy().isFailoverTopUp()));
-		this.buttonList.add(button(ID_APPLY, EDITOR_X+2, 168, 52, 14, "Apply"));
-		this.buttonList.add(toggle(ID_LOCK, EDITOR_X+58, 168, 57, 14,
+		this.buttonList.add(button(ID_APPLY, EDITOR_X+2, 182, 52, 14, "Apply"));
+		this.buttonList.add(toggle(ID_LOCK, EDITOR_X+58, 182, 57, 14,
 				main.isLocked()?"Locked": "Unlocked", main.isLocked()));
-		//Only offered when it can actually work. A greyed-out control the player cannot explain
-		//is worse than one that is simply absent while the main still holds something.
-		if(main.isTyped()&&main.getPack()<=0)
-			this.buttonList.add(button(ID_CLEAR_FLUID, EDITOR_X+2, 184, 113, 14, "Clear fluid"));
-		if(main.isTripped())
-			this.buttonList.add(button(ID_TRIP, EDITOR_X+2, 200, 113, 14, "Reset overpressure"));
+		//	=================================
+		//	The last row, shared when it has to be.
+		//	=================================
+		//
+		// Only offered when they can actually work. A greyed-out control the player cannot explain
+		// is worse than one that is simply absent while the main still holds something.
+		//
+		// Both can apply at once -- a tripped main with a fluid type and an empty pack is an
+		// ordinary thing to be looking at -- and the schedule row above took the space they used to
+		// have one under the other. So they share a row when both are wanted, with shorter labels,
+		// and each takes the full width when it is alone.
+		boolean canClear = main.isTyped()&&main.getPack() <= 0;
+		boolean canReset = main.isTripped();
+		if(canClear&&canReset)
+		{
+			this.buttonList.add(button(ID_CLEAR_FLUID, EDITOR_X+2, 198, 55, 14, "Clear fluid"));
+			this.buttonList.add(button(ID_TRIP, EDITOR_X+60, 198, 55, 14, "Reset trip"));
+		}
+		else if(canClear)
+			this.buttonList.add(button(ID_CLEAR_FLUID, EDITOR_X+2, 198, 113, 14, "Clear fluid"));
+		else if(canReset)
+			this.buttonList.add(button(ID_TRIP, EDITOR_X+2, 198, 113, 14, "Reset overpressure"));
 	}
 
 	private void loadFieldsFrom(@Nullable FluidMain main)
@@ -334,6 +494,8 @@ public class GuiFluidConsole extends GuiIEContainerBase
 			outputField.setText("");
 			leakField.setText("");
 			packField.setText("");
+			schedOnField.setText("");
+			schedOffField.setText("");
 			return;
 		}
 		//Only reload when the selection actually changed, so a half-typed value is not wiped by
@@ -347,6 +509,8 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		outputField.setText(Integer.toString(main.getPolicy().getMaxOutput()));
 		leakField.setText(Integer.toString((int)Math.round(main.getPolicy().getLeakPct()*100)));
 		packField.setText(Integer.toString(main.getPolicy().getPackCap()));
+		schedOnField.setText(Integer.toString(main.getPolicy().getScheduleOn()));
+		schedOffField.setText(Integer.toString(main.getPolicy().getScheduleOff()));
 	}
 
 	private void applyEditor()
@@ -372,6 +536,22 @@ public class GuiFluidConsole extends GuiIEContainerBase
 		policy.setDouble("leakPct", parseIntOr(leakField.getText(),
 				(int)Math.round(main.getPolicy().getLeakPct()*100))/100.0);
 		policy.setInteger("packCap", parseIntOr(packField.getText(), main.getPolicy().getPackCap()));
+		//	=================================
+		//	The schedule window.
+		//	=================================
+		//
+		// Sent only when the two ends differ. Equal endpoints mean a window that never opens --
+		// deliberate in FluidPolicy, because an always-open window is indistinguishable from no
+		// schedule and would hide the typo -- so writing them through from a GUI would let somebody
+		// close their own main by pressing Apply on two boxes that happened to match. The command
+		// refuses the same pair outright; here the old window is simply kept.
+		int on = parseIntOr(schedOnField.getText(), main.getPolicy().getScheduleOn());
+		int off = parseIntOr(schedOffField.getText(), main.getPolicy().getScheduleOff());
+		if(on!=off)
+		{
+			policy.setInteger("scheduleOn", on);
+			policy.setInteger("scheduleOff", off);
+		}
 		send(Op.SET_POLICY, selected, policy);
 		fieldsLoadedFor = null;
 	}
@@ -582,23 +762,31 @@ public class GuiFluidConsole extends GuiIEContainerBase
 	{
 		FluidMain main = selectedMain();
 		loadFieldsFrom(main);
-		nameField.drawTextBox();
 		if(main==null)
 		{
+			drawFields(nameField);
 			fontRenderer.drawString("No main selected.", EDITOR_X+2, 40, COL_DIM);
 			return;
 		}
-		fluidField.drawTextBox();
-		inputField.drawTextBox();
-		outputField.drawTextBox();
-		leakField.drawTextBox();
-		packField.drawTextBox();
 
 		fontRenderer.drawString("carries", EDITOR_X+2, 96, COL_DIM);
 		fontRenderer.drawString("max in", EDITOR_X+2, 110, COL_DIM);
 		fontRenderer.drawString("max out", EDITOR_X+2, 124, COL_DIM);
 		fontRenderer.drawString("leak %", EDITOR_X+2, 138, COL_DIM);
 		fontRenderer.drawString("pack", EDITOR_X+2, 152, COL_DIM);
+		//Dimmed while the schedule is switched off, so the two boxes read as "not in use" rather
+		//than as settings that are being ignored for no stated reason.
+		boolean scheduled = main.getPolicy().isScheduleEnabled();
+		fontRenderer.drawString("open/shut", EDITOR_X+2, 166, scheduled?COL_TEXT: COL_DIM);
+		fontRenderer.drawString("-", EDITOR_X+79, 166, COL_DIM);
+
+		//The five full-width rows, then the schedule row's two narrow boxes.
+		for(int row = 0; row < 5; row++)
+			drawRect(EDITOR_X+46, 95+row*14, BODY_R-2, 107+row*14, COL_INSET);
+		drawRect(EDITOR_X+46, 165, EDITOR_X+78, 177, COL_INSET);
+		drawRect(EDITOR_X+83, 165, BODY_R-2, 177, COL_INSET);
+
+		drawFields(mainsFields());
 
 		fontRenderer.drawString(stateWord(main), EDITOR_X+22, 44, stateColour(main));
 		fontRenderer.drawString(main.getPack()+" / "+main.getPolicy().getPackCap()+" mB",
@@ -864,8 +1052,7 @@ public class GuiFluidConsole extends GuiIEContainerBase
 	protected void keyTyped(char typedChar, int keyCode) throws IOException
 	{
 		if(tab==Tab.MAINS)
-			for(GuiTextField field : new GuiTextField[]{nameField, fluidField, inputField,
-					outputField, leakField, packField})
+			for(GuiTextField field : mainsFields())
 				if(field!=null&&field.isFocused())
 				{
 					//Escape still has to close the window, or a focused field would trap the player.
@@ -886,8 +1073,7 @@ public class GuiFluidConsole extends GuiIEContainerBase
 	protected void mouseClicked(int mouseX, int mouseY, int mouseButton) throws IOException
 	{
 		if(tab==Tab.MAINS)
-			for(GuiTextField field : new GuiTextField[]{nameField, fluidField, inputField,
-					outputField, leakField, packField})
+			for(GuiTextField field : mainsFields())
 				if(field!=null)
 					field.mouseClicked(mouseX, mouseY, mouseButton);
 		super.mouseClicked(mouseX, mouseY, mouseButton);
@@ -916,7 +1102,8 @@ public class GuiFluidConsole extends GuiIEContainerBase
 	private static class GuiColourSwatch extends GuiButton
 	{
 		private final int colour;
-		private final boolean active;
+		/** Not final: the periodic refresh re-reads which swatch is the selected main's colour. */
+		private boolean active;
 
 		GuiColourSwatch(int id, int x, int y, int colour, boolean active)
 		{
