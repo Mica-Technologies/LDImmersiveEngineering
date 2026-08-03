@@ -24,11 +24,10 @@ import java.util.Locale;
  */
 public enum BlockTypes_GridMultiblock implements IStringSerializable, BlockIEBase.IBlockEnum
 {
-	GRID_CONSOLE,
-	/**
-	 * A formed Substation: a Feed Unit and a Service Unit in one transformer yard.
-	 */
-	SUBSTATION;
+	GRID_CONSOLE;
+	//The Substation was removed before it ever shipped: a transformer yard that was a Feed Unit and
+	//a Service Unit at once, and clunky enough in practice that it was not worth keeping. It sat at
+	//meta 1, the last value, so dropping it moved nothing else.
 
 	@Override
 	public String getName()

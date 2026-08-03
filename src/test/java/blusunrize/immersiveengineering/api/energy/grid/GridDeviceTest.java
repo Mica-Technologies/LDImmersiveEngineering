@@ -130,8 +130,8 @@ class GridDeviceTest
 		void displayNamePrefersCustom()
 		{
 			GridDevice device = new GridDevice(pos, GridDeviceType.FEED);
-			device.setCustomName("North substation tap");
-			assertEquals("North substation tap", device.getDisplayName());
+			device.setCustomName("North yard tap");
+			assertEquals("North yard tap", device.getDisplayName());
 		}
 
 		@Test

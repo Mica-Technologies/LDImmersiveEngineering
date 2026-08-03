@@ -62,12 +62,6 @@
 				"textures": {
 					"front": "immersiveengineering:blocks/grid_device_signal_front"
 				}
-			},
-			"substation_frame": {
-				"model": "cube_all",
-				"textures": {
-					"all": "immersiveengineering:blocks/grid_substation_frame"
-				}
 			}
 		},
 		"facing": {
@@ -91,14 +85,6 @@
 		"boolean0": {
 			"false": {},
 			"true": {}
-		},
-		"inventory,type=substation_frame": [
-			{
-				"model": "cube_all",
-				"textures": {
-					"all": "immersiveengineering:blocks/grid_substation_frame"
-				}
-			}
-		]
+		}
 	}
 }

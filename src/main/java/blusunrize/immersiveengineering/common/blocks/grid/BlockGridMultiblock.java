@@ -64,18 +64,6 @@ public class BlockGridMultiblock extends BlockIEMultiblock<BlockTypes_GridMultib
 	}
 
 	@Override
-	public void breakBlock(World world, BlockPos pos, IBlockState state)
-	{
-		//Drop both grid registrations with the yard. Without this the console's device list keeps a
-		//permanently offline ghost for every substation ever dismantled -- the same reason
-		//BlockGridDevice does it for the wall boxes.
-		TileEntity te = world.getTileEntity(pos);
-		if(te instanceof TileEntityGridSubstation)
-			((TileEntityGridSubstation)te).onBlockBroken();
-		super.breakBlock(world, pos, state);
-	}
-
-	@Override
 	public TileEntity createBasicTE(World world, BlockTypes_GridMultiblock type)
 	{
 		switch(type)

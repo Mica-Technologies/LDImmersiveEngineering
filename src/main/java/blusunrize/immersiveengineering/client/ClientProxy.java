@@ -854,12 +854,7 @@ public class ClientProxy extends CommonProxy
 				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid8",
 						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid9"),
-				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"),
-				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid11",
-						new ItemStack(IEContent.blockGridDevice, 1,
-								BlockTypes_GridDevice.SUBSTATION_FRAME.getMeta())),
-				new ManualPageMultiblock(ManualHelper.getManual(), "virtualGrid12",
-						MultiblockSubstation.instance));
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"));
 		//Conduits. Next to the wires and the grid, because the three are the same question asked
 		//three ways: how does power get from there to here, and what does it look like on the way.
 		ManualHelper.getManual().addEntry("conduits", ManualHelper.CAT_ENERGY,

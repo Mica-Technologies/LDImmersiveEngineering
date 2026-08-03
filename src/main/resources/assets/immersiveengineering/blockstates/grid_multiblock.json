@@ -19,13 +19,7 @@
 			}
 		],
 		"type": {
-			"grid_console": {},
-			"substation": {
-				"model": "cube_all",
-				"textures": {
-					"all": "immersiveengineering:blocks/grid_substation"
-				}
-			}
+			"grid_console": {}
 		},
 		"boolean1": {
 			"false": {
@@ -62,14 +56,6 @@
 		"_0multiblockslave": {
 			"false": {},
 			"true": {}
-		},
-		"inventory,type=substation": [
-			{
-				"model": "cube_all",
-				"textures": {
-					"all": "immersiveengineering:blocks/grid_substation"
-				}
-			}
-		]
+		}
 	}
 }
