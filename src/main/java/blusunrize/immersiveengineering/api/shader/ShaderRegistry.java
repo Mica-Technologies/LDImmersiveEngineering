@@ -523,10 +523,31 @@ public class ShaderRegistry
 
 	public static String getRandomShader(String player, Random rand, EnumRarity minRarity, boolean addToReceived)
 	{
-		int total = 0;
+		//	=================================
+		//	This used to alias the global table.
+		//	=================================
+		//
+		// It stored *the same map instance* as totalWeight under the player's key. The draw then
+		// ends in recalculatePlayerTotalWeight, which finds the key present, clears the map it finds
+		// -- the global one -- and refills it with this one player's duplicate-adjusted weights.
+		//
+		// So the first bag anybody opened destroyed the global weight table, and because every
+		// subsequent unknown player was handed that same instance again, every player after the
+		// first read whoever drew last. Bag odds were wrong for everyone, and the per-player
+		// duplicate de-weighting this whole mechanism exists for was shared rather than personal.
+		//
+		// Computing it properly instead: recalculatePlayerTotalWeight builds a fresh map when the
+		// key is absent, and for a player who has received nothing it produces exactly what
+		// compileWeight puts in totalWeight -- the two differ only in substituting a weight of 1 for
+		// shaders already held.
 		if(!playerTotalWeight.containsKey(player))
-			playerTotalWeight.put(player, totalWeight);
-		total = playerTotalWeight.get(player).get(minRarity);
+			recalculatePlayerTotalWeight(player);
+		//Absent rather than zero when a rarity has no bag loot at all -- a pack that removes every
+		//shader of a rarity would otherwise unbox a null here.
+		Integer totalForRarity = playerTotalWeight.get(player).get(minRarity);
+		if(totalForRarity==null)
+			return null;
+		int total = totalForRarity;
 
 		String shader = null;
 		int minWeight = rarityWeightMap.get(minRarity);

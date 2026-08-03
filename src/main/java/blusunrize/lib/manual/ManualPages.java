@@ -26,6 +26,8 @@ import net.minecraftforge.oredict.ShapedOreRecipe;
 import net.minecraftforge.oredict.ShapelessOreRecipe;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public abstract class ManualPages implements IManualPage
 {
@@ -885,15 +887,36 @@ public abstract class ManualPages implements IManualPage
 		}
 	}
 
-	public static String addLinks(ManualInstance helper, GuiManual gui, String text, int x, int y, int width, List<GuiButton> pageButtons)
+	/**
+	 * Rewrite every {@code <link;entry;text;page>} tag into a marked run, recording where each one
+	 * pointed.
+	 * <p>
+	 * <strong>Split out because it is the half that goes wrong and the half that can be tested.</strong>
+	 * The rest of {@code addLinks} needs a {@code FontRenderer} to measure the result; this needs
+	 * nothing but the string. Both defects it used to have came from the text itself -- which is
+	 * lang-file content, so pack authors and translators write it, and neither of them can be
+	 * expected to know that a stray bracket was being compiled as a regular expression.
+	 *
+	 * @param repList filled with {marked run, entry key, page} for each link found
+	 *
+	 * @return the text with each tag replaced by its marked run
+	 */
+	static String extractLinks(String text, List<String[]> repList)
 	{
-		List<String[]> repList = new ArrayList<String[]>();
 		int start;
 		int overflow = 0;
 		while((start = text.indexOf("<link")) >= 0&&overflow < 50)
 		{
 			overflow++;
 			int end = text.indexOf(">", start);
+			//	=================================
+			//	An unclosed tag is a typo, not a crash.
+			//	=================================
+			//
+			// indexOf answers -1 when there is no closing bracket, and substring(start, 0) then
+			// throws. One dropped '>' in a lang file took the whole manual page down with it.
+			if(end < 0)
+				break;
 			String rep = text.substring(start, end+1);
 			String[] segment = rep.substring(0, rep.length()-1).split(";");
 			if(segment.length < 3)
@@ -904,13 +927,34 @@ public abstract class ManualPages implements IManualPage
 			for(int iPart = 0; iPart < resultParts.length; iPart++)
 			{
 				//prefixing replacements with MC's formatting character and an unused char to keep them unique, but not counted for size
-				String part = '\u00a7'+String.valueOf((char)(128+repList.size()))+resultParts[iPart];
+				String part = '§'+String.valueOf((char)(128+repList.size()))+resultParts[iPart];
 				repList.add(new String[]{part, segment[1], page});
 				result += (iPart > 0?" ": "")+part;
 			}
-			text = text.replaceFirst(rep, result);
+			//	=================================
+			//	replaceFirst takes a regex, and this is prose.
+			//	=================================
+			//
+			// Both halves are user-authored. As a pattern, a link whose display text contains a
+			// bracket -- "<link;mixer;Mixer (see below);0>" -- is an unbalanced group and throws
+			// PatternSyntaxException; as a replacement, a '$' or a backslash is a group reference
+			// and either throws or silently mangles the line.
+			//
+			// Quoted on both sides so the two strings mean themselves. There is no literal
+			// replaceFirst in Java, which is the whole reason this was easy to get wrong.
+			text = text.replaceFirst(Pattern.quote(rep), Matcher.quoteReplacement(result));
 		}
+		return text;
+	}
 
+	public static String addLinks(ManualInstance helper, GuiManual gui, String text, int x, int y, int width, List<GuiButton> pageButtons)
+	{
+		List<String[]> repList = new ArrayList<String[]>();
+		text = extractLinks(text, repList);
+		int start;
+		//Was the tag counter from the loop that now lives in extractLinks. Only ever used to keep
+		//the button ids apart, so a per-button counter does the same job.
+		int buttonId = 0;
 
 		List<String> list = helper.fontRenderer.listFormattedStringToWidth(text, width);
 
@@ -936,8 +980,8 @@ public abstract class ManualPages implements IManualPage
 					} catch(Exception e)
 					{
 					}
-					pageButtons.add(new GuiButtonManualLink(gui, 900+overflow, x+bx, y+by, bw, (int)(helper.fontRenderer.FONT_HEIGHT*1.5), new ManualLink(bkey, bpage), rep[0]));
-					text = text.replaceFirst(formatIdent, "");
+					pageButtons.add(new GuiButtonManualLink(gui, 900+(buttonId++), x+bx, y+by, bw, (int)(helper.fontRenderer.FONT_HEIGHT*1.5), new ManualLink(bkey, bpage), rep[0]));
+					text = text.replaceFirst(Pattern.quote(formatIdent), "");
 					break;
 				}
 			}

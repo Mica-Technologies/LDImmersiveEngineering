@@ -519,14 +519,12 @@ class ShaderRegistryTest
 	}
 
 	@Test
-	@Disabled("getRandomShader aliases the global totalWeight map into playerTotalWeight")
 	@DisplayName("drawing a shader for one player leaves the global weight table alone")
 	void drawingAShaderDoesNotCorruptTheGlobalWeights()
 	{
-		// ShaderRegistry#getRandomShader stores the *same* totalWeight instance under the player's
-		// key when the player is unknown, and then calls recalculatePlayerTotalWeight, which clears
-		// and refills that very map. The global table therefore ends up holding one player's
-		// duplicate-adjusted weights until the next compileWeight().
+		// getRandomShader used to store the *same* totalWeight instance under the player's key when
+		// the player was unknown, and then call recalculatePlayerTotalWeight, which clears and
+		// refills that very map. The first bag anybody opened therefore destroyed the global table.
 		ShaderRegistry.registerShaderCase("test:only", dummyCase(), EnumRarity.COMMON);
 		ShaderRegistry.shaderRegistry.get("test:only").setBagLoot(true).setWeight(9);
 		ShaderRegistry.compileWeight();
@@ -538,6 +536,52 @@ class ShaderRegistryTest
 				"the global weight table must not track a single player's draws");
 		assertNotSame(ShaderRegistry.totalWeight, ShaderRegistry.playerTotalWeight.get("tester"),
 				"a player's weight table must be its own map");
+	}
+
+	@Test
+	@DisplayName("two players draw against their own weight tables, not a shared one")
+	void playersDoNotShareAWeightTable()
+	{
+		//	=================================
+		//	The damaging half of the same bug.
+		//	=================================
+		//
+		// Every unknown player was handed the *same* global map instance, so after the first draw
+		// they all pointed at one table -- and each draw cleared and refilled it with that player's
+		// duplicate-adjusted weights. The per-player de-weighting this whole mechanism exists for
+		// was therefore shared: your odds moved when somebody else opened a bag.
+		ShaderRegistry.registerShaderCase("test:only", dummyCase(), EnumRarity.COMMON);
+		ShaderRegistry.shaderRegistry.get("test:only").setBagLoot(true).setWeight(9);
+		ShaderRegistry.compileWeight();
+
+		ShaderRegistry.getRandomShader("alice", new Random(1), EnumRarity.COMMON, true);
+		ShaderRegistry.getRandomShader("bob", new Random(2), EnumRarity.COMMON, true);
+
+		assertNotSame(ShaderRegistry.playerTotalWeight.get("alice"),
+				ShaderRegistry.playerTotalWeight.get("bob"),
+				"two players must not share one weight table");
+		//Alice has received the only shader there is, so her weight for it drops to 1 while the
+		//global table still reads 9. If those two numbers are equal, her draw never happened or it
+		//was written somewhere shared.
+		assertEquals(1, (int)ShaderRegistry.playerTotalWeight.get("alice").get(EnumRarity.COMMON),
+				"a received shader must be de-weighted for the player who received it");
+		assertEquals(9, (int)ShaderRegistry.totalWeight.get(EnumRarity.COMMON),
+				"and that must not touch the global table");
+	}
+
+	@Test
+	@DisplayName("a rarity with no bag loot draws nothing rather than throwing")
+	void rarityWithNoBagLootIsSafe()
+	{
+		//getRandomShader unboxed the rarity's total straight out of the map. A pack that removes
+		//every shader of a rarity leaves no entry for it, so that was a null unbox on a bag the
+		//player had legitimately obtained.
+		ShaderRegistry.registerShaderCase("test:common", dummyCase(), EnumRarity.COMMON);
+		ShaderRegistry.shaderRegistry.get("test:common").setBagLoot(true).setWeight(5);
+		ShaderRegistry.compileWeight();
+
+		assertNull(ShaderRegistry.getRandomShader("tester", new Random(3), EnumRarity.EPIC, true),
+				"a rarity nothing is registered for should draw nothing");
 	}
 
 	// ---------------------------------------------------------------- layer assembly

@@ -314,7 +314,18 @@ public class ItemShader extends ItemIEBase implements IShaderItem, ITextureOverr
 		{
 			list.add(I18n.format(Lib.DESC_INFO+"shader.applyTo"));
 			String name = getShaderName(stack);
-			if(name!=null&&!name.isEmpty())
+			//	=================================
+			//	A name is not a registration.
+			//	=================================
+			//
+			// This checked the string was non-empty and then trusted the registry to know it. Every
+			// other lookup in this file guards with containsKey; this one is the tooltip, so an item
+			// whose shader no longer exists -- a pack that dropped one, or a stack that arrived from
+			// somewhere else -- threw on hover, every frame the cursor stayed on it.
+			//
+			// Shader items outlive the packs that defined them: they sit in chests and ender chests
+			// across updates, which is exactly when a name stops resolving.
+			if(name!=null&&ShaderRegistry.shaderRegistry.containsKey(name))
 			{
 				List<ShaderCase> array = ShaderRegistry.shaderRegistry.get(name).getCases();
 				for(ShaderCase sCase : array)
