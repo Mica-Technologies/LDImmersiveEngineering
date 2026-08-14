@@ -11,6 +11,7 @@ package blusunrize.immersiveengineering.common.util.compat;
 import blusunrize.immersiveengineering.common.Config;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import blusunrize.immersiveengineering.common.util.compat.crafttweaker.CraftTweakerHelper;
+import blusunrize.immersiveengineering.common.util.compat.mts.MTSHelper;
 import blusunrize.immersiveengineering.common.util.compat.opencomputers.OCHelper;
 import blusunrize.immersiveengineering.common.util.compat.waila.WailaHelper;
 import net.minecraftforge.fml.common.Loader;
@@ -48,6 +49,9 @@ public abstract class IECompatModule
 		moduleClasses.put("harvestcraft", HarvestcraftHelper.class);
 		moduleClasses.put("ic2", IC2Helper.class);
 		moduleClasses.put("inspirations", InspirationsHelper.class);
+		//Immersive Vehicles. Registered under its internal modid, which is "mts" -- the mod was
+		//Minecraft Transport Simulator long before it was renamed, and the id never followed.
+		moduleClasses.put("mts", MTSHelper.class);
 		moduleClasses.put("mysticalagriculture", MysticalAgricultureHelper.class);
 		moduleClasses.put("opencomputers", OCHelper.class);
 		moduleClasses.put("theoneprobe", OneProbeHelper.class);

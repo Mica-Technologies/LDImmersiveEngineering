@@ -18,9 +18,10 @@ manual and tested where the logic is world-free.
 behind it. The arithmetic is unit-tested and the server smoke run is clean, but no number in the
 back half of this document has been judged in a game.
 
-The only thing from the plan deliberately left out is **vehicles**, whose decision was always
-deferred: the Gas Station Pump and the Fuel Nozzle already target any entity with a fluid
-capability, so one could be added with no change to anything here.
+The only thing from the plan deliberately left out is **a vehicle of this fork's own**, whose
+decision was always deferred: the Gas Station Pump and the Fuel Nozzle already target any entity
+with a fluid capability, so one could be added with no change to anything here. Somebody else's
+vehicles are handled — see [Immersive Vehicles (MTS)](#immersive-vehicles-mts).
 
 Line numbers in this document are a reading aid, not a contract; the tree moves under them.
 
@@ -750,6 +751,109 @@ and walk back to the pump to refill.
 
 ---
 
+## Immersive Vehicles (MTS)
+
+`common/util/compat/mts/MTSHelper.java`, table in `MTSFuelTable.java`, registered as the `mts`
+compat module in `common/util/compat/IECompatModule.java`.
+
+This fork builds no vehicle of its own, but the pack it is built for runs **Immersive Vehicles**
+(internal modid `mts`, once Minecraft Transport Simulator) alongside content packs — the official
+one, UNU, DKZ. Out of the box **none of this fork's fuels worked in any of them**: a gas pump would
+reject a tank of `ie_gasoline` on contact.
+
+### Why they were rejected
+
+MTS decides what an engine will burn from `ConfigSystem.settings.fuel.fuels`, a
+`Map<fuelType, Map<fluidRegistryName, potency>>`. `PackParser.parsePacks` seeds it during MTS's own
+pre-init from a hardcoded table, keyed on the fuel types the loaded packs' engines actually ask for,
+and **a fuel type already in `mtsconfig.json` is never revisited**. Its defaults are:
+
+| MTS fuel type | Fluids it accepts by default |
+|---|---|
+| `gasoline` | `lava` 1.0, `gasoline` 1.0, `ethanol` 0.85 |
+| `diesel` | `lava` 1.0, `diesel` 1.0, `biodiesel` 0.8, `creosote` 0.7, `oil` 0.5 |
+| `avgas` | `lava` 1.0, `gasoline` 1.0 |
+| `redstone` / `water` / `nothing` | not petroleum |
+
+All bare names. This fork prefixes its distillation cuts `ie_` on purpose — see
+[Fluids](#fluids) — so `ie_gasoline` and `ie_diesel` are in none of those lists.
+`AEntityVehicleE_Powered.checkFuelTankCompatibility` looks the tank's fluid up in that map, misses,
+and returns `INVALID`. That is the rejection, and it is a naming mismatch rather than anything to do
+with how good the fuel is.
+
+### What the integration does
+
+At **post-init** — late enough that MTS's pre-init has certainly run and the map is populated, early
+enough that no vehicle has ticked — `MTSHelper` reaches that map by reflection and folds this fork's
+fluids into every fuel type it recognises. Nothing is written to `mtsconfig.json`: MTS saves its
+config during its own init, *before* this runs, so the injection is rebuilt from scratch each launch
+and leaves no mark on a file the player may have hand-edited. It is applied identically on both
+logical sides, which matters — MTS throws outright if a client and a server disagree about a fuel.
+
+Two rules make it safe to run against somebody else's config: **it never overwrites** a fluid the
+file already lists (that potency may be a pack author's deliberate edit), and **it never adds a fuel
+type** MTS does not already have (a type no engine asked for is noise in a config file).
+
+### The mapping
+
+Potency divides fuel consumption in MTS, so 1.0 is a full-value fuel and 0.5 burns twice as fast.
+
+| MTS fuel type | This fork's fluid | Registry name | Potency | Why |
+|---|---|---|---|---|
+| `gasoline` | Gasoline | `ie_gasoline` | 1.00 | The reference spark-ignition fuel. |
+| `gasoline` | Ethanol | `ethanol` | 0.85 | MTS's own number for ethanol, so a tuned pack sees no change. |
+| `gasoline` | Naphtha | `ie_naphtha` | 0.60 | A blendstock, not a finished fuel — it runs and knocks. Matches the cut's standing everywhere else in this feature. |
+| `gasoline` | Propane | `propane` | 0.70 | An LPG conversion; about seven tenths of gasoline by the litre. |
+| `avgas` | Gasoline | `ie_gasoline` | 1.00 | MTS's own avgas list is gasoline and nothing else. No substitutes are offered — an aircraft is the one place this table refuses to be generous. |
+| `diesel` | Diesel | `ie_diesel` | 1.00 | The reference compression-ignition fuel. |
+| `diesel` | Biodiesel | `biodiesel` | 0.80 | MTS's own number. |
+| `diesel` | Creosote | `creosote` | 0.70 | MTS's own number. |
+| `diesel` | Plant Oil | `plantoil` | 0.50 | What MTS gives its generic `oil`, and the same bargain: straight vegetable oil will run a diesel, poorly. |
+| jet / kerosene types | Diesel | `ie_diesel` | 0.90 | This fork has no kerosene — the design folded its yield into diesel — so diesel is what a turbine gets, discounted for the mismatch. |
+| jet / kerosene types | Naphtha | `ie_naphtha` | 0.70 | A naphtha-kerosene blend is a real wide-cut jet fuel. |
+
+Registry names are read off the live `Fluid` objects, not hardcoded, because `IEContent.setupFluid`
+yields to whoever registered a name first: on a pack where another mod owns `ethanol` or `creosote`,
+`IEContent.fluidEthanol` **is** that mod's fluid, and its name is the one MTS will see in the tank.
+
+### Fuel types this code has never heard of
+
+The four names above are MTS's own. Content packs invent their own freely, and a fuel type MTS has
+no default for gets nothing but `lava` — so `MTSFuelTable.classify` reads the name instead of
+looking it up: `avgas`/`aviation`/`100LL` before anything else (`avgas` contains "gas", and getting
+that order wrong hands a light aircraft a tank of ethanol), then `jet`/`kerosene`/`jp8`/`turbine`,
+then `diesel`, then `gasoline`/`petrol`/`octane`. Never a bare `gas` substring, so `natural_gas` is
+not mistaken for petrol. A hard refusal list — `redstone`, `water`, `nothing`, `electric`, `steam`,
+`lava`, `coal`, `furnace`, `brewer`/`brewing`, `milk`, `creative` — is checked first, so a crafter
+or an electric drive never starts taking diesel because a word happened to match.
+
+### What is deliberately not offered
+
+Crude oil, heavy fuel oil, lubricant, bitumen, asphalt, sour gas, natural gas, steam and concrete
+are all left out. Sour gas and steam are not fuels at all; crude is deliberately awful even in the
+machines that will take it; and heavy fuel oil, lubricant, bitumen and natural gas each exist to
+give one fork machine its reason to be built — the Industrial Burner, the Lubrication Manifold, the
+asphalt line, the Gas Turbine. Handing them to a car would dissolve the choice each of those blocks
+poses.
+
+### Verification
+
+**The mapping and the merge are unit-tested**
+(`src/test/java/.../common/util/compat/mts/MTSFuelTableTest.java`); the reflection is not, because
+MTS is not in this dev environment. The module says exactly what it did at startup, so a playtester
+can confirm it from the log without a debugger — search `latest.log` for
+`Immersive Vehicles compat`:
+
+```
+[INFO] Immersive Vehicles compat: fuel type 'gasoline' now also accepts {ie_gasoline=1.0, ie_naphtha=0.6, propane=0.7}
+[INFO] Immersive Vehicles compat: extended 3 of its 4 fuel types ([gasoline, diesel, avgas, redstone]). Fuel pumps and jerrycans should now take these fluids.
+```
+
+Every way it can fail logs a `WARN` naming the step that failed. If nothing at all is logged, the
+compat module never ran: check that `mts` is `true` under `compat` in IE's config.
+
+---
+
 ## Fluid Loading Gantry
 
 `common/blocks/petroleum/TileEntityLoadingGantry.java`, shape in
@@ -1148,13 +1252,14 @@ cells not yet rolled. A cell already cached keeps the capacity it rolled at.
 | Buried tanks | `common/blocks/petroleum/BuriedTankGeometry.java`, `TileEntityBuriedTank.java` (+ three tier subclasses), `common/blocks/multiblocks/MultiblockBuriedTank.java` |
 | Forecourt | `common/blocks/petroleum/TileEntityGasPump.java`, `TileEntityForecourtSign.java`, `TileEntityPortableGenerator.java`, `client/gui/GuiGasPump.java`, `common/gui/ContainerGasPump.java`, `common/util/network/MessagePumpSettings.java` |
 | Economy hook | `api/petroleum/FuelDispensedEvent.java` |
+| Immersive Vehicles fuel injection (reflection) / mapping table (world-free, unit-tested) | `common/util/compat/mts/MTSHelper.java`, `common/util/compat/mts/MTSFuelTable.java` |
 | Loose items (nozzle, drill pipe, preventer, pad, petcoke, survey kit) | `common/items/ItemPetroleum.java`, `common/items/PetroleumItemNames.java` |
 | Loading gantry | `common/blocks/petroleum/TileEntityLoadingGantry.java`, `common/blocks/multiblocks/MultiblockLoadingGantry.java` |
 | Cracking unit | `common/blocks/petroleum/TileEntityCrackingUnit.java`, `common/blocks/multiblocks/MultiblockCrackingUnit.java` |
 | Enhanced recovery | `common/blocks/petroleum/TileEntityReinjectionWell.java`, allowance tracking in `api/petroleum/Reservoir.java` |
 | Seismic survey arithmetic (world-free, unit-tested) | `api/petroleum/SeismicSurvey.java` |
 | Virtual fluid network | `api/fluid/network/`, `common/blocks/fluidnet/`, `common/util/fluidnet/` — see `docs/FLUID_NETWORK.md` |
-| Tests | `src/test/java/blusunrize/immersiveengineering/api/petroleum/` (`ReservoirHandlerTest`, `ReservoirModelTest`), `src/test/java/.../common/util/petroleum/ReservoirSurveyTest.java`, `src/test/java/.../common/blocks/petroleum/` (`DerrickTest`, `PumpjackTest`, `DistillationTowerTest`, `IndustrialBurnerTest`, `PetroleumAssetsTest`) |
+| Tests | `src/test/java/blusunrize/immersiveengineering/api/petroleum/` (`ReservoirHandlerTest`, `ReservoirModelTest`), `src/test/java/.../common/util/petroleum/ReservoirSurveyTest.java`, `src/test/java/.../common/blocks/petroleum/` (`DerrickTest`, `PumpjackTest`, `DistillationTowerTest`, `IndustrialBurnerTest`, `PetroleumAssetsTest`), `src/test/java/.../common/util/compat/mts/MTSFuelTableTest.java` |
 
 The reservoir model (`ReservoirHandler`, `ReservoirModel`, `Reservoir`, `ReservoirType`) and
 `ReservoirSurvey` are expressed purely in terms of plain data and `java.util.Random` — none of them

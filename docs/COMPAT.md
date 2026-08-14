@@ -12,7 +12,7 @@ config, and driven through a fixed lifecycle. Every lifecycle call is wrapped in
 try/catch so a broken compat module can never crash IE.
 
 Larger integrations live in subpackages (`jei/`, `opencomputers/`, `waila/`,
-`crafttweaker/`); smaller ones are single `*Helper` files in the compat root.
+`crafttweaker/`, `mts/`); smaller ones are single `*Helper` files in the compat root.
 
 ---
 
@@ -144,6 +144,34 @@ Thermoelectric. Each wraps the corresponding IE recipe/handler list with add/rem
 removeAll. Removal scans are O(n) full-list iterations but **load-time only**.
 
 > Cosmetic note: `Mixer.java:61` `describe()` mislabels itself as "Fermenter".
+
+---
+
+## Immersive Vehicles (`mts/`) — fork-only
+
+Entry: `mts/MTSHelper.java`, gated on modid **`mts`** (Immersive Vehicles was Minecraft
+Transport Simulator long before it was renamed, and the id never followed).
+
+Makes this fork's petroleum fuels usable in MTS vehicles. MTS holds what an engine will
+burn in `ConfigSystem.settings.fuel.fuels`, a `Map<fuelType, Map<fluidRegistryName,
+potency>>` seeded once during MTS's own pre-init from a hardcoded default table of *bare*
+fluid names (`gasoline`, `diesel`, `ethanol`, …). This fork prefixes its cuts `ie_`, so
+none of them appear in any entry and a fuel pump rejects them on contact.
+
+`postInit` reaches that live map by **reflection** — no MTS class is named at compile
+time, and the jar is not in this dev environment — and folds in the fork's fluids. Post-init
+is the moment because MTS populates the map in its own pre-init, and MTS writes
+`mtsconfig.json` in its own init, so the injection lands after both and is never persisted:
+it is rebuilt from scratch every launch. It never overwrites a potency already in the file
+and never invents a fuel type MTS does not have.
+
+The decision itself — which fuel type takes which fluid at what potency, and how a content
+pack's invented fuel type name is classified — lives in `mts/MTSFuelTable.java`, which
+imports nothing from Minecraft or Forge and is unit-tested in
+`src/test/java/.../common/util/compat/mts/MTSFuelTableTest.java`. **The mapping table for
+each fuel type, and what is deliberately excluded, is documented in `docs/PETROLEUM.md`.**
+
+Load-time only; no runtime cost and no event subscribers.
 
 ---
 
