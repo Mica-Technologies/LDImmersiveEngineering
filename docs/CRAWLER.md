@@ -27,7 +27,13 @@ would make every sentence about either one ambiguous.
 
 **Turning your head slews the house.** The operator cannot look around independently of the
 machine, which is authentic and is also the sort of thing that has to be said rather than
-discovered.
+discovered. The house follows at **six degrees a tick** rather than instantly — see the movement
+contract below.
+
+**It is heavy, and it is meant to feel heavy.** The throttle asks for a speed and the machine winds
+up to it over about a second; letting go stops it in about a third of one. It steers tightest
+standing still and describes an arc at speed, the way a skid steer does. A one-block ledge is
+climbed rather than bumped into, and climbing it costs some of the speed you arrived with.
 
 **The arm is aimed, not jointed.** Two pairs of keys say which way it points and how far along that
 line the tool sits; the boom and stick solve their own angles to get there. That is a deliberate
@@ -103,6 +109,48 @@ reported an empty tank on a full machine. Both now mirror into `DataParameter`s 
 `onContentsChanged`, with the NBT paths topped up by hand because neither `FluidTank.readFromNBT`
 nor `ItemStackHandler.deserializeNBT` fires that hook.
 
+## How it moves
+
+**The server decides where the machine is, and the client only ever catches up to that.** Everything
+about the driving happens on the server: throttle, steering, gravity and the one `move` call a tick.
+A client runs none of it. It receives a position and a heading, and slides towards them over three
+ticks — the same mechanism a boat uses, with fewer steps, because this machine's tracker sends a
+packet every tick and more smoothing would only be more delay between the key and the tracks.
+
+**That split is what "janky" was.** The machine used to run its own gravity and its own `move` on the
+client, with a motion vector nothing client-side ever filled in, and then have its position
+overwritten by every packet that arrived. So it stood still, jumped forward, stood still, jumped
+forward, twenty times a second — and the operator's camera, bolted to a seat on top of it, did the
+same. Two authorities disagreeing about where a thing is, at the tick rate.
+
+| Quantity | Value | Why |
+|---|---|---|
+| Top speed | 0.14 blocks/tick | About what the old impulse-and-friction scheme settled at |
+| Reverse | ×0.6 | Slower, as it is on anything tracked |
+| Acceleration | 0.008 blocks/tick² | Full speed in about a second |
+| Braking | 0.02 blocks/tick² | Stopped in about a third of one, so it never coasts |
+| Turn rate | 2.6°/tick at rest | Tightest standing still, ×0.6 of that at full speed |
+| Turn ramp | 0.4°/tick², 0.9 unwinding | A turn winds up rather than switching on |
+| Slew | 6°/tick | Twice a real machine's ten revolutions a minute |
+| Climb cost | 45% of speed per block | A ledge is heaved over, not stepped over for free |
+| Interpolation | 3 ticks, snapping past 4 blocks | Smoothing below a teleport, and a teleport above it |
+
+**Nothing is set; everything is a rate that is wound up to.** The throttle asks for a speed and the
+acceleration walks towards it, with a separate and faster figure for slowing down, because an engine
+and a brake are not the same device. The steering is the same shape with different numbers. All of it
+is in `CrawlerDrive`, world-free and unit-tested, for the same reason the geometry is.
+
+**A machine held against a wall banks no momentum.** The speed it carries into the next tick is
+reconciled against the ground it actually covered, so an obstacle bogs it down instead of storing up a
+throttle's worth of energy to spend the instant the obstacle is dug away — which on a demolition
+machine happens several times a minute.
+
+**The house slews at a rate for the same reason the arm's joints do.** It used to snap straight to the
+operator's view, which threw the seat (and the camera bolted to it) a block and a half sideways in one
+tick on a flick of the mouse, and swept the tool between two headings without ever occupying the space
+in between. The joints had been rate-limited since they were written; the one axis that could move the
+tool through a wall in a single tick was the one that was not.
+
 ---
 
 ## How it is put together
@@ -111,6 +159,7 @@ nor `ItemStackHandler.deserializeNBT` fires that hook.
 |---|---|
 | The entity: driving, riding, fuel, attachments | `common/entities/EntityHydraulicCrawler.java` |
 | Dimensions, scale, headings, angle helpers | `common/entities/CrawlerGeometry.java` |
+| Acceleration, braking, steering, interpolation | `common/entities/CrawlerDrive.java` |
 | The arm's inverse kinematics and forward kinematics | `common/entities/CrawlerArm.java` |
 | Which blocks a bite takes, and which may be taken | `common/entities/CrawlerDemolition.java` |
 | The three attachments | `common/entities/CrawlerAttachment.java` |
@@ -148,6 +197,13 @@ find them by walking `getParts()`. Giving them collision boxes would make the ar
 is blocked by, and a blocking box that sweeps into somebody leaves them stuck inside geometry —
 Minecraft resolves a moving entity against a standing one by refusing to let the standing one in. So
 "ride in the cab" is a promise and "stand on the boom while it swings" is not.
+
+**Every angle the machine is drawn at is interpolated, and none may be snapped.** The pose is four
+synced floats that change once a tick, and the joints step four degrees at a time; drawn straight from
+them, the arm moves at twenty frames a second on a screen refreshing at several times that. The
+house's rotation is taken *relative to the interpolated heading*, not to this tick's — subtracting the
+un-interpolated one drew the cab swinging back and forth across the tracks by a tick's worth of
+steering, every frame, but only while turning.
 
 **All the geometry is world-free and unit-tested.** The test harness has no Minecraft bootstrap, so
 an `Entity` cannot even be constructed — anything left on the entity is code no test will ever run.

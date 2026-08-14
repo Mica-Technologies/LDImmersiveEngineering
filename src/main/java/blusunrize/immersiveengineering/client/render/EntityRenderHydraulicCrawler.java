@@ -29,8 +29,11 @@ import javax.annotation.Nullable;
  * at the slew on top of that. The model owns the second rotation, so this only has to hand over four
  * angles.
  * <p>
- * The slew is interpolated between ticks rather than snapped. It arrives over the network as a synced
- * float, so a machine turning under a distant player would otherwise step round in visible jumps.
+ * <strong>Every angle here is interpolated between ticks, and none of them may be snapped.</strong>
+ * The pose arrives over the network as four synced floats that change once a tick, so anything drawn
+ * straight from them moves at twenty frames a second on a screen refreshing at several times that --
+ * which is not a subtle effect on an arm whose joints step four degrees at a time. The machine's own
+ * heading is interpolated for us, by the render manager, and arrives as {@code entityYaw}.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
@@ -93,12 +96,27 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 
 		bindEntityTexture(crawler);
 		model.setPose(
-				//Relative to the tracks: the entity's yaw is already in the matrix above, so feeding
-				//the absolute slew in here would apply the heading twice and the house would counter-
-				//rotate as the machine turned.
+				//	=================================
+				//	Relative to the tracks, and to the tracks as they are being drawn.
+				//	=================================
+				//
+				// The entity's yaw is already in the matrix above, so feeding the absolute slew in here
+				// would apply the heading twice and the house would counter-rotate as the machine
+				// turned. What has to be taken back out of it is therefore exactly what was put in --
+				// entityYaw, which the render manager has already interpolated between ticks.
+				//
+				// It used to subtract crawler.rotationYaw: this tick's heading, against an interpolated
+				// one. The difference between the two is a whole tick of steering, so while the machine
+				// was turning the house was drawn swinging back and forth across the tracks by up to
+				// the turn rate, every frame. Standing still it was exact, which is why it read as the
+				// cab shaking only while driving.
 				MathHelper.wrapDegrees(interpolate(crawler.prevSlew, crawler.getSlew(), partialTicks)
-						-MathHelper.wrapDegrees(crawler.rotationYaw)),
-				crawler.getBoomAngle(), crawler.getStickAngle(), crawler.getToolAngle());
+						-entityYaw),
+				//The joints step once a tick, by up to four degrees. Drawn straight from the synced
+				//values the arm judders at twenty frames a second; interpolated, it moves.
+				interpolate(crawler.prevBoom, crawler.getBoomAngle(), partialTicks),
+				interpolate(crawler.prevStick, crawler.getStickAngle(), partialTicks),
+				interpolate(crawler.prevTool, crawler.getToolAngle(), partialTicks));
 		model.render(crawler, 0, 0, 0, 0, 0, 1F);
 
 		GlStateManager.popMatrix();

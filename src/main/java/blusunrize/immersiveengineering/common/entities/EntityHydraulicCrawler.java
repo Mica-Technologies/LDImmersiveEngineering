@@ -50,6 +50,8 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 import javax.annotation.Nullable;
 
@@ -194,18 +196,41 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	private Vec3d lastToolTip;
 	private int contactCooldown;
 
-	/** Blocks per tick at full throttle. Slow, because a tracked machine is slow. */
-	private static final double DRIVE_SPEED = 0.11;
-	/** Reverse is slower still, as it is on anything with tracks. */
-	private static final double REVERSE_FACTOR = 0.6;
-	/** Degrees per tick the undercarriage turns under a full steering input. */
-	private static final float TURN_RATE = 2.2F;
 	/**
-	 * How much of its speed the machine keeps each tick with no throttle. Low: twenty tonnes on
-	 * steel tracks does not coast, and a machine that drifted after the key was released would feel
-	 * like a boat.
+	 * How fast the machine is travelling along its tracks, in blocks per tick, signed.
+	 * <p>
+	 * <strong>State, rather than something recomputed from the throttle each tick.</strong> That is the
+	 * whole of the acceleration model: the key says what speed is wanted and this is what the machine
+	 * has got round to. Server-side only -- a client never simulates this machine at all, it
+	 * interpolates towards what it is told.
 	 */
-	private static final double GROUND_FRICTION = 0.55;
+	private double groundSpeed;
+	/** Degrees per tick the undercarriage is turning right now. Wound up to, not switched on. */
+	private double turnRate;
+
+	/** Where the server last said this machine was, and the yaw it was at. See {@link #tickLerp()}. */
+	private double lerpX, lerpY, lerpZ, lerpYaw;
+	private int lerpSteps;
+
+	/** How fast gravity pulls it down, and the fastest it is allowed to fall. */
+	private static final double GRAVITY = 0.08;
+	private static final double TERMINAL_FALL = 2.0;
+
+	/**
+	 * Degrees a tick the house slews towards the operator's view.
+	 * <p>
+	 * <strong>It used to be instant, and that was a jolt rather than a machine.</strong> The seat is on
+	 * the house, nearly a block out from the mast, so a flick of the mouse threw the operator -- and the
+	 * camera bolted to them -- a block and a half sideways inside one tick. The arm's joints were rate
+	 * limited from the day they were written, for reasons the class comment on {@link CrawlerArm} sets
+	 * out at length, and the one axis that could sweep the tool through a wall in a single tick was the
+	 * one that was not.
+	 * <p>
+	 * A real machine slews at something like ten revolutions a minute, which would be three degrees a
+	 * tick. Six is twice that: heavy enough to feel like mass, quick enough that a quarter turn takes
+	 * three quarters of a second rather than a second and a half.
+	 */
+	private static final float SLEW_RATE = 6F;
 
 	private static final DataParameter<Float> SLEW = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
@@ -257,8 +282,16 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	public static final float PARKED_STICK = 96F;
 	public static final float PARKED_TOOL = 24F;
 
-	/** Interpolated on the client so the house does not snap between sync packets. */
-	public float prevSlew;
+	/**
+	 * Last tick's pose, kept so the renderer can draw the frames in between.
+	 * <p>
+	 * <strong>All four, not just the slew.</strong> Every one of them is a synced parameter that steps
+	 * once a tick -- the joints at up to {@link CrawlerArm#JOINT_RATE} degrees a step -- so an arm drawn
+	 * straight from them moves at twenty frames a second on a screen refreshing at several times that.
+	 * It reads as the arm juddering, which is exactly what it is. The slew has been interpolated since
+	 * the machine was first drawn; the joints were not, and they are the parts that move fastest.
+	 */
+	public float prevSlew, prevBoom, prevStick, prevTool;
 
 	//	=================================
 	//		CONTROLS
@@ -335,6 +368,23 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		this.preventEntitySpawning = true;
 		//A block of step, so it climbs a kerb instead of stopping at one. Tracks would.
 		this.stepHeight = 1.0F;
+		//	=================================
+		//	Never culled by the frustum.
+		//	=================================
+		//
+		// A 1.12 entity is culled against its collision box, and this machine's collision box is the
+		// tracks -- two and a quarter blocks square. The arm reaches five and a half blocks past it, so
+		// an operator looking along their own boom had the whole machine, arm included, blink out of
+		// existence the moment the tracks left the edge of the screen. There is exactly one of these in
+		// a world at a time, so drawing it unconditionally costs nothing worth measuring, and it is what
+		// the Ender Dragon does with its own parts for the same reason.
+		this.ignoreFrustumCheck = true;
+
+		//Seeded with the pose entityInit has just registered, so the very first frame a client draws
+		//interpolates from the parked arm rather than from three zeroes it was never in.
+		prevBoom = PARKED_BOOM;
+		prevStick = PARKED_STICK;
+		prevTool = PARKED_TOOL;
 
 		parts = new EntityCrawlerPart[PART_ALONG.length];
 		for(int i = 0; i < parts.length; i++)
@@ -798,12 +848,43 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	public void onUpdate()
 	{
 		super.onUpdate();
-		prevSlew = getSlew();
+		//	=================================
+		//	Where the machine was when this tick began.
+		//	=================================
+		//
+		// Everything a renderer draws between two ticks is drawn between a prev field and its live
+		// counterpart, so every quantity that moves needs one and every one of them has to be taken
+		// before the tick moves anything. Position and rotation are also copied by Entity's own base
+		// tick, immediately above, and are restated here because they are the two the smoothness of
+		// this machine rests on and neither should depend on remembering that.
 		prevPosX = posX;
 		prevPosY = posY;
 		prevPosZ = posZ;
+		prevRotationYaw = rotationYaw;
+		//The pose has no such machinery at all: these four are synced parameters, and nothing in
+		//vanilla knows they are angles that get drawn.
+		prevSlew = getSlew();
+		prevBoom = getBoomAngle();
+		prevStick = getStickAngle();
+		prevTool = getToolAngle();
 
-		if(!world.isRemote)
+		if(world.isRemote)
+		{
+			//	=================================
+			//	The client does not simulate this machine. At all.
+			//	=================================
+			//
+			// It used to. It ran the same gravity and the same move() the server ran, on a motion
+			// vector nothing client-side had ever put anything into, and then had its position
+			// overwritten by every packet that arrived. So the machine stood still, jumped forward,
+			// stood still, jumped forward, twenty times a second -- and the operator's camera, bolted
+			// to a seat on top of it, did the same. That is the jank: not the speed and not the
+			// steering, but two authorities disagreeing about where a thing is, at the tick rate.
+			//
+			// Now there is one authority, and the client's only job is to catch up to it smoothly.
+			tickLerp();
+		}
+		else
 		{
 			//Counted down here rather than inside workAttachment, which only runs while the trigger
 			//is held: a cooldown that only expired while working stayed latched the moment somebody
@@ -813,7 +894,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			followOperatorsView();
 			drive();
 		}
-		//Positioned on both sides -- see positionParts -- and before the contact check, so the arm is
+		//Positioned on both sides -- see positionParts -- and after the machine has moved, so the arm is
 		//tested where it is now rather than where it was last tick.
 		positionParts();
 		if(!world.isRemote)
@@ -822,17 +903,43 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			bumpEntities();
 			lastToolTip = getToolTip();
 		}
+	}
 
-		//Gravity, then a single move: a machine this heavy does not need airborne control, and
-		//applying the throttle after the move would spend it on a position that no longer exists.
-		motionY -= 0.08;
-		move(MoverType.SELF, motionX, motionY, motionZ);
-		motionX *= GROUND_FRICTION;
-		motionZ *= GROUND_FRICTION;
-		if(onGround)
-			motionY = 0;
-		else
-			motionY *= 0.98;
+	/**
+	 * Slide the machine towards where the server last said it was.
+	 * <p>
+	 * A vanilla {@code Entity} handed a position packet simply teleports to it -- which is fine for a
+	 * chicken and is not fine for something a player is sitting on. Boats have overridden this since
+	 * they were written; this is the same mechanism, with fewer steps because this machine's tracker
+	 * sends a packet every tick and the extra smoothing would only be extra delay.
+	 * <p>
+	 * <strong>The yaw is stepped by the shortest turn and never wrapped.</strong> It arrives as a single
+	 * byte, so it wraps at half a turn, and a renderer interpolating from 179 degrees to -179 spins the
+	 * whole machine a full revolution inside one frame. Keeping the client's own copy continuous costs
+	 * nothing and makes that impossible.
+	 */
+	private void tickLerp()
+	{
+		if(lerpSteps <= 0)
+			return;
+		double step = lerpSteps;
+		setPosition(posX+(lerpX-posX)/step, posY+(lerpY-posY)/step, posZ+(lerpZ-posZ)/step);
+		rotationYaw += CrawlerGeometry.shortestTurn(rotationYaw, lerpYaw)/step;
+		lerpSteps--;
+	}
+
+	@Override
+	@SideOnly(Side.CLIENT)
+	public void setPositionAndRotationDirect(double x, double y, double z, float yaw, float pitch,
+											 int posRotationIncrements, boolean teleport)
+	{
+		lerpX = x;
+		lerpY = y;
+		lerpZ = z;
+		lerpYaw = yaw;
+		//The server's own count is ignored: it is three for everything that moves, chickens included,
+		//and what this machine wants depends on how far off it is rather than on what it is.
+		lerpSteps = CrawlerDrive.lerpSteps(Math.sqrt(getDistanceSq(x, y, z)));
 	}
 
 	/**
@@ -863,7 +970,11 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			controlFlags = 0;
 			return;
 		}
-		setSlew(rider.rotationYaw);
+		//Towards the operator's view at the speed a slew ring turns, not straight to it. A machine that
+		//could face anywhere in one tick threw its own seat -- and the camera on it -- a block and a
+		//half sideways on a flick of the mouse, and swept the tool through whatever was between the two
+		//headings without ever occupying the space in between.
+		setSlew((float)CrawlerGeometry.approach(getSlew(), rider.rotationYaw, SLEW_RATE));
 		//The engine burns while somebody is aboard, whether or not they are doing anything. A machine
 		//that cost nothing to sit in would be a machine nobody ever switched off.
 		burn(CrawlerConfig.fuelIdle);
@@ -1277,26 +1388,63 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		return new Vec3d(posX+offset[0], posY+offset[1], posZ+offset[2]);
 	}
 
+	/**
+	 * A tick of driving: the throttle, the steering, gravity, and exactly one move.
+	 * <p>
+	 * <strong>Everything here is a rate the machine winds up to, not a value it is set to.</strong> The
+	 * first version put a fixed impulse into {@code motion} whenever W was held and multiplied what was
+	 * left by a friction constant afterwards. It worked, in the sense that the machine went where it was
+	 * pointed, and it felt like nothing at all: full speed on the first tick, stopped four ticks after
+	 * letting go, and a turn that was either off or at its maximum with nothing in between. All three
+	 * are things twenty tonnes on steel tracks conspicuously does not do. See {@link CrawlerDrive} for
+	 * the numbers and for why braking and accelerating are two different ones.
+	 * <p>
+	 * Runs with nobody aboard as well, with the inputs at zero: a machine whose ground is dug out from
+	 * under it has to fall, and one left mid-turn has to wind down rather than stop dead.
+	 */
 	private void drive()
 	{
 		Entity rider = getControllingPassenger();
-		if(!(rider instanceof EntityLivingBase))
-			return;
-		EntityLivingBase operator = (EntityLivingBase)rider;
+		float throttle = 0, steer = 0;
+		if(rider instanceof EntityLivingBase)
+		{
+			throttle = ((EntityLivingBase)rider).moveForward;
+			//Skid steer: strafing turns the tracks rather than sliding the machine sideways, because
+			//tracks cannot go sideways. This is what makes it read as tracked rather than as a car.
+			steer = ((EntityLivingBase)rider).moveStrafing;
+		}
 
-		//Skid steer: strafing turns the tracks rather than sliding the machine sideways, because
-		//tracks cannot go sideways. This is what makes it read as tracked rather than as a car.
-		float steer = operator.moveStrafing;
-		if(steer!=0)
-			rotationYaw += -steer*TURN_RATE;
+		//Steered before it is driven, so the throttle is spent along the heading the machine has this
+		//tick rather than the one it had last tick.
+		turnRate = CrawlerDrive.ramp(turnRate, CrawlerDrive.targetTurn(steer, groundSpeed),
+				CrawlerDrive.TURN_ACCELERATION, CrawlerDrive.TURN_BRAKING);
+		if(turnRate!=0)
+			//Wrapped on the server only. The client keeps its own copy continuous -- see tickLerp --
+			//because the two have opposite requirements: the heading goes over the wire as a byte that
+			//wraps, and a rendered angle that wraps spins a full turn in one frame.
+			rotationYaw = MathHelper.wrapDegrees(rotationYaw+(float)turnRate);
 
-		float throttle = operator.moveForward;
-		if(throttle==0)
-			return;
-		double speed = DRIVE_SPEED*throttle*(throttle < 0?REVERSE_FACTOR: 1);
+		groundSpeed = CrawlerDrive.ramp(groundSpeed, CrawlerDrive.targetSpeed(throttle),
+				CrawlerDrive.ACCELERATION, CrawlerDrive.BRAKING);
 		double[] heading = CrawlerGeometry.heading(rotationYaw);
-		motionX += heading[0]*speed;
-		motionZ += heading[1]*speed;
+		//Assigned rather than added to: the speed above is the whole of the machine's motion, and
+		//anything else that has pushed a tracked vehicle sideways is wrong about it.
+		motionX = heading[0]*groundSpeed;
+		motionZ = heading[1]*groundSpeed;
+		motionY = Math.max(motionY-GRAVITY, -TERMINAL_FALL);
+
+		double fromX = posX, fromY = posY, fromZ = posZ;
+		move(MoverType.SELF, motionX, motionY, motionZ);
+		if(onGround)
+			motionY = 0;
+		else
+			motionY *= 0.98;
+
+		//What it managed, rather than what it intended. A machine held against a wall must not be
+		//storing up a throttle's worth of momentum to spend the moment the wall comes down, and a
+		//machine that has just heaved itself up a kerb has spent something doing it.
+		groundSpeed = CrawlerDrive.afterMove(groundSpeed,
+				Math.hypot(posX-fromX, posZ-fromZ), posY-fromY);
 	}
 
 	@Override
