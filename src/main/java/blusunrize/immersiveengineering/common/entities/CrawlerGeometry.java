@@ -86,6 +86,17 @@ public final class CrawlerGeometry
 	public static final double HEIGHT = 46*UNIT;
 
 	/**
+	 * Half the distance between the two tracks' centrelines, in model units.
+	 * <p>
+	 * What a skid steer turns about. The outside track of a turn covers this much extra ground
+	 * per radian and the inside one covers that much less, which is how the two tracks are wound
+	 * on at different rates so that a machine spinning on the spot still has running gear that
+	 * is visibly running. The tracks span 12 to 24 units out from the centre, so their
+	 * centrelines are at 18.
+	 */
+	public static final double TRACK_CENTRE = 18;
+
+	/**
 	 * Where the operator sits, relative to the centre of the machine.
 	 * <p>
 	 * <strong>Read off the model's cab box rather than guessed.</strong> The cab spans model x 1 to 15

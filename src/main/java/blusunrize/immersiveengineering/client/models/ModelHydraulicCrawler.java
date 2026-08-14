@@ -8,60 +8,61 @@
 
 package blusunrize.immersiveengineering.client.models;
 
+import blusunrize.immersiveengineering.common.entities.CrawlerAttachment;
 import blusunrize.immersiveengineering.common.entities.CrawlerGeometry;
-import net.minecraft.client.model.ModelBase;
-import net.minecraft.client.model.ModelRenderer;
-import net.minecraft.entity.Entity;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
- * The Hydraulic Crawler's body: tracks, a house that slews on them, and a three-piece arm.
+ * The Hydraulic Crawler's body: two tracks with the wheels turning inside them, a house that
+ * slews on top, a three-piece arm, and whichever of the three attachments is fitted.
  * <p>
- * A hand-built {@link ModelBase} rather than an OBJ, and not for want of preferring the nicer option:
- * the arm has to <em>move</em>, and a hierarchy of {@link ModelRenderer} boxes is the only thing in
- * 1.12 that animates per part without writing a bespoke renderer. IE's OBJ support is for blocks.
+ * <strong>An OBJ read by {@link EntityOBJModel}, not a hierarchy of boxes, and the reason is
+ * the playtest report that asked for this.</strong> The old model was nine
+ * {@code ModelRenderer} cuboids -- "crude and rudimentary at least", which was fair. A machine
+ * with a drive sprocket, an idler, four road wheels a side, a cab you can see through, a
+ * counterweight and a toothed bucket is upwards of a thousand faces, and nobody writes a
+ * thousand faces of {@code addBox} by hand. It is generated, by
+ * {@code docs/tools/make_crawler_obj.py}, which is also where its texture comes from.
  * <p>
- * <strong>The hierarchy is the machine.</strong> Each joint is a child of the piece it is bolted to,
- * so rotating the boom carries the stick and the tool with it, exactly as steel would. Getting that
- * wrong gives an arm whose sections come apart in mid-air; getting it right means the only thing the
- * renderer has to supply is four angles.
+ * <strong>Every pivot below is the number the old model used.</strong> That is the whole of
+ * what makes this a change of appearance and not a change of behaviour: the arm's hitboxes are
+ * placed by {@code CrawlerArm.alongArm} from the boom's pivot, in model units, along each
+ * section in turn, and the server decides which blocks the machine may destroy from the same
+ * arithmetic. Move a pivot and the visible steel walks away from the boxes that decide what
+ * the machine can touch -- and it would still look perfectly fine while doing it.
  * <p>
- * Built at sixteen units to the block, as every Minecraft model is, so the numbers read as pixels:
- * the machine is 48 across, 56 long over the tracks, and reaches some seven blocks with the arm out.
- * <p>
- * <strong>Every texture offset here is owned by {@code docs/tools/make_crawler_textures.py}.</strong>
- * Its {@code REGIONS} table is this list, and it asserts the regions neither overlap nor run off the
- * sheet -- which is worth having, because nothing at runtime complains when two boxes share pixels.
- * It simply paints the tracks with the cab's glazing.
+ * The pivots are duplicated in the generator, because a Python script cannot read a Java
+ * constant, and {@code CrawlerAssetsTest} asserts the two copies agree.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
 @SideOnly(Side.CLIENT)
-public class ModelHydraulicCrawler extends ModelBase
+public class ModelHydraulicCrawler
 {
 	/**
-	 * The arm's section lengths, <strong>read from {@link CrawlerGeometry} rather than declared here</strong>.
+	 * The sheet the OBJ's UVs are cut from. The generator owns the layout; this is here so a
+	 * test can assert the file on disk is the size the UVs assume, which is the one way the
+	 * two can disagree without anything at runtime saying so.
+	 */
+	public static final int SHEET_WIDTH = 256;
+	public static final int SHEET_HEIGHT = 256;
+
+	/**
+	 * The arm's section lengths, <strong>read from {@link CrawlerGeometry} rather than declared
+	 * here</strong>.
 	 * <p>
-	 * The solver that decides where the bucket <em>is</em> lives on the common side, because the server
-	 * is what destroys blocks and it cannot see a client-only class. So the numbers live there and the
-	 * picture reads them. Two copies would eventually be two lengths, and an arm drawn shorter than it
-	 * reaches would destroy blocks the operator is not pointing at -- the one failure in this feature
-	 * nobody would forgive.
+	 * The solver that decides where the bucket <em>is</em> lives on the common side, because the
+	 * server is what destroys blocks and it cannot see a client-only class. So the numbers live
+	 * there and the picture reads them. Two copies would eventually be two lengths, and an arm
+	 * drawn shorter than it reaches would destroy blocks the operator is not pointing at -- the
+	 * one failure in this feature nobody would forgive.
 	 */
 	public static final float BOOM_LENGTH = (float)CrawlerGeometry.BOOM_LENGTH;
 	public static final float STICK_LENGTH = (float)CrawlerGeometry.STICK_LENGTH;
 	public static final float TOOL_LENGTH = (float)CrawlerGeometry.TOOL_LENGTH;
-
-	/**
-	 * How far each arm section reaches back past its own pivot, into the section it hangs off.
-	 * <p>
-	 * It buys two things: no coplanar faces at the joint, so nothing z-fights; and a joint that looks
-	 * pinned rather than balanced end to end. It does <em>not</em> change any section's length -- the
-	 * pivot spacing is still BOOM_LENGTH and STICK_LENGTH, so the geometry that decides where the
-	 * bucket is stays exactly what the picture shows.
-	 */
-	public static final int JOINT_OVERLAP = 2;
 
 	/** Where the boom is pinned to the house. */
 	public static final float BOOM_PIVOT_X = -5F;
@@ -71,132 +72,135 @@ public class ModelHydraulicCrawler extends ModelBase
 	/** Height of the slew ring above the entity's origin, in pixels. The house turns about this. */
 	public static final float SLEW_HEIGHT = -14F;
 
-	/** Never moves relative to the entity: the tracks and what sits between them. */
-	private final ModelRenderer undercarriage;
-	/** Everything that slews: engine deck, counterweight, cab, and the arm hanging off the front. */
-	private final ModelRenderer house;
-	private final ModelRenderer boom;
-	private final ModelRenderer stick;
-	private final ModelRenderer tool;
+	/**
+	 * Every wheel on one side: {@code {z, y, radius}} about its own axle, in model units.
+	 * <p>
+	 * The first two are the drive sprocket and the idler, at the back and the front; the rest
+	 * are road wheels. They are drawn as their own groups so each can spin at its own rate --
+	 * a small wheel turns further for the same ground covered, and a machine whose wheels all
+	 * turned together would read as a printed pattern rather than as running gear.
+	 * <p>
+	 * No x: a wheel turns about the x axis, so where it sits along that axis never changes and
+	 * is baked into the group. Which side of the machine a group is on is in its name.
+	 */
+	public static final float[][] WHEELS = {
+			{19F, -6F, 4F},
+			{-19F, -6F, 4F},
+			{-11F, -5F, 3F},
+			{-4F, -5F, 3F},
+			{4F, -5F, 3F},
+			{11F, -5F, 3F},
+	};
 
-	public ModelHydraulicCrawler()
+	/**
+	 * How far down the belt strip one repeat of the tread is, in sheet pixels.
+	 * <p>
+	 * The tracks are animated by scrolling the belt group's texture coordinates, and this is
+	 * what makes that possible without tearing: the strip is painted so that a shift of exactly
+	 * one period is invisible, so any distance the machine has driven can be reduced into one
+	 * period and the belt still looks continuous. It is also the only offset the generator has
+	 * left room for -- see its {@code check_belt}.
+	 */
+	public static final float BELT_PERIOD = 8F;
+
+	private static final ResourceLocation MODEL = new ResourceLocation(
+			"immersiveengineering:models/entity/hydraulic_crawler.obj");
+
+	private static final String UNDERCARRIAGE = "undercarriage";
+	private static final String[] SIDES = {"left", "right"};
+
+	private final EntityOBJModel model = new EntityOBJModel(MODEL);
+
+	/**
+	 * @return the group holding the given attachment's steel
+	 */
+	public static String groupFor(CrawlerAttachment attachment)
 	{
-		textureWidth = 256;
-		textureHeight = 256;
-
-		//	=================================
-		//		UNDERCARRIAGE
-		//	=================================
-		//An empty parent, so the whole machine has one root to rotate and the tracks are siblings of
-		//the house rather than its owner.
-		undercarriage = new ModelRenderer(this);
-		undercarriage.setRotationPoint(0, 0, 0);
-
-		//Both tracks share one texture region: they are the same object twice, and painting it twice
-		//would only be somewhere for the two to differ.
-		ModelRenderer trackLeft = new ModelRenderer(this, 0, 0);
-		trackLeft.addBox(-24F, -12F, -28F, 12, 12, 56);
-		undercarriage.addChild(trackLeft);
-
-		ModelRenderer trackRight = new ModelRenderer(this, 0, 0);
-		trackRight.addBox(12F, -12F, -28F, 12, 12, 56);
-		undercarriage.addChild(trackRight);
-
-		//The belly joining them, held up off the ground so the tracks carry the machine.
-		ModelRenderer belly = new ModelRenderer(this, 0, 70);
-		belly.addBox(-12F, -8F, -20F, 24, 6, 40);
-		undercarriage.addChild(belly);
-
-		//The ring the house turns on.
-		ModelRenderer slewRing = new ModelRenderer(this, 136, 0);
-		slewRing.addBox(-14F, -14F, -14F, 28, 3, 28);
-		undercarriage.addChild(slewRing);
-
-		//	=================================
-		//		HOUSE
-		//	=================================
-		house = new ModelRenderer(this);
-		house.setRotationPoint(0, SLEW_HEIGHT, 0);
-
-		ModelRenderer deck = new ModelRenderer(this, 136, 34);
-		deck.addBox(-14F, -14F, -18F, 28, 14, 30);
-		house.addChild(deck);
-
-		//The counterweight, hung off the back. It is why a real one does not tip over, and the fastest
-		//way to make a silhouette read as an excavator rather than a tractor.
-		ModelRenderer counterweight = new ModelRenderer(this, 0, 118);
-		counterweight.addBox(-13F, -16F, 12F, 26, 16, 10);
-		house.addChild(counterweight);
-
-		//The cab, offset to one side, the way every excavator's is.
-		ModelRenderer cab = new ModelRenderer(this, 74, 118);
-		cab.addBox(1F, -32F, -14F, 14, 18, 18);
-		house.addChild(cab);
-
-		ModelRenderer exhaust = new ModelRenderer(this, 140, 118);
-		exhaust.addBox(-10F, -22F, 2F, 4, 8, 4);
-		house.addChild(exhaust);
-
-		undercarriage.addChild(house);
-
-		//	=================================
-		//		ARM
-		//	=================================
-		//Each section is pinned at the end of the one before and drawn forward from its own pin, so an
-		//angle on a joint sweeps everything downstream of it.
-		//
-		//	=================================
-		//	Tapered, and each section buried in the last.
-		//	=================================
-		//
-		// The first version butted each section's end flush against the next one's start, which put two
-		// coplanar faces at every joint -- and coplanar faces at the same depth are what z-fighting is.
-		// It showed up in game as the joints flickering between two textures.
-		//
-		// Two changes fix it together and neither is a hack. Each section is a size smaller in
-		// cross-section than the one it hangs off, so the child fits inside the parent rather than
-		// meeting it edge to edge, which is also how real steel is pinned. And each section's box
-		// starts JOINT_OVERLAP units *behind* its own pivot, so its near end is buried inside the
-		// parent and there is no near face to fight with anything.
-		boom = new ModelRenderer(this, 0, 158);
-		boom.setRotationPoint(BOOM_PIVOT_X, BOOM_PIVOT_Y, BOOM_PIVOT_Z);
-		boom.addBox(-3.5F, -4F, -BOOM_LENGTH, 7, 8, (int)BOOM_LENGTH);
-		house.addChild(boom);
-
-		stick = new ModelRenderer(this, 68, 158);
-		stick.setRotationPoint(0, 0, -BOOM_LENGTH);
-		stick.addBox(-3F, -3.5F, -STICK_LENGTH, 6, 7, (int)STICK_LENGTH+JOINT_OVERLAP);
-		boom.addChild(stick);
-
-		//A plain stub on purpose. The attachments replace what hangs here, and drawing a bucket now
-		//would mean drawing one the machine might not have fitted.
-		tool = new ModelRenderer(this, 126, 158);
-		tool.setRotationPoint(0, 0, -STICK_LENGTH);
-		tool.addBox(-2.5F, -3F, -TOOL_LENGTH, 5, 6, (int)TOOL_LENGTH+JOINT_OVERLAP);
-		stick.addChild(tool);
+		//Off the enum's own name, so adding a fourth attachment is a group in the generator and
+		//nothing here. The names are the enum's, lower case, which is what getName already is.
+		return "tool_"+attachment.getName();
 	}
 
 	/**
-	 * Pose the machine.
+	 * Draw the machine, posed.
 	 *
 	 * @param slew       degrees the house is turned <em>relative to the tracks</em>
 	 * @param boomAngle  degrees the boom is raised
 	 * @param stickAngle degrees the stick is folded against the boom
 	 * @param toolAngle  degrees the attachment is curled
+	 * @param attachment which tool is fitted
+	 * @param leftRoll   how far the left track has rolled, in model units of belt travel
+	 * @param rightRoll  and the right, which differs from it whenever the machine is turning
 	 */
-	public void setPose(float slew, float boomAngle, float stickAngle, float toolAngle)
+	public void render(float slew, float boomAngle, float stickAngle, float toolAngle,
+					   CrawlerAttachment attachment, float leftRoll, float rightRoll)
 	{
-		house.rotateAngleY = (float)Math.toRadians(slew);
-		boom.rotateAngleX = (float)Math.toRadians(boomAngle);
-		stick.rotateAngleX = (float)Math.toRadians(stickAngle);
-		tool.rotateAngleX = (float)Math.toRadians(toolAngle);
+		model.render(UNDERCARRIAGE);
+		for(int side = 0; side < SIDES.length; side++)
+			renderTrack(SIDES[side], side==0?leftRoll: rightRoll);
+
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(0, SLEW_HEIGHT, 0);
+		GlStateManager.rotate(slew, 0, 1, 0);
+		model.render("house");
+
+		//Each section is pinned at the end of the one before, so an angle on a joint sweeps
+		//everything downstream of it -- which is what steel does and is why the renderer only
+		//has to hand over four angles.
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(BOOM_PIVOT_X, BOOM_PIVOT_Y, BOOM_PIVOT_Z);
+		GlStateManager.rotate(boomAngle, 1, 0, 0);
+		model.render("boom");
+
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(0, 0, -BOOM_LENGTH);
+		GlStateManager.rotate(stickAngle, 1, 0, 0);
+		model.render("stick");
+
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(0, 0, -STICK_LENGTH);
+		GlStateManager.rotate(toolAngle, 1, 0, 0);
+		model.render(groupFor(attachment));
+		GlStateManager.popMatrix();
+
+		GlStateManager.popMatrix();
+		GlStateManager.popMatrix();
+		GlStateManager.popMatrix();
 	}
 
-	@Override
-	public void render(Entity entity, float limbSwing, float limbSwingAmount, float ageInTicks,
-					   float netHeadYaw, float headPitch, float scale)
+	/**
+	 * One track: the belt, scrolled, and the wheels inside it, turned.
+	 *
+	 * @param roll how far this track has travelled over the ground, in model units
+	 */
+	private void renderTrack(String side, float roll)
 	{
-		//Only the root: everything else is a child and is drawn by it.
-		undercarriage.render(scale);
+		//	=================================
+		//	Why the offset is the negative of the distance driven.
+		//	=================================
+		//
+		// The belt's texture runs along the direction the tread travels, so a feature painted
+		// at v appears at the point on the belt where the sampled coordinate reaches v -- which
+		// moves *backwards* along the belt as the offset grows. Negated, the tread travels
+		// forwards with the machine. Wrapped into one period first, because the strip only has
+		// room for one period of slack; anything else walks the UVs off the bottom of the
+		// region and paints the tracks with whatever is underneath it.
+		float wrapped = roll%BELT_PERIOD;
+		if(wrapped < 0)
+			wrapped += BELT_PERIOD;
+		model.render("track_"+side, 0, (BELT_PERIOD-wrapped)/SHEET_HEIGHT);
+
+		for(int i = 0; i < WHEELS.length; i++)
+		{
+			float[] wheel = WHEELS[i];
+			GlStateManager.pushMatrix();
+			GlStateManager.translate(0, wheel[1], wheel[0]);
+			//Rolling, not spinning at a speed: the angle is the distance travelled divided by
+			//the radius, so every wheel stays in step with the ground and with the others no
+			//matter what the machine has been doing.
+			GlStateManager.rotate((float)Math.toDegrees(roll/wheel[2]), 1, 0, 0);
+			model.render("wheel_"+side+"_"+i);
+			GlStateManager.popMatrix();
+		}
 	}
 }

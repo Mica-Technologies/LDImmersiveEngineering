@@ -151,6 +151,51 @@ tick on a flick of the mouse, and swept the tool between two headings without ev
 in between. The joints had been rate-limited since they were written; the one axis that could move the
 tool through a wall in a single tick was the one that was not.
 
+## What it looks like
+
+**The machine is one generated OBJ, drawn a group at a time.** It was nine boxes until a
+playtester called the model "crude and rudimentary at least", which was fair: nine boxes is what
+a `ModelBase` hierarchy is worth writing by hand, and it is not an excavator. It is now about
+eleven hundred faces — an undercarriage with a drive sprocket, an idler and four road wheels a
+side inside a wrapped tread belt; a house with a louvred engine cowl, an exhaust stack,
+handrails, a striped counterweight and a cab whose windows are holes rather than paint; a
+tapered boom and stick carrying their rams; and a bucket, a breaker and a grapple, of which the
+fitted one is drawn.
+
+| Group | Moves how |
+|---|---|
+| `undercarriage` | Never, relative to the machine: the frames, the belly and the slew ring |
+| `track_left`, `track_right` | Their tread scrolls with the ground each track has covered |
+| `wheel_<side>_0..5` | Each turns about its own axle, at the rate its own radius demands |
+| `house` | Slews |
+| `boom`, `stick` | Rotate about their pins, each carrying everything downstream |
+| `tool_bucket`, `tool_grapple`, `tool_breaker` | The fitted one rotates about the tool pin |
+
+**Every pivot is the number the box model used**, and that is the whole of what makes this a
+change of appearance rather than of behaviour. The arm's hitboxes are placed along its centreline
+from the boom's pivot, and the server decides which blocks may be destroyed from the same
+arithmetic; a model whose steel had moved would still work perfectly and would break blocks
+somewhere other than where its bucket is drawn. `CrawlerAssetsTest` compares the pivots, the
+lengths and the wheel table between the Java and the generator, because neither language can read
+the other's constants.
+
+**The tracks are wound on by the ground actually covered, not by the throttle.** A machine held
+against a wall has a speed and covers nothing, and tracks that ran while the machine stood still
+would be the one thing tracks may never be seen to do. The two are wound at different rates while
+turning — that is what a skid steer is — and both are measured from the difference between
+`prevPos` and `pos`, which the server gets from its own movement and a client gets from sliding
+towards it.
+
+**Forge's OBJ support is for blocks, so the model is read here instead.** `OBJLoader` bakes UVs
+against the block atlas and hands the result to a block renderer; an entity is drawn with its own
+texture bound and its parts moving relative to each other. `EntityOBJModel` reads the file once,
+keeps a flat vertex array per group, and draws a group at a time — which leaves the animation in
+the renderer's hands, which is the reason for using an OBJ on something that moves at all.
+
+**The generator checks what nothing at runtime would.** Overlapping atlas regions, a face wound
+inside out, a UV that has left its region, a shell with a hole in it: none of those are errors
+Minecraft reports. It draws them.
+
 ---
 
 ## How it is put together
@@ -166,9 +211,10 @@ tool through a wall in a single tick was the one that was not.
 | Arm hitboxes | `common/entities/EntityCrawlerPart.java` |
 | Numbers worth tuning | `common/entities/CrawlerConfig.java` |
 | The model and its renderer | `client/models/ModelHydraulicCrawler.java`, `client/render/EntityRenderHydraulicCrawler.java` |
+| The OBJ reader the model is drawn through | `client/models/EntityOBJModel.java` |
 | The operator's panel | `client/gui/CrawlerHud.java` |
 | Control input | `common/util/network/MessageCrawlerInput.java` |
-| Textures, generated | `docs/tools/make_crawler_textures.py` |
+| The model and its textures, generated | `docs/tools/make_crawler_obj.py` |
 | The in-game manual chapter | `ie.manual.entry.crawler0`–`crawler4`, registered in `ClientProxy` |
 
 **The manual chapter is not decoration.** This machine has six keybinds, two sneak gestures, three

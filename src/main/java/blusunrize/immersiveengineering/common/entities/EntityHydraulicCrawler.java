@@ -293,6 +293,25 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 */
 	public float prevSlew, prevBoom, prevStick, prevTool;
 
+	/**
+	 * How far each track has rolled over the ground, in model units, and where it was last tick.
+	 * <p>
+	 * <strong>Measured from the machine's own movement rather than from the throttle.</strong>
+	 * {@code groundSpeed} is the server's, and it is a request as much as a fact -- a machine
+	 * held against a wall has a speed and covers no ground. What the tracks have to agree with
+	 * is the ground, or they slide instead of driving, which is the one thing tracks may never
+	 * be seen to do. The distance actually travelled is available on both sides: the server
+	 * moves the machine and a client slides it towards where the server said it was, and both
+	 * of those show up as the same difference between {@code prevPos} and {@code pos}.
+	 * <p>
+	 * The two differ while the machine is turning, because it turns by driving one track against
+	 * the other. That is the whole of what makes a skid steer look like one.
+	 * <p>
+	 * Not saved and not synced: it is a distance nobody can see the absolute value of, and a
+	 * machine whose tracks resume from zero after a reload is a machine nobody can tell has.
+	 */
+	public float trackLeft, trackRight, prevTrackLeft, prevTrackRight;
+
 	//	=================================
 	//		CONTROLS
 	//	=================================
@@ -867,6 +886,8 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		prevBoom = getBoomAngle();
 		prevStick = getStickAngle();
 		prevTool = getToolAngle();
+		prevTrackLeft = trackLeft;
+		prevTrackRight = trackRight;
 
 		if(world.isRemote)
 		{
@@ -894,6 +915,8 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			followOperatorsView();
 			drive();
 		}
+		//After the move, on both sides, because it is measured from the move.
+		rollTracks();
 		//Positioned on both sides -- see positionParts -- and after the machine has moved, so the arm is
 		//tested where it is now rather than where it was last tick.
 		positionParts();
@@ -903,6 +926,32 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			bumpEntities();
 			lastToolTip = getToolTip();
 		}
+	}
+
+	/**
+	 * Wind the tracks on by the ground they have just covered.
+	 * <p>
+	 * Two numbers rather than one, because a skid steer turns by running its tracks at different
+	 * speeds: the outside track of a turn covers the extra ground its own distance from the
+	 * machine's centre demands, and the inside one covers that much less. At full lock standing
+	 * still that is the whole of the movement, which is why a machine spinning on the spot still
+	 * has tracks that are visibly running.
+	 * <p>
+	 * Everything here is in model units, because that is what the model is drawn in.
+	 */
+	private void rollTracks()
+	{
+		double[] facing = CrawlerGeometry.heading(rotationYaw);
+		//Signed along the heading rather than taken as a distance: a machine reversing has to run
+		//its tracks backwards, and a hypot cannot tell the difference.
+		double travelled = (posX-prevPosX)*facing[0]+(posZ-prevPosZ)*facing[1];
+		//Positive yaw is a turn to the right -- see CrawlerDrive.targetTurn -- so it is the left
+		//track that goes the long way round.
+		double slip = Math.toRadians(CrawlerGeometry.shortestTurn(prevRotationYaw, rotationYaw))
+				*CrawlerGeometry.TRACK_CENTRE;
+		float units = (float)(travelled/CrawlerGeometry.UNIT);
+		trackLeft += units+(float)slip;
+		trackRight += units-(float)slip;
 	}
 
 	/**
