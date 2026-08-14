@@ -84,8 +84,9 @@ public class ManualPageShader extends ManualPages
 			example = 0;
 			if(exampleItems.length > 1)
 			{
-				pageButtons.add(new GuiButtonManualNavigation(gui, 100, x+50, y, 10, 16, 0));
-				pageButtons.add(new GuiButtonManualNavigation(gui, 101, x+100, y, 10, 16, 1));
+				int mid = gui.getPageWidth()/2;
+				pageButtons.add(new GuiButtonManualNavigation(gui, 100, x+mid-10, y, 10, 16, 0));
+				pageButtons.add(new GuiButtonManualNavigation(gui, 101, x+mid+40, y, 10, 16, 1));
 			}
 		}
 		else
@@ -108,13 +109,13 @@ public class ManualPageShader extends ManualPages
 			String cost = Integer.toString(replicationCost.inputSize);
 			if(!ApiUtils.hasPlayerIngredient(gui.mc.player, replicationCost)&&!gui.mc.player.capabilities.isCreativeMode)
 				cost = TextFormatting.RED+cost;
-			pageButtons.add(new GuiButtonManual(gui, 102, x+50, y+138, 70, 12, TextFormatting.BOLD+I18n.format("ie.manual.entry.shaderList.order")+" "+cost+"x   ").setTextColour(gui.getManual().getTextColour(), gui.getManual().getHighlightColour()));
+			pageButtons.add(new GuiButtonManual(gui, 102, x+gui.getPageWidth()/2-10, y+138, 70, 12, TextFormatting.BOLD+I18n.format("ie.manual.entry.shaderList.order")+" "+cost+"x   ").setTextColour(gui.getManual().getTextColour(), gui.getManual().getHighlightColour()));
 		}
 		else
 		{
 			this.text += "<br><br>"+I18n.format("ie.manual.entry.shaderList.noInfo");
 			if(player.capabilities.isCreativeMode)
-				pageButtons.add(new GuiButtonManual(gui, 103, x+10, y+80, 100, 16, I18n.format("ie.manual.entry.shaderList.unlock")).setTextColour(gui.getManual().getTextColour(), gui.getManual().getHighlightColour()));
+				pageButtons.add(new GuiButtonManual(gui, 103, x+gui.getPageWidth()/2-50, y+80, 100, 16, I18n.format("ie.manual.entry.shaderList.unlock")).setTextColour(gui.getManual().getTextColour(), gui.getManual().getHighlightColour()));
 		}
 		super.initPage(gui, x, y, pageButtons);
 	}
@@ -127,15 +128,16 @@ public class ManualPageShader extends ManualPages
 		float scale = 2;
 		GlStateManager.scale(scale, scale, scale);
 		boolean examples = exampleItems!=null&&exampleItems.length > 0;
+		int mid = gui.getPageWidth()/2;
 
-		ManualUtils.renderItem().renderItemAndEffectIntoGUI(shaderItem, (int)((x+10+(examples?0: 34))/scale), (int)((y-8)/scale));
+		ManualUtils.renderItem().renderItemAndEffectIntoGUI(shaderItem, (int)((x+mid-(examples?50: 16))/scale), (int)((y-8)/scale));
 		if(examples&&example >= 0&&example < exampleItems.length)
-			ManualUtils.renderItem().renderItemAndEffectIntoGUI(exampleItems[example], (int)((x+63)/scale), (int)((y-8)/scale));
+			ManualUtils.renderItem().renderItemAndEffectIntoGUI(exampleItems[example], (int)((x+mid+3)/scale), (int)((y-8)/scale));
 
 		GlStateManager.scale(1/scale, 1/scale, 1/scale);
 
 		if(unlocked)
-			ManualUtils.renderItem().renderItemAndEffectIntoGUI(replicationCost.getRandomizedExampleStack(gui.mc.player.ticksExisted), x+102, y+136);
+			ManualUtils.renderItem().renderItemAndEffectIntoGUI(replicationCost.getRandomizedExampleStack(gui.mc.player.ticksExisted), x+mid+42, y+136);
 
 		RenderHelper.disableStandardItemLighting();
 		GlStateManager.disableRescaleNormal();
@@ -143,9 +145,9 @@ public class ManualPageShader extends ManualPages
 		manual.fontRenderer.setUnicodeFlag(true);
 		String name = "§l"+shader.getName();
 		int w = manual.fontRenderer.getStringWidth(name);
-		manual.fontRenderer.drawString(name, x+60-w/2, y+24, manual.getTextColour(), false);
+		manual.fontRenderer.drawString(name, x+mid-w/2, y+24, manual.getTextColour(), false);
 		if(localizedText!=null&&!localizedText.isEmpty())
-			manual.fontRenderer.drawSplitString(localizedText, x, y+38, 120, manual.getTextColour());
+			ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+38, gui.getPageWidth(), manual.getTextColour());
 
 	}
 

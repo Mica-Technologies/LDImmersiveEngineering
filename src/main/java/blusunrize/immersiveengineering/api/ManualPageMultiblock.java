@@ -54,6 +54,10 @@ public class ManualPageMultiblock extends ManualPages
 	float transY = 0;
 	float rotX = 0;
 	float rotY = 0;
+	/**
+	 * How far below the top of the page the description starts, i.e. how much room the structure took.
+	 */
+	int textOffset = 0;
 	List<String> componentTooltip;
 	MultiblockRenderInfo renderInfo;
 	MultiblockBlockAccess blockAccess;
@@ -87,14 +91,25 @@ public class ManualPageMultiblock extends ManualPages
 		{
 			this.renderInfo = new MultiblockRenderInfo(multiblock);
 			this.blockAccess = new MultiblockBlockAccess(renderInfo);
-			transX = x+60+renderInfo.structureWidth/2;
-			transY = y+35+(float)Math.sqrt(renderInfo.structureHeight*renderInfo.structureHeight+renderInfo.structureWidth*renderInfo.structureWidth+renderInfo.structureLength*renderInfo.structureLength)/2;
 			rotX = 25;
 			rotY = -45;
-			scale = multiblock.getManualScale();
+			//	=================================
+			//	The structure grows with the page.
+			//	=================================
+			//
+			// The multiblock scale in the API was picked so the model fit a 120x150 hole. The pane is
+			// several times that now, so it is scaled up by however much of that growth it can use,
+			// capped so a big structure never outgrows the room below the title.
+			float diagonal = (float)Math.sqrt(renderInfo.structureHeight*renderInfo.structureHeight+renderInfo.structureWidth*renderInfo.structureWidth+renderInfo.structureLength*renderInfo.structureLength);
+			float fit = Math.min(gui.getPageWidth()/120f, gui.getPageHeight()/2f/(diagonal*multiblock.getManualScale()/2f));
+			scale = multiblock.getManualScale()*Math.max(1f, Math.min(1.75f, fit));
+			float radius = scale*diagonal/2f;
+			transX = x+gui.getPageWidth()/2f+renderInfo.structureWidth/2f;
+			transY = y+4+radius;
 			boolean canRenderFormed = multiblock.canRenderFormedStructure();
 
-			yOff = (int)(transY+scale*Math.sqrt(renderInfo.structureHeight*renderInfo.structureHeight+renderInfo.structureWidth*renderInfo.structureWidth+renderInfo.structureLength*renderInfo.structureLength)/2);
+			textOffset = (int)(transY-y+radius)+6;
+			yOff = y+textOffset;
 			pageButtons.add(new GuiButtonManualNavigation(gui, 100, x+4, (int)transY-(canRenderFormed?11: 5), 10, 10, 4));
 			if(canRenderFormed)
 				pageButtons.add(new GuiButtonManualNavigation(gui, 103, x+4, (int)transY+1, 10, 10, 6));
@@ -177,7 +192,7 @@ public class ManualPageMultiblock extends ManualPages
 				int structureWidth = renderInfo.structureWidth;
 				int structureHeight = renderInfo.structureHeight;
 
-				int yOffTotal = (int)(transY-y+scale*Math.sqrt(renderInfo.structureHeight*renderInfo.structureHeight+renderInfo.structureWidth*renderInfo.structureWidth+renderInfo.structureLength*renderInfo.structureLength)/2);
+				int yOffTotal = textOffset;
 
 				GlStateManager.enableRescaleNormal();
 				GlStateManager.pushMatrix();
@@ -245,13 +260,14 @@ public class ManualPageMultiblock extends ManualPages
 
 				manual.fontRenderer.setUnicodeFlag(true);
 				if(localizedText!=null&&!localizedText.isEmpty())
-					manual.fontRenderer.drawSplitString(localizedText, x, y+yOffTotal, 120, manual.getTextColour());
+					ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOffTotal, gui.getPageWidth(), manual.getTextColour());
 
 				manual.fontRenderer.setUnicodeFlag(false);
 				if(componentTooltip!=null)
 				{
-					manual.fontRenderer.drawString("?", x+116, y+yOffTotal/2-4, manual.getTextColour(), false);
-					if(mx >= x+116&&mx < x+122&&my >= y+yOffTotal/2-4&&my < y+yOffTotal/2+4)
+					int hintX = x+gui.getPageWidth()-6;
+					manual.fontRenderer.drawString("?", hintX, y+yOffTotal/2-4, manual.getTextColour(), false);
+					if(mx >= hintX&&mx < hintX+6&&my >= y+yOffTotal/2-4&&my < y+yOffTotal/2+4)
 						gui.drawHoveringText(componentTooltip, mx, my, manual.fontRenderer);
 				}
 			}
@@ -278,13 +294,12 @@ public class ManualPageMultiblock extends ManualPages
 	@Override
 	public void mouseDragged(int x, int y, int clickX, int clickY, int mx, int my, int lastX, int lastY, int button)
 	{
-		if((clickX >= 40&&clickX < 144&&mx >= 20&&mx < 164)&&(clickY >= 30&&clickY < 130&&my >= 30&&my < 180))
-		{
-			int dx = mx-lastX;
-			int dy = my-lastY;
-			rotY = rotY+(dx/104f)*80;
-			rotX = rotX+(dy/100f)*80;
-		}
+		//The bounds this used to check were the old book's page rectangle, in book-relative pixels.
+		//The screen decides what counts as "on the page" now, and only forwards drags that are.
+		int dx = mx-lastX;
+		int dy = my-lastY;
+		rotY = rotY+(dx/104f)*80;
+		rotX = rotX+(dy/100f)*80;
 	}
 
 	@Override
@@ -311,7 +326,7 @@ public class ManualPageMultiblock extends ManualPages
 	@Override
 	public boolean listForSearch(String searchTag)
 	{
-		return false;
+		return textMatchesSearch(searchTag);
 	}
 
 	static class MultiblockBlockAccess implements IBlockAccess

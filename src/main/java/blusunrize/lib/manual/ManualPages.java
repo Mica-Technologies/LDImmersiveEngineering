@@ -31,10 +31,23 @@ import java.util.regex.Pattern;
 
 public abstract class ManualPages implements IManualPage
 {
+	/**
+	 * The width the recipe grids were laid out against when the page was a 186x198 texture.
+	 * <p>
+	 * Recipe positions are computed once, at load, with no GUI to ask -- so they stay relative to this
+	 * and get centred in whatever column the page actually has via {@link #recipeOffset(GuiManual)}.
+	 */
+	public static final int RECIPE_WIDTH = 120;
+
 	protected ManualInstance manual;
 	protected String text;
 	protected String localizedText;
 	protected List<ItemStack> providedItems;
+	/**
+	 * Lower-cased page text, kept so that searching does not re-translate every page on every
+	 * keystroke.
+	 */
+	private String searchableText;
 
 	protected ItemStack highlighted = ItemStack.EMPTY;
 
@@ -42,6 +55,35 @@ public abstract class ManualPages implements IManualPage
 	{
 		this.manual = manual;
 		this.text = text;
+	}
+
+	/**
+	 * Where the fixed-width recipe block starts inside the (now much wider) text column.
+	 */
+	protected static int recipeOffset(GuiManual gui)
+	{
+		return Math.max(0, (gui.getPageWidth()-RECIPE_WIDTH)/2);
+	}
+
+	/**
+	 * Does this page's prose mention the search term? The old search could only match entry names and
+	 * item names, which in a manual this size means most of it was unfindable.
+	 */
+	protected boolean textMatchesSearch(String searchTag)
+	{
+		if(text==null||text.isEmpty())
+			return false;
+		if(searchableText==null)
+			try
+			{
+				searchableText = manual.formatText(text).toLowerCase(Locale.ENGLISH);
+			} catch(Exception e)
+			{
+				//Page text is lang-file content and can carry markup that does not resolve. A search
+				//is not worth an exception.
+				searchableText = text.toLowerCase(Locale.ENGLISH);
+			}
+		return searchableText.contains(searchTag);
 	}
 
 	@Override
@@ -53,7 +95,7 @@ public abstract class ManualPages implements IManualPage
 			boolean uni = manual.fontRenderer.getUnicodeFlag();
 			manual.fontRenderer.setUnicodeFlag(true);
 			this.localizedText = manual.formatText(text);
-			this.localizedText = addLinks(manual, gui, this.localizedText, x, y, 120, pageButtons);
+			this.localizedText = addLinks(manual, gui, this.localizedText, x, y, gui.getPageWidth(), pageButtons);
 			if(this.localizedText==null)
 				this.localizedText = "";
 			manual.fontRenderer.setUnicodeFlag(uni);
@@ -124,7 +166,7 @@ public abstract class ManualPages implements IManualPage
 		public void renderPage(GuiManual gui, int x, int y, int mx, int my)
 		{
 			if(localizedText!=null&&!localizedText.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y, 120, manual.getTextColour());
+				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y, gui.getPageWidth(), manual.getTextColour());
 			GlStateManager.enableBlend();
 			//				manual.fontRenderer.drawSplitString(localizedText, x,y, 120, manual.getTextColour());
 		}
@@ -132,7 +174,7 @@ public abstract class ManualPages implements IManualPage
 		@Override
 		public boolean listForSearch(String searchTag)
 		{
-			return false;
+			return textMatchesSearch(searchTag);
 		}
 	}
 
@@ -182,7 +224,7 @@ public abstract class ManualPages implements IManualPage
 			for(int i = 0; i < resources.length; i++)
 				if(resources[i]!=null&&!resources[i].isEmpty())
 				{
-					int xOff = 60-sizing[i][2]/2;
+					int xOff = gui.getPageWidth()/2-sizing[i][2]/2;
 					gui.drawGradientRect(x+xOff-2, y+yOff-2, x+xOff+sizing[i][2]+2, y+yOff+sizing[i][3]+2, 0xffeaa74c, 0xfff6b059);
 					gui.drawGradientRect(x+xOff-1, y+yOff-1, x+xOff+sizing[i][2]+1, y+yOff+sizing[i][3]+1, 0xffc68e46, 0xffbe8844);
 					yOff += sizing[i][3]+5;
@@ -194,21 +236,21 @@ public abstract class ManualPages implements IManualPage
 				{
 					if(!resources[i].equals(lastResource))
 						ManualUtils.bindTexture(resources[i]);
-					int xOff = 60-sizing[i][2]/2;
+					int xOff = gui.getPageWidth()/2-sizing[i][2]/2;
 					ManualUtils.drawTexturedRect(x+xOff, y+yOff, sizing[i][2], sizing[i][3], (sizing[i][0])/256f, (sizing[i][0]+sizing[i][2])/256f, (sizing[i][1])/256f, (sizing[i][1]+sizing[i][3])/256f);
 					yOff += sizing[i][3]+5;
 					lastResource = resources[i];
 				}
 
 			if(localizedText!=null&&!localizedText.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff, 120, manual.getTextColour());
+				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff, gui.getPageWidth(), manual.getTextColour());
 			//			manual.fontRenderer.drawSplitString(localizedText, x,y+yOff, 120, manual.getTextColour());
 		}
 
 		@Override
 		public boolean listForSearch(String searchTag)
 		{
-			return false;
+			return textMatchesSearch(searchTag);
 		}
 	}
 
@@ -233,7 +275,7 @@ public abstract class ManualPages implements IManualPage
 		{
 			super.initPage(gui, x, y, pageButtons);
 			manual.fontRenderer.setUnicodeFlag(true);
-			int l = localizedText!=null?manual.fontRenderer.listFormattedStringToWidth(localizedText, 120).size(): 0;
+			int l = localizedText!=null?manual.fontRenderer.listFormattedStringToWidth(localizedText, gui.getPageWidth()).size(): 0;
 			textHeight = l*manual.fontRenderer.FONT_HEIGHT+6;
 			try
 			{
@@ -273,14 +315,15 @@ public abstract class ManualPages implements IManualPage
 		@Override
 		public void renderPage(GuiManual gui, int x, int y, int mx, int my)
 		{
+			int pageWidth = gui.getPageWidth();
 			if(localizedText!=null&&!localizedText.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y, 120, manual.getTextColour());
+				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y, pageWidth, manual.getTextColour());
 			//			manual.fontRenderer.drawSplitString(localizedText, x,y, 120, manual.getTextColour());
 
 			if(localizedTable!=null)
 			{
 				int col = manual.getHighlightColour()|0xff000000;
-				gui.drawGradientRect(x, y+textHeight-2, x+120, y+textHeight-1, col, col);
+				gui.drawGradientRect(x, y+textHeight-2, x+pageWidth, y+textHeight-1, col, col);
 				int[] textOff = new int[bars!=null?bars.length: 0];
 
 				//				gui.drawGradientRect(x,y+textHeight+yOff-2,x+120,y+textHeight+yOff-1,  manual.getTextColour()|0xff000000, manual.getTextColour()|0xff000000);
@@ -307,7 +350,7 @@ public abstract class ManualPages implements IManualPage
 							if(line[j]!=null)
 							{
 								int xx = textOff.length > 0&&j > 0?textOff[j-1]: x;
-								int w = Math.max(10, 120-(j > 0?textOff[j-1]-x: 0));
+								int w = Math.max(10, pageWidth-(j > 0?textOff[j-1]-x: 0));
 								ManualUtils.drawSplitString(manual.fontRenderer, line[j], xx, y+textHeight+yOff, w, manual.getTextColour());
 								//							manual.fontRenderer.drawSplitString(localizedTable[i][j], xx,y+textHeight+yOff, w, manual.getTextColour());
 								int l = manual.fontRenderer.listFormattedStringToWidth(line[j], w).size();
@@ -320,7 +363,7 @@ public abstract class ManualPages implements IManualPage
 							float scale = .5f;
 							GlStateManager.scale(1, scale, 1);
 							int barHeight = (int)((y+textHeight+yOff+height*manual.fontRenderer.FONT_HEIGHT)/scale);
-							gui.drawGradientRect(x, barHeight, x+120, barHeight+1,
+							gui.drawGradientRect(x, barHeight, x+pageWidth, barHeight+1,
 									manual.getTextColour()|0xff000000, manual.getTextColour()|0xff000000);
 							GlStateManager.scale(1, 1/scale, 1);
 						}
@@ -337,6 +380,14 @@ public abstract class ManualPages implements IManualPage
 		@Override
 		public boolean listForSearch(String searchTag)
 		{
+			if(textMatchesSearch(searchTag))
+				return true;
+			if(localizedTable!=null)
+				for(String[] line : localizedTable)
+					if(line!=null)
+						for(String cell : line)
+							if(cell!=null&&cell.toLowerCase(Locale.ENGLISH).contains(searchTag))
+								return true;
 			return false;
 		}
 	}
@@ -422,7 +473,7 @@ public abstract class ManualPages implements IManualPage
 						int item = line/2*lineSum+line%2*line0+i;
 						if(item >= length)
 							break;
-						int xx = x+60-w2+(int)(i*18*scale);
+						int xx = x+gui.getPageWidth()/2-w2+(int)(i*18*scale);
 						int yy = y+(lines < 2?4: 0)+line*(int)(18*scale);
 						ManualUtils.renderItem().renderItemAndEffectIntoGUI(stacks.get(item), (int)(xx/scale), (int)(yy/scale));
 						if(mx >= xx&&mx < xx+(16*scale)&&my >= yy&&my < yy+(16*scale))
@@ -435,7 +486,7 @@ public abstract class ManualPages implements IManualPage
 			GlStateManager.disableRescaleNormal();
 			GlStateManager.enableBlend();
 			if(localizedText!=null&&!localizedText.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOffset, 120, manual.getTextColour());
+				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOffset, gui.getPageWidth(), manual.getTextColour());
 
 			manual.fontRenderer.setUnicodeFlag(false);
 			if(!highlighted.isEmpty())
@@ -449,7 +500,7 @@ public abstract class ManualPages implements IManualPage
 			for(ItemStack stack : stacks)
 				if(stack.getDisplayName().toLowerCase(Locale.ENGLISH).contains(searchTag))
 					return true;
-			return false;
+			return textMatchesSearch(searchTag);
 		}
 	}
 
@@ -524,7 +575,7 @@ public abstract class ManualPages implements IManualPage
 					return;
 
 				PositionedItemStack[] pIngredients = new PositionedItemStack[ingredientsPre.size()+1];
-				int xBase = (120-(w+2)*18)/2;
+				int xBase = (RECIPE_WIDTH-(w+2)*18)/2;
 				for(int hh = 0; hh < h; hh++)
 					for(int ww = 0; ww < w; ww++)
 						if(hh*w+ww < ingredientsPre.size())
@@ -541,12 +592,13 @@ public abstract class ManualPages implements IManualPage
 		{
 			int i = 1;
 			int yyOff = 0;
+			int xOff = recipeOffset(gui);
 			for(Object stack : this.stacks)
 			{
 				if(this.recipes.get(stack).size() > 1)
 				{
-					pageButtons.add(new GuiButtonManualNavigation(gui, 100*i+0, x-2, y+yyOff+yOff[i-1]/2-3, 8, 10, 0));
-					pageButtons.add(new GuiButtonManualNavigation(gui, 100*i+1, x+122-16, y+yyOff+yOff[i-1]/2-3, 8, 10, 1));
+					pageButtons.add(new GuiButtonManualNavigation(gui, 100*i+0, x+xOff-2, y+yyOff+yOff[i-1]/2-3, 8, 10, 0));
+					pageButtons.add(new GuiButtonManualNavigation(gui, 100*i+1, x+xOff+RECIPE_WIDTH+2-16, y+yyOff+yOff[i-1]/2-3, 8, 10, 1));
 				}
 				if(this.recipes.get(stack).size() > 0)
 					yyOff += yOff[i-1]+8;
@@ -562,6 +614,7 @@ public abstract class ManualPages implements IManualPage
 			RenderHelper.enableGUIStandardItemLighting();
 
 			int totalYOff = 0;
+			int xOff = recipeOffset(gui);
 			highlighted = ItemStack.EMPTY;
 			for(int i = 0; i < stacks.length; i++)
 			{
@@ -575,10 +628,10 @@ public abstract class ManualPages implements IManualPage
 						{
 							if(pstack.x > maxX)
 								maxX = pstack.x;
-							gui.drawGradientRect(x+pstack.x, y+totalYOff+pstack.y, x+pstack.x+16, y+totalYOff+pstack.y+16, 0x33666666, 0x33666666);
+							gui.drawGradientRect(x+xOff+pstack.x, y+totalYOff+pstack.y, x+xOff+pstack.x+16, y+totalYOff+pstack.y+16, 0x33666666, 0x33666666);
 						}
 					ManualUtils.bindTexture(manual.texture);
-					ManualUtils.drawTexturedRect(x+maxX-17, y+totalYOff+yOff[i]/2-5, 16, 10, 0/256f, 16/256f, 226/256f, 236/256f);
+					ManualUtils.drawTexturedRect(x+xOff+maxX-17, y+totalYOff+yOff[i]/2-5, 16, 10, 0/256f, 16/256f, 226/256f, 236/256f);
 
 					totalYOff += yOff[i]+8;
 				}
@@ -600,9 +653,9 @@ public abstract class ManualPages implements IManualPage
 						if(pstack!=null)
 							if(!pstack.getStack().isEmpty())
 							{
-								ManualUtils.renderItem().renderItemAndEffectIntoGUI(pstack.getStack(), x+pstack.x, y+totalYOff+pstack.y);
-								ManualUtils.renderItem().renderItemOverlayIntoGUI(manual.fontRenderer, pstack.getStack(), x+pstack.x, y+totalYOff+pstack.y, null);
-								if(mx >= x+pstack.x&&mx < x+pstack.x+16&&my >= y+totalYOff+pstack.y&&my < y+totalYOff+pstack.y+16)
+								ManualUtils.renderItem().renderItemAndEffectIntoGUI(pstack.getStack(), x+xOff+pstack.x, y+totalYOff+pstack.y);
+								ManualUtils.renderItem().renderItemOverlayIntoGUI(manual.fontRenderer, pstack.getStack(), x+xOff+pstack.x, y+totalYOff+pstack.y, null);
+								if(mx >= x+xOff+pstack.x&&mx < x+xOff+pstack.x+16&&my >= y+totalYOff+pstack.y&&my < y+totalYOff+pstack.y+16)
 									highlighted = pstack.getStack();
 							}
 					totalYOff += yOff[i]+8;
@@ -616,7 +669,7 @@ public abstract class ManualPages implements IManualPage
 
 			manual.fontRenderer.setUnicodeFlag(uni);
 			if(localizedText!=null&&!localizedText.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+totalYOff-2, 120, manual.getTextColour());
+				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+totalYOff-2, gui.getPageWidth(), manual.getTextColour());
 
 			manual.fontRenderer.setUnicodeFlag(false);
 			if(!highlighted.isEmpty())
@@ -668,7 +721,7 @@ public abstract class ManualPages implements IManualPage
 								return true;
 				}
 			}
-			return false;
+			return textMatchesSearch(searchTag);
 		}
 	}
 
@@ -754,7 +807,7 @@ public abstract class ManualPages implements IManualPage
 				return;
 
 			PositionedItemStack[] pIngredients = new PositionedItemStack[ingredientsPre.size()+1];
-			int xBase = (120-(w+2)*18)/2;
+			int xBase = (RECIPE_WIDTH-(w+2)*18)/2;
 			for(int hh = 0; hh < h; hh++)
 				for(int ww = 0; ww < w; ww++)
 					if(hh*w+ww < ingredientsPre.size())
@@ -771,10 +824,11 @@ public abstract class ManualPages implements IManualPage
 		@Override
 		public void initPage(GuiManual gui, int x, int y, List<GuiButton> pageButtons)
 		{
+			int xOff = recipeOffset(gui);
 			if(this.recipes.size() > 1)
 			{
-				pageButtons.add(new GuiButtonManualNavigation(gui, 100+0, x-2, y+yOff/2-3, 8, 10, 0));
-				pageButtons.add(new GuiButtonManualNavigation(gui, 100+1, x+122-16, y+yOff/2-3, 8, 10, 1));
+				pageButtons.add(new GuiButtonManualNavigation(gui, 100+0, x+xOff-2, y+yOff/2-3, 8, 10, 0));
+				pageButtons.add(new GuiButtonManualNavigation(gui, 100+1, x+xOff+RECIPE_WIDTH+2-16, y+yOff/2-3, 8, 10, 1));
 			}
 			super.initPage(gui, x, y+yOff+2, pageButtons);
 		}
@@ -785,6 +839,7 @@ public abstract class ManualPages implements IManualPage
 			GlStateManager.enableRescaleNormal();
 			RenderHelper.enableGUIStandardItemLighting();
 
+			int xOff = recipeOffset(gui);
 			highlighted = ItemStack.EMPTY;
 
 			if(!recipes.isEmpty()&&recipePage >= 0&&recipePage < this.recipes.size())
@@ -795,10 +850,10 @@ public abstract class ManualPages implements IManualPage
 					{
 						if(pstack.x > maxX)
 							maxX = pstack.x;
-						gui.drawGradientRect(x+pstack.x, y+pstack.y, x+pstack.x+16, y+pstack.y+16, 0x33666666, 0x33666666);
+						gui.drawGradientRect(x+xOff+pstack.x, y+pstack.y, x+xOff+pstack.x+16, y+pstack.y+16, 0x33666666, 0x33666666);
 					}
 				ManualUtils.bindTexture(manual.texture);
-				ManualUtils.drawTexturedRect(x+maxX-17, y+yOff/2-5, 16, 10, 0/256f, 16/256f, 226/256f, 236/256f);
+				ManualUtils.drawTexturedRect(x+xOff+maxX-17, y+yOff/2-5, 16, 10, 0/256f, 16/256f, 226/256f, 236/256f);
 
 			}
 
@@ -812,10 +867,10 @@ public abstract class ManualPages implements IManualPage
 					if(pstack!=null)
 						if(!pstack.getStack().isEmpty())
 						{
-							ManualUtils.renderItem().renderItemAndEffectIntoGUI(pstack.getStack(), x+pstack.x, y+pstack.y);
-							ManualUtils.renderItem().renderItemOverlayIntoGUI(manual.fontRenderer, pstack.getStack(), x+pstack.x, y+pstack.y, null);
+							ManualUtils.renderItem().renderItemAndEffectIntoGUI(pstack.getStack(), x+xOff+pstack.x, y+pstack.y);
+							ManualUtils.renderItem().renderItemOverlayIntoGUI(manual.fontRenderer, pstack.getStack(), x+xOff+pstack.x, y+pstack.y, null);
 
-							if(mx >= x+pstack.x&&mx < x+pstack.x+16&&my >= y+pstack.y&&my < y+pstack.y+16)
+							if(mx >= x+xOff+pstack.x&&mx < x+xOff+pstack.x+16&&my >= y+pstack.y&&my < y+pstack.y+16)
 								highlighted = pstack.getStack();
 						}
 			}
@@ -827,7 +882,7 @@ public abstract class ManualPages implements IManualPage
 
 			manual.fontRenderer.setUnicodeFlag(uni);
 			if(localizedText!=null&&!localizedText.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff+2, 120, manual.getTextColour());
+				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff+2, gui.getPageWidth(), manual.getTextColour());
 			//			manual.fontRenderer.drawSplitString(localizedText, x,y+yOff+2, 120, manual.getTextColour());
 
 			manual.fontRenderer.setUnicodeFlag(false);
@@ -883,7 +938,7 @@ public abstract class ManualPages implements IManualPage
 									return true;
 					}
 				}
-			return false;
+			return textMatchesSearch(searchTag);
 		}
 	}
 

@@ -61,6 +61,22 @@ public abstract class ManualInstance
 
 	public abstract boolean improveReadability();
 
+	/**
+	 * Shown on the empty page, before an entry has been picked. Empty means "draw nothing".
+	 */
+	public String getIndexHint()
+	{
+		return "";
+	}
+
+	/**
+	 * Placeholder inside the search box while it is empty. Empty means "draw nothing".
+	 */
+	public String getSearchLabel()
+	{
+		return "";
+	}
+
 	public void openManual()
 	{
 	}

@@ -78,10 +78,11 @@ public class ManualPageBlueprint extends ManualPages
 	@Override
 	public void initPage(GuiManual gui, int x, int y, List<GuiButton> pageButtons)
 	{
+		int xOff = recipeOffset(gui);
 		if(this.recipes.size() > 1)
 		{
-			pageButtons.add(new GuiButtonManualNavigation(gui, 100+0, x-2, y+yOff/2-3, 8, 10, 0));
-			pageButtons.add(new GuiButtonManualNavigation(gui, 100+1, x+122-16, y+yOff/2-3, 8, 10, 1));
+			pageButtons.add(new GuiButtonManualNavigation(gui, 100+0, x+xOff-2, y+yOff/2-3, 8, 10, 0));
+			pageButtons.add(new GuiButtonManualNavigation(gui, 100+1, x+xOff+RECIPE_WIDTH+2-16, y+yOff/2-3, 8, 10, 1));
 		}
 		super.initPage(gui, x, y+yOff+2, pageButtons);
 	}
@@ -92,6 +93,7 @@ public class ManualPageBlueprint extends ManualPages
 		GlStateManager.enableRescaleNormal();
 		RenderHelper.enableGUIStandardItemLighting();
 
+		int xOff = recipeOffset(gui);
 		highlighted = ItemStack.EMPTY;
 
 		if(!recipes.isEmpty()&&recipePage >= 0&&recipePage < this.recipes.size())
@@ -102,10 +104,10 @@ public class ManualPageBlueprint extends ManualPages
 				{
 					if(pstack.x > maxX)
 						maxX = pstack.x;
-					gui.drawGradientRect(x+pstack.x, y+pstack.y, x+pstack.x+16, y+pstack.y+16, 0x33666666, 0x33666666);
+					gui.drawGradientRect(x+xOff+pstack.x, y+pstack.y, x+xOff+pstack.x+16, y+pstack.y+16, 0x33666666, 0x33666666);
 				}
 			ManualUtils.bindTexture(manual.texture);
-			ManualUtils.drawTexturedRect(x+maxX-17, y+yOff/2-5, 16, 10, 0/256f, 16/256f, 226/256f, 236/256f);
+			ManualUtils.drawTexturedRect(x+xOff+maxX-17, y+yOff/2-5, 16, 10, 0/256f, 16/256f, 226/256f, 236/256f);
 
 		}
 
@@ -119,10 +121,10 @@ public class ManualPageBlueprint extends ManualPages
 				if(pstack!=null)
 					if(!pstack.getStack().isEmpty())
 					{
-						ManualUtils.renderItem().renderItemAndEffectIntoGUI(pstack.getStack(), x+pstack.x, y+pstack.y);
-						ManualUtils.renderItem().renderItemOverlayIntoGUI(manual.fontRenderer, pstack.getStack(), x+pstack.x, y+pstack.y, null);
+						ManualUtils.renderItem().renderItemAndEffectIntoGUI(pstack.getStack(), x+xOff+pstack.x, y+pstack.y);
+						ManualUtils.renderItem().renderItemOverlayIntoGUI(manual.fontRenderer, pstack.getStack(), x+xOff+pstack.x, y+pstack.y, null);
 
-						if(mx >= x+pstack.x&&mx < x+pstack.x+16&&my >= y+pstack.y&&my < y+pstack.y+16)
+						if(mx >= x+xOff+pstack.x&&mx < x+xOff+pstack.x+16&&my >= y+pstack.y&&my < y+pstack.y+16)
 							highlighted = pstack.getStack();
 					}
 		}
@@ -134,7 +136,7 @@ public class ManualPageBlueprint extends ManualPages
 
 		manual.fontRenderer.setUnicodeFlag(uni);
 		if(localizedText!=null&&!localizedText.isEmpty())
-			ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff+2, 120, manual.getTextColour());
+			ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff+2, gui.getPageWidth(), manual.getTextColour());
 		//			manual.fontRenderer.drawSplitString(localizedText, x,y+yOff+2, 120, manual.getTextColour());
 
 		manual.fontRenderer.setUnicodeFlag(false);
@@ -190,6 +192,6 @@ public class ManualPageBlueprint extends ManualPages
 								return true;
 				}
 			}
-		return false;
+		return textMatchesSearch(searchTag);
 	}
 }

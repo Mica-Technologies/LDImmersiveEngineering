@@ -30,6 +30,7 @@ import net.minecraft.world.World;
 import net.minecraftforge.common.DimensionManager;
 import org.lwjgl.input.Keyboard;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -39,12 +40,30 @@ public class IEManualInstance extends ManualInstance
 {
 	private final Set<String> hiddenEntries = new HashSet<>();
 
+	//	=================================
+	//	Two palettes, because the page is white now.
+	//	=================================
+	//
+	// The manual's own §-codes were picked against tan paper: §6 is IE orange, §7 is light grey, §e is
+	// yellow. On a white page they wash out, and there are over a hundred §6 headers in the lang file
+	// alone. Rather than rewrite the text, the page is drawn with the colours darkened and the screen
+	// palette is put back for anything drawn on a dark background -- tooltips, chiefly.
+	private final int[] screenColours;
+	private final int[] paperColours;
+
 	public IEManualInstance()
 	{
 		super(new IEItemFontRender(), "immersiveengineering:textures/gui/manual.png");
 		this.fontRenderer.colorCode[0+6] = Lib.COLOUR_I_ImmersiveOrange;
 		this.fontRenderer.colorCode[16+6] = Lib.COLOUR_I_ImmersiveOrangeShadow;
 		((IEItemFontRender)this.fontRenderer).createColourBackup();
+		this.screenColours = Arrays.copyOf(this.fontRenderer.colorCode, 32);
+		this.paperColours = Arrays.copyOf(this.screenColours, 32);
+		int[] darkened = {
+				0x000000, 0x0000aa, 0x006622, 0x006680, 0x992316, 0x77257c, 0xb25a12, 0x6e6e6e,
+				0x555555, 0x2a2ad6, 0x2e8b2e, 0x1e8a8a, 0xc42b1c, 0xa020a0, 0x9a7b00, 0x2a2a2a
+		};
+		System.arraycopy(darkened, 0, this.paperColours, 0, darkened.length);
 		if(Minecraft.getMinecraft().gameSettings.language!=null)
 		{
 			this.fontRenderer.setUnicodeFlag(ClientUtils.mc().getLanguageManager().isCurrentLocaleUnicode());
@@ -227,9 +246,16 @@ public class IEManualInstance extends ManualInstance
 		}
 	}
 
+	private void useColours(int[] colours)
+	{
+		System.arraycopy(colours, 0, this.fontRenderer.colorCode, 0, colours.length);
+		((IEItemFontRender)this.fontRenderer).createColourBackup();
+	}
+
 	@Override
 	public void entryRenderPre()
 	{
+		useColours(paperColours);
 		if(improveReadability())
 			((IEItemFontRender)this.fontRenderer).verticalBoldness = true;
 	}
@@ -237,6 +263,7 @@ public class IEManualInstance extends ManualInstance
 	@Override
 	public void entryRenderPost()
 	{
+		useColours(screenColours);
 		if(improveReadability())
 			((IEItemFontRender)this.fontRenderer).verticalBoldness = false;
 	}
@@ -244,6 +271,7 @@ public class IEManualInstance extends ManualInstance
 	@Override
 	public void tooltipRenderPre()
 	{
+		useColours(screenColours);
 		if(improveReadability())
 		{
 			((IEItemFontRender)this.fontRenderer).spacingModifier = 0f;
@@ -255,6 +283,7 @@ public class IEManualInstance extends ManualInstance
 	@Override
 	public void tooltipRenderPost()
 	{
+		useColours(paperColours);
 		if(improveReadability())
 		{
 			((IEItemFontRender)this.fontRenderer).spacingModifier = -.5f;
@@ -267,7 +296,22 @@ public class IEManualInstance extends ManualInstance
 	@Override
 	public String getManualName()
 	{
-		return I18n.format("item.immersiveengineering.tool.manual.name");
+		//The book on the shelf keeps the item's name; the title bar gets the fork's own if one is set.
+		String key = "ie.manual.title";
+		String title = I18n.format(key);
+		return key.equals(title)?I18n.format("item.immersiveengineering.tool.manual.name"): title;
+	}
+
+	@Override
+	public String getIndexHint()
+	{
+		return I18n.format("ie.manual.indexHint");
+	}
+
+	@Override
+	public String getSearchLabel()
+	{
+		return I18n.format("ie.manual.search");
 	}
 
 	@Override
@@ -340,33 +384,36 @@ public class IEManualInstance extends ManualInstance
 			ImmersiveEngineering.packetHandler.sendToServer(new MessageShaderManual(MessageType.SYNC));
 	}
 
+	//Everything below is drawn on the white page, so it is toned for white -- IE orange at 0xf78034
+	//has barely more contrast against paper than the paper does.
 	@Override
 	public int getTitleColour()
 	{
-		return 0xf78034;
+		return 0xa34f12;
 	}
 
 	@Override
 	public int getSubTitleColour()
 	{
-		return 0xf78034;
+		return 0x6b6156;
 	}
 
 	@Override
 	public int getTextColour()
 	{
-		return improveReadability()?0: 0x555555;
+		return improveReadability()?0: 0x1a1a1a;
 	}
 
 	@Override
 	public int getHighlightColour()
 	{
-		return 0xd4804a;
+		return 0xb35a18;
 	}
 
 	@Override
 	public int getPagenumberColour()
 	{
+		//On the frame under the page, not on the page.
 		return 0x9c917c;
 	}
 
