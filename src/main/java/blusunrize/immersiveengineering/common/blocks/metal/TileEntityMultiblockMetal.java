@@ -22,6 +22,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.CityMode;
+import blusunrize.immersiveengineering.common.util.CityModeMachines;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
 import blusunrize.immersiveengineering.common.util.Utils;
@@ -252,6 +253,47 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 		return false;
 	}
 
+	/**
+	 * The enable state this machine's redstone control was last seen in, or null if it has not been
+	 * seen yet. Server side and master only; deliberately not persisted, because "not seen yet" is
+	 * exactly the right state to come back from disk in -- see {@link #updateCityModeRedstoneBuffer()}.
+	 */
+	private Boolean cityRedstoneEnabled = null;
+
+	/**
+	 * City mode: keep the energy buffer in step with the redstone switch.
+	 * <p>
+	 * Flipping a machine on fills its buffer and flipping it off empties it, once per transition. In
+	 * a city build the machine and its gauge are one thing a player switches, and stock behaviour --
+	 * where the lever stops the process and leaves whatever was in the buffer sitting there -- reads
+	 * as the switch only half working. The level in between is untouched, so a machine that is
+	 * actually doing work still draws its buffer down and still refills from whatever feeds it.
+	 * <p>
+	 * Server side, master only. The resulting level reaches the client through the ordinary block
+	 * update, since the buffer is part of the description packet.
+	 */
+	private void updateCityModeRedstoneBuffer()
+	{
+		if(!formed)
+			return;
+		if(!CityMode.machines())
+		{
+			//Forget the observed state while the flag is off, so that turning city mode back on
+			//re-syncs the buffer instead of waiting for a transition that already happened.
+			cityRedstoneEnabled = null;
+			return;
+		}
+		boolean enabled = !isRSDisabled();
+		int target = CityModeMachines.redstoneEdgeBufferLevel(true, cityRedstoneEnabled, enabled,
+				energyStorage.getMaxEnergyStored());
+		cityRedstoneEnabled = enabled;
+		if(target < 0||energyStorage.getEnergyStored()==target)
+			return;
+		energyStorage.setEnergy(target);
+		markDirty();
+		markContainingBlockForUpdate(null);
+	}
+
 	public boolean isRSDisabled()
 	{
 		if(computerOn.isPresent())
@@ -322,13 +364,24 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 	//	=================================
 	public List<MultiblockProcess<R>> processQueue = new ArrayList<MultiblockProcess<R>>();
 	public int tickedProcesses = 0;
+	/**
+	 * World time at which this machine last queued a process, or {@link CityModeMachines#NEVER}.
+	 * Server side and master only; it decides whether an idle machine still counts as running, which
+	 * is all it is for, so it is not worth persisting.
+	 */
+	private long lastProcessStart = CityModeMachines.NEVER;
 
 	@Override
 	public void update()
 	{
 		ApiUtils.checkForNeedlessTicking(this);
 		tickedProcesses = 0;
-		if(world.isRemote||isDummy()||isRSDisabled())
+		if(world.isRemote||isDummy())
+			return;
+		//Before the enable check, not after: switching a machine *off* is a transition too, and a
+		//machine that has already returned cannot notice it.
+		updateCityModeRedstoneBuffer();
+		if(isRSDisabled())
 			return;
 
 		int max = getMaxProcessPerTick();
@@ -386,12 +439,20 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 	 * City mode therefore throttles the idle scan as well, at the cost of a machine taking up to
 	 * {@link #CITY_RECIPE_SCAN_INTERVAL} ticks to notice new input. Recipe outputs and processing
 	 * rates are unaffected either way.
+	 * <p>
+	 * That throttle is only correct for a machine that has nothing to do. Applied to a machine that
+	 * empties its queue between batches it is a stall: the one tick in 32 the machine is allowed to
+	 * look is also a tick on which it must happen to have energy, feed and output room, and every
+	 * time one of those does not line up the machine waits another 32 ticks. So the exemption is kept
+	 * for a machine that has started something in the last
+	 * {@link CityModeMachines#IDLE_SCAN_GRACE_TICKS} ticks -- see
+	 * {@link CityModeMachines#idleScanExempt(boolean, long, long)}.
 	 *
 	 * @param queueEmpty whether the machine currently has nothing queued
 	 */
 	protected boolean shouldScanForRecipe(boolean queueEmpty)
 	{
-		if(queueEmpty&&!CityMode.machines())
+		if(queueEmpty&&CityModeMachines.idleScanExempt(CityMode.machines(), world.getTotalWorldTime(), lastProcessStart))
 			return true;
 		return shouldThrottledRecipeScan();
 	}
@@ -447,6 +508,7 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 					if(canStack)
 					{
 						if(!simulate)
+						{
 							for(ItemStack old : (List<ItemStack>)p.inputItems)
 							{
 								for(ItemStack in : (List<ItemStack>)((MultiblockProcessInWorld)process).inputItems)
@@ -456,6 +518,8 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 										break;
 									}
 							}
+							noteProcessStarted();
+						}
 						return true;
 					}
 				}
@@ -474,10 +538,25 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 				return false;
 
 			if(!simulate)
+			{
 				processQueue.add(process);
+				noteProcessStarted();
+			}
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Records that this machine just started work, which is what keeps it exempt from city mode's
+	 * idle recipe-scan throttle. Every machine reaches a new process through
+	 * {@link #addProcessToQueue(MultiblockProcess, boolean, boolean)}, so this is the one place it
+	 * needs noting.
+	 */
+	private void noteProcessStarted()
+	{
+		if(world!=null&&!world.isRemote)
+			lastProcessStart = world.getTotalWorldTime();
 	}
 
 	@Override
@@ -504,9 +583,19 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 		return ia;
 	}
 
+	/**
+	 * Whether this machine should be drawn, sparked and sounded as running.
+	 * <p>
+	 * In city mode the process queue drops out of the answer: a switched-on, powered machine looks
+	 * busy whether or not it currently is, because a decorative machine whose animation and looping
+	 * sound cut out for every gap between batches reads as broken rather than as idle. Redstone and
+	 * power still switch it, which are the two things a player wired up on purpose. See
+	 * {@link CityModeMachines#renderAsActive(boolean, boolean, boolean, boolean)}.
+	 */
 	public boolean shouldRenderAsActive()
 	{
-		return getEnergyStored(null) > 0&&!isRSDisabled()&&!processQueue.isEmpty();
+		return CityModeMachines.renderAsActive(CityMode.machines(), !isRSDisabled(), getEnergyStored(null) > 0,
+				!processQueue.isEmpty());
 	}
 
 	public abstract static class MultiblockProcess<R extends IMultiblockRecipe>

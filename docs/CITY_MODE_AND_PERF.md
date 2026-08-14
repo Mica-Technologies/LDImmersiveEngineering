@@ -108,7 +108,7 @@ It covers seven subsystems:
 | **Wires** | One lossless push per connector instead of loss, distance weighting, proportional split, a double simulate/real pass and a network-wide broadcast. |
 | **Floodlights** | Beams are re-traced only when the light switches or a neighbour changes, never on a timer, and the number of light blocks one lamp may place is capped. |
 | **Generators** | Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and a per-tick tank drain. |
-| **Machines** | Idle multiblocks stop re-scanning the recipe list every tick, and the scan interval widens. |
+| **Machines** | Multiblocks with nothing to do stop re-scanning the recipe list every tick, and the scan interval widens. A switched-on machine also animates steadily rather than per-batch, and its energy buffer follows its redstone switch. |
 | **Virtual grid** | Segments stop accounting for flux and switch to presence: a segment is energized or it is not, and its Service Units deliver freely. See [Virtual Power Grid](#virtual-power-grid). |
 | **Fluid pipes** | A pipe hands its fluid to the endpoints on its network in order until it runs out, instead of simulating a fill against every one of them and then splitting the result in proportion. See [Fluid Pipes](#fluid-pipes). |
 | **Conduits** | Bundles stop moving units of flux and switch to presence, exactly as the grid does: a conductor is energised or it is not. See [Conduits](#conduits). |
@@ -530,6 +530,61 @@ indefinitely.
 **What you give up:** a machine can take up to 1.6 seconds to notice newly inserted items. Recipe
 outputs, processing rates and throughput once running are all untouched.
 
+### The idle throttle only applies to machines that are actually idle
+
+The first version of the above threw the throttle at *every* machine with an empty queue, and that
+was wrong in a way worth recording, because it looked correct and was reported as three separate
+bugs.
+
+A machine empties its queue between batches. When it does, it is not idle in the sense the throttle
+means — it is running, and it wants to start the next thing. Under a 32-tick throttle it gets one
+tick in 32 to look, and every caller ANDs that opportunity with conditions read on that same tick:
+stored energy, feed level, output room. Miss the window because the buffer happened to be empty on
+that tick and the next chance is 32 ticks away; miss twice and it is three seconds. That is the
+reported symptom — *"every 3-5 seconds a noticeable stutter, both in the animations and in
+sounds"* — and at short process times it is most of the duty cycle, which is why it also read as
+*"machines do not operate server side"*.
+
+The throttle now applies only to a machine that has **proved** it has nothing to do: one that has
+not managed to start a process for **200 ticks** (`CityModeMachines.IDLE_SCAN_GRACE_TICKS`). A
+machine between batches scans every tick exactly as it does in normal mode. A decorative machine
+holding input it can never use — the case the throttle exists for, and the one that re-scans the arc
+furnace's hundreds of recycling recipes forever — falls back onto the throttle within ten seconds of
+going quiet and stays there. Nothing about the expensive case changed.
+
+### Animations and sounds run steadily
+
+In city mode a machine that is **switched on and holds power** draws, sparks and sounds as running
+whether or not it currently has anything queued. Normally that last condition is part of the answer;
+here it is not, because a decorative machine whose animation and looping sound cut out for every gap
+between batches reads as broken rather than as idle.
+
+The two conditions that remain are the two a player deliberately wired: **redstone still stops a
+machine dead**, and an unpowered machine is still still. `shouldRenderAsActive()` only ever gains
+cases in city mode — nothing that animates in normal mode goes still in city mode.
+
+This is client-visible state only. It changes no processing, no output and no energy draw. It does
+also change what the OpenComputers `isActive` call reports, which now answers "switched on" rather
+than "mid-process" while city mode is enabled.
+
+### Redstone drives the energy buffer
+
+In city mode a machine's redstone control moves its energy buffer with it: switching the machine
+**on fills the buffer, switching it off empties it**. This is presence rather than accounting, the
+same trade the [virtual grid](#virtual-power-grid) and [conduits](#conduits) make — in a city build
+the machine and its gauge are one thing a player switches, and stopping the process while leaving
+the buffer sitting where it was reads as the switch only half working.
+
+It is an **edge**, not a level: the buffer is set once per transition and left alone in between, so
+a machine doing real work still draws its buffer down and still refills from whatever feeds it. A
+machine seen for the first time — freshly placed, or freshly loaded from disk — counts as a
+transition, so a machine that comes back with its lever already thrown is brought into line
+immediately rather than waiting for someone to flip it twice.
+
+This does create energy, and it is the one place city mode does. It is gated behind
+`cityModeMachines` with everything else in this section, so `cityModeMachines = false` (or the
+master switch) restores strict conservation.
+
 ---
 
 ## Virtual Power Grid
@@ -649,9 +704,11 @@ counted.
 | Generator fuel burn | per-tick rate derived from the fluid | 1 mB every 20 ticks, cosmetic |
 | Generator load gate | only runs under load | **unchanged — deliberately kept** |
 | Generator output | flat config value | unchanged |
-| Idle machine recipe scan | every tick | every 32 ticks |
+| Idle machine recipe scan | every tick | every 32 ticks, but only once the machine has started nothing for 200 ticks |
 | Machine recipe outputs / speed | — | unchanged |
 | Machine power requirements | — | unchanged |
+| Machine animation / looping sound | on while mid-process | on while switched on and powered |
+| Machine energy buffer on a redstone edge | untouched | filled when switched on, emptied when switched off |
 
 ### Wire burnout is disabled
 
@@ -937,8 +994,19 @@ With `cityMode = true` — generators:
 With `cityMode = true` — machines:
 
 - [ ] Arc Furnace, Squeezer, Fermenter, Mixer and Refinery all still craft, at unchanged speed.
-- [ ] Hopper-fed input is picked up within ~1.6 s (the widened idle scan interval).
+- [ ] A machine fed a long run of input crafts **continuously**, with no pause every few seconds
+      between batches. This is the regression that produced the original bug report.
+- [ ] Hopper-fed input on a machine that has been sitting idle is picked up within ~1.6 s (the
+      widened idle scan interval); once it is running, further input starts immediately.
 - [ ] A machine holding non-matching input does not stall a machine beside it.
+- [ ] A powered machine with nothing to do still animates and still plays its looping sound
+      (Crusher barrel, Squeezer piston, Mixer agitator, Arc Furnace sparks).
+- [ ] Cutting the machine's power stops the animation and the sound.
+- [ ] A redstone signal that disables the machine stops the animation and the sound.
+- [ ] Toggling that redstone signal fills the machine's energy buffer when it enables the machine
+      and empties it when it disables it, visible in the GUI without reopening it.
+- [ ] The buffer is only set on the transition: a running machine still visibly draws its buffer
+      down between toggles.
 
 Finally:
 

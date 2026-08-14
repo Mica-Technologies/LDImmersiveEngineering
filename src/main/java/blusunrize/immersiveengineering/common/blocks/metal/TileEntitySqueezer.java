@@ -81,9 +81,11 @@ public class TileEntitySqueezer extends TileEntityMultiblockMetal<TileEntitySque
 
 		if(world.isRemote)
 		{
-			if(this.processQueue.isEmpty()&&animation_piston < .6875)
-				animation_piston = Math.min(.6875f, animation_piston+.03125f);
-			else if(shouldRenderAsActive())
+			//The active test comes first. Outside city mode the two branches are mutually exclusive
+			//anyway -- an active squeezer always has something queued -- but in city mode an active
+			//one need not, and parking the piston at rest would freeze exactly the animation city
+			//mode is trying to keep running.
+			if(shouldRenderAsActive())
 			{
 				if(animation_down)
 					animation_piston = Math.max(0, animation_piston-.03125f);
@@ -94,6 +96,8 @@ public class TileEntitySqueezer extends TileEntityMultiblockMetal<TileEntitySque
 				else if(animation_piston >= .6875&&!animation_down)
 					animation_down = true;
 			}
+			else if(this.processQueue.isEmpty()&&animation_piston < .6875)
+				animation_piston = Math.min(.6875f, animation_piston+.03125f);
 		}
 		else
 		{

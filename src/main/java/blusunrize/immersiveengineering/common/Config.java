@@ -116,8 +116,9 @@ public class Config
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModeGenerators = true;
 
-		@Comment({"City mode: machines. Multiblocks scan for a new recipe far less often when they are already busy, and the stone furnaces stop broadcasting a block update to all 26 neighbours on every state change.",
-				"Machines still craft the same recipes at the same speed; they may take slightly longer to notice newly inserted items.",
+		@Comment({"City mode: machines. Multiblocks scan for a new recipe far less often when they are already busy, and the stone furnaces stop broadcasting a block update to all 26 neighbours on every state change. A multiblock that has not managed to start anything for ten seconds is throttled too, so a decorative machine holding input it cannot use stops re-scanning the recipe list forever; a machine that is working is not throttled and does not stutter between batches.",
+				"A machine that is switched on and holds power also animates and plays its looping sound steadily rather than only while mid-process, and its energy buffer follows its redstone switch: enabling the machine fills the buffer, disabling it empties it. That is the one place city mode creates energy.",
+				"Machines still craft the same recipes at the same speed; an idle one may take slightly longer to notice newly inserted items.",
 				"Only applies when cityMode is enabled."})
 		public static boolean cityModeMachines = true;
 
