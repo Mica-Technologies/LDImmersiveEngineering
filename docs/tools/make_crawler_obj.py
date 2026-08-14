@@ -38,6 +38,9 @@ Self-checks, all of them the sort of failure nothing at runtime reports:
     what catches a cylinder cap fanned the wrong way or a belt loop that failed to close;
   * the scrolling track belt's UVs stay inside their strip at every offset it can be
     drawn at;
+  * no two co-rendered faces that point the same way lie in the same plane and overlap,
+    which is the check that would have caught the z-fighting a playtester reported as
+    "mottled patches" on the cowl, the deck seams, the track guards and the arm's pins;
   * the glazing region is painted with partial alpha and every other region is fully
     opaque, which is the check that would have caught a windscreen nobody can see out
     of and a hole in the bodywork respectively.
@@ -160,7 +163,30 @@ BELT_PERIOD = 8
 
 # ---------------------------------------------------------------------------
 # Geometry, in model units.  See the module docstring for the axes.
+# ---------------------------------------------------------------------------
+
+# How far a detail stands proud of -- or sinks into -- the surface it is attached to.
 #
+# **This is the fix for the z-fighting a playtester reported**: mottled patches that
+# flickered as the camera moved, on the cowl flank, along the deck seams, on the track
+# guards and at the arm's pins.  Every one of them was two faces that point the same way
+# lying in exactly the same plane: a handrail flush with the posts holding it up, a
+# mudguard exactly as wide as the belt under it, a stick eye exactly the radius of the
+# boom pin it turns on.  Nothing decides which of two coincident faces wins; the depth
+# buffer's rounding does, per pixel, per frame, and it changes its mind as the machine
+# moves.  See check_coplanar, which now refuses to write a model with any of it left.
+#
+# 0.1 of a unit, and both bounds of that are worth stating.  Downwards: the depth buffer
+# resolves about z**2/8e5 blocks at a distance of z blocks, so at the 64 blocks an entity
+# is still drawn at it separates about 0.005 of a block -- 0.08 of a unit.  A tenth clears
+# that everywhere the machine is visible at all; the 0.05 that would do at arm's length
+# would still shimmer across a build site.  Upwards: a unit is one texel of the sheet, so
+# a tenth of one is a tenth of a texel.  There is no distance at which that reads as a
+# panel floating off the bodywork -- it is well under the width of the seam lines painted
+# on the panels either side of it.
+RELIEF = 0.1
+
+# ---------------------------------------------------------------------------
 # THE PIVOTS.  Duplicated in ModelHydraulicCrawler, compared by CrawlerAssetsTest.
 # ---------------------------------------------------------------------------
 SLEW_HEIGHT = -14.0                     # the ring the house turns on
@@ -224,6 +250,11 @@ class Mesh:
         self.uv_index = {}
         self.groups = []            # (name, [face...]) in file order
         self.by_name = {}
+        #  The same faces again as plain points, per group, for check_coplanar: that check
+        #  is about where two faces are in space, and the file's shared vertex table is the
+        #  one form of the mesh that has thrown that away.
+        self.polygons = {}          # name -> [(what, [point...])...]
+        self.group_of = {}          # id(face list) -> name
         self.quads = 0
 
     def group(self, name):
@@ -232,6 +263,8 @@ class Mesh:
         faces = []
         self.groups.append((name, faces))
         self.by_name[name] = faces
+        self.polygons[name] = []
+        self.group_of[id(faces)] = name
         return faces
 
     def _pos(self, point):
@@ -248,8 +281,9 @@ class Mesh:
             self.uvs.append(key)
         return self.uv_index[key]+1
 
-    def add(self, faces, points, uvs):
+    def add(self, faces, points, uvs, what="?"):
         faces.append([(self._pos(p), self._uv(uv)) for p, uv in zip(points, uvs)])
+        self.polygons[self.group_of[id(faces)]].append((what, [tuple(p) for p in points]))
         self.quads += 1
 
 
@@ -307,7 +341,7 @@ class Solid:
             if not (-1e-6 <= u <= SHEET+1e-6 and -1e-6 <= v <= SHEET+1e-6):
                 raise SystemExit("%s: uv %.2f,%.2f leaves the sheet" % (self.what, u, v))
         self.polygons.append(points)
-        self.mesh.add(self.faces, points, [obj_uv(uv) for uv in uvs])
+        self.mesh.add(self.faces, points, [obj_uv(uv) for uv in uvs], self.what)
 
     def finish(self):
         edges = {}
@@ -611,8 +645,15 @@ def build_undercarriage(mesh):
         volume += add_box(mesh, faces, "cross member", (-TRACK_X1, -8, z0, TRACK_X1, -3, z1),
                           sides("steel", bottom="steel_dark"))
     # The slew ring, and the collar the house sits down over.
-    volume += add_cylinder(mesh, faces, "slew ring", -13, 13, 0, -11.5, 13, 12,
-                           "plate", "plate", twist=math.pi/12)
+    #
+    # A hair narrower than the counterweight above it, which is 13 to a side: the ring's
+    # end caps and the counterweight's flanks are both flat, both face outwards and both
+    # would sit on x = +-13, and where they overlap -- a sliver at the back of the ring --
+    # that is two same-facing faces in one plane.  See RELIEF.  The ring loses the tenth
+    # rather than the counterweight gaining one, because the counterweight's width is part
+    # of the silhouette and the ring is mostly hidden under the house.
+    volume += add_cylinder(mesh, faces, "slew ring", -13+RELIEF, 13-RELIEF, 0, -11.5, 13,
+                           12, "plate", "plate", twist=math.pi/12)
     volume += add_cylinder(mesh, faces, "slew collar", -10, 10, 0, -14.0, 10, 12,
                            "plate", "plate", twist=math.pi/12)
 
@@ -622,13 +663,22 @@ def build_undercarriage(mesh):
         volume += add_frustum(mesh, faces, "track frame", -WHEEL_Z, WHEEL_Z,
                               (x0, -9.5, x1, -2.5), (x0, -9.5, x1, -2.5),
                               sides("steel", top="steel", bottom="steel_dark"))
-        # The guard over the top run, which is where the mud goes.
+        # The guard over the top run, which is where the mud goes.  It stops RELIEF short
+        # of the belt's own edge rather than being exactly as wide as it: flush -- which
+        # is how it was built, both at 12 and 24 -- the guard's flanks and the belt's are
+        # one plane down the whole length of both tracks, and that is the grey flickering
+        # reported between the runs.  Short rather than proud, so that nothing on the
+        # machine is drawn outside the hull TRACK_X1 sets; it still overhangs the frame it
+        # is bolted to by most of a unit, which is what makes it read as a guard.
         volume += add_box(mesh, faces, "track guard",
-                          (min(x0, x1)-1, -13.5, -12, max(x0, x1)+1, -11.5, 12),
+                          (min(x0, x1)-1+RELIEF, -13.5, -12, max(x0, x1)+1-RELIEF, -11.5, 12),
                           sides("yellow", top="yellow", bottom="yellow_dark"))
         # A tensioner block at the idler, so the front of the frame is not a bare end.
+        # Proud of the frame by RELIEF, for the same reason and to the same effect: flush
+        # with it, its flanks and the frame's are one plane over the length they share.
         volume += add_box(mesh, faces, "tensioner",
-                          (min(x0, x1), -8, -WHEEL_Z-3, max(x0, x1), -4, -WHEEL_Z+1),
+                          (min(x0, x1)-RELIEF, -8, -WHEEL_Z-3,
+                           max(x0, x1)+RELIEF, -4, -WHEEL_Z+1),
                           sides("plate", bottom="steel_dark"))
     return volume
 
@@ -693,10 +743,13 @@ def build_house(mesh):
     volume += add_box(mesh, faces, "toolbox", (1, -9, 5, 14, -3, 12),
                       sides("yellow", top="walkway", bottom="yellow_dark"))
 
-    # The ears the boom is pinned between, straddling the pivot.
+    # The ears the boom is pinned between, straddling the pivot.  Their feet go RELIEF
+    # into the deck rather than stopping level with the front deck's, which is where they
+    # were: two undersides in one plane, both facing down, over the whole footprint the
+    # ears share with the deck they stand on.  Buried, they are simply not drawn.
     for x0, x1 in ((-9.5, -6.5), (-3.5, -0.5)):
         volume += add_frustum(mesh, faces, "boom ear", -19, -8,
-                              (x0, -13, x1, -3), (x0, -13, x1, -3),
+                              (x0, -13, x1, -3+RELIEF), (x0, -13, x1, -3+RELIEF),
                               sides("plate", bottom="steel_dark"))
 
     # The exhaust stack and its rain cap.
@@ -738,8 +791,15 @@ def build_cab(mesh, faces, glass):
             volume += add_box(mesh, faces, "cab post",
                               (x0, CAB_TOP+2, z0, x1, CAB_FLOOR, z1), "yellow")
     # The back wall is solid: it is the side the engine is on and nobody looks that way.
+    #
+    # It spans *between* the two rear posts rather than across them.  Across them it
+    # enclosed them: both rear posts were inside this box with all six of their faces in
+    # its faces' planes, so every one of them was a coincident pair and the whole back
+    # corner of the cab flickered.  Between them, the wall meets each post edge to edge --
+    # face against opposing face, which is what a box against a box is and is fine -- and
+    # the posts read as the corner pillars they are meant to be.
     volume += add_box(mesh, faces, "cab back",
-                      (CAB_X0, CAB_TOP+2, CAB_Z1-2, CAB_X1, CAB_FLOOR, CAB_Z1),
+                      (CAB_X0+2, CAB_TOP+2, CAB_Z1-2, CAB_X1-2, CAB_FLOOR, CAB_Z1),
                       sides("yellow", ends="cab_side"))
     # The inner wall, half height: a rail to lean on, and clear glass above it so the
     # operator can see the arm they are working with.
@@ -783,16 +843,30 @@ def build_handrails(mesh, faces):
     counterweight does: they are the only thin thing on an otherwise slab-sided machine."""
     volume = 0.0
     rail_y = -12.0
+
+    def post(z):
+        #  The foot goes RELIEF into the deck.  Level with it -- which is how these were
+        #  built -- the post's underside and the underside of whatever else stands on that
+        #  patch of deck (the cowl, the front deck) are one plane facing one way, and that
+        #  is half of the flickering reported down the machine's right-hand flank.
+        return add_box(mesh, faces, "rail post",
+                       (-13.5, rail_y, z, -12.5, -3+RELIEF, z+1), "plate")
+
+    def rail(z0, z1):
+        #  And the bar stands RELIEF proud of its posts on every side.  Flush, it shared
+        #  four planes with each post it crosses -- both flanks, the top, and the end --
+        #  which is the other half of it.  A handrail is welded to the outside of its
+        #  stanchions in any case; this is what that looks like.
+        return add_box(mesh, faces, "rail",
+                       (-13.5-RELIEF, rail_y-RELIEF, z0-RELIEF,
+                        -12.5+RELIEF, rail_y+1, z1+RELIEF), "plate")
+
     for z in (-16, -6):
-        volume += add_box(mesh, faces, "rail post", (-13.5, rail_y, z, -12.5, -3, z+1),
-                          "plate")
-    volume += add_box(mesh, faces, "rail", (-13.5, rail_y, -16, -12.5, rail_y+1, -5),
-                      "plate")
+        volume += post(z)
+    volume += rail(-16, -5)
     for z in (2, 10):
-        volume += add_box(mesh, faces, "rail post", (-13.5, rail_y, z, -12.5, -3, z+1),
-                          "plate")
-    volume += add_box(mesh, faces, "rail", (-13.5, rail_y, 2, -12.5, rail_y+1, 11),
-                      "plate")
+        volume += post(z)
+    volume += rail(2, 11)
     # A step up onto the deck, on the cab's side, where the door is.
     volume += add_box(mesh, faces, "step", (14, -2, -12, 16, -1, -6),
                       sides("walkway", bottom="steel_dark"))
@@ -845,7 +919,15 @@ def build_stick(mesh):
     volume += add_frustum(mesh, faces, "stick beam", -STICK_LENGTH, 2,
                           (-2.75, -3.0, 2.75, 3.0), (-3.5, -4.0, 3.5, 4.0),
                           sides("yellow", top="yellow", bottom="yellow_dark"))
-    volume += add_cylinder(mesh, faces, "stick foot pin", -4.0, 4.0, 0, 0, 3.5, 12,
+    # The eye the stick turns on, RELIEF larger than the boom's head pin it turns *on*.
+    #
+    # **The two were the same radius on the same axis**, which is a pair of cylinders whose
+    # every facet is one surface -- and being coaxial with the joint they turn about, it
+    # stayed one surface at every angle the arm can be folded to.  That is the flicker
+    # reported at the boom-stick knuckle.  Larger rather than smaller: smaller would put
+    # this eye entirely inside the boom's pin, drawing twenty-two faces nobody can ever
+    # see, and a boss around a pin is the larger of the two on a real machine anyway.
+    volume += add_cylinder(mesh, faces, "stick foot pin", -4.0, 4.0, 0, 0, 3.5+RELIEF, 12,
                            "plate", "plate")
     volume += add_cylinder(mesh, faces, "stick head pin", -3.0, 3.0, -STICK_LENGTH, 0,
                            2.6, 12, "plate", "plate")
@@ -886,8 +968,12 @@ def build_bucket(mesh):
                               (-w1, y1a, w1, y1b), (-w0, y0a, w0, y0b),
                               {"+x": "plate", "-x": "plate", "+z": "bucket",
                                "-z": "bucket", "-y": "bucket", "+y": "trim"})
-    # The sides, which close the shell the slabs left open.
-    for x0, x1 in ((-7.0, -5.5), (5.5, 7.0)):
+    # The sides, which close the shell the slabs left open.  Each stands RELIEF proud of
+    # it: flush -- 7.0, which is the shell's own half width and the lip's -- the side
+    # plate, the widest slab of the back and the lip all put an outward face on the same
+    # plane, three deep in places.  Wear plates are bolted to the outside of a real
+    # bucket's sides, so proud is also what they look like.
+    for x0, x1 in ((-7.0-RELIEF, -5.5), (5.5, 7.0+RELIEF)):
         volume += add_frustum(mesh, faces, "bucket side", -12, -2,
                               (x0, -7.0, x1, 3.0), (x0, -6.0, x1, 2.0), "plate")
     # The lip, and five teeth on it.
@@ -926,8 +1012,13 @@ def build_grapple(mesh):
     volume += add_box(mesh, faces, "grapple mount", (-4, -4, -3, 4, 2, 1), "plate")
     volume += add_cylinder(mesh, faces, "grapple pin", -4.5, 4.5, 0, 0, 2.4, 8,
                            "plate", "plate")
-    volume += add_cylinder(mesh, faces, "rotator", -3.0, 3.0, -4.5, 0, 3.0, 12,
-                           "steel", "steel_dark")
+    # The rotator, a shade narrower than the stick's head pin it hangs behind.  At the
+    # same width its end discs and the pin's were in the same two planes and overlapped --
+    # the two are only 4.5 apart and together they are 5.6 across -- and the pair survived
+    # every angle the tool can be curled to, because curling it turns it about the very
+    # axis those planes are square to.
+    volume += add_cylinder(mesh, faces, "rotator", -3.0+RELIEF, 3.0-RELIEF, -4.5, 0, 3.0,
+                           12, "steel", "steel_dark")
     volume += add_box(mesh, faces, "jaw beam", (-5, -2, -8, 5, 2, -6), "plate")
     # Each jaw is three segments hinged outwards, so the pair reads as a claw about to
     # close rather than as two flat plates.
@@ -941,6 +1032,167 @@ def build_grapple(mesh):
                               yrect(4.5, y0+sign*3.5, y0+sign*5.0),
                               sides("edge", top="edge", bottom="edge"))
     return volume
+
+
+# ---------------------------------------------------------------------------
+# Z-fighting
+#
+# **The check that would have caught every one of the mottled patches a playtester
+# reported.**  Two faces that point the same way, lie in the same plane and cover any of
+# the same ground are a coin flip resolved by the depth buffer's rounding: per pixel, per
+# frame, changing its mind as the camera moves.  It is not an error anything reports and
+# it does not look like a modelling mistake from the seat -- it looks like the texture is
+# broken.  It was five separate places on this machine and every one of them was steel
+# built flush against steel.
+#
+# The rules, and each of them is load bearing:
+#
+#   * **Same-facing only.**  Two boxes stood against each other share a plane by
+#     definition -- one's +x face and the other's -x face.  Those never fight: whichever
+#     side you are on, one of them is facing away and is culled, and the other is in
+#     front of it.  Only faces pointing the *same* way can both be drawn at once.
+#   * **Real polygon overlap, not bounding boxes.**  A cylinder's cap is fanned into
+#     quads that share edges and whose bounding boxes overlap almost completely, and
+#     every wheel on the machine would be reported by a box test.  This projects both
+#     faces onto their shared plane and separates them properly, so a shared edge is
+#     contact and not overlap.
+#   * **The alternates never meet.**  Exactly one of the three attachments is drawn, so
+#     a pair between two different tool_* groups is geometry that is never on screen
+#     together.  Pairs *within* one of them are still checked.
+#   * **The rest pose is enough, and this is why.**  Groups move relative to one another,
+#     so in principle a coincidence could appear at one angle and not another.  But a
+#     rotation leaves exactly the planes square to its own axis where they were, so a
+#     coincidence that survives being posed is a coincidence in one of those planes --
+#     and it is therefore already there at every angle, this one included.  What this
+#     cannot see is the transient sort: the boom's flank sweeping through the cowl's
+#     plane at one particular angle on the way past.  Nothing can be done about those
+#     and they flicker for a frame rather than sitting there.
+# ---------------------------------------------------------------------------
+#  Two planes closer than this are the same plane as far as a depth buffer at any
+#  sensible viewing distance is concerned; see RELIEF, which is ten times it.
+COPLANAR_TOL = 0.01
+#  Faces have to be *parallel*, not nearly so: the boom's flanks and the stick's taper at
+#  1.6 milliradians apart are two different surfaces and converge to nothing.
+PARALLEL_TOL = 1e-7
+#  Slack for faces that touch along an edge or a corner, which is contact, not overlap.
+TOUCH_TOL = 1e-4
+
+#  One of these is drawn at a time -- see ModelHydraulicCrawler.groupFor -- so two of
+#  them sharing a plane is two things that are never in the same frame.
+ALTERNATES = {"tool_bucket", "tool_breaker", "tool_grapple"}
+
+
+def rest_pose(name):
+    """Where a group's own space sits when every joint is at zero.
+
+    The renderer's transform stack, flattened: the house is translated to the slew ring,
+    the boom to its pin in the house, the stick to the boom's head, the tool to the
+    stick's, and a wheel to its axle.  Angles are all zero, which is what makes this a
+    translation -- see check_coplanar on why that is the pose worth checking.
+    """
+    house = (0.0, SLEW_HEIGHT, 0.0)
+    boom = (house[0]+BOOM_PIVOT[0], house[1]+BOOM_PIVOT[1], house[2]+BOOM_PIVOT[2])
+    stick = (boom[0], boom[1], boom[2]-BOOM_LENGTH)
+    if name in ("undercarriage", "track_left", "track_right"):
+        return 0.0, 0.0, 0.0
+    if name in ("house", "house_glass"):
+        return house
+    if name=="boom":
+        return boom
+    if name=="stick":
+        return stick
+    if name.startswith("tool_"):
+        return stick[0], stick[1], stick[2]-STICK_LENGTH
+    if name.startswith("wheel_"):
+        z, y, _, _ = WHEELS[int(name.rsplit("_", 1)[1])]
+        return 0.0, y, z
+    raise SystemExit("no rest pose for the group %s; a new group has to say where the "
+                     "renderer puts it before its faces can be checked against the "
+                     "rest of the machine" % name)
+
+
+def separated(poly, other):
+    """Whether an edge of `poly` has all of `other` outside it: one separating axis."""
+    count = len(poly)
+    twice_area = sum(poly[i][0]*poly[(i+1)%count][1]-poly[(i+1)%count][0]*poly[i][1]
+                     for i in range(count))
+    turn = 1.0 if twice_area > 0 else -1.0
+    for i in range(count):
+        x0, y0 = poly[i]
+        x1, y1 = poly[(i+1)%count]
+        ex, ey = x1-x0, y1-y0
+        length = math.hypot(ex, ey)
+        if length < 1e-9:
+            continue
+        nx, ny = turn*ey/length, -turn*ex/length      # outwards, whichever way it winds
+        if min(nx*(vx-x0)+ny*(vy-y0) for vx, vy in other) >= -TOUCH_TOL:
+            return True
+    return False
+
+
+def overlaps(a, b, axis):
+    """Whether two convex polygons in one plane cover any of the same ground.
+
+    Separating axis, over the edges of both: two convex shapes miss each other if and
+    only if one of their own edges has the other entirely on its outside.  Every face
+    this generator makes is convex -- boxes, frusta, and cap quads whose corners are in
+    order round a circle -- which is what makes that true here.
+    """
+    keep = [i for i in range(3) if i!=axis]
+    pa = [(p[keep[0]], p[keep[1]]) for p in a]
+    pb = [(p[keep[0]], p[keep[1]]) for p in b]
+    return not separated(pa, pb) and not separated(pb, pa)
+
+
+def check_coplanar(mesh):
+    """Refuse to write a machine with two co-rendered faces fighting over one plane."""
+    quads = []
+    for name, _ in mesh.groups:
+        ox, oy, oz = rest_pose(name)
+        for what, points in mesh.polygons[name]:
+            placed = [(p[0]+ox, p[1]+oy, p[2]+oz) for p in points]
+            normal = newell(placed)
+            length = math.sqrt(dot(normal, normal))
+            unit = (normal[0]/length, normal[1]/length, normal[2]/length)
+            quads.append((name, what, unit, dot(unit, placed[0]), placed))
+
+    #  Bucketed by which way the face points, and sorted by how far along that direction
+    #  its plane is, so each face is only ever compared with the handful whose planes are
+    #  within a hundredth of a unit of its own.  Faces pointing opposite ways land in
+    #  different buckets, which is the "same-facing only" rule falling out for free.
+    buckets = {}
+    for quad in quads:
+        axis = max(range(3), key=lambda i: abs(quad[2][i]))
+        buckets.setdefault((axis, quad[2][axis] > 0), []).append(quad)
+
+    clashes = []
+    for (axis, _), bucket in sorted(buckets.items()):
+        bucket.sort(key=lambda q: q[3])
+        for i, a in enumerate(bucket):
+            for b in bucket[i+1:]:
+                if b[3]-a[3] > COPLANAR_TOL:
+                    break
+                if dot(a[2], b[2]) < 1-PARALLEL_TOL:
+                    continue
+                if a[0]!=b[0] and a[0] in ALTERNATES and b[0] in ALTERNATES:
+                    continue
+                if overlaps(a[4], b[4], axis):
+                    clashes.append((axis, a, b))
+    if clashes:
+        lines = ["%d pairs of faces point the same way and share a plane, which is a "
+                 "machine that flickers:" % len(clashes)]
+        for axis, a, b in clashes[:40]:
+            lines.append("  %s in %s and %s in %s, both facing %s%s at %.3f"
+                         % (a[1], a[0], b[1], b[0],
+                            "+" if a[2][axis] > 0 else "-", "xyz"[axis],
+                            a[3] if a[2][axis] > 0 else -a[3]))
+        if len(clashes) > 40:
+            lines.append("  ... and %d more" % (len(clashes)-40))
+        lines.append("Give whichever of the two is the detail a RELIEF of clearance --")
+        lines.append("proud of the surface it decorates, or sunk into it -- or shrink it")
+        lines.append("until the two no longer overlap.  See the note on RELIEF.")
+        raise SystemExit("\n".join(lines))
+    return len(quads)
 
 
 def build_model():
@@ -1421,6 +1673,7 @@ def main():
 
     used = check_layout()
     mesh, volume = build_model()
+    checked = check_coplanar(mesh)
 
     model_dir = os.path.join(args.assets, "models", "entity")
     os.makedirs(model_dir, exist_ok=True)
@@ -1432,6 +1685,7 @@ def main():
           % (len(mesh.groups), mesh.quads, len(mesh.positions), volume))
     for name, faces in mesh.groups:
         print("    %-16s %4d quads"%(name, len(faces)))
+    print("  %d faces checked, no two of them fighting over a plane"%checked)
 
     entity_dir = os.path.join(args.assets, "textures", "entity")
     os.makedirs(entity_dir, exist_ok=True)
