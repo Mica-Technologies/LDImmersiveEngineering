@@ -39,6 +39,11 @@ either:
 - An online tile entity, `TileEntityImmersiveConnectable`
   (`api/energy/wires/TileEntityImmersiveConnectable.java:45`), the base class for every connector,
   relay, and transformer; or
+- A fork block that is a wire endpoint in its own right: a **Grid Feed or Service Unit**
+  (`common/blocks/grid/TileEntityGridDevice.java`, which extends
+  `TileEntityImmersiveConnectable` so a coil attaches straight to the terminal post on its
+  front), or a **Junction Box** (`common/blocks/conduit/TileEntityJunctionBox.java`, whose
+  edges are conduit bundles and are never ordinary catenaries); or
 - An offline placeholder, `IICProxy` (`api/energy/wires/IICProxy.java:23`), which stands in for a
   connector whose chunk is unloaded so that energy can still be routed *through* (but not into/out
   of) that position.
@@ -164,7 +169,15 @@ TileEntityConnectorLV.update()                         [LV.java:60]
    └─ notifyAvailableEnergy(stored, null)              [LV.java:414]  ← advertise to pull-consumers
 ```
 
-### `transferEnergy` (`TileEntityConnectorLV.java:333`)
+### `transferEnergy` (`common/util/WireNetTransfer.java`)
+
+The body of this lived on `TileEntityConnectorLV` until the Grid Service Unit began taking a
+wire directly. A service unit has to put energy onto a catenary in precisely the way a connector
+does -- same loss, same proportional split, same Energy Meter readings -- so the method was moved
+verbatim into `WireNetTransfer` and the connector now calls it. One implementation, and no second
+copy of arithmetic this subtle to drift. `WireNetTransfer.city` is the same move for
+`cityModeTransfer`. The caller owns the endpoint-cache map and its own storage; the method
+reports what was taken so the caller debits itself.
 
 1. `getIndirectEnergyConnections(thisPos, world, ignoreIsEnergyOutput=true)` — fetch (or build &
    cache) the set of `AbstractConnection` routes from this connector (`:338`).

@@ -21,8 +21,10 @@ tubing.
 2. Lengths joined along the same surface make a **run**. A run stays on one surface.
 3. A run ends at a **Junction Box**. Lay conduit between two boxes and the run connects itself —
    there is no coil and no linking tool.
-4. Right-click a box's face with a **dye**: the conductor of that colour leaves by that face.
-5. Put an **LV / MV / HV Connector** against that face. It picks up that conductor and nothing else.
+4. Put an **LV / MV / HV Connector** — or a **Grid Feed / Service Unit** — against a bare face of a
+   box. The box breaks a free conductor out to that face by itself, and wears its plate so you can
+   see which. That is all most circuits need.
+5. To choose *which* conductor instead, right-click the face with a **dye** first.
 6. To get a run through a floor without a box showing, set a **Ground Feeder** into it. It wears
    whatever is around it.
 
@@ -59,6 +61,33 @@ A patch panel with six faces. Each face is one of three things:
 | A **dye** | That face breaks out the conductor of that colour |
 | **Redstone dust** (on a patched face) | Cycles that face: power → reads redstone → emits redstone |
 | **Nothing**, while sneaking | Unpatches the face |
+
+### Auto-patching
+
+**A bare face with power hardware bolted to it patches itself.** Put an LV, MV or HV connector — or
+a Grid Feed or Service Unit — against a junction box and the box breaks the lowest free conductor
+out to that face, wearing the plate as if it had been dyed by hand.
+
+This is the whole of what "connectors should connect to conduit with ease" needed. Before it, the
+block that made a connector work was a *dye*, which is not a thing anybody guesses; a connector hung
+on a box did nothing, silently, and read as the feature being broken. Dyeing still works and still
+overrides — it is how you choose *which* conductor rather than *whether*.
+
+Three rules keep it from being a nuisance:
+
+- **Only wiring hardware.** A connector (never a relay: a relay neither takes nor gives energy, and
+  `EnergyHelper.acceptingSide` answers null for one) or a Feed or Service Unit. Not any neighbour
+  that happens to accept flux — a box dropped beside a capacitor bank to turn a corner must not
+  quietly start draining the run into it, and "connectors and grid boxes claim a face" is a rule a
+  player can state.
+- **Lowest free conductor, never one already broken out on that box.** The same conductor arriving
+  at two connectors is a short. A box with all sixteen spoken for hands out nothing rather than
+  stealing one from a working circuit. `JunctionBoxLogic.firstFreeChannel` owns that and is tested.
+- **It never un-patches.** Taking a connector down leaves the breakout where it was; the alternative
+  is a box that forgets a deliberate configuration the moment something is mined next to it.
+
+It runs on neighbour change and on load. On load as well, because a box placed against hardware that
+was already there hears nothing afterwards — settled blocks never fire another update.
 
 **A patched face wears a plate in its conductor's colour.** A box says how it is wired from across
 the room rather than only under the crosshair. The plate is painted near-white and tinted per face

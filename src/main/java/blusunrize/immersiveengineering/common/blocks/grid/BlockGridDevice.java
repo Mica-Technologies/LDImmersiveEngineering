@@ -39,8 +39,13 @@ public class BlockGridDevice extends BlockIETileProvider<BlockTypes_GridDevice>
 {
 	public BlockGridDevice()
 	{
+		//CONNECTIONS is what makes a wire strung to a Feed or Service Unit visible. Without it
+		//BlockIETileProvider.getExtendedState skips the box -- the property has to be declared here
+		//before it can be filled -- and the far end draws only its own half of the catenary, which
+		//is the "wires with holes in" symptom rather than a missing wire.
 		super("grid_device", Material.IRON, PropertyEnum.create("type", BlockTypes_GridDevice.class),
-				ItemBlockIEBase.class, IEProperties.FACING_ALL, IEProperties.BOOLEANS[0]);
+				ItemBlockIEBase.class, IEProperties.FACING_ALL, IEProperties.BOOLEANS[0],
+				IEProperties.CONNECTIONS);
 		this.setHardness(3.0F);
 		this.setResistance(15.0F);
 		this.lightOpacity = 0;
@@ -51,6 +56,14 @@ public class BlockGridDevice extends BlockIETileProvider<BlockTypes_GridDevice>
 			this.setNotNormalBlock(box.getMeta());
 			this.setMetaBlockLayer(box.getMeta(), BlockRenderLayer.CUTOUT);
 		}
+		//The two boxes that take a wire also render in SOLID, and that is not cosmetic: the
+		//connection model only emits catenary quads during the SOLID and TRANSLUCENT passes, so a
+		//box that declared CUTOUT alone would never be asked for them and its wires would simply not
+		//be there. The box's own quads stay on CUTOUT -- the blockstate's "layers" says so -- so
+		//nothing is drawn twice.
+		for(BlockTypes_GridDevice box : new BlockTypes_GridDevice[]{BlockTypes_GridDevice.FEED_UNIT,
+				BlockTypes_GridDevice.SERVICE_UNIT})
+			this.setMetaBlockLayer(box.getMeta(), BlockRenderLayer.CUTOUT, BlockRenderLayer.SOLID);
 	}
 
 	//NOTE: deliberately no custom state mapping. Returning a name here makes IE look for a

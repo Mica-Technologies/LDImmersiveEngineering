@@ -66,7 +66,16 @@ class GridAssetsTest
 	}
 
 	/**
-	 * Collects every {@code "model"} and {@code "textures"} value anywhere in a tree.
+	 * The connection model is supplied by {@code ConnLoader} rather than by a file, so it is the
+	 * one "model" reference in these blockstates that must not be looked for on disk. The real
+	 * geometry it wraps is named by {@code custom.base}, which is collected instead.
+	 */
+	private static final String CONN_MODEL = "immersiveengineering:smartmodel/connector";
+
+	/**
+	 * Collects every {@code "model"} and {@code "textures"} value anywhere in a tree, plus the
+	 * {@code custom.base} of any connection model -- which is a model reference in everything but
+	 * name, and the one the Feed and Service Units are actually drawn from.
 	 */
 	private static void collectRefs(JsonElement element, Set<String> models, Set<String> textures)
 	{
@@ -77,6 +86,11 @@ class GridAssetsTest
 			{
 				if("model".equals(entry.getKey())&&entry.getValue().isJsonPrimitive())
 					models.add(entry.getValue().getAsString());
+				else if("base".equals(entry.getKey())&&entry.getValue().isJsonPrimitive())
+					//A base is written as a full model path ("<domain>:block/..."), while a blockstate
+					//"model" is written relative to block/. Normalised here so both kinds land in one
+					//set and every check below applies to both.
+					models.add(entry.getValue().getAsString().replace(":block/", ":"));
 				else if("textures".equals(entry.getKey())&&entry.getValue().isJsonObject())
 					for(Map.Entry<String, JsonElement> tex : entry.getValue().getAsJsonObject().entrySet())
 					{
@@ -234,6 +248,31 @@ class GridAssetsTest
 		}
 
 		@Test
+		@DisplayName("the two boxes that take a wire are drawn with the connection model")
+		void wireTakingBoxesUseTheConnectionModel()
+		{
+			//A wire attached to a Feed or Service Unit is drawn by *this* block: each end of a
+			//catenary renders its own half, so a box drawn with an ordinary model leaves a wire that
+			//stops in mid-air halfway along. Nothing in the game logs that -- it just looks broken --
+			//which is why the two halves of the wiring are asserted together here: the smart model on
+			//the variant, and the real geometry under custom.base.
+			JsonObject types = blockstate("grid_device").getAsJsonObject("variants")
+				.getAsJsonObject("type");
+			for(String box : new String[]{"feed_unit", "service_unit"})
+			{
+				JsonObject variant = types.getAsJsonObject(box);
+				assertEquals(CONN_MODEL, variant.get("model").getAsString(),
+					box+" is not drawn with the connection model, so wires on it would be half-drawn");
+				assertTrue(variant.has("custom"), box+" declares no custom data");
+				JsonObject custom = variant.getAsJsonObject("custom");
+				assertTrue(custom.has("base"),
+					box+" has no custom.base, so the connection model has nothing to wrap");
+				assertEquals("immersiveengineering:block/grid/utility_box_terminal",
+					custom.get("base").getAsString(), box+" wraps the wrong model");
+			}
+		}
+
+		@Test
 		@DisplayName("each block meta has an inventory variant so the item renders")
 		void everyMetaHasAnInventoryVariant()
 		{
@@ -277,8 +316,8 @@ class GridAssetsTest
 
 			for(String model : models)
 			{
-				if(!model.startsWith("immersiveengineering:"))
-					continue;//vanilla, e.g. cube_all
+				if(!model.startsWith("immersiveengineering:")||CONN_MODEL.equals(model))
+					continue;//vanilla, e.g. cube_all -- or the loader-supplied connection model
 				String path = model.split(":", 2)[1];
 				//An .obj reference names the file itself; everything else gets .json added,
 				//because that suffix is the loader's and is never written in a blockstate.
@@ -302,7 +341,8 @@ class GridAssetsTest
 			for(String reference : models)
 				//The console is an OBJ and has no JSON to parse; TerminalModel below is what
 				//checks it, and it checks rather more than this could.
-				if(reference.startsWith("immersiveengineering:")&&!reference.endsWith(".obj"))
+				if(reference.startsWith("immersiveengineering:")&&!reference.endsWith(".obj")
+						&&!CONN_MODEL.equals(reference))
 					ours.add(reference.split(":", 2)[1]);
 			assertTrue(ours.contains("grid/utility_box_terminal"),
 					"the Feed and Service Units should be drawn with the terminal-post model, which is "

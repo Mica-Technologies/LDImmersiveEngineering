@@ -11,16 +11,21 @@ package blusunrize.immersiveengineering.common.blocks.grid;
 import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.api.energy.grid.*;
+import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Connection;
+import blusunrize.immersiveengineering.api.energy.wires.TileEntityImmersiveConnectable;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
-import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.items.ItemNetworkLinker;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
+import blusunrize.immersiveengineering.common.util.link.NetworkLinker;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.tileentity.TileEntity;
@@ -28,6 +33,8 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
+
+import javax.annotation.Nonnull;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -45,10 +52,26 @@ import java.util.UUID;
  * {@code facing} follows the wire-connector convention: it points at the block the box is
  * bolted to. Placing one against a wall, a machine or an IE post therefore needs no
  * special casing.
+ * <p>
+ * <strong>These boxes are wire endpoints in their own right.</strong> They extend
+ * {@link TileEntityImmersiveConnectable}, so a coil strung at the terminal post on the front of a
+ * Feed or Service Unit makes a connection exactly as one strung at a connector does -- no relay
+ * block in between, and no second block to explain. That is the seam this feature shipped without:
+ * the fluid network's fittings have always taken a pipe straight into a face, and the power side
+ * asking for a connector first was an asymmetry with no reason behind it other than the order the
+ * two were written in.
+ * <p>
+ * The tier of such a run is the tier of the wire on it, and the rate is whatever that wire and the
+ * device's own transfer cap allow -- both already enforced by machinery that existed. Nothing about
+ * how much energy moves, or what it costs to move it, changes here; only how few blocks it takes to
+ * say so.
+ * <p>
+ * A Signal Unit refuses wires. It carries no flux, and a wire that attached to one and did nothing
+ * would be a worse answer than one that cannot be attached.
  *
  * @author LDImmersiveEngineering -- virtual grid
  */
-public abstract class TileEntityGridDevice extends TileEntityIEBase implements IDirectionalTile,
+public abstract class TileEntityGridDevice extends TileEntityImmersiveConnectable implements IDirectionalTile,
 		IBlockBounds, IPlayerInteraction, IGuiTile, IGridEndpoint, IComparatorOverride, IBlockOverlayText,
 		IStatusLineProvider
 {
@@ -265,6 +288,64 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 	}
 
 	//	=================================
+	//		WIRE GRAPH
+	//	=================================
+
+	/**
+	 * Where a wire attaches: the terminal post on the front of the box.
+	 * <p>
+	 * The post was drawn on the model from the day these boxes shipped, so that the place wiring
+	 * attaches would be something you could see rather than something you had to be told. It was a
+	 * promise the block did not keep until now. The offset lands on it: centred across the face,
+	 * a little above the middle on a wall-mounted box, and level on one bolted to a floor or a
+	 * ceiling, where "above" is along the mounting axis and would push the wire into the block.
+	 */
+	@Override
+	public Vec3d getConnectionOffset(Connection con)
+	{
+		EnumFacing front = facing.getOpposite();
+		//The box is six pixels deep; this sits just proud of its front face.
+		double depth = .34;
+		double x = .5+front.getXOffset()*(depth-.5);
+		double y = .5+front.getYOffset()*(depth-.5);
+		double z = .5+front.getZOffset()*(depth-.5);
+		if(facing.getAxis()!=EnumFacing.Axis.Y)
+			y += .18;
+		return new Vec3d(x, y, z);
+	}
+
+	@Override
+	public boolean canConnect()
+	{
+		//A Signal Unit moves no flux, so a wire on one would be a lie. Refused here as well as
+		//through the tier checks below, so it is refused for redstone wire too.
+		return getDeviceType().movesEnergy();
+	}
+
+	/**
+	 * The description packet, restored to the form {@code TileEntityIEBase} sends.
+	 * <p>
+	 * {@link TileEntityImmersiveConnectable} overrides this to send the full save tag, which is
+	 * right for a connector -- it has no client-only state -- and wrong here: the segment name,
+	 * colour, state and throughput the in-world readout draws are written only when
+	 * {@code descPacket} is true. The connection list still travels, because
+	 * {@link #writeCustomNBT} calls super, which appends it on exactly that flag.
+	 */
+	@Override
+	public SPacketUpdateTileEntity getUpdatePacket()
+	{
+		NBTTagCompound nbt = new NBTTagCompound();
+		writeCustomNBT(nbt, true);
+		return new SPacketUpdateTileEntity(pos, 3, nbt);
+	}
+
+	@Override
+	public void onDataPacket(@Nonnull NetworkManager net, @Nonnull SPacketUpdateTileEntity pkt)
+	{
+		readCustomNBT(pkt.getNbtCompound(), true);
+	}
+
+	//	=================================
 	//		INTERACTION / READOUT
 	//	=================================
 
@@ -272,6 +353,16 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 	public boolean interact(EnumFacing side, EntityPlayer player, EnumHand hand, ItemStack heldItem,
 							float hitX, float hitY, float hitZ)
 	{
+		//A Grid Linker claims a plain rightclick: loaded, it links this box to whatever it is
+		//carrying; empty, it opens its chooser and remembers this box so the pick links it too.
+		//Sneaking with one never arrives here at all -- the item's own onItemUse takes that, which is
+		//what makes sneak mean "choose again" on a box that is already linked.
+		if(!player.isSneaking()&&ItemNetworkLinker.isGrid(heldItem))
+		{
+			if(!world.isRemote)
+				NetworkLinker.onDeviceClicked(heldItem, player, hand, world, pos);
+			return true;
+		}
 		//Sneak for a quick chat readout without opening anything; a plain right click falls
 		//through to the IGuiTile branch in BlockIETileProvider, which opens the panel.
 		if(!player.isSneaking())
@@ -506,6 +597,11 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 	@Override
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
+		//super first: it writes the wire limiter, and on a description packet the connection list
+		//the client needs to draw the catenary. That is also why getUpdatePacket below re-states the
+		//description-packet form rather than inheriting the connectable one, which sends the full
+		//save tag and would leave the in-world readout's keys out.
+		super.writeCustomNBT(nbt, descPacket);
 		captureBackup();
 		nbt.setInteger("facing", facing.ordinal());
 		if(backupSegment!=null)
@@ -528,6 +624,7 @@ public abstract class TileEntityGridDevice extends TileEntityIEBase implements I
 	@Override
 	public void readCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
+		super.readCustomNBT(nbt, descPacket);
 		facing = EnumFacing.byIndex(nbt.getInteger("facing"));
 		backupSegment = nbt.hasKey("segment")?GridDevice.parseUUID(nbt.getString("segment")): null;
 		backupName = nbt.getString("deviceName");

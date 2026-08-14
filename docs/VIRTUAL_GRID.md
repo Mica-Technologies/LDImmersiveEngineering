@@ -26,23 +26,51 @@ The three units are 10×12×6 pixel sheet-metal boxes that bolt to any solid fac
 wooden and steel posts — that is the pole-mount look, with no special-case code. Facing follows the
 wire-connector convention: it points at whatever the box is bolted to.
 
-**They exchange flux with the blocks they touch, not with wires.** A Service Unit bolted to a
-capacitor powers that capacitor; a Service Unit bolted to a post with an LV connector against it
-feeds a wire network. This is exactly how every IE machine behaves, but it is not obvious from
-looking at a box, so the readout says what the box does with the world whether or not anything is
-moving — grey while it is working, yellow when nothing adjacent will take what it has.
+**They exchange flux with the blocks they touch, and they take a wire directly.** A Service Unit
+bolted to a capacitor powers that capacitor; a coil strung at the terminal post on the front of a
+Feed or Service Unit is a connection like any other, with no connector or relay block in between.
+The readout says what the box is doing with the world whether or not anything is moving — grey
+while it is working, yellow when nothing will take what it has.
+
+**Direct wire attachment.** `TileEntityGridDevice` extends `TileEntityImmersiveConnectable`, so a
+Feed or Service Unit is a node in the catenary graph exactly as a connector is. LV, MV and HV are
+all accepted and the *wire* sets the tier, the same rule conduit uses for a breakout — the block
+does not carry a tier of its own for the two to disagree about.
+
+- A **Feed Unit** is an energy *output* on the graph, i.e. somewhere the network may put flux. It
+  accepts into the same intake buffer a cable or a connector on any face fills, so a wire and a
+  cable together cannot exceed the device's transfer cap.
+- A **Service Unit** is a source, and deliberately *not* an energy output. It pushes during the
+  grid's own tick pass — the same moment a connector's `update` would have — through
+  `WireNetTransfer`, which is IE's connector transfer lifted out of `TileEntityConnectorLV` so that
+  both use one implementation. Loss, the proportional split between competing outputs and what an
+  Energy Meter in the middle reads are therefore identical to what a connector bolted beside the box
+  used to produce. Leaving an *accepting* path open as well would let a second network draw from the
+  segment outside the per-tick budget the engine enforces.
+- A **Signal Unit** refuses wires. It moves no flux, and a wire that attached and did nothing would
+  be a worse answer than one that cannot be attached.
+
+Order of delivery for a Service Unit is unchanged and then extended: mount face, other faces, then
+wires. Touching stays the strongest claim, so bolting a unit onto a machine still powers that
+machine before the run leaves the building.
+
+Wires on these boxes render because `BlockGridDevice` declares `IEProperties.CONNECTIONS` and the
+`feed_unit` and `service_unit` variants are drawn through `smartmodel/connector`. Both halves are
+needed and neither fails loudly: each end of a catenary draws its own half, so a box drawn with an
+ordinary model leaves a wire that stops in mid-air. `GridAssetsTest` asserts both.
 
 **A wire connector beside a Service Unit is fed whichever way it faces.** An IE connector accepts
 flux on exactly one side, the block it is bolted to, so a connector mounted on the *wall* next to a
-unit — the same gesture as far as a player is concerned, and often the only one the geometry leaves
-room for — used to touch a live unit and do nothing, silently. `EnergyHelper.acceptingSide` is
-where that exemption lives. Nothing but a connector gets it: on
-a machine the accepting face is a real configuration choice rather than an artefact of where there
-was room to put it.
+unit — the same gesture as far as a player is concerned — used to touch a live unit and do nothing,
+silently. `EnergyHelper.acceptingSide` is where that exemption lives. Nothing but a connector gets
+it: on a machine the accepting face is a real configuration choice rather than an artefact of where
+there was room to put it. This still works and is still the right answer when the geometry leaves no
+room for a catenary.
 
 The Feed and Service Units carry a terminal post on the front, so the place wiring attaches is
-something you can see rather than something you have to be told. The Signal Unit deliberately does
-not — it moves no flux, and a terminal on it would be a lie.
+something you can see rather than something you have to be told. That was a promise the block did
+not keep until wires could be attached to it. The Signal Unit deliberately has no post — it moves no
+flux, and a terminal on it would be a lie.
 
 ### Segments
 
@@ -239,13 +267,30 @@ reload.
 
 ## Tools and commands
 
+**Grid Linker — the tool for wiring a street.** Rightclick any grid box with it: an empty linker
+opens a compact chooser listing every segment with its colour and what it is doing, and picking one
+loads the tool *and* links the box that opened it. Every plain rightclick after that links the box
+you clicked, with no window in the way. Sneak-rightclick a box to choose again; sneak-rightclick the
+air to empty the tool. The tooltip shows what it is holding.
+
+The **Fluid Linker** is the same item at metadata 1 and does the same thing to fluid mains. Two
+items rather than one mode switch, because a tool that silently linked to the wrong network would be
+worse than no tool; one class and one window, because they are otherwise the same object.
+
+Both are additive. The console and the per-device panel are unchanged and still the only places a
+segment can be *created*, renamed, priced or deleted — the linker can do exactly one thing, and
+`MessageLinkerSelect` carries exactly that one thing. `ContainerNetworkLinker` extends neither
+console base for the same reason `ContainerNetworkTerminal` does not: the console action packets
+gate on those bases, and inheriting from either would hand a pocket item a console's authority.
+
 **Engineer's Voltmeter — quick assign.** Sneak-rightclick a linked box and the voltmeter picks up
 its segment; every sneak-rightclick after that assigns the box you clicked. Sneak-rightclick the
-air to empty it. The tooltip shows what it is holding. Segment locks are re-checked on both ends,
-so a tool in hand is not a way around one.
+air to empty it. Kept as it was: it is the diagnostic instrument, it is in everybody's toolbox
+already, and the Grid Linker is a different gesture rather than a replacement for this one.
 
-*(The plan called for an Engineer's Screwdriver. That item does not exist in 1.12 — it is 1.16+ —
-and the voltmeter is already the grid's diagnostic instrument, so the gesture lives there.)*
+Segment locks are re-checked on both ends of every move — the segment being pasted *and* the one the
+box is leaving — on every path, in `LinkerLogic`. A tool in hand is not a way around a lock, and
+that rule is unit-tested rather than trusted to two tools independently.
 
 **Sneak-rightclick bare-handed** on any box for a chat readout: segment, state, throughput, and a
 hint when the box is correctly assigned but wired up wrong.
@@ -300,12 +345,14 @@ needed. Chunk-loaded devices never go offline.
 | Blocks and tiles | `common/blocks/grid/` |
 | Console multiblock | `common/blocks/multiblocks/MultiblockGridConsole.java`, `common/blocks/grid/GridConsoleGeometry.java` |
 | Tick driver, save data, chunk tickets, quick-assign | `common/util/grid/` |
-| Packets | `common/util/network/MessageGridSync.java`, `MessageGridAction.java` |
-| GUIs | `client/gui/GuiGridConsole.java`, `GuiGridDevice.java` |
+| Wire push, shared with connectors | `common/util/WireNetTransfer.java` |
+| Linker tools (both networks) | `common/items/ItemNetworkLinker.java`, `common/util/link/` |
+| Packets | `common/util/network/MessageGridSync.java`, `MessageGridAction.java`, `MessageLinkerSelect.java` |
+| GUIs | `client/gui/GuiGridConsole.java`, `GuiGridDevice.java`, `GuiNetworkLinker.java` |
 | Commands | `common/util/commands/CommandGrid.java` |
 | Texture generator | `docs/tools/make_grid_textures.py` |
 | Console model and textures | `docs/tools/make_terminal_assets.py` |
-| Tests | `src/test/java/blusunrize/immersiveengineering/api/energy/grid/`, `common/blocks/grid/GridAssetsTest.java` |
+| Tests | `src/test/java/blusunrize/immersiveengineering/api/energy/grid/`, `common/blocks/grid/GridAssetsTest.java`, `common/util/link/LinkerLogicTest.java`, `common/items/NetworkLinkerAssetsTest.java` |
 
 The engine is expressed purely in terms of the model and `IGridEndpoint` — it never touches `World`
 or `TileEntity`. That is what makes caps, buffers, loss, priorities, load shedding, failover walks,

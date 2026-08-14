@@ -66,6 +66,53 @@ public class TileEntityGridFeed extends TileEntityGridDevice implements IIEInter
 	}
 
 	//	=================================
+	//		WIRE ENDPOINT
+	//	=================================
+	// A wire may be strung straight at the terminal post on the front of this box, with no connector
+	// in between. From the catenary graph's side that makes this an "energy output": a place the
+	// network may put energy, exactly as a connector bolted to a machine is.
+	//
+	// Nothing about how much arrives changes. The wire's own transfer rate caps the run, the
+	// connector at the far end caps what it may send, line loss is charged by the same code that
+	// charges it for every other wire, and this box's own intake buffer -- sized from the device's
+	// transfer cap in applyLimits -- is the last word on what fits.
+
+	@Override
+	protected boolean canTakeLV()
+	{
+		return true;
+	}
+
+	@Override
+	protected boolean canTakeMV()
+	{
+		return true;
+	}
+
+	@Override
+	protected boolean canTakeHV()
+	{
+		return true;
+	}
+
+	@Override
+	public boolean isEnergyOutput()
+	{
+		return true;
+	}
+
+	@Override
+	public int outputEnergy(int amount, boolean simulate, int energyType)
+	{
+		if(amount <= 0||world==null||world.isRemote)
+			return 0;
+		//receiveEnergy on the storage rather than the IFluxReceiver path: this is the same buffer a
+		//cable or a connector on any face fills, so a wire and a connector cannot between them put in
+		//more than the box can hold in a tick.
+		return energyStorage.receiveEnergy(amount, simulate);
+	}
+
+	//	=================================
 	//		IGridEndpoint
 	//	=================================
 
@@ -165,8 +212,8 @@ public class TileEntityGridFeed extends TileEntityGridDevice implements IIEInter
 		//Something is arriving, so the hookup is fine whatever it looks like.
 		if(energyStorage.getEnergyStored() > 0||tapMountedBlock(1, true) > 0)
 			return null;
-		return "No power is arriving. Run a wire to a connector placed against this box, "
-				+"or bolt the box straight onto a capacitor or generator.";
+		return "No power is arriving. String a wire straight to this box, put a cable or "
+				+"connector against it, or bolt it onto a capacitor or generator.";
 	}
 
 	/**

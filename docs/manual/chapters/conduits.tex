@@ -50,9 +50,20 @@ A patch panel with six faces. Each face is one of three things:
 from across the room: which faces break out, and which channel each one carries. A box with no
 plates on it is a box nobody has patched.
 
-Put an LV, MV or HV Connector against a power breakout and it picks up that conductor and nothing
-else. One bundle down a corridor can feed a lighting circuit, a workshop and a furnace, each on its
-own colour.
+Put an LV, MV or HV Connector --- or a Grid Feed or Service Unit --- against a \emph{bare} face and
+the box breaks a free conductor out to it by itself, wearing that conductor's plate so you can see
+which. That is all most circuits need; the dye is how you choose \emph{which} conductor rather than
+whether there is one.
+
+A connector on a power breakout picks up that conductor and nothing else. One bundle down a corridor
+can feed a lighting circuit, a workshop and a furnace, each on its own colour.
+
+\begin{ietip}
+Auto-patching only answers to wiring hardware --- a connector or a grid box. A junction box dropped
+beside a capacitor bank to turn a corner will not quietly start draining the run into it, and a box
+whose sixteen conductors are all spoken for hands out nothing rather than stealing one from a
+working circuit.
+\end{ietip}
 
 \begin{ietip}
 There is no tier setting. The tier of a circuit is whichever connector you hang on its breakout,

@@ -857,7 +857,11 @@ public class ClientProxy extends CommonProxy
 				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid8",
 						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid9"),
-				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"));
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGrid10"),
+				//The Grid Linker last, because it is the thing you reach for once you know what a
+				//segment is and have thirty boxes to put on one.
+				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid11",
+						new ItemStack(IEContent.itemNetworkLinker, 1, ItemNetworkLinker.META_GRID)));
 		//Conduits. Next to the wires and the grid, because the three are the same question asked
 		//three ways: how does power get from there to here, and what does it look like on the way.
 		ManualHelper.getManual().addEntry("conduits", ManualHelper.CAT_ENERGY,
@@ -955,7 +959,12 @@ public class ClientProxy extends CommonProxy
 				new ManualPages.Text(ManualHelper.getManual(), "fluidNetwork4"),
 				new ManualPages.Text(ManualHelper.getManual(), "fluidNetwork5"),
 				new ManualPages.Crafting(ManualHelper.getManual(), "fluidNetwork6",
-						new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.MAIN_VALVE.getMeta())));
+						new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.MAIN_VALVE.getMeta())),
+				//The Fluid Linker, the mirror of the Grid Linker on the power side. The two chapters
+				//end the same way on purpose: the networks are deliberate mirrors, and a reader who
+				//has learnt one should find the other where they expect it.
+				new ManualPages.Crafting(ManualHelper.getManual(), "fluidNetwork7",
+						new ItemStack(IEContent.itemNetworkLinker, 1, ItemNetworkLinker.META_FLUID)));
 
 		Map<String, Integer> sortedMap = ThermoelectricHandler.getThermalValuesSorted(true);
 		String[][] table = formatToTable_ItemIntHashmap(sortedMap, "K");
@@ -1502,6 +1511,8 @@ public class ClientProxy extends CommonProxy
 					return new GuiToolbox(player.inventory, world, slot, item);
 				if(ID==Lib.GUIID_NetworkTerminal&&item.getItem() instanceof ItemNetworkTerminal)
 					return new GuiNetworkTerminal(player.inventory);
+				if(ID==Lib.GUIID_NetworkLinker&&item.getItem() instanceof ItemNetworkLinker)
+					return new GuiNetworkLinker(player.inventory, slot, ItemNetworkLinker.isFluid(item), item);
 				if(ID==Lib.GUIID_MaintenanceKit&&item.getItem() instanceof ItemMaintenanceKit)
 					return new GuiMaintenanceKit(player.inventory, world, slot, item);
 			}

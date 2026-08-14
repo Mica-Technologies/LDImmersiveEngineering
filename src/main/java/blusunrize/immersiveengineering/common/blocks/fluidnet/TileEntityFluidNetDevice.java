@@ -14,8 +14,10 @@ import blusunrize.immersiveengineering.api.fluid.network.*;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.*;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.items.ItemNetworkLinker;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.CityMode;
+import blusunrize.immersiveengineering.common.util.link.NetworkLinker;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -292,6 +294,16 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 	public boolean interact(EnumFacing side, EntityPlayer player, EnumHand hand, ItemStack heldItem,
 							float hitX, float hitY, float hitZ)
 	{
+		//A Fluid Linker claims a plain rightclick: loaded, it links this fitting to whatever it is
+		//carrying; empty, it opens its chooser and remembers this fitting so the pick links it too.
+		//Sneaking with one never arrives here at all -- the item's own onItemUse takes that, which is
+		//what makes sneak mean "choose again" on a fitting that is already linked.
+		if(!player.isSneaking()&&ItemNetworkLinker.isFluid(heldItem))
+		{
+			if(!world.isRemote)
+				NetworkLinker.onDeviceClicked(heldItem, player, hand, world, pos);
+			return true;
+		}
 		//Sneak for a quick chat readout without opening anything; a plain right click falls through
 		//to the IGuiTile branch in BlockIETileProvider, which opens the panel.
 		if(!player.isSneaking())

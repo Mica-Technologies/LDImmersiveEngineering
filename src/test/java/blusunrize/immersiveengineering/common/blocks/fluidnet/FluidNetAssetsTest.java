@@ -408,6 +408,11 @@ class FluidNetAssetsTest
 				deviceMetas.add(type.getMeta());
 			Map<String, Set<Integer>> valid = new HashMap<>();
 			valid.put("immersiveengineering:fluidnet_device", deviceMetas);
+			//The Fluid Linker is an item rather than a fitting, but it belongs to this network and
+			//its recipe belongs beside the network's -- the same arrangement the grid folder has
+			//with the Network Terminal. Meta 1 is the fluid variant; meta 0 is the Grid Linker and
+			//is deliberately not craftable from here.
+			valid.put("immersiveengineering:network_linker", new HashSet<>(Collections.singletonList(1)));
 
 			for(String file : recipeFiles())
 			{

@@ -270,4 +270,44 @@ class JunctionBoxLogicTest
 			assertEquals(CHANNELS, JunctionBoxLogic.strongestPerChannel(CHANNELS, null).length);
 		}
 	}
+
+	@Nested
+	@DisplayName("which conductor an unasked-for breakout takes")
+	class AutoPatch
+	{
+		@Test
+		@DisplayName("a bare box hands out the first conductor")
+		void bareBoxGivesTheFirst()
+		{
+			assertEquals(0, JunctionBoxLogic.firstFreeChannel(0, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("it never hands out a conductor already broken out somewhere on the box")
+		void skipsWhatIsAlreadyPatched()
+		{
+			//The same conductor arriving at two connectors is a short, not a feature.
+			assertEquals(1, JunctionBoxLogic.firstFreeChannel(0b0001, CHANNELS));
+			assertEquals(2, JunctionBoxLogic.firstFreeChannel(0b0011, CHANNELS));
+			//A gap left by a hand-dyed face is filled before anything past it, so a box wired by
+			//hand and then by hardware does not scatter its conductors.
+			assertEquals(1, JunctionBoxLogic.firstFreeChannel(0b1101, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a box with every conductor spoken for gives nothing rather than stealing one")
+		void fullBoxRefuses()
+		{
+			assertEquals(-1, JunctionBoxLogic.firstFreeChannel(WireChannel.ALL_MASK, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("bits above the channel count cannot make the box look full")
+		void ignoresBitsPastTheEnd()
+		{
+			//The mask is built from real channels, but the rule should not depend on that: a stray
+			//high bit must not be read as "nothing left".
+			assertEquals(0, JunctionBoxLogic.firstFreeChannel(1 << (CHANNELS+2), CHANNELS));
+		}
+	}
 }

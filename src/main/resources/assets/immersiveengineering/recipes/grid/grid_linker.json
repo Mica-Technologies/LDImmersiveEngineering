@@ -1,0 +1,26 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:network_linker",
+		"data": 0
+	},
+	"pattern": [
+		" C ",
+		"STS",
+		" W "
+	],
+	"key": {
+		"C": {
+			"item": "#copperCoil"
+		},
+		"S": {
+			"item": "#plateSteel"
+		},
+		"T": {
+			"item": "#elecTube"
+		},
+		"W": {
+			"item": "#stickTreatedWood"
+		}
+	}
+}

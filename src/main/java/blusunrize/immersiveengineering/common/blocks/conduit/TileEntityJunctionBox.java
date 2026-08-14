@@ -21,6 +21,8 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbou
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
+import blusunrize.immersiveengineering.common.blocks.metal.TileEntityConnectorLV;
 import net.minecraft.block.state.IBlockState;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IRedstoneOutput;
 import blusunrize.immersiveengineering.common.util.CityMode;
@@ -288,6 +290,85 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	}
 
 	// ------------------------------------------------------------------
+	// Auto-patching
+	// ------------------------------------------------------------------
+
+	/**
+	 * Break a free conductor out onto any bare face that has power hardware bolted to it.
+	 * <p>
+	 * Putting an LV connector on a junction box and having it do nothing was the single most
+	 * cumbersome thing about conduit: the block that makes it work is a <em>dye</em>, which is not a
+	 * thing anybody guesses. The gesture already says what it means -- somebody who bolts a
+	 * connector or a grid unit to a box wants power at that face -- so the box now answers it, and
+	 * answers it visibly: the face wears its conductor's plate exactly as a hand-dyed one does, and
+	 * a dye re-patches it afterwards like any other face.
+	 * <p>
+	 * <strong>Only wiring hardware.</strong> A connector, or a Grid Feed or Service Unit. Not any
+	 * machine that happens to accept flux: a box dropped beside a capacitor bank to turn a corner
+	 * must not quietly start draining the run into it, and a rule a player can state -- "connectors
+	 * and grid boxes claim a face" -- beats one that depends on what a neighbouring mod implements.
+	 * <p>
+	 * Never <em>un</em>patches. Taking a connector down leaves the breakout where it was, because
+	 * the alternative is a box that forgets a deliberate configuration the moment something is mined
+	 * next to it.
+	 *
+	 * @return true if anything changed
+	 */
+	private boolean autoPatch()
+	{
+		if(world==null||world.isRemote)
+			return false;
+		boolean changed = false;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			if(patch.isPatched(face)||!wantsBreakout(face))
+				continue;
+			int free = JunctionBoxLogic.firstFreeChannel(patchedMask(), WireChannel.VALUES.length);
+			if(free < 0)
+				//Sixteen conductors, all spoken for. Nothing sensible left to do, and stealing one
+				//from another face would break a working circuit to make a new one.
+				break;
+			patch.set(face, WireChannel.byIndex(free));
+			changed = true;
+		}
+		return changed;
+	}
+
+	/**
+	 * @return one bit per conductor already broken out somewhere on this box
+	 */
+	private int patchedMask()
+	{
+		int mask = 0;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			WireChannel channel = patch.get(face);
+			if(channel!=null)
+				mask |= channel.getMask();
+		}
+		return mask;
+	}
+
+	/**
+	 * @return true if the block against that face is a connector or a grid unit, and so is asking
+	 * for a breakout by being there
+	 */
+	private boolean wantsBreakout(EnumFacing face)
+	{
+		TileEntity target = Utils.getExistingTileEntity(world, getPos().offset(face));
+		if(target==null)
+			return false;
+		if(target instanceof TileEntityGridDevice)
+			//A Feed or Service Unit bolted straight onto a box. A Signal Unit moves nothing and is
+			//refused by the same test the wire graph uses.
+			return ((TileEntityGridDevice)target).getDeviceType().movesEnergy();
+		//A connector, and not a relay: acceptingSide answers null for a relay, which neither takes
+		//nor gives energy and would sit on a conductor doing nothing.
+		return target instanceof TileEntityConnectorLV
+				&&EnergyHelper.acceptingSide(target, face.getOpposite())!=null;
+	}
+
+	// ------------------------------------------------------------------
 	// Wire graph
 	// ------------------------------------------------------------------
 
@@ -406,7 +487,16 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		TileEntity target = Utils.getExistingTileEntity(world, getPos().offset(face));
 		if(target==null)
 			return;
-		int accepted = EnergyHelper.insertFlux(target, face.getOpposite(), offered, false);
+		//acceptingSide rather than face.getOpposite(): a connector takes flux only on the face it is
+		//bolted to, so one mounted on the *wall* beside a box -- the same gesture as far as a player
+		//is concerned, and often the only one the geometry leaves room for -- used to sit on a live
+		//breakout doing nothing. The Grid Service Unit has had this exemption since it shipped; the
+		//breakout is the other half of the same seam, and auto-patching would otherwise hand such a
+		//connector a conductor it could never be fed from.
+		EnumFacing into = EnergyHelper.acceptingSide(target, face.getOpposite());
+		if(into==null)
+			return;
+		int accepted = EnergyHelper.insertFlux(target, into, offered, false);
 		//City mode delivers without debiting: the conductor is energised, and where the energy came
 		//from is precisely the accounting it exists to stop doing. The decay in update() is what
 		//keeps that from being a free generator that never switches off.
@@ -567,6 +657,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(world==null||world.isRemote)
 			return;
 		rebuildRuns();
+		//Also on load, not only on a neighbour change: a box placed against a connector that was
+		//already there hears nothing afterwards, and settled hardware never fires another update.
+		if(autoPatch())
+		{
+			markDirty();
+			markContainingBlockForUpdate(null);
+		}
 		//A lever thrown while the chunk was unloaded left no trace, so the run has to re-derive
 		//itself once on the way back rather than trusting what it saved.
 		if(patch.hasRedstone())
@@ -579,6 +676,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(world==null||world.isRemote)
 			return;
 		rebuildRuns();
+		if(autoPatch())
+		{
+			markDirty();
+			markContainingBlockForUpdate(null);
+		}
 		//A neighbour changing is the only thing that can move a redstone input, so it is the only
 		//thing that has to re-derive the run's signals.
 		if(patch.hasRedstone())
@@ -809,10 +911,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		lines.add(TextFormatting.GOLD+"Junction Box"+TextFormatting.RESET+": "
 				+currentBundles().size()+" run(s)");
 		if(patch.isEmpty())
-			//Said because a box that does nothing looks identical to one that is broken, and the
-			//fix -- right-click a face with a dye -- is not guessable.
-			lines.add(TextFormatting.YELLOW+"Nothing patched. Dye a face to break a channel out."
-					+TextFormatting.RESET);
+			//Said because a box that does nothing looks identical to one that is broken. The
+			//connector half is first because it is the one somebody is about to do anyway; the dye
+			//is what you reach for when you want to choose which conductor.
+			lines.add(TextFormatting.YELLOW+"Nothing patched. Put a connector or grid box against a "
+					+"face -- or dye one -- to break a channel out."+TextFormatting.RESET);
 		else
 			for(EnumFacing face : EnumFacing.VALUES)
 			{

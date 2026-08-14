@@ -44,13 +44,25 @@
 		],
 		"type": {
 			"feed_unit": {
-				"model": "immersiveengineering:grid/utility_box_terminal"
+				"model": "immersiveengineering:smartmodel/connector",
+				"custom": {
+					"base": "immersiveengineering:block/grid/utility_box_terminal",
+					"layers": [
+						"CUTOUT"
+					]
+				}
 			},
 			"service_unit": {
 				"textures": {
 					"front": "immersiveengineering:blocks/grid_device_service_front"
 				},
-				"model": "immersiveengineering:grid/utility_box_terminal"
+				"model": "immersiveengineering:smartmodel/connector",
+				"custom": {
+					"base": "immersiveengineering:block/grid/utility_box_terminal",
+					"layers": [
+						"CUTOUT"
+					]
+				}
 			},
 			"console_housing": {
 				"model": "cube_all",

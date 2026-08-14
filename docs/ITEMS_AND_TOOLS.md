@@ -197,6 +197,8 @@ The revolver supports a rich first-person render rig (reload animation, cylinder
 | Skyhook | `ItemSkyhook` | Rides wire connections; sneak toggles speed limit (`ItemSkyhook.java:113`) |
 | Toolbox | `ItemToolbox` | 23-slot portable storage, placeable as a block (`ItemToolbox.java:88`) |
 | Maintenance Kit | `ItemMaintenanceKit` | Opens a GUI to repair/maintain machines (`ItemMaintenanceKit.java:22`) |
+| Network Terminal | `ItemNetworkTerminal` | Reads the power grid and the fluid network from anywhere; read-only by container type |
+| Grid Linker / Fluid Linker | `ItemNetworkLinker` metas 0/1 | Pick a segment or main once, then link boxes with one click each; selection lives on the item |
 
 The `ItemIETool` multitool is *not* damageable in the vanilla sense (`canRepair = false`,
 `ItemIETool.java:83`, to avoid issue #2990); it stores damage in NBT (`Lib.NBT_DAMAGE`) and reports it
@@ -265,6 +267,8 @@ bullet list).
 | Skyhook | `ItemSkyhook` | tool | Wire traversal, speed-limit toggle, fall-boost upgrade |
 | IE Shield | `ItemIEShield` | weapon/equipment | Blocking shield; flash/shock/magnet active upgrades (FE-powered) |
 | Engineer's Tools | `ItemIETool` | tool | Hammer / wirecutter / voltmeter / manual (4 metas) |
+| Network Terminal | `ItemNetworkTerminal` | utility | Pocket read-out of both virtual networks; cannot change either |
+| Network Linker | `ItemNetworkLinker` | utility | Grid and fluid linking tools (2 metas); chooser GUI, NBT-held selection, lock-checked |
 | Maintenance Kit | `ItemMaintenanceKit` | tool | Machine repair GUI |
 | Powerpack | `ItemPowerpack` | equipment | Wearable 100k IF battery, charges worn items |
 | Faraday Suit | `ItemFaradaySuit` | armor | Electric damage mitigation set |
@@ -294,3 +298,6 @@ Common per-item NBT keys (read/written through `ItemNBTHelper`):
 | `reload` / `cooldown` | revolver | Animation + fire-rate timers |
 | `IE:Damage` (`Lib.NBT_DAMAGE`) | engineer's tools | Custom durability |
 | `linkingPos` | voltmeter, wire coil | First-clicked link target |
+| `gridSegment` / `gridSegmentName` | voltmeter | Segment held for quick-assign |
+| `linkTarget` / `linkTargetName` / `linkTargetColour` | network linker | The chosen segment or main, and its label for the tooltip |
+| `linkPendingPos` | network linker | The box that opened the chooser, so the pick links it too |

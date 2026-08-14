@@ -21,6 +21,7 @@ import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridMultibl
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
 import blusunrize.immersiveengineering.common.blocks.metal.BlockTypes_MetalMultiblock;
 import blusunrize.immersiveengineering.common.crafting.ArcRecyclingRecipe;
+import blusunrize.immersiveengineering.common.items.ItemNetworkLinker;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
 import blusunrize.immersiveengineering.common.util.compat.jei.alloysmelter.AlloySmelterRecipeCategory;
@@ -167,6 +168,8 @@ public class JEIHelper implements IModPlugin
 		addInfo(new ItemStack(IEContent.blockConduit, 1, BlockTypes_Conduit.CONDUIT_RUN.getMeta()));
 		addInfo(new ItemStack(IEContent.blockConduit, 1, BlockTypes_Conduit.JUNCTION_BOX.getMeta()));
 		addInfo(new ItemStack(IEContent.itemNetworkTerminal));
+		addInfo(new ItemStack(IEContent.itemNetworkLinker, 1, ItemNetworkLinker.META_GRID));
+		addInfo(new ItemStack(IEContent.itemNetworkLinker, 1, ItemNetworkLinker.META_FLUID));
 
 		// Allow jumping to recipies from the block GUIs.
 		modRegistry.addRecipeClickArea(GuiCokeOven.class, 58, 36, 11, 13, "ie.cokeoven");

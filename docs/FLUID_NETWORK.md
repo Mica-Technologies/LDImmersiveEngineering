@@ -204,6 +204,29 @@ what the console actually displays.
 
 ---
 
+## The Fluid Linker
+
+The mirror of the [Grid Linker](VIRTUAL_GRID.md#tools-and-commands), and the same item at metadata
+1. Rightclick a fitting with it: an empty linker opens a compact chooser listing every main with its
+colour, its fluid and what it is doing, and picking one loads the tool *and* links the fitting that
+opened it. Every plain rightclick after that links the fitting you clicked. Sneak-rightclick a
+fitting to choose again; sneak-rightclick the air to empty the tool.
+
+Main locks are re-checked on both ends of every move, in the same `LinkerLogic` the grid side uses.
+There is one decision table, so the two tools cannot drift into disagreeing about who may move what.
+
+This also closes a small asymmetry that had been there since the fluid network was written: the grid
+had the voltmeter's quick-assign and this side had nothing, so a hundred fittings meant a hundred
+walks to a console.
+
+**The wire seam has no counterpart here, and did not need one.** A Fluid Inlet has always exposed a
+fill-only handler on every face, so an IE fluid pipe run plumbs straight into a fitting — which is
+exactly what the power side could not do until Feed and Service Units became wire endpoints. The
+mirror-symmetry check for that change comes out "nothing to do", and it is worth writing down that
+it was checked.
+
+---
+
 ## Commands
 
 `/ie fluidnet ...`, permission level 4. Not a substitute for the console: these exist so a network
@@ -278,4 +301,5 @@ The mirror extends to the tests: `FluidNetTestSupport` is `GridTestSupport` with
 | Client-side copy of the network | `common/util/fluidnet/ClientFluidNetCache.java` |
 | Persistence / tick driver | `common/util/fluidnet/FluidNetSaveData.java`, `FluidNetTickHandler.java` |
 | Commands | `common/util/commands/CommandFluidNet.java` |
-| Tests | `src/test/java/blusunrize/immersiveengineering/api/fluid/network/` |
+| Linker tool (shared with the grid) | `common/items/ItemNetworkLinker.java`, `common/util/link/`, `client/gui/GuiNetworkLinker.java`, `common/gui/ContainerNetworkLinker.java`, `common/util/network/MessageLinkerSelect.java` |
+| Tests | `src/test/java/blusunrize/immersiveengineering/api/fluid/network/`, `common/util/link/LinkerLogicTest.java`, `common/items/NetworkLinkerAssetsTest.java` |

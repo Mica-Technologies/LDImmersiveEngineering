@@ -43,6 +43,13 @@ packets are registered in the mod's main class.
 | `MessageSetGhostSlots.java` | C→S | Set GUI ghost-slot contents |
 | `MessageMaintenanceKit.java` | C→S | Apply tool config from maintenance kit |
 | `MessageRevolverRotate.java` | C→S | Rotate the revolver cylinder |
+| `MessageGridSync.java` | S→C | Push the virtual power grid to an open console, panel, terminal or linker |
+| `MessageGridAction.java` | C→S | One console/panel edit; gated on `ContainerGridBase` |
+| `MessageFluidNetSync.java` | S→C | The fluid network's counterpart of `MessageGridSync` |
+| `MessageFluidNetAction.java` | C→S | One fluid console edit; gated on `ContainerFluidNetBase` |
+| `MessagePumpSettings.java` | C→S | Gas pump settings |
+| `MessageCrawlerInput.java` | C→S | Hydraulic Crawler control input |
+| `MessageLinkerSelect.java` | C→S | A linking tool's chosen segment or main; gated on `ContainerNetworkLinker`, and the only thing that container may do |
 
 ## Channel setup and registration
 

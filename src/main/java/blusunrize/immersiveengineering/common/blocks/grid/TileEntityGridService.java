@@ -8,13 +8,24 @@
 
 package blusunrize.immersiveengineering.common.blocks.grid;
 
+import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.GridDeviceType;
+import blusunrize.immersiveengineering.api.energy.wires.IImmersiveConnectable;
+import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler;
+import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.AbstractConnection;
+import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Connection;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbourChangeTile;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper;
 import blusunrize.immersiveengineering.common.util.Utils;
+import blusunrize.immersiveengineering.common.util.WireNetTransfer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Grid Service Unit: the point where power leaves a segment and re-enters the world.
@@ -39,10 +50,44 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 	private final boolean[] receiverFaces = new boolean[6];
 	private boolean facesDirty = true;
 
+	/**
+	 * Scratch for the wire push, owned here rather than allocated per call for the same reason the
+	 * connector owns one: this runs once a tick for every service unit that is actually serving.
+	 * Server thread only, and never re-entrant -- nothing downstream calls back into this box.
+	 */
+	private final Map<AbstractConnection, IImmersiveConnectable> transferEndCache = new HashMap<>();
+
 	@Override
 	public GridDeviceType getDeviceType()
 	{
 		return GridDeviceType.SERVICE;
+	}
+
+	//	=================================
+	//		WIRE ENDPOINT
+	//	=================================
+	// A wire attaches straight to the terminal post on the front, with no connector in between.
+	// This box is a source, so it is deliberately not an "energy output" on the graph: it pushes in
+	// its own turn during the grid's tick pass, which is the same moment a connector would have,
+	// and leaving an accepting path open as well would let a second network draw from the segment
+	// outside the per-tick budget the engine enforces.
+
+	@Override
+	protected boolean canTakeLV()
+	{
+		return true;
+	}
+
+	@Override
+	protected boolean canTakeMV()
+	{
+		return true;
+	}
+
+	@Override
+	protected boolean canTakeHV()
+	{
+		return true;
 	}
 
 	@Override
@@ -67,7 +112,39 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 			if(delivered >= max)
 				break;
 		}
+		//Then out along any wire strung to the terminal post. Last on purpose: touching stays the
+		//strongest claim, so bolting a unit onto a machine still powers that machine before the
+		//run leaves the building. Nothing here is a second budget -- max is what the segment
+		//allowed this tick, and everything above has already spent part of it.
+		if(delivered < max)
+			delivered += deliverToWires(max-delivered, simulate);
 		return delivered;
+	}
+
+	/**
+	 * Pushes onto the wire network, exactly as a connector's own tick would.
+	 * <p>
+	 * The same code path a connector uses -- see {@link WireNetTransfer} -- so loss, the split
+	 * between competing outputs and what an Energy Meter in the middle reads are all identical to
+	 * what a connector bolted beside this box used to produce. Removing the connector removes a
+	 * block, not a rule.
+	 */
+	private int deliverToWires(int amount, boolean simulate)
+	{
+		if(amount <= 0||world.isRemote)
+			return 0;
+		//The device's own transfer cap stands in for a connector's rate. It is the figure the loss
+		//curve's shoulder is measured against, and it is the same number the console shows for this
+		//box, so a player who raises the cap sees the run behave as a fatter connector would.
+		int rate = device!=null?device.getTransferCap(): GridConfig.defaultDeviceCap;
+		if(rate <= 0)
+			return 0;
+		if(CityMode.grid())
+			//City mode is presence rather than accounting, and the wire side of it is lossless by
+			//the same argument. Simulation still reports the demand honestly, so the engine's probe
+			//is not fooled into thinking a dark network is hungry.
+			return simulate?0: WireNetTransfer.city(world, pos, amount);
+		return WireNetTransfer.transfer(world, pos, rate, rate, amount, simulate, 0, transferEndCache);
 	}
 
 	private int deliverTo(EnumFacing side, int amount, boolean simulate)
@@ -112,10 +189,10 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 	@Override
 	protected String describeWorldHookup()
 	{
-		if(hasReceiver())
+		if(hasReceiver()||hasWire())
 			return null;
-		return "Nothing adjacent accepts power. Bolt this onto a machine or capacitor, "
-				+"or put a wire connector against it to feed a wire network.";
+		return "Nothing is connected. Bolt this onto a machine or capacitor, string a wire "
+				+"straight to it, or put a connector against it.";
 	}
 
 	@Override
@@ -123,8 +200,18 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 	{
 		//Said while it is working, not only once it has failed. See describeWorldHookupHint's own
 		//comment for why that distinction is the whole point of the second line existing.
-		return "Powers what it touches. A wire connector beside this unit is fed "
-				+"whichever way it faces.";
+		return "Powers what it touches, and anything on a wire strung to it.";
+	}
+
+	/**
+	 * @return true if anything is strung to the terminal post
+	 */
+	private boolean hasWire()
+	{
+		if(world==null||world.isRemote)
+			return false;
+		Set<Connection> conns = ImmersiveNetHandler.INSTANCE.getConnections(world, pos);
+		return conns!=null&&!conns.isEmpty();
 	}
 
 	/**

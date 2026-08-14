@@ -79,6 +79,7 @@ public class Lib
 	//and the next item GUI written against "the ids are unique" would have opened the wrong window.
 	public static final int GUIID_NetworkTerminal = GUIID_Base_Item+4;
 	public static final int GUIID_MaintenanceKit = GUIID_Base_Item+3;
+	public static final int GUIID_NetworkLinker = GUIID_Base_Item+5;
 
 	public static final String NBT_Earmuffs = "IE:Earmuffs";
 	public static final String NBT_EarmuffColour = "IE:EarmuffColour";

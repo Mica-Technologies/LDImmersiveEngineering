@@ -1,0 +1,27 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:network_linker",
+		"data": 1
+	},
+	"pattern": [
+		" P ",
+		"STS",
+		" W "
+	],
+	"key": {
+		"P": {
+			"item": "immersiveengineering:metal_device1",
+			"data": 6
+		},
+		"S": {
+			"item": "#plateSteel"
+		},
+		"T": {
+			"item": "#elecTube"
+		},
+		"W": {
+			"item": "#stickTreatedWood"
+		}
+	}
+}

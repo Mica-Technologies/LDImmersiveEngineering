@@ -16,10 +16,15 @@ per-player networks.
 Power still has to enter and leave somewhere. It enters at a \textbf{Grid Feed Unit} and leaves at a
 \textbf{Grid Service Unit}. Both bolt to any solid surface, including engineering posts.
 
-These boxes exchange power with the block they are bolted to, exactly as a machine does. They do
-\emph{not} accept wires directly --- put a connector against one if you want it to feed a wire
-network. A Feed Unit takes power out of the world; a Service Unit puts it back. Both carry a
-terminal post on the front, which is where wiring goes.
+These boxes exchange power with the block they are bolted to, exactly as a machine does --- and
+they take a \textbf{wire directly}. String a coil at the terminal post on the front of a Feed or
+Service Unit and it connects as any connector would: no relay block in between, and any of LV, MV
+or HV. The wire sets the tier and the loss, exactly as it does everywhere else. A Feed Unit takes
+power out of the world; a Service Unit puts it back.
+
+A Service Unit powers what it touches first and the wire second, so bolting one onto a machine still
+powers that machine before the run leaves the building. A Signal Unit takes no wire at all: it moves
+no flux, and a wire on it would be a lie.
 
 \begin{ietip}
 A wire connector \emph{beside} a Service Unit is fed as well as one bolted to it, whichever way the
@@ -89,6 +94,22 @@ Bridges a segment to redstone in either direction. In \emph{input} mode a signal
 off, which makes any lever, daylight sensor or logic circuit an external kill switch; inverted, it
 demands a keep-alive signal instead, which is a dead-man's switch. In \emph{output} mode it reports
 whether its segment is up --- or, inverted, whether it is down, which is a fault lamp.
+
+\section{The Grid Linker}
+
+Wiring a street one panel at a time is the part of this feature that was tedious. The
+\textbf{Grid Linker} answers it: right-click any grid box and a short list of segments appears, with
+each one's colour and what it is doing. Pick one and it links that box \emph{and} loads the tool;
+every right-click after that links the box you clicked, with no window in the way.
+
+Sneak-right-click a box to choose a different segment, and sneak-right-click the air to empty the
+tool. What it is holding is on its tooltip.
+
+\begin{ietip}
+The linker adds to the console and the box's own panel rather than replacing either, and it can do
+exactly one thing: choose which segment a box belongs to. Segments are still created, named, priced
+and deleted at a console --- and a locked segment stays locked, on both ends of every move.
+\end{ietip}
 
 \section{The Engineer's Network Terminal}
 

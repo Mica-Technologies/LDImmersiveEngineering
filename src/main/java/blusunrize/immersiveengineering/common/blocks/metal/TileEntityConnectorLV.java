@@ -8,7 +8,6 @@
 
 package blusunrize.immersiveengineering.common.blocks.metal;
 
-import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.IEEnums.SideConfig;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.FluxStorage;
 import blusunrize.immersiveengineering.api.energy.wires.IImmersiveConnectable;
@@ -25,6 +24,7 @@ import blusunrize.immersiveengineering.common.util.EnergyHelper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
 import blusunrize.immersiveengineering.common.util.Utils;
+import blusunrize.immersiveengineering.common.util.WireNetTransfer;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
@@ -32,7 +32,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.ITickable;
 import net.minecraft.util.math.AxisAlignedBB;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -41,10 +40,8 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.function.Consumer;
 
 //@Optional.Interface(iface = "ic2.api.energy.tile.IEnergySink", modid = "IC2")
@@ -358,39 +355,8 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 	{
 		if(world.isRemote)
 			return;
-		Set<AbstractConnection> outputs = ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(Utils.toCC(this), world, true);
-		if(outputs.isEmpty())
-			return;
 		int available = Math.min(getMaxOutput(), energyStorage.getEnergyStored());
-		int powerLeft = available;
-		for(AbstractConnection con : outputs)
-		{
-			if(powerLeft <= 0)
-				break;
-			if(!con.isEnergyOutput||con.cableType==null||con.cableType.getTransferRate() <= 0)
-				continue;
-			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
-			if(end==null||!end.allowEnergyToPass(null))
-				continue;
-			int sent = end.outputEnergy(powerLeft, false, 0);
-			powerLeft -= sent;
-			//Notify in-line connectables (e.g. the Energy Meter) of throughput so they still measure power
-			//in city mode. City mode is lossless, so the full amount passes through every sub-connection.
-			if(sent > 0)
-			{
-				HashSet<IImmersiveConnectable> passed = new HashSet<>();
-				for(Connection sub : con.subConnections)
-				{
-					IImmersiveConnectable subStart = ApiUtils.toIIC(sub.start, world);
-					if(subStart!=null&&passed.add(subStart))
-						subStart.onEnergyPassthrough((double)sent);
-					IImmersiveConnectable subEnd = ApiUtils.toIIC(sub.end, world);
-					if(subEnd!=null&&passed.add(subEnd))
-						subEnd.onEnergyPassthrough((double)sent);
-				}
-			}
-		}
-		int consumed = available-powerLeft;
+		int consumed = WireNetTransfer.city(world, pos, available);
 		if(consumed > 0)
 		{
 			energyStorage.modifyEnergyStored(-consumed);
@@ -400,86 +366,12 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 
 	public int transferEnergy(int energy, boolean simulate, final int energyType)
 	{
-		int received = 0;
-		if(!world.isRemote)
-		{
-			Set<AbstractConnection> outputs = ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(Utils.toCC(this),
-					world, true);
-			int powerLeft = Math.min(Math.min(getMaxOutput(), getMaxInput()), energy);
-			final int powerForSort = powerLeft;
-
-			if(outputs.isEmpty())
-				return 0;
-
-			transferEndCache.clear();
-			Map<Connection, Integer> transferedRates = ImmersiveNetHandler.INSTANCE.getTransferedRates(world.provider.getDimension());
-			int sum = 0;
-			//TreeMap to prioritize outputs close to this connector if more energy is requested than available
-			//(energy will be provided to the nearby outputs rather than some random ones)
-			Map<AbstractConnection, Integer> powerSorting = new TreeMap<>();
-			for(AbstractConnection con : outputs)
-				if(con.isEnergyOutput)
-				{
-					IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
-					if(con.cableType!=null&&end!=null)
-					{
-						int atmOut = Math.min(powerForSort, con.cableType.getTransferRate());
-						int tempR = end.outputEnergy(atmOut, true, energyType);
-						if(tempR > 0)
-						{
-							powerSorting.put(con, tempR);
-							transferEndCache.put(con, end);
-							sum += tempR;
-						}
-					}
-				}
-
-			if(sum > 0)
-				for(AbstractConnection con : powerSorting.keySet())
-				{
-					IImmersiveConnectable end = transferEndCache.get(con);
-					if(con.cableType!=null&&end!=null)
-					{
-						float prio = powerSorting.get(con)/(float)sum;
-						int output = Math.min(MathHelper.ceil(powerForSort*prio), powerLeft);
-
-						int tempR = end.outputEnergy(Math.min(output, con.cableType.getTransferRate()), true, energyType);
-						int r = tempR;
-						int maxInput = getMaxInput();
-						tempR -= (int)Math.max(0, Math.floor(tempR*con.getPreciseLossRate(tempR, maxInput)));
-						end.outputEnergy(tempR, simulate, energyType);
-						HashSet<IImmersiveConnectable> passedConnectors = new HashSet<IImmersiveConnectable>();
-						float intermediaryLoss = 0;
-						//<editor-fold desc="Transfer rate and passed energy">
-						for(Connection sub : con.subConnections)
-						{
-							float length = sub.length/(float)sub.cableType.getMaxLength();
-							float baseLoss = (float)sub.cableType.getLossRatio();
-							float mod = (((maxInput-tempR)/(float)maxInput)/.25f)*.1f;
-							intermediaryLoss = MathHelper.clamp(intermediaryLoss+length*(baseLoss+baseLoss*mod), 0, 1);
-
-							int transferredPerCon = transferedRates.getOrDefault(sub, 0);
-							transferredPerCon += r;
-							if(!simulate)
-							{
-								transferedRates.put(sub, transferredPerCon);
-								IImmersiveConnectable subStart = ApiUtils.toIIC(sub.start, world);
-								IImmersiveConnectable subEnd = ApiUtils.toIIC(sub.end, world);
-								if(subStart!=null&&passedConnectors.add(subStart))
-									subStart.onEnergyPassthrough(r-r*intermediaryLoss);
-								if(subEnd!=null&&passedConnectors.add(subEnd))
-									subEnd.onEnergyPassthrough(r-r*intermediaryLoss);
-							}
-						}
-						//</editor-fold>
-						received += r;
-						powerLeft -= r;
-						if(powerLeft <= 0)
-							break;
-					}
-				}
-		}
-		return received;
+		//The body of this method now lives in WireNetTransfer, unchanged. It moved because the Grid
+		//Service Unit takes a wire directly and has to put energy onto a catenary in precisely the
+		//way a connector does -- same loss, same proportional split, same Energy Meter readings --
+		//and two copies of arithmetic that subtle would eventually be two different behaviours.
+		return WireNetTransfer.transfer(world, pos, getMaxInput(), getMaxOutput(), energy, simulate,
+				energyType, transferEndCache);
 	}
 
 	/**

@@ -432,6 +432,57 @@ def console_panel():
     return img
 
 
+# ---------------------------------------------------------------------------
+# Item art
+# -----------------------------------------------------------------------
+# The two linkers share a body and differ only in their accent, because they are
+# the same tool pointed at different infrastructure. Blue is the fluid network's
+# own colour, taken from make_fluidnet_textures.py so the two scripts cannot
+# drift apart on it; orange is the grid's, and IE's.
+FLUID = (58, 150, 190, 255)
+FLUID_DARK = (34, 98, 130, 255)
+
+
+def _linker(accent, accent_dark):
+    """A hand unit: grip, body, a lit readout and an emitter that has just fired."""
+    img = new_image((0, 0, 0, 0))
+    px = img.load()
+    # Grip.
+    rect(px, 4, 9, 6, 14, STEEL_DARK)
+    outline_rect(px, 4, 9, 6, 14, OUTLINE)
+    px[5, 11] = STEEL_LIT
+    # Body.
+    rect(px, 3, 4, 11, 9, STEEL)
+    brushed_metal(px, 4, 5, 10, 8, STEEL, STEEL_DARK)
+    outline_rect(px, 3, 4, 11, 9, OUTLINE)
+    # Readout, in the accent so the two tools are told apart in a hotbar at a glance.
+    rect(px, 5, 5, 8, 7, GLASS_DARK)
+    rect(px, 5, 5, 8, 5, accent_dark)
+    px[6, 6] = accent
+    px[8, 6] = accent_dark
+    # Emitter, and the link it has just made: three dots arcing away from the muzzle.
+    rect(px, 12, 5, 13, 8, STEEL_DARK)
+    outline_rect(px, 12, 5, 13, 8, OUTLINE)
+    px[13, 6] = accent
+    dots(px, [(14, 4), (13, 2), (11, 1)], accent)
+    px[10, 9] = BOLT
+    return img
+
+
+def linker_grid():
+    return _linker(ORANGE, ORANGE_DARK)
+
+
+def linker_fluid():
+    return _linker(FLUID, FLUID_DARK)
+
+
+ITEM_TEXTURES = {
+    "network_linker_grid": linker_grid,
+    "network_linker_fluid": linker_fluid,
+}
+
+
 TEXTURES = {
     "grid_device_feed_front": feed_front,
     "grid_device_service_front": service_front,
@@ -449,13 +500,23 @@ TEXTURES = {
 
 DEFAULT_OUT = os.path.join("src", "main", "resources", "assets", "immersiveengineering",
                            "textures", "blocks")
+DEFAULT_ITEM_OUT = os.path.join("src", "main", "resources", "assets", "immersiveengineering",
+                                "textures", "items")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", default=DEFAULT_OUT,
-                        help="directory to write the PNGs into")
+                        help="directory to write the block PNGs into")
+    parser.add_argument("--items-out", default=DEFAULT_ITEM_OUT,
+                        help="directory to write the item PNGs into")
     args = parser.parse_args()
+
+    os.makedirs(args.items_out, exist_ok=True)
+    for name, builder in sorted(ITEM_TEXTURES.items()):
+        path = os.path.join(args.items_out, name + ".png")
+        builder().save(path, "PNG", optimize=True)
+        print("wrote", path)
 
     os.makedirs(args.out, exist_ok=True)
     for name, builder in sorted(TEXTURES.items()):

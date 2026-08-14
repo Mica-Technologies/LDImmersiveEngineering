@@ -92,4 +92,32 @@ public final class JunctionBoxLogic
 		}
 		return strongest;
 	}
+
+	/**
+	 * Which conductor a face should break out when a connector turns up against it and nobody has
+	 * said which.
+	 * <p>
+	 * <strong>The lowest free one.</strong> Dyeing a face is a real choice and it stays available,
+	 * but it is a choice almost nobody wants to make the first time: what a player putting an LV
+	 * connector on a junction box means is "power, here", and answering that with silence until they
+	 * find out about dyes is the awkwardness this whole change is about. Lowest-first rather than
+	 * random so a run wired left to right comes out white, orange, magenta in that order and reads
+	 * as deliberate.
+	 * <p>
+	 * A conductor already patched somewhere on this box is never handed out again -- the same
+	 * conductor arriving at two connectors is a short, not a feature -- which is why this takes the
+	 * box's whole used mask rather than one face.
+	 *
+	 * @param usedMask     one bit per conductor already patched on this box
+	 * @param channelCount how many conductors a bundle carries
+	 *
+	 * @return the index of the conductor to patch, or -1 if the box has none left
+	 */
+	public static int firstFreeChannel(int usedMask, int channelCount)
+	{
+		for(int i = 0; i < channelCount; i++)
+			if((usedMask&(1 << i))==0)
+				return i;
+		return -1;
+	}
 }

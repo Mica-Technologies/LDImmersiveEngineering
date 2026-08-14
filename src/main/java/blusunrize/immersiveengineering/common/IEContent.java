@@ -208,6 +208,7 @@ public class IEContent
 	public static ItemIEBase itemJerrycan;
 	public static ItemIEBase itemPetroleum;
 	public static ItemIEBase itemNetworkTerminal;
+	public static ItemIEBase itemNetworkLinker;
 	public static ItemIEBase itemMold;
 	public static ItemIEBase itemBlueprint;
 	public static ItemIEBase itemRevolver;
@@ -399,6 +400,7 @@ public class IEContent
 		itemJerrycan = new ItemJerrycan();
 		itemPetroleum = new ItemPetroleum();
 		itemNetworkTerminal = new ItemNetworkTerminal();
+		itemNetworkLinker = new ItemNetworkLinker();
 		itemMold = new ItemIEBase("mold", 1, "plate", "gear", "rod", "bullet_casing", "wire", "packing4", "packing9", "unpacking");
 		itemBlueprint = new ItemEngineersBlueprint().setRegisterSubModels(false);
 		BlueprintCraftingRecipe.itemBlueprint = itemBlueprint;
