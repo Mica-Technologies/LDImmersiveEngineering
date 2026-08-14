@@ -246,4 +246,78 @@ class ManualLayoutTest
 					"even after capping, all six lines must still fit");
 		}
 	}
+
+	@Nested
+	@DisplayName("the update-news page budget")
+	class UpdateNewsBudget
+	{
+		//The line height ClientProxy actually derives this from is FontRenderer.FONT_HEIGHT, which is
+		//9 for the font the manual runs with. Pinned as a literal here because this test has no
+		//FontRenderer to ask -- if that ever stops being 9, ClientProxy's budget moves with it and
+		//this test should be revisited alongside it.
+		private static final int LINE_HEIGHT = 9;
+		//No subtext on a version entry (see IEManualInstance#formatEntrySubtext), so this is always
+		//the "no subtext" header GuiManual#initGui computes.
+		private static final int HEADER = LINE_HEIGHT+6+4;
+
+		/**
+		 * The exact arithmetic {@code ClientProxy#addVersionToManual} runs to size LINES_PER_PAGE --
+		 * duplicated here (rather than called into, since that method needs a live FontRenderer and
+		 * ManualHelper) so a change to ManualLayout's constants is caught here instead of silently
+		 * shrinking or overflowing an update-news page.
+		 */
+		private int linesPerPage(int screenWidth, int screenHeight)
+		{
+			ManualLayout l = new ManualLayout(screenWidth, screenHeight, LINE_HEIGHT+3);
+			int available = l.pageY+l.pageHeight-ManualLayout.PAGE_PADDING-l.getTextY(HEADER);
+			return Math.max(1, ManualLayout.maxLines(available, 0, LINE_HEIGHT));
+		}
+
+		@Test
+		@DisplayName("the floor (ManualLayout.MIN_WIDTH x MIN_HEIGHT) is pinned")
+		void floorBudgetIsPinned()
+		{
+			//If this changes, it is because ManualLayout's geometry changed underneath it -- update
+			//the expected value deliberately, don't just chase the failure.
+			assertEquals(11, linesPerPage(ManualLayout.MIN_WIDTH, ManualLayout.MIN_HEIGHT),
+					"the update-news line budget drifted from what ClientProxy was built against");
+		}
+
+		@Test
+		@DisplayName("the floor is never roomier than any other supported screen")
+		void floorIsTheWorstCase()
+		{
+			//This is the property the whole scheme depends on: a budget sized at the layout's floor
+			//must never be more lines than what a bigger screen can actually show, or a page built to
+			//that budget would overflow there. Checked across every screen ManualLayoutTest exercises,
+			//not just the two named "the floor" -- 240x180, MIN_WIDTH x MIN_HEIGHT, is the smallest of
+			//them, but this proves it rather than assumes it.
+			int floorBudget = linesPerPage(ManualLayout.MIN_WIDTH, ManualLayout.MIN_HEIGHT);
+			for(int[] screen : SCREENS)
+			{
+				int budget = linesPerPage(screen[0], screen[1]);
+				assertTrue(budget >= floorBudget,
+						"screen "+screen[0]+"x"+screen[1]+" fits fewer lines ("+budget+
+								") than the floor budget ("+floorBudget+") was sized against");
+			}
+		}
+
+		@Test
+		@DisplayName("a paragraph counted at the legacy width never under-counts the real render width")
+		void legacyWidthNeverUndercounts()
+		{
+			//The other half of the safety argument: paragraphs are counted at
+			//ManualLayout.LEGACY_TEXT_WIDTH (120) to decide how many lines they need. That is only a
+			//safe over-estimate if the real pane is never narrower than 120 -- which is exactly what
+			//"widerThanTheOldBook" already asserts for every screen. Restated here, pinned to the
+			//constant ClientProxy actually reads, so a change to either one is caught in one place.
+			for(int[] screen : SCREENS)
+			{
+				ManualLayout l = new ManualLayout(screen[0], screen[1], LINE_HEIGHT+3);
+				assertTrue(l.textWidth >= ManualLayout.LEGACY_TEXT_WIDTH,
+						"real text width "+l.textWidth+" at "+screen[0]+"x"+screen[1]+
+								" is narrower than the width paragraphs are counted at");
+			}
+		}
+	}
 }

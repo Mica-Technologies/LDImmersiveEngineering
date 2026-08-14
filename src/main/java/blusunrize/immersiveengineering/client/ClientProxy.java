@@ -88,6 +88,7 @@ import blusunrize.immersiveengineering.common.util.sound.SkyhookSound;
 import blusunrize.lib.manual.IManualPage;
 import blusunrize.lib.manual.ManualInstance.ManualEntry;
 import blusunrize.lib.manual.ManualPages;
+import blusunrize.lib.manual.gui.ManualLayout;
 import blusunrize.lib.manual.ManualPages.PositionedItemStack;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -1396,17 +1397,86 @@ public class ClientProxy extends CommonProxy
 				return null;
 		}
 
-		List<String> l = ManualHelper.getManual().fontRenderer.listFormattedStringToWidth(changes.replace("\t", "  "), 120);
-		final int LINES_PER_PAGE = 16;
-		int pageCount = l.size()/LINES_PER_PAGE+(l.size()%LINES_PER_PAGE==0?0: 1);
-		ManualPages.Text[] pages = new ManualPages.Text[pageCount];
-		for(int i = 0; i < pageCount; i++)
+		FontRenderer fr = ManualHelper.getManual().fontRenderer;
+		String changesText = changes.replace("\t", "  ");
+
+		//	=================================
+		//	Wrap at render time, like every other Text page -- not at load time.
+		//	=================================
+		//
+		// This used to hard-wrap the whole changelog to a 120px column with listFormattedStringToWidth
+		// and bake the result into literal "\n"s, which is why these pages stayed a ragged 120px
+		// column in the new wide pane no matter how wide it actually was: ManualPages.Text re-wraps
+		// against gui.getPageWidth() every time it is shown (initPage -> addLinks), but that re-wrap
+		// can only widen lines back out where there ISN'T already a hard newline splitting them -- and
+		// every line here had one. Passing the raw, paragraph-broken text through instead lets the
+		// real pane width do the wrapping, exactly like a hand-authored manual page.
+		//
+		// Pagination still has to be decided now, though: there is no GUI to ask how tall the pane is
+		// until the player opens the book. LINES_PER_PAGE is sized against the layout's own guaranteed
+		// floor -- ManualLayout.MIN_WIDTH x MIN_HEIGHT, the smallest size ManualLayoutTest exercises,
+		// and the size the layout clamps to rather than shrinking further -- so a budget that fits
+		// there fits every screen the layout can ever produce. Anything roomier only ever leaves
+		// spare space, never a shortfall.
+		int lineHeight = fr.FONT_HEIGHT;
+		ManualLayout floorLayout = new ManualLayout(ManualLayout.MIN_WIDTH, ManualLayout.MIN_HEIGHT, lineHeight+3);
+		//The header for a version entry, exactly as GuiManual computes it: version entries have no
+		//subtext (see IEManualInstance#formatEntrySubtext), so this is always the "no subtext" case.
+		int header = lineHeight+6+4;
+		int available = floorLayout.pageY+floorLayout.pageHeight-ManualLayout.PAGE_PADDING-floorLayout.getTextY(header);
+		final int LINES_PER_PAGE = Math.max(1, ManualLayout.maxLines(available, 0, lineHeight));
+
+		//Paragraphs, not the whole blob: a page break may only ever land between two of these, so a
+		//changelog's own line breaks (one bullet per line) are never disturbed by pagination.
+		String[] paragraphs = changesText.split("\n", -1);
+		List<String> pageTexts = new ArrayList<>();
+		StringBuilder current = new StringBuilder();
+		int currentLines = 0;
+		for(String paragraph : paragraphs)
 		{
-			StringBuilder nextPage = new StringBuilder();
-			for(int j = LINES_PER_PAGE*i; j < l.size()&&j < (i+1)*LINES_PER_PAGE; j++)
-				nextPage.append(l.get(j)).append("\n");
-			pages[i] = new ManualPages.Text(ManualHelper.getManual(), nextPage.toString());
+			//Counted at the layout's guaranteed-minimum text width -- ManualLayout.LEGACY_TEXT_WIDTH,
+			//120, proven by the "widerThanTheOldBook" test to never be narrower than the real pane --
+			//so this always over-estimates the lines a paragraph will actually take to render.
+			int paragraphLines = Math.max(1,
+					fr.listFormattedStringToWidth(paragraph, ManualLayout.LEGACY_TEXT_WIDTH).size());
+			if(paragraphLines > LINES_PER_PAGE)
+			{
+				//A single paragraph too long for one page even at the floor -- vanishingly unlikely
+				//for a changelog line, but split defensively rather than ever let it overflow the
+				//pane. This is the only place text still gets hard-wrapped ahead of render time.
+				if(current.length() > 0)
+				{
+					pageTexts.add(current.toString());
+					current = new StringBuilder();
+					currentLines = 0;
+				}
+				List<String> wrapped = fr.listFormattedStringToWidth(paragraph, ManualLayout.LEGACY_TEXT_WIDTH);
+				for(int i = 0; i < wrapped.size(); i += LINES_PER_PAGE)
+				{
+					StringBuilder chunk = new StringBuilder();
+					for(int j = i; j < wrapped.size()&&j < i+LINES_PER_PAGE; j++)
+						chunk.append(wrapped.get(j)).append("\n");
+					pageTexts.add(chunk.toString());
+				}
+				continue;
+			}
+			if(currentLines > 0&&currentLines+paragraphLines > LINES_PER_PAGE)
+			{
+				pageTexts.add(current.toString());
+				current = new StringBuilder();
+				currentLines = 0;
+			}
+			if(current.length() > 0)
+				current.append("\n");
+			current.append(paragraph);
+			currentLines += paragraphLines;
 		}
+		if(current.length() > 0||pageTexts.isEmpty())
+			pageTexts.add(current.toString());
+
+		ManualPages.Text[] pages = new ManualPages.Text[pageTexts.size()];
+		for(int i = 0; i < pages.length; i++)
+			pages[i] = new ManualPages.Text(ManualHelper.getManual(), pageTexts.get(i));
 		return new ImmutablePair<>(title, pages);
 	}
 
