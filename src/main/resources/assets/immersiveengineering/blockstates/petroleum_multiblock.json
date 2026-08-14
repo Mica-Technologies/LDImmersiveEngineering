@@ -101,6 +101,16 @@
 			"true": {
 				"textures": {"all": "immersiveengineering:blocks/petroleum_tank_cap"}
 			}
+		},
+		"facing": {
+			"north": {"transform": {"rotation": {"y": 0}}},
+			"south": {"transform": {"rotation": {"y": 180}}},
+			"west": {"transform": {"rotation": {"y": 90}}},
+			"east": {"transform": {"rotation": {"y": -90}}}
+		},
+		"_0multiblockslave": {
+			"false": {},
+			"true": {}
 		}
 	}
 }

@@ -189,6 +189,230 @@ class PetroleumAssetsTest
 		}
 	}
 
+	/**
+	 * Walks every block state each petroleum block can express and resolves it against its
+	 * blockstate file exactly the way Forge does.
+	 * <p>
+	 * Forge's {@code forge_marker} loader turns the property sub-maps under {@code variants} into
+	 * one entry per <em>combination</em> of the properties it was given, keyed by the properties in
+	 * name order. Minecraft then asks for one model per block state, keyed by <em>all</em> of the
+	 * block's listed properties in name order. A property the block declares and the file does not
+	 * mention therefore does not "default" to anything: the key simply never matches, and every
+	 * state of that block loads the missing model.
+	 * <p>
+	 * This is invisible in the log. Forge prints only the first five such failures per mod and
+	 * folds the rest into a single "suppressed additional N model loading errors" line, so a block
+	 * whose every state is broken looks exactly like a block with four odd broken states.
+	 */
+	@Nested
+	@DisplayName("blockstate state space")
+	class StateSpace
+	{
+		@Test
+		@DisplayName("each blockstate declares exactly the properties its block does")
+		void propertiesMatchTheBlock()
+		{
+			for(Map.Entry<String, Map<String, List<String>>> block : stateSpaces().entrySet())
+			{
+				Map<String, Set<String>> declared = new TreeMap<>();
+				for(Map.Entry<String, JsonObject> property :
+						propertySubMaps(blockstate(block.getKey())).entrySet())
+					declared.put(property.getKey(), keys(property.getValue()));
+				Map<String, Set<String>> expected = new TreeMap<>();
+				for(Map.Entry<String, List<String>> property : block.getValue().entrySet())
+					expected.put(property.getKey(), new HashSet<>(property.getValue()));
+				assertEquals(expected, declared, block.getKey()
+						+": the properties under \"variants\" must be exactly the ones the block "
+						+"declares, or the states it can express have no model at all");
+			}
+		}
+
+		@Test
+		@DisplayName("every state the block can express resolves to a model")
+		void everyStateResolvesAModel()
+		{
+			for(Map.Entry<String, Map<String, List<String>>> block : stateSpaces().entrySet())
+			{
+				Map<String, JsonObject> resolved = resolveVariants(blockstate(block.getKey()));
+				for(String variant : everyVariantString(block.getValue()))
+				{
+					JsonObject merged = resolved.get(variant);
+					assertNotNull(merged, block.getKey()+": no variant resolves \""+variant
+							+"\", so that state renders as the missing model");
+					assertTrue(merged.has("model")&&!merged.get("model").getAsString().isEmpty(),
+							block.getKey()+": variant \""+variant+"\" resolves no model");
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("every inventory variant resolves to a model")
+		void everyInventoryVariantResolvesAModel()
+		{
+			for(String name : BLOCKSTATES)
+			{
+				Map<String, JsonObject> resolved = resolveVariants(blockstate(name));
+				for(Map.Entry<String, JsonObject> entry : resolved.entrySet())
+					if(entry.getKey().startsWith("inventory"))
+						assertTrue(entry.getValue().has("model")
+										&&!entry.getValue().get("model").getAsString().isEmpty(),
+								name+": variant \""+entry.getKey()+"\" resolves no model");
+			}
+		}
+	}
+
+	/**
+	 * The properties each petroleum block declares, and the values each of them takes.
+	 * <p>
+	 * These come from the block constructors: {@code BlockPetroleumMultiblock} passes
+	 * {@code type} and {@code boolean0}, and {@code BlockIEMultiblock} adds
+	 * {@code IEProperties.FACING_HORIZONTAL} and {@code IEProperties.MULTIBLOCKSLAVE} on top of
+	 * them. The device and decoration blocks add no listed property beyond their own type --
+	 * {@code IOBJModelCallback.PROPERTY} is unlisted and so never appears in a variant key.
+	 * <p>
+	 * Written out rather than read off the blocks because a block cannot be constructed without
+	 * a running Minecraft.
+	 */
+	private static Map<String, Map<String, List<String>>> stateSpaces()
+	{
+		Map<String, Map<String, List<String>>> out = new LinkedHashMap<>();
+
+		Map<String, List<String>> multiblock = new LinkedHashMap<>();
+		List<String> multiblockTypes = new ArrayList<>();
+		for(BlockTypes_PetroleumMultiblock type : BlockTypes_PetroleumMultiblock.values())
+			multiblockTypes.add(type.getName());
+		multiblock.put("type", multiblockTypes);
+		multiblock.put("facing", Arrays.asList("north", "south", "west", "east"));
+		multiblock.put("boolean0", Arrays.asList("false", "true"));
+		multiblock.put("_0multiblockslave", Arrays.asList("false", "true"));
+		out.put("petroleum_multiblock", multiblock);
+
+		Map<String, List<String>> device = new LinkedHashMap<>();
+		List<String> deviceTypes = new ArrayList<>();
+		for(BlockTypes_PetroleumDevice type : BlockTypes_PetroleumDevice.values())
+			deviceTypes.add(type.getName());
+		device.put("type", deviceTypes);
+		out.put("petroleum_device", device);
+
+		Map<String, List<String>> decoration = new LinkedHashMap<>();
+		List<String> decorationTypes = new ArrayList<>();
+		for(BlockTypes_PetroleumDecoration type : BlockTypes_PetroleumDecoration.values())
+			decorationTypes.add(type.getName());
+		decoration.put("type", decorationTypes);
+		out.put("petroleum_decoration", decoration);
+
+		return out;
+	}
+
+	/**
+	 * @return every variant key Minecraft will ask this block for: one per combination of its
+	 * properties, with the properties in name order, which is the order a block state's property
+	 * map is kept in.
+	 */
+	private static List<String> everyVariantString(Map<String, List<String>> stateSpace)
+	{
+		List<String> properties = new ArrayList<>(stateSpace.keySet());
+		Collections.sort(properties);
+		List<String> out = new ArrayList<>();
+		out.add("");
+		for(String property : properties)
+		{
+			List<String> next = new ArrayList<>();
+			for(String prefix : out)
+				for(String value : stateSpace.get(property))
+					next.add(prefix.isEmpty()?property+"="+value: prefix+","+property+"="+value);
+			out = next;
+		}
+		return out;
+	}
+
+	/**
+	 * @return the entries under {@code variants} that Forge reads as a property, mapped to their
+	 * value objects. Forge decides this by looking at the first entry: a sub-map whose first value
+	 * is an object is a property, anything else is a fully specified variant.
+	 */
+	private static Map<String, JsonObject> propertySubMaps(JsonObject blockstate)
+	{
+		Map<String, JsonObject> out = new TreeMap<>();
+		for(Map.Entry<String, JsonElement> entry : blockstate.getAsJsonObject("variants").entrySet())
+		{
+			if(entry.getValue().isJsonArray())
+				continue;
+			JsonObject object = entry.getValue().getAsJsonObject();
+			//Forge reads the first entry of every variant without checking there is one, so an
+			//empty object here is not an empty variant -- it is a crash while loading the file.
+			assertFalse(object.entrySet().isEmpty(),
+					"\""+entry.getKey()+"\" is empty, which Forge cannot read at all");
+			if(object.entrySet().iterator().next().getValue().isJsonObject())
+				out.put(entry.getKey(), object);
+		}
+		return out;
+	}
+
+	/**
+	 * Resolves a forge_marker blockstate into the variant keys Forge would hand the model loader,
+	 * each merged with the file's defaults the way Forge merges them.
+	 */
+	private static Map<String, JsonObject> resolveVariants(JsonObject blockstate)
+	{
+		JsonObject defaults = blockstate.has("defaults")
+				?blockstate.getAsJsonObject("defaults"): new JsonObject();
+		Map<String, JsonObject> properties = propertySubMaps(blockstate);
+
+		Map<String, JsonObject> out = new LinkedHashMap<>();
+		out.put("", merge(new JsonObject(), defaults));
+		for(Map.Entry<String, JsonObject> property : properties.entrySet())
+		{
+			Map<String, JsonObject> next = new LinkedHashMap<>();
+			for(Map.Entry<String, JsonObject> so_far : out.entrySet())
+				for(Map.Entry<String, JsonElement> value : property.getValue().entrySet())
+				{
+					String key = property.getKey()+"="+value.getKey();
+					next.put(so_far.getKey().isEmpty()?key: so_far.getKey()+","+key,
+							merge(merge(new JsonObject(), so_far.getValue()),
+									value.getValue().getAsJsonObject()));
+				}
+			out = next;
+		}
+
+		for(Map.Entry<String, JsonElement> entry : blockstate.getAsJsonObject("variants").entrySet())
+		{
+			if(properties.containsKey(entry.getKey()))
+				continue;
+			//A fully specified variant may be written as a list of weighted alternatives; every one
+			//of them has to resolve, so the first standing in for all of them would be too kind.
+			JsonElement value = entry.getValue();
+			JsonObject specified = value.isJsonArray()
+					?(value.getAsJsonArray().size() > 0
+					?value.getAsJsonArray().get(0).getAsJsonObject(): new JsonObject())
+					: value.getAsJsonObject();
+			out.put(entry.getKey(), merge(merge(new JsonObject(), defaults), specified));
+		}
+		return out;
+	}
+
+	/**
+	 * Merges one variant over another the way Forge's {@code sync} does: a value replaces the one
+	 * below it, except for the texture map, whose keys are merged one at a time.
+	 */
+	private static JsonObject merge(JsonObject target, JsonObject source)
+	{
+		for(Map.Entry<String, JsonElement> entry : source.entrySet())
+		{
+			if("textures".equals(entry.getKey())&&entry.getValue().isJsonObject())
+			{
+				JsonObject textures = target.has("textures")
+						?target.getAsJsonObject("textures"): new JsonObject();
+				for(Map.Entry<String, JsonElement> texture : entry.getValue().getAsJsonObject().entrySet())
+					textures.add(texture.getKey(), texture.getValue());
+				target.add("textures", textures);
+			}
+			else
+				target.add(entry.getKey(), entry.getValue());
+		}
+		return target;
+	}
+
 	@Nested
 	@DisplayName("referenced files")
 	class References
