@@ -123,4 +123,29 @@ public class ManualLayout
 	{
 		return pageY+PAGE_PADDING+headerHeight;
 	}
+
+	/**
+	 * How many lines of body text fit below a top offset -- the space a multiblock preview or a
+	 * recipe grid claimed first -- before a line's bottom edge would cross the bottom of the
+	 * available height.
+	 * <p>
+	 * Every page type that puts something above its text needs this arithmetic, so it lives once,
+	 * here, instead of being re-derived (and re-broken, as {@code ManualPageMultiblock} did when
+	 * the multiblock preview's scale-up was added without it) in each page type.
+	 */
+	public static int maxLines(int availableHeight, int topOffset, int lineHeight)
+	{
+		if(lineHeight <= 0)
+			return 0;
+		return Math.max(0, (availableHeight-topOffset)/lineHeight);
+	}
+
+	/**
+	 * The inverse of {@link #maxLines}: the most a top element is allowed to push the text down
+	 * by, if a given number of lines still has to fit below it without crossing the pane's bottom.
+	 */
+	public static int maxTopOffset(int availableHeight, int lines, int lineHeight)
+	{
+		return availableHeight-lines*lineHeight;
+	}
 }

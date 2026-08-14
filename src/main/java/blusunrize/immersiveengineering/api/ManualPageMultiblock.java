@@ -15,6 +15,7 @@ import blusunrize.lib.manual.ManualPages;
 import blusunrize.lib.manual.ManualUtils;
 import blusunrize.lib.manual.gui.GuiButtonManualNavigation;
 import blusunrize.lib.manual.gui.GuiManual;
+import blusunrize.lib.manual.gui.ManualLayout;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiButton;
@@ -83,6 +84,26 @@ public class ManualPageMultiblock extends ManualPages
 	}
 
 
+	/**
+	 * How many lines the entry's own text will need, so the preview can leave room for them
+	 * instead of growing over them.
+	 * <p>
+	 * Measured against the raw, un-linkified text: {@code <link;...>} tags are longer than what
+	 * they render as, so this can only over-estimate the line count, never under -- an
+	 * over-estimate shrinks the preview a little more than strictly necessary, which is safe; an
+	 * under-estimate is the bug this method exists to avoid.
+	 */
+	private int countTextLines(GuiManual gui)
+	{
+		if(text==null||text.isEmpty())
+			return 0;
+		boolean uni = manual.fontRenderer.getUnicodeFlag();
+		manual.fontRenderer.setUnicodeFlag(true);
+		int lines = manual.fontRenderer.listFormattedStringToWidth(manual.formatText(text), gui.getPageWidth()).size();
+		manual.fontRenderer.setUnicodeFlag(uni);
+		return lines;
+	}
+
 	@Override
 	public void initPage(GuiManual gui, int x, int y, List<GuiButton> pageButtons)
 	{
@@ -94,14 +115,23 @@ public class ManualPageMultiblock extends ManualPages
 			rotX = 25;
 			rotY = -45;
 			//	=================================
-			//	The structure grows with the page.
+			//	The structure grows with the page, but not into its own text.
 			//	=================================
 			//
 			// The multiblock scale in the API was picked so the model fit a 120x150 hole. The pane is
-			// several times that now, so it is scaled up by however much of that growth it can use,
-			// capped so a big structure never outgrows the room below the title.
+			// several times that now, so it is scaled up by however much of that growth it can use --
+			// but never by more than leaves room for the entry's own description below it. Capping
+			// only against the page's total height (as this used to) let a big enough scale-up push
+			// textOffset past the bottom of the pane, so the last lines of the entry drew on the
+			// leather frame instead of the paper. See ManualLayoutTest for the arithmetic this leans on.
 			float diagonal = (float)Math.sqrt(renderInfo.structureHeight*renderInfo.structureHeight+renderInfo.structureWidth*renderInfo.structureWidth+renderInfo.structureLength*renderInfo.structureLength);
-			float fit = Math.min(gui.getPageWidth()/120f, gui.getPageHeight()/2f/(diagonal*multiblock.getManualScale()/2f));
+			float nativeSpan = diagonal*multiblock.getManualScale();
+			int textLines = countTextLines(gui);
+			int maxTextOffset = ManualLayout.maxTopOffset(gui.getPageHeight(), textLines, manual.fontRenderer.FONT_HEIGHT);
+			//Never smaller than the structure's native size: a screen too small for that already had
+			//nothing to offer under the old fixed-size page either.
+			float spanBudget = Math.max(nativeSpan, maxTextOffset-10);
+			float fit = Math.min(gui.getPageWidth()/120f, spanBudget/nativeSpan);
 			scale = multiblock.getManualScale()*Math.max(1f, Math.min(1.75f, fit));
 			float radius = scale*diagonal/2f;
 			transX = x+gui.getPageWidth()/2f+renderInfo.structureWidth/2f;

@@ -180,4 +180,70 @@ class ManualLayoutTest
 			assertTrue(l.getTextY(30) < l.pageY+l.pageHeight, "a title block should not fill the page");
 		}
 	}
+
+	@Nested
+	@DisplayName("the text budget below a large top element")
+	class TextBudget
+	{
+		private static final int TEXT_LINE_HEIGHT = 9;
+
+		@Test
+		@DisplayName("maxLines never leaves a line hanging off the bottom of the pane")
+		void maxLinesStaysInsideThePane()
+		{
+			for(int availableHeight : new int[]{0, 1, 9, 20, 87, 141, 176, 357})
+				for(int topOffset : new int[]{0, 8, 20, 87, 128, 141, 200})
+				{
+					int lines = ManualLayout.maxLines(availableHeight, topOffset, TEXT_LINE_HEIGHT);
+					String at = " (available "+availableHeight+", offset "+topOffset+")";
+					assertTrue(lines >= 0, "negative line count"+at);
+					assertTrue(topOffset+lines*TEXT_LINE_HEIGHT <= availableHeight||lines==0&&topOffset >= availableHeight,
+							"a line's baseline fell past the bottom of the pane"+at);
+				}
+		}
+
+		@Test
+		@DisplayName("maxTopOffset leaves exactly enough room for the lines it was asked for")
+		void maxTopOffsetLeavesRoomForItsLines()
+		{
+			for(int availableHeight : new int[]{20, 87, 141, 176, 357})
+				for(int lines : new int[]{0, 1, 3, 6, 10})
+				{
+					int topOffset = ManualLayout.maxTopOffset(availableHeight, lines, TEXT_LINE_HEIGHT);
+					int fits = ManualLayout.maxLines(availableHeight, topOffset, TEXT_LINE_HEIGHT);
+					assertTrue(fits >= lines||topOffset >= availableHeight,
+							"maxTopOffset didn't actually leave room for "+lines+" lines at height "+availableHeight);
+				}
+		}
+
+		@Test
+		@DisplayName("reproduces the Squeezer page bleed at 854x480, GUI scale 2")
+		void squeezerAtRealScreenSize()
+		{
+			//854x480 at GUI scale 2 hands the manual a 427x240 layout -- this is the case that
+			//actually shipped with the entry's body text bleeding onto the leather frame under the
+			//page, below the paper pane.
+			ManualLayout l = new ManualLayout(427, 240, ROW_HEIGHT);
+			//The header for an entry with no subtext, exactly as GuiManual computes it.
+			int header = 9+6;
+			int available = l.pageY+l.pageHeight-ManualLayout.PAGE_PADDING-l.getTextY(header);
+			assertEquals(141, available, "the real budget the Squeezer page had to work with");
+
+			//This is what ManualPageMultiblock used to compute for the Squeezer's textOffset, before
+			//the preview's scale-up was made to leave room for the text below it: a 3x3x3 structure
+			//at its authored scale of 13, capped only by the old (uncapped-by-text) formula.
+			int buggyTextOffset = 128;
+			int roomLeft = ManualLayout.maxLines(available, buggyTextOffset, TEXT_LINE_HEIGHT);
+			assertTrue(roomLeft <= 1,
+					"the bug: almost the whole six-line entry had nowhere left to draw but past the pane");
+
+			//The fix: cap the preview so its offset leaves room for the lines the entry actually
+			//needs, using the same arithmetic as production code.
+			int neededLines = 6;
+			int fixedTextOffset = ManualLayout.maxTopOffset(available, neededLines, TEXT_LINE_HEIGHT);
+			assertTrue(fixedTextOffset < buggyTextOffset, "the cap should shrink the preview below the old size");
+			assertTrue(ManualLayout.maxLines(available, fixedTextOffset, TEXT_LINE_HEIGHT) >= neededLines,
+					"even after capping, all six lines must still fit");
+		}
+	}
 }
