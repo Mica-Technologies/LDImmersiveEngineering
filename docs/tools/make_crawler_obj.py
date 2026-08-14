@@ -41,6 +41,12 @@ Self-checks, all of them the sort of failure nothing at runtime reports:
   * no two co-rendered faces that point the same way lie in the same plane and overlap,
     which is the check that would have caught the z-fighting a playtester reported as
     "mottled patches" on the cowl, the deck seams, the track guards and the arm's pins;
+  * every part is touching whatever it says holds it up, stands out of it by exactly what
+    it claims to, and is not buried inside it -- which is the check that would have caught
+    the same playtester's "floating parts of the model": a cab eleven units above its deck,
+    an exhaust stack four units over the cowl, two ram rods hanging off the arm, a breaker
+    barrel beside its housing, and bosses built against a tapered beam's widest section
+    standing a unit off the steel everywhere else;
   * the glazing region is painted with partial alpha and every other region is fully
     opaque, which is the check that would have caught a windscreen nobody can see out
     of and a hole in the bodywork respectively.
@@ -116,6 +122,31 @@ def opaque(colour):
     return colour[0], colour[1], colour[2], 255
 
 
+def shaded(colour, factor):
+    """The same colour, that much lighter or darker, and just as opaque.
+
+    **Every line drawn on painted steel is now a multiple of the colour it is drawn on**,
+    rather than one of the four palette entries picked by hand.  The complaint this
+    answers is "very harsh lines in the textures": the panels were seamed with
+    YELLOW_SHADE and trimmed with OUTLINE, which against the livery is a contrast ratio of
+    four to one and reads at any distance as a machine built out of planks.  A seam is a
+    join in a sheet of steel and a join catches slightly less light than the sheet does;
+    0.9 of it is a shade or two, which is all a seam ever is.
+    """
+    return (max(0, min(255, int(round(colour[0]*factor)))),
+            max(0, min(255, int(round(colour[1]*factor)))),
+            max(0, min(255, int(round(colour[2]*factor)))),
+            colour[3])
+
+
+#  How much light a seam, a bolt head and a scuff lose or gain against the sheet they are
+#  on.  These three numbers are the whole of the painted detail's contrast, and they are
+#  deliberately small: see shaded().
+SEAM = 0.90
+BOLT = 1.07
+SCUFF = 0.94
+
+
 # ---------------------------------------------------------------------------
 # The atlas.
 #
@@ -153,6 +184,16 @@ REGIONS = {
     "cab_side": (64, 128, 64, 64),   # the cab's outer skin: door, handle, glazing bar
     "counterweight": (128, 128, 64, 64),
     "bucket": (192, 128, 64, 64),    # the bucket's back, ribbed
+
+    # A pin seen end on, and the reason it is not simply a crop of "plate".
+    #
+    # Every cylinder's cap is mapped *radially about the centre of its region*, so whatever
+    # is painted at the middle of the region lands at the middle of every disc.  The middle
+    # of "plate" is where two of its panel seams cross, so every pin on the machine wore a
+    # dark cross through its face -- which is what the playtester saw as "dark cross-hatched
+    # discs" hovering off the arm.  A region painted in rings puts a machined pin face there
+    # instead, at any radius from the tool pins' 2.4 to the slew ring's 13.
+    "boss": (0, 192, 32, 32),
 }
 
 # The belt strip repeats every BELT_PERIOD pixels down its length, and every quad of
@@ -185,6 +226,20 @@ BELT_PERIOD = 8
 # panel floating off the bodywork -- it is well under the width of the seam lines painted
 # on the panels either side of it.
 RELIEF = 0.1
+
+# How far a pin's boss stands out of the beam it is pinned through.
+#
+# **This is the other half of the same playtest report**: "floating parts of the model".
+# The bosses were sized against the beams' *nominal* half width -- the widest a tapered
+# beam ever gets -- so on a beam that is 3.5 wide at its head and 4.5 at its foot a boss
+# built for 4.5 stands a full unit out of the steel wherever the steel is narrower, and a
+# disc a unit off the surface it belongs to does not read as a boss.  It reads as a disc
+# hovering beside the arm.  Every boss now asks the beam how wide it is *where the boss
+# actually is* -- see Beam.half_width -- and stands exactly this far out of that.
+#
+# Half a unit, which is the smallest step that still reads as a raised face at ten blocks
+# and the largest that never reads as a gap.  check_anchoring holds every one of them to it.
+BOSS_PROUD = 0.5
 
 # ---------------------------------------------------------------------------
 # THE PIVOTS.  Duplicated in ModelHydraulicCrawler, compared by CrawlerAssetsTest.
@@ -255,6 +310,10 @@ class Mesh:
         #  one form of the mesh that has thrown that away.
         self.polygons = {}          # name -> [(what, [point...])...]
         self.group_of = {}          # id(face list) -> name
+        #  Every closed piece, kept whole: check_anchoring asks which solid a face belongs
+        #  to and where that solid's surface is, and neither question can be answered from
+        #  a pile of faces.
+        self.solids = []            # (group, what, [polygon...]) in build order
         self.quads = 0
 
     def group(self, name):
@@ -365,6 +424,8 @@ class Solid:
         if volume <= 0:
             raise SystemExit("%s: encloses %.3f cubic units -- it is inside out"
                              % (self.what, volume))
+        self.mesh.solids.append((self.mesh.group_of[id(self.faces)], self.what,
+                                 [list(points) for points in self.polygons]))
         return volume
 
 
@@ -483,10 +544,34 @@ def add_frustum(mesh, faces, what, z0, z1, rect0, rect1, regions, uv_origin=(0.0
     return solid.finish()
 
 
+#  Which two coordinates a prism's cross-section is drawn in, for each axis it can run
+#  along, in the order that keeps the frame right-handed -- so "counter-clockwise seen
+#  from outside" means the same thing whichever way the prism points and the winding check
+#  is as sharp on a vertical exhaust stack as it is on a wheel.
+CROSS_SECTION = {"x": (1, 2), "y": (2, 0), "z": (0, 1)}
+
+
 def add_cylinder(mesh, faces, what, x0, x1, cz, cy, radius, count, side, cap,
                  twist=0.0):
+    """A prism about the X axis: a wheel, a pin boss, a rotator.  See add_tube."""
+    return add_tube(mesh, faces, what, "x", x0, x1, cy, cz, radius, count, side, cap,
+                    twist)
+
+
+def add_tube(mesh, faces, what, axis, a0, a1, cu, cv, radius, count, side, cap,
+             twist=0.0):
     """
-    A wheel, a pin boss, an exhaust stack: a prism about the X axis.
+    A prism about any one of the three axes, with its cross-section at (cu, cv).
+
+    **The axis is a parameter because three things on this machine are not wheels.**  The
+    rams along the arm, the exhaust stack out of the cowl and the breaker's barrel all run
+    somewhere other than across the machine, and with only an X-axis primitive to hand they
+    had been built as short fat drums lying on their sides -- which is what a playtester saw
+    as discs floating beside the arm, and in the breaker's case as a barrel hanging in the
+    air a body's length from the tool it belongs to.
+
+    (cu, cv) are the centre in the two coordinates the prism does *not* run along, named in
+    the order CROSS_SECTION gives them, which for the X axis is (y, z).
 
     The caps are fanned into quads rather than left as one many-sided face because the
     renderer draws quads and nothing else -- one format, one loop, no triangle path to
@@ -494,34 +579,108 @@ def add_cylinder(mesh, faces, what, x0, x1, cz, cy, radius, count, side, cap,
     """
     if count%2:
         raise SystemExit("%s: %d facets; the cap fan needs an even count" % (what, count))
+    if axis not in CROSS_SECTION:
+        raise SystemExit("%s: %s is not an axis a prism can run along" % (what, axis))
+    ai = "xyz".index(axis)
+    ui, vi = CROSS_SECTION[axis]
+
+    def point(along, u, v):
+        p = [0.0, 0.0, 0.0]
+        p[ai], p[ui], p[vi] = along, u, v
+        return tuple(p)
+
+    def outward(u, v):
+        return point(0.0, u-cu, v-cv)
+
     solid = Solid(mesh, faces, what)
     ring = []
     for i in range(count):
         angle = twist+2*math.pi*i/count
-        ring.append((cz+radius*math.sin(angle), cy+radius*math.cos(angle)))
+        ring.append((cu+radius*math.cos(angle), cv+radius*math.sin(angle)))
     arc = 2*math.pi*radius/count
     for i in range(count):
-        (z0, y0), (z1, y1) = ring[i], ring[(i+1)%count]
-        outward = ((z0+z1)/2-cz, (y0+y1)/2-cy)
-        solid.quad([(x0, y0, z0), (x0, y1, z1), (x1, y1, z1), (x1, y0, z0)],
-                   uv_rect(side, x1-x0, arc),
-                   (0, outward[1], outward[0]), side)
+        (u0, v0), (u1, v1) = ring[i], ring[(i+1)%count]
+        solid.quad([point(a0, u0, v0), point(a0, u1, v1),
+                    point(a1, u1, v1), point(a1, u0, v0)],
+                   uv_rect(side, a1-a0, arc),
+                   outward((u0+u1)/2, (v0+v1)/2), side)
     # The caps, radially mapped so the hub's art lands square on the wheel.
     rx, ry, rw, rh = REGIONS[cap]
     hub = (rx+rw/2, ry+rh/2)
 
-    def cap_uv(z, y):
-        return hub[0]+(z-cz), hub[1]+(y-cy)
+    def cap_uv(u, v):
+        return hub[0]+(v-cv), hub[1]+(u-cu)
 
+    ahead = point(1.0, 0.0, 0.0)
+    behind = point(-1.0, 0.0, 0.0)
     for i in range(0, count-2, 2):
         a, b, c, d = ring[0], ring[i+1], ring[i+2], ring[(i+3)%count]
-        solid.quad([(x1, a[1], a[0]), (x1, b[1], b[0]), (x1, c[1], c[0]),
-                    (x1, d[1], d[0])],
-                   [cap_uv(*p) for p in (a, b, c, d)], (1, 0, 0), cap)
-        solid.quad([(x0, d[1], d[0]), (x0, c[1], c[0]), (x0, b[1], b[0]),
-                    (x0, a[1], a[0])],
-                   [cap_uv(*p) for p in (d, c, b, a)], (-1, 0, 0), cap)
+        solid.quad([point(a1, *a), point(a1, *b), point(a1, *c), point(a1, *d)],
+                   [cap_uv(*p) for p in (a, b, c, d)], ahead, cap)
+        solid.quad([point(a0, *d), point(a0, *c), point(a0, *b), point(a0, *a)],
+                   [cap_uv(*p) for p in (d, c, b, a)], behind, cap)
     return solid.finish()
+
+
+class Beam:
+    """
+    A tapered beam, and the question every detail bolted to one has to ask it.
+
+    **This is the anchoring fix.**  The boom and the stick are frusta: 8 units across at
+    the head and 10 at the foot for the boom, 5.5 and 7 for the stick.  Everything bolted
+    to them -- the pins, the hose run -- was placed against the *nominal* half width, the
+    number in the widest cross-section, because that is the number written in the call that
+    builds the beam.  Anywhere the beam is narrower than that, and that is everywhere but
+    one end of it, the detail hangs that far off the steel.
+
+    So a detail asks for the surface *over the span it actually covers* and puts itself
+    that far out, and check_anchoring measures the answer back off the finished mesh.  The
+    span matters: a boss is a disc, it covers a stretch of the beam rather than a station
+    on it, and the taper means the widest point of that stretch is the one it has to clear.
+    """
+
+    def __init__(self, z0, z1, rect0, rect1):
+        self.z0, self.z1 = z0, z1
+        self.rect0, self.rect1 = rect0, rect1
+
+    def rect(self, z):
+        """The cross-section at z, as (x0, y0, x1, y1), clamped to the beam's own ends."""
+        t = (min(max(z, self.z0), self.z1)-self.z0)/(self.z1-self.z0)
+        return tuple(a+(b-a)*t for a, b in zip(self.rect0, self.rect1))
+
+    def _span(self, za, zb, index, sign):
+        if zb is None:
+            zb = za
+        za, zb = min(za, zb), max(za, zb)
+        if zb < self.z0 or za > self.z1:
+            raise SystemExit("a detail over z %g..%g is not on a beam that runs %g..%g"
+                             % (za, zb, self.z0, self.z1))
+        #  Linear in z, so the extreme over a span is at one end of it.
+        return max(sign*self.rect(z)[index] for z in (za, zb))
+
+    def half_width(self, za, zb=None):
+        """The half width of the widest cross-section over a span: what a boss must clear."""
+        return self._span(za, zb, 2, 1)
+
+    def lies_along(self, above, z0, z1, radius, sink):
+        """Where the axis of a ram lying along this beam goes.
+
+        A ram is a straight round thing on a surface that tapers away under it, so it can
+        only be bedded into the *shallowest* end of what it lies on; sunk to there, it is
+        sunk further everywhere else and there is no length of it standing off the steel.
+        """
+        edges = [self.rect(z)[1 if above else 3] for z in (z0, z1)]
+        return max(edges)+sink-radius if above else min(edges)-sink+radius
+
+    def build(self, mesh, faces, what, regions):
+        return add_frustum(mesh, faces, what, self.z0, self.z1, self.rect0, self.rect1,
+                           regions)
+
+
+#  The two beams of the arm.  Their cross-sections are the geometry; BOOM_LENGTH and
+#  STICK_LENGTH are the kinematics, and the two agree here and nowhere else.
+BOOM = Beam(-BOOM_LENGTH, 2, (-3.5, -4.0, 3.5, 4.0), (-4.5, -5.0, 4.5, 5.0))
+STICK = Beam(-STICK_LENGTH, 2, (-2.75, -3.0, 2.75, 3.0), (-3.5, -4.0, 3.5, 4.0))
 
 
 # ---------------------------------------------------------------------------
@@ -652,10 +811,13 @@ def build_undercarriage(mesh):
     # that is two same-facing faces in one plane.  See RELIEF.  The ring loses the tenth
     # rather than the counterweight gaining one, because the counterweight's width is part
     # of the silhouette and the ring is mostly hidden under the house.
+    #
+    # There was a second, narrower collar inside this one.  It was entirely inside it --
+    # a ten-unit disc 2.5 above the centre of a thirteen-unit one, which is 12.5 from the
+    # middle against a facet 12.56 out -- so it was twenty-two faces drawn every frame
+    # inside another solid, and check_anchoring says so now.
     volume += add_cylinder(mesh, faces, "slew ring", -13+RELIEF, 13-RELIEF, 0, -11.5, 13,
-                           12, "plate", "plate", twist=math.pi/12)
-    volume += add_cylinder(mesh, faces, "slew collar", -10, 10, 0, -14.0, 10, 12,
-                           "plate", "plate", twist=math.pi/12)
+                           12, "plate", "boss", twist=math.pi/12)
 
     # A track frame per side: the beam the wheels hang off, inside the belt loop.
     for sign in (-1, 1):
@@ -692,7 +854,7 @@ def build_tracks(mesh):
     for side, sign in (("left", 1), ("right", -1)):
         faces = mesh.group("track_"+side)
         x0, x1 = sorted((sign*TRACK_X0, sign*TRACK_X1))
-        volume += add_belt(mesh, faces, "belt "+side, x0, x1)
+        volume += add_belt(mesh, faces, "belt", x0, x1)
         for index, (z, y, radius, half) in enumerate(WHEELS):
             wheel = mesh.group("wheel_%s_%d"%(side, index))
             # Authored about the axle, because the renderer spins it about the axle.
@@ -734,13 +896,34 @@ def build_house(mesh):
                       {"+x": "cowl", "-x": "cowl", "+z": "vent", "-z": "cowl",
                        "-y": "yellow", "+y": "steel_dark"})
     # The grating over it: a real machine's radiator breathes upwards.
-    volume += add_box(mesh, faces, "radiator grating", (-12, -15, 0, -2, -14, 10),
+    volume += add_box(mesh, faces, "radiator grating", (-8, -15, 1, -2, -14, 9),
                       sides("vent", top="grille", bottom="steel_dark"))
-    # The front deck, lower, so the boom and its ram are not buried in bodywork.
-    volume += add_box(mesh, faces, "front deck", (-14, -9, -18, 0, -3, -2),
+    # The front deck, lower, so the boom and its ram are not buried in bodywork.  Its
+    # inboard edge runs RELIEF into the cab's base rather than stopping flush against it:
+    # the boom's foot pin, which stands BOSS_PROUD out of ears that are themselves 4.5
+    # either side of the pivot, puts its face on exactly the plane those two would have
+    # shared, and three surfaces in one plane at the busiest joint on the machine is the
+    # flicker this generator refuses to write.
+    volume += add_box(mesh, faces, "front deck", (-14, -9, -18, RELIEF, -3, -2),
                       sides("yellow", top="walkway", bottom="yellow_dark"))
     # A toolbox filling the corner behind the cab.
     volume += add_box(mesh, faces, "toolbox", (1, -9, 5, 14, -3, 12),
+                      sides("yellow", top="walkway", bottom="yellow_dark"))
+    # The block the cab stands on: tanks and pumps on a real machine, and the reason the
+    # operator sits where CrawlerGeometry says they do.
+    #
+    # **Without it the whole cab floated.**  CAB_FLOOR is 30 units above the ground and the
+    # deck it is meant to stand on is 17, and nothing at all filled the thirteen units
+    # between them on the cab's side of the machine -- the nearest steel was the engine
+    # cowl, a unit away across a gap you could see the sky through.  Eighteen solids, the
+    # entire cab, hanging in the air; the second thing the report "floating parts of the
+    # model" was about.  It runs to the cowl's face at x=0 so that the two read as one
+    # superstructure rather than as two blocks with a slot between them.
+    # Its foot goes RELIEF into the deck slab, as the boom's ears and the rail posts do:
+    # level with it, its underside and the front deck's are one plane facing one way over
+    # the strip the two share.
+    volume += add_box(mesh, faces, "cab base",
+                      (0, DECK_TOP, CAB_Z0, CAB_X1, -3+RELIEF, 5),
                       sides("yellow", top="walkway", bottom="yellow_dark"))
 
     # The ears the boom is pinned between, straddling the pivot.  Their feet go RELIEF
@@ -752,11 +935,16 @@ def build_house(mesh):
                               (x0, -13, x1, -3+RELIEF), (x0, -13, x1, -3+RELIEF),
                               sides("plate", bottom="steel_dark"))
 
-    # The exhaust stack and its rain cap.
-    volume += add_cylinder(mesh, faces, "exhaust", -10, -6, 4, -20, 2, 8,
-                           "steel", "steel_dark")
-    volume += add_cylinder(mesh, faces, "exhaust cap", -10.5, -5.5, 4, -21, 2.6, 8,
-                           "steel_dark", "steel_dark")
+    # The exhaust stack and its rain cap, standing *up* out of the cowl.
+    #
+    # It used to lie across the machine four units above the cowl's roof, touching nothing:
+    # a drum and a lid floating over the engine, because the only prism this generator could
+    # build ran across the machine and a stack that runs across the machine is not a stack.
+    # Its foot is a unit inside the cowl, which is where a pipe out of an engine begins.
+    volume += add_tube(mesh, faces, "exhaust", "y", -24.0, -13.0, 6.5, -10.5, 1.4, 8,
+                       "steel", "steel_dark")
+    volume += add_tube(mesh, faces, "exhaust cap", "y", -25.4, -23.4, 6.5, -10.5, 2.0, 8,
+                       "steel_dark", "steel_dark")
 
     volume += build_cab(mesh, faces, glass)
     volume += build_handrails(mesh, faces)
@@ -832,41 +1020,52 @@ def build_cab(mesh, faces, glass):
     volume += add_box(mesh, faces, "work light", (10, CAB_TOP+0.5, CAB_Z0-1.5, 13,
                                                   CAB_TOP+2.5, CAB_Z0-0.5),
                       sides("lamp", ends="steel_dark"))
-    # A beacon, because everything on a site has one.
-    volume += add_cylinder(mesh, faces, "beacon", 7, 9, CAB_Z1-2, CAB_TOP-1, 1.2, 8,
-                           "lamp", "steel_dark")
+    # A beacon, because everything on a site has one.  Upright, and its foot inside the
+    # roof it is bolted to rather than resting on the skin of it.
+    volume += add_tube(mesh, faces, "beacon", "y", CAB_TOP-2.5, CAB_TOP+0.5, CAB_Z1-2, 8,
+                       1.1, 8, "lamp", "steel_dark")
     return volume
 
 
 def build_handrails(mesh, faces):
-    """The rails round the deck.  Small, and they do more for the silhouette than the
-    counterweight does: they are the only thin thing on an otherwise slab-sided machine."""
+    """
+    The rails round the deck.  Small, and they do more for the silhouette than the
+    counterweight does: they are the only thin thing on an otherwise slab-sided machine.
+
+    **Each rail stands on the deck it guards, not on the deck slab far below it.**  Both
+    were built six units tall from the slab at y=-3, which put the front pair two thirds
+    buried in the front deck and the rear pair -- bar and all -- entirely inside the engine
+    cowl, six units of steel drawn every frame inside a box nobody can see into.  They
+    start from whatever they actually stand on now, which is what makes them visible and
+    what makes them read as the walkway edge rather than as posts growing out of bodywork.
+    """
     volume = 0.0
-    rail_y = -12.0
 
-    def post(z):
-        #  The foot goes RELIEF into the deck.  Level with it -- which is how these were
-        #  built -- the post's underside and the underside of whatever else stands on that
-        #  patch of deck (the cowl, the front deck) are one plane facing one way, and that
-        #  is half of the flickering reported down the machine's right-hand flank.
-        return add_box(mesh, faces, "rail post",
-                       (-13.5, rail_y, z, -12.5, -3+RELIEF, z+1), "plate")
+    def post(name, z, floor, height):
+        #  The foot goes RELIEF into the deck it stands on.  Level with it -- which is how
+        #  these were built -- the post's underside and the underside of whatever else
+        #  stands on that patch of deck are one plane facing one way, and that is half of
+        #  the flickering reported down the machine's right-hand flank.
+        return add_box(mesh, faces, name+" rail post",
+                       (-13.5, floor-height, z, -12.5, floor+RELIEF, z+1), "plate")
 
-    def rail(z0, z1):
+    def rail(name, z0, z1, floor, height):
         #  And the bar stands RELIEF proud of its posts on every side.  Flush, it shared
         #  four planes with each post it crosses -- both flanks, the top, and the end --
         #  which is the other half of it.  A handrail is welded to the outside of its
         #  stanchions in any case; this is what that looks like.
-        return add_box(mesh, faces, "rail",
-                       (-13.5-RELIEF, rail_y-RELIEF, z0-RELIEF,
-                        -12.5+RELIEF, rail_y+1, z1+RELIEF), "plate")
+        top = floor-height
+        return add_box(mesh, faces, name+" rail",
+                       (-13.5-RELIEF, top-RELIEF, z0-RELIEF,
+                        -12.5+RELIEF, top+1, z1+RELIEF), "plate")
 
+    #  The front pair stand on the front deck, the rear pair on the roof of the cowl.
     for z in (-16, -6):
-        volume += post(z)
-    volume += rail(-16, -5)
+        volume += post("front", z, -9, 6)
+    volume += rail("front", -16, -5, -9, 6)
     for z in (2, 10):
-        volume += post(z)
-    volume += rail(2, 11)
+        volume += post("rear", z, DECK_TOP, 6)
+    volume += rail("rear", 2, 11, DECK_TOP, 6)
     # A step up onto the deck, on the cab's side, where the door is.
     volume += add_box(mesh, faces, "step", (14, -2, -12, 16, -1, -6),
                       sides("walkway", bottom="steel_dark"))
@@ -886,38 +1085,64 @@ def build_boom(mesh):
     following the centreline of each section in turn.  A curved "banana" boom looks
     better standing still and would put the visible steel a couple of units off the
     boxes that decide what the machine can hit, everywhere except at the two pins.
+
+    **Two discs on this section, not five.**  The arm had a boss at each pin and then a
+    drum for each ram and each ram rod besides -- nine round faces down its length, all of
+    them the same dark plate, and from ten blocks away a playtester read the lot as
+    barnacles rather than as machinery.  A disc is now what a *pin* looks like and nothing
+    else does: the rams lie along the beam as rams, which is both what they are and the
+    one shape on an arm that cannot be mistaken for a joint.
     """
     faces = mesh.group("boom")
     volume = 0.0
-    volume += add_frustum(mesh, faces, "boom beam", -BOOM_LENGTH, 2,
-                          (-3.5, -4.0, 3.5, 4.0), (-4.5, -5.0, 4.5, 5.0),
-                          sides("yellow", top="yellow", bottom="yellow_dark"))
-    # The pin at each end, wider than the beam so the joint reads as pinned rather
-    # than as two boxes that happen to touch.
-    volume += add_cylinder(mesh, faces, "boom foot pin", -5.5, 5.5, 0, 0, 4.5, 12,
-                           "plate", "plate")
-    volume += add_cylinder(mesh, faces, "boom head pin", -4.5, 4.5, -BOOM_LENGTH, 0,
-                           3.5, 12, "plate", "plate")
-    # The ram that folds the stick, lying along the top of the boom.
-    volume += add_cylinder(mesh, faces, "stick ram", -2.5, 2.5, -8, -6.5, 2.5, 8,
-                           "steel", "steel_dark")
-    volume += add_cylinder(mesh, faces, "stick ram rod", -1.6, 1.6, -19, -6.5, 1.4, 8,
-                           "plate", "plate")
+    volume += BOOM.build(mesh, faces, "boom beam",
+                         sides("yellow", top="yellow", bottom="yellow_dark"))
+    # The pin at each end, standing BOSS_PROUD out of the beam *as it is where the pin is*.
+    volume += add_cylinder(mesh, faces, "boom foot pin",
+                           -pin_half(BOOM, 0, 4.5), pin_half(BOOM, 0, 4.5), 0, 0,
+                           4.5, 12, "plate", "boss")
+    volume += add_cylinder(mesh, faces, "boom head pin",
+                           -pin_half(BOOM, -BOOM_LENGTH, 3.5),
+                           pin_half(BOOM, -BOOM_LENGTH, 3.5), -BOOM_LENGTH, 0,
+                           3.5, 12, "plate", "boss")
+    # The ram that folds the stick: a body pinned to the anchor on the boom's back and a
+    # rod out of it towards the knuckle, both lying *along* the boom rather than across it.
     volume += add_box(mesh, faces, "ram anchor", (-3, -8, -4, 3, -3, 0), "plate")
-    # And the boom's own ram, under it, anchored on the foot.
-    volume += add_cylinder(mesh, faces, "boom ram", -2.2, 2.2, -10, 6.0, 2.2, 8,
-                           "steel", "steel_dark")
-    volume += add_box(mesh, faces, "hose run", (-4.6, -5.5, -22, -3.8, -1.5, -2),
-                      "steel_dark")
+    ram = BOOM.lies_along(True, -14, -4, 2.0, 0.8)
+    volume += add_tube(mesh, faces, "stick ram", "z", -14, -4, 0, ram, 2.0, 8,
+                       "steel", "steel_dark")
+    volume += add_tube(mesh, faces, "stick ram rod", "z", -21, -13.5, 0, ram, 1.1, 8,
+                       "plate", "steel_dark")
+    # And the boom's own ram, bedded into the underside near the foot, where the pair of
+    # cylinders that lift a real boom are pinned.
+    volume += add_tube(mesh, faces, "boom ram", "z", -12, -1, 0,
+                       BOOM.lies_along(False, -12, -1, 2.2, 0.8), 2.2, 8,
+                       "steel", "steel_dark")
+    # The hydraulic run down the flank, which follows the taper rather than crossing it:
+    # a straight box lifts off the steel as the beam narrows under it.
+    volume += add_hose_run(mesh, faces, "hose run", BOOM, -22, -2, -2.5, 0.5, 0.8)
     return volume
+
+
+def pin_half(beam, z, radius):
+    """How far out a pin of that radius, pinned there, reaches: the boss's own half length."""
+    return beam.half_width(z-radius, z+radius)+BOSS_PROUD
+
+
+def add_hose_run(mesh, faces, what, beam, z0, z1, y0, y1, thickness):
+    """A bundle of hose down a beam's -x flank, following it as it tapers."""
+    def rect(z):
+        surface = beam.half_width(z)
+        return -surface-thickness, y0, -surface+thickness/2, y1
+
+    return add_frustum(mesh, faces, what, z0, z1, rect(z0), rect(z1), "steel_dark")
 
 
 def build_stick(mesh):
     """The stick, and the linkage the tool hangs off."""
     faces = mesh.group("stick")
     volume = 0.0
-    volume += add_frustum(mesh, faces, "stick beam", -STICK_LENGTH, 2,
-                          (-2.75, -3.0, 2.75, 3.0), (-3.5, -4.0, 3.5, 4.0),
+    volume += STICK.build(mesh, faces, "stick beam",
                           sides("yellow", top="yellow", bottom="yellow_dark"))
     # The eye the stick turns on, RELIEF larger than the boom's head pin it turns *on*.
     #
@@ -927,18 +1152,38 @@ def build_stick(mesh):
     # reported at the boom-stick knuckle.  Larger rather than smaller: smaller would put
     # this eye entirely inside the boom's pin, drawing twenty-two faces nobody can ever
     # see, and a boss around a pin is the larger of the two on a real machine anyway.
-    volume += add_cylinder(mesh, faces, "stick foot pin", -4.0, 4.0, 0, 0, 3.5+RELIEF, 12,
-                           "plate", "plate")
-    volume += add_cylinder(mesh, faces, "stick head pin", -3.0, 3.0, -STICK_LENGTH, 0,
-                           2.6, 12, "plate", "plate")
-    # The tool's ram, on top, and the two link plates down to the pin.
-    volume += add_cylinder(mesh, faces, "tool ram", -2.0, 2.0, -5, -5.5, 2.0, 8,
-                           "steel", "steel_dark")
-    volume += add_cylinder(mesh, faces, "tool ram rod", -1.3, 1.3, -14, -5.5, 1.1, 8,
-                           "plate", "plate")
+    volume += add_cylinder(mesh, faces, "stick foot pin",
+                           -pin_half(STICK, 0, 3.5+RELIEF),
+                           pin_half(STICK, 0, 3.5+RELIEF), 0, 0, 3.5+RELIEF, 12,
+                           "plate", "boss")
+    volume += add_cylinder(mesh, faces, "stick head pin",
+                           -pin_half(STICK, -STICK_LENGTH, 2.6),
+                           pin_half(STICK, -STICK_LENGTH, 2.6), -STICK_LENGTH, 0,
+                           2.6, 12, "plate", "boss")
+    # The tool's ram, lying along the stick's back, and the two link plates down to the pin.
+    ram = STICK.lies_along(True, -12, -3, 1.8, 0.8)
+    volume += add_tube(mesh, faces, "tool ram", "z", -12, -3, 0, ram, 1.8, 8,
+                       "steel", "steel_dark")
+    volume += add_tube(mesh, faces, "tool ram rod", "z", -17, -11.5, 0, ram, 1.0, 8,
+                       "plate", "steel_dark")
     for x0, x1 in ((-3.2, -2.0), (2.0, 3.2)):
         volume += add_frustum(mesh, faces, "tool link", -STICK_LENGTH+1, -14,
                               (x0, -3.0, x1, 0.5), (x0, -6.0, x1, -3.0), "plate")
+    return volume
+
+
+# The ears every attachment hangs off, and the pin through them.  All three tools carry
+# the same one -- they hang off the same stick -- so it is built once; the names differ
+# only because a group's parts are named after the group in the anchoring table.
+TOOL_MOUNT = (-4, -4, -3, 4, 2, 1)
+TOOL_MOUNT_HALF = TOOL_MOUNT[3]
+
+
+def add_tool_mount(mesh, faces, tool):
+    volume = add_box(mesh, faces, tool+" mount", TOOL_MOUNT, "plate")
+    volume += add_cylinder(mesh, faces, tool+" pin",
+                           -TOOL_MOUNT_HALF-BOSS_PROUD, TOOL_MOUNT_HALF+BOSS_PROUD,
+                           0, 0, 2.4, 8, "plate", "boss")
     return volume
 
 
@@ -952,10 +1197,7 @@ def build_bucket(mesh):
     """
     faces = mesh.group("tool_bucket")
     volume = 0.0
-    # The mount: the ears the pin goes through, and the boss on it.
-    volume += add_box(mesh, faces, "bucket mount", (-4, -4, -3, 4, 2, 1), "plate")
-    volume += add_cylinder(mesh, faces, "bucket pin", -4.5, 4.5, 0, 0, 2.4, 8,
-                           "plate", "plate")
+    volume += add_tool_mount(mesh, faces, "bucket")
     # The back, in four slabs that between them curve away from the mouth and back to
     # the lip.  A curve at this scale is three straight bits and a decision.
     # z, half width, and the two y edges of the slab at that z.
@@ -988,17 +1230,24 @@ def build_bucket(mesh):
 
 
 def build_breaker(mesh):
-    """The hydraulic breaker: a housing, a barrel and a chisel."""
+    """
+    The hydraulic breaker: a housing, a barrel and a chisel, in a line down the tool.
+
+    **The barrel used to hang in mid-air beside the housing.**  It was built with the only
+    primitive there was, a prism across the machine, and given the tool's centreline as its
+    *height* instead of its length: a drum three and a half units below the mount and four
+    off the nearest steel, which is the part a playtester saw floating detached beside the
+    bucket end of the arm.  It runs along the tool now, out of the housing and into the
+    chisel, which is where a breaker's barrel is.
+    """
     faces = mesh.group("tool_breaker")
     volume = 0.0
-    volume += add_box(mesh, faces, "breaker mount", (-4, -4, -3, 4, 2, 1), "plate")
-    volume += add_cylinder(mesh, faces, "breaker pin", -4.5, 4.5, 0, 0, 2.4, 8,
-                           "plate", "plate")
+    volume += add_tool_mount(mesh, faces, "breaker")
     volume += add_frustum(mesh, faces, "breaker housing", -9, -1,
                           (-4.5, -5.0, 4.5, 5.0), (-5.0, -5.5, 5.0, 5.5),
                           sides("yellow", top="yellow", bottom="yellow_dark"))
-    volume += add_cylinder(mesh, faces, "breaker barrel", -3.5, 3.5, 0, -12.5, 3.5, 12,
-                           "steel", "steel_dark")
+    volume += add_tube(mesh, faces, "breaker barrel", "z", -12.5, -8.5, 0, 0, 3.2, 12,
+                       "steel", "steel_dark")
     volume += add_frustum(mesh, faces, "chisel", -17, -12,
                           (-1.0, -1.0, 1.0, 1.0), (-2.2, -2.2, 2.2, 2.2),
                           sides("edge", top="edge", bottom="edge"))
@@ -1009,9 +1258,7 @@ def build_grapple(mesh):
     """The grapple: a rotator and two jaws, held a little open."""
     faces = mesh.group("tool_grapple")
     volume = 0.0
-    volume += add_box(mesh, faces, "grapple mount", (-4, -4, -3, 4, 2, 1), "plate")
-    volume += add_cylinder(mesh, faces, "grapple pin", -4.5, 4.5, 0, 0, 2.4, 8,
-                           "plate", "plate")
+    volume += add_tool_mount(mesh, faces, "grapple")
     # The rotator, a shade narrower than the stick's head pin it hangs behind.  At the
     # same width its end discs and the pin's were in the same two planes and overlapped --
     # the two are only 4.5 apart and together they are 5.6 across -- and the pair survived
@@ -1195,6 +1442,371 @@ def check_coplanar(mesh):
     return len(quads)
 
 
+# ---------------------------------------------------------------------------
+# Anchoring
+#
+# **The check that would have caught the floating discs.**  A playtester's second report
+# on this machine was "floating parts of the model", and it was four separate things:
+#
+#   * the whole cab, eighteen solids of it, hanging eleven units above the deck it is
+#     meant to stand on, because nothing had ever been built to fill the space between;
+#   * the exhaust stack and its cap, four units over the engine cowl;
+#   * the stick's and the tool's ram rods, a unit off the beams they run along, because
+#     they were drums lying across the arm rather than rods running down it;
+#   * the breaker's barrel, hanging beside its housing rather than out of it.
+#
+# And, everywhere else, a subtler version of the same thing: a boss sized against the
+# *nominal* half width of a tapered beam stands proud of it by a whole unit wherever the
+# beam is narrower than its widest cross-section, which at ten blocks is a disc hovering
+# beside the arm rather than a pin through it.
+#
+# None of it is an error anything reports.  A part with nothing under it draws perfectly.
+#
+# So every solid on the machine says what holds it up, and this checks that the answer is
+# true of the mesh that was actually written:
+#
+#   * **it touches its parent.**  Two convex solids are separated by the largest gap any
+#     of their face normals or edge-pair normals can find, which for convex shapes is the
+#     distance between them; anything above a hundredth of a unit is air you can see.
+#   * **it stands out of its parent by exactly what it says it does.**  Measured, not
+#     assumed: rays cast from the part's own outer face back into the parent's solid, at a
+#     quarter-unit pitch, and the *smallest* distance any of them finds is the protrusion
+#     where the parent is closest.  On a tapered beam that is the widest station under the
+#     part, which is the number a boss has to be built against and the one that was wrong.
+#   * **it is not buried.**  A part entirely inside another solid is drawn every frame and
+#     never seen; the machine had a handrail, posts and bar, inside the engine cowl.
+#
+# Two honest limits.  Solids are treated as their convex hulls, which is exact for every
+# primitive here except the belt loop, and errs towards saying nothing rather than towards
+# a false alarm.  And it is all measured in the rest pose, for the reason check_coplanar
+# gives: joints turn about their pins, so what is seated at rest stays seated.
+# ---------------------------------------------------------------------------
+CONTACT_TOL = 0.01          # air thinner than this is a rounding error, not a gap
+PROUD_TOL = 0.05            # how far a measured protrusion may miss what it claims
+SAMPLE_PITCH = 0.25         # how finely an outer face is sampled to find its parent
+FACING = 0.95               # how squarely a face must point a way to be measured that way
+
+
+class Mount:
+    """What holds one solid up, and how far it stands out of it."""
+
+    def __init__(self, parents, faces=(), proud=0.0):
+        self.parents = (parents,) if isinstance(parents, str) else tuple(parents)
+        self.faces = (faces,) if isinstance(faces, str) else tuple(faces)
+        self.proud = proud
+
+
+#  Groups that never move relative to one another, and may therefore hold each other up.
+#  Everything else is checked against its own group only: the boom's pins are on the boom
+#  whatever angle it is at, but the boom against the cowl is true at one angle and false
+#  at the next, and a check that believed otherwise would be checking the rest pose rather
+#  than the machine.  A wheel counts as part of the chassis because it is round about the
+#  axle it spins on, so its surface is where it is at every angle.
+def frame_of(group):
+    if group in ("undercarriage", "track_left", "track_right") or group.startswith("wheel_"):
+        return "chassis"
+    if group in ("house", "house_glass"):
+        return "house"
+    return group
+
+
+#  The pieces that are not attached to anything: each is the thing its own group is built
+#  around, and the renderer's transform is what holds it up.
+ROOTS = {("undercarriage", "belly"), ("track_left", "belt"), ("track_right", "belt"),
+         ("house", "deck"), ("boom", "boom beam"), ("stick", "stick beam"),
+         ("tool_bucket", "bucket mount"), ("tool_breaker", "breaker mount"),
+         ("tool_grapple", "grapple mount")}
+ROOTS.update((("wheel_%s_%d"%(side, i), "wheel %s %d"%(side, i))
+              for side in ("left", "right") for i in range(len(WHEELS))))
+
+#  Everything else, and what it is bolted to.  Named by (group, part name), so the five
+#  bucket teeth are one row and both track guards are one row -- parts built in a loop are
+#  bolted to the same thing in the same way, which is why they are built in a loop.
+ATTACHMENTS = {
+    ("undercarriage", "cross member"): Mount("belly"),
+    ("undercarriage", "slew ring"): Mount("belly"),
+    ("undercarriage", "track frame"): Mount("cross member"),
+    #  The guard is over the top run of the belt and rests on it; the frame it is bolted
+    #  to is two units below, which is what makes it a mudguard and not a lid.
+    ("undercarriage", "track guard"): Mount("belt"),
+    ("undercarriage", "tensioner"): Mount("track frame", ("+x", "-x"), RELIEF),
+
+    ("house", "counterweight"): Mount("deck"),
+    ("house", "counterweight shoulder"): Mount("counterweight"),
+    ("house", "engine cowl"): Mount("deck"),
+    ("house", "radiator grating"): Mount("engine cowl"),
+    ("house", "front deck"): Mount("deck"),
+    ("house", "toolbox"): Mount("deck"),
+    ("house", "cab base"): Mount("deck"),
+    ("house", "boom ear"): Mount("deck"),
+    ("house", "exhaust"): Mount("engine cowl"),
+    ("house", "exhaust cap"): Mount("exhaust"),
+    ("house", "cab floor"): Mount("cab base"),
+    ("house", "cab post"): Mount("cab floor"),
+    ("house", "cab roof"): Mount("cab post"),
+    ("house", "cab back"): Mount("cab post"),
+    ("house", "cab inner wall"): Mount("cab floor"),
+    ("house", "door panel"): Mount("cab post"),
+    ("house", "door handle"): Mount("door panel", "+x", 0.6),
+    ("house", "seat"): Mount("cab floor"),
+    ("house", "seat back"): Mount("seat"),
+    ("house", "work light"): Mount("cab roof"),
+    ("house", "beacon"): Mount("cab roof"),
+    ("house", "front rail post"): Mount("front deck"),
+    ("house", "front rail"): Mount("front rail post", "-x", RELIEF),
+    ("house", "rear rail post"): Mount("engine cowl"),
+    ("house", "rear rail"): Mount("rear rail post", "-x", RELIEF),
+    ("house", "step"): Mount("deck", "+x", 2.0),
+    ("house", "nameplate"): Mount("engine cowl", "-x", 0.4),
+
+    ("house_glass", "windscreen"): Mount("cab post"),
+    ("house_glass", "door glass"): Mount("cab post"),
+    ("house_glass", "cab inner glass"): Mount("cab inner wall"),
+
+    ("boom", "boom foot pin"): Mount("boom beam", ("+x", "-x"), BOSS_PROUD),
+    ("boom", "boom head pin"): Mount("boom beam", ("+x", "-x"), BOSS_PROUD),
+    ("boom", "ram anchor"): Mount("boom beam"),
+    ("boom", "stick ram"): Mount(("ram anchor", "boom beam")),
+    ("boom", "stick ram rod"): Mount("stick ram"),
+    ("boom", "boom ram"): Mount("boom beam"),
+    ("boom", "hose run"): Mount("boom beam", "-x", 0.8),
+
+    ("stick", "stick foot pin"): Mount("stick beam", ("+x", "-x"), BOSS_PROUD),
+    ("stick", "stick head pin"): Mount("stick beam", ("+x", "-x"), BOSS_PROUD),
+    ("stick", "tool ram"): Mount("stick beam"),
+    ("stick", "tool ram rod"): Mount("tool ram"),
+    ("stick", "tool link"): Mount("stick beam"),
+
+    ("tool_bucket", "bucket pin"): Mount("bucket mount", ("+x", "-x"), BOSS_PROUD),
+    #  The shell is slabs that chain to one another, so it names itself as well as the
+    #  mount the first slab hangs off.
+    ("tool_bucket", "bucket back"): Mount(("bucket mount", "bucket back")),
+    ("tool_bucket", "bucket side"): Mount("bucket back", ("+x", "-x"), RELIEF),
+    ("tool_bucket", "bucket lip"): Mount(("bucket back", "bucket side")),
+    ("tool_bucket", "bucket tooth"): Mount("bucket lip"),
+
+    ("tool_breaker", "breaker pin"): Mount("breaker mount", ("+x", "-x"), BOSS_PROUD),
+    ("tool_breaker", "breaker housing"): Mount("breaker mount"),
+    ("tool_breaker", "breaker barrel"): Mount("breaker housing"),
+    ("tool_breaker", "chisel"): Mount("breaker barrel"),
+
+    ("tool_grapple", "grapple pin"): Mount("grapple mount", ("+x", "-x"), BOSS_PROUD),
+    ("tool_grapple", "rotator"): Mount("grapple mount"),
+    ("tool_grapple", "jaw beam"): Mount("rotator"),
+    ("tool_grapple", "jaw"): Mount("jaw beam"),
+    ("tool_grapple", "jaw tip"): Mount("jaw"),
+}
+
+
+class Piece:
+    """One solid of the finished machine, placed where the renderer draws it."""
+
+    def __init__(self, group, what, polygons):
+        self.group = group
+        self.what = what
+        ox, oy, oz = rest_pose(group)
+        self.polygons = [[(p[0]+ox, p[1]+oy, p[2]+oz) for p in poly] for poly in polygons]
+        self.vertices = sorted({tuple(round(c, 5) for c in p)
+                                for poly in self.polygons for p in poly})
+        self.planes = []            # (unit normal, offset): the solid is n.p <= c
+        self.normals = []           # the same normals, one per direction
+        self.edges = []
+        for poly in self.polygons:
+            unit = normalise(newell(poly))
+            if unit is None:
+                continue
+            self.planes.append((unit, dot(unit, poly[0])))
+            if not any(dot(unit, other) > 1-PARALLEL_TOL for other in self.normals):
+                self.normals.append(unit)
+            for i, a in enumerate(poly):
+                b = poly[(i+1)%len(poly)]
+                edge = normalise((b[0]-a[0], b[1]-a[1], b[2]-a[2]))
+                if edge is not None and not any(abs(dot(edge, other)) > 1-PARALLEL_TOL
+                                                for other in self.edges):
+                    self.edges.append(edge)
+
+    def name(self):
+        return "%s in %s"%(self.what, self.group)
+
+    def span(self, axis):
+        seen = [dot(axis, v) for v in self.vertices]
+        return min(seen), max(seen)
+
+    def contains(self, other):
+        """Whether every corner of `other` is inside this solid: steel nobody can see."""
+        return all(dot(n, v) <= c+CONTACT_TOL for n, c in self.planes
+                   for v in other.vertices)
+
+    def entry(self, origin, direction):
+        """How far along `direction` from `origin` this solid's surface is, or None.
+
+        Ahead of the origin only.  A ray cast off the machine's left flank towards its
+        middle passes out the other side and would otherwise "find" the right-hand track
+        frame thirty-six units behind it, and a face that starts *inside* the solid it is
+        being measured against -- the inboard face of one of a mirrored pair, which is the
+        other one's outboard face -- has no protrusion to report rather than a negative one.
+        """
+        near, far = -1e9, 1e9
+        for normal, offset in self.planes:
+            along = dot(normal, direction)
+            outside = dot(normal, origin)-offset
+            if abs(along) < 1e-9:
+                if outside > TOUCH_TOL:
+                    return None
+                continue
+            hit = -outside/along
+            if along > 0:
+                far = min(far, hit)
+            else:
+                near = max(near, hit)
+        return near if -TOUCH_TOL <= near <= far else None
+
+    def faces_towards(self, direction):
+        """The polygons of this solid that point the way asked: its outer face there.
+
+        Nearly, rather than exactly.  The hose run down the boom's flank is built on the
+        taper it follows, so its outer face leans by the same thirty-fifth the beam does,
+        and a face that has to be square to the axis to be measured is a face that cannot
+        follow the thing it is bolted to.
+        """
+        return [poly for poly in self.polygons
+                if dot(normalise(newell(poly)), direction) > FACING]
+
+
+def normalise(vector):
+    length = math.sqrt(dot(vector, vector))
+    if length < 1e-12:
+        return None
+    return vector[0]/length, vector[1]/length, vector[2]/length
+
+
+def separation(a, b):
+    """How far apart two convex solids are; zero or less if they meet.
+
+    The separating axis theorem, used for the distance rather than for the yes-or-no:
+    two convex bodies that miss each other do so along one of their face normals or along
+    the normal to one edge of each, so the largest gap those axes find is the gap.
+    """
+    worst = -1e9
+    axes = list(a.normals)+list(b.normals)
+    for edge in a.edges:
+        for other in b.edges:
+            axis = normalise(cross(edge, other))
+            if axis is not None:
+                axes.append(axis)
+    for axis in axes:
+        a0, a1 = a.span(axis)
+        b0, b1 = b.span(axis)
+        worst = max(worst, b0-a1, a0-b1)
+    return worst
+
+
+def cross(a, b):
+    return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+
+
+def face_samples(polygon, pitch):
+    """Points over a convex face: its corners, its edges, and a coarse fill inside it.
+
+    The corners alone are not enough.  A boss is a disc and the beam under it ends part
+    way across that disc, so the closest the parent's surface ever comes to the disc is at
+    a point on the disc's rim between two of its corners -- which is exactly the station
+    the boss has to be built against.  Walking the rim at a quarter of a unit finds it to
+    within a hundredth on any taper this machine has.
+    """
+    points = list(polygon)
+    for i, a in enumerate(polygon):
+        b = polygon[(i+1)%len(polygon)]
+        length = math.sqrt(sum((b[k]-a[k])**2 for k in range(3)))
+        for step in range(1, int(length/pitch)):
+            t = step*pitch/length
+            points.append(tuple(a[k]+(b[k]-a[k])*t for k in range(3)))
+    #  And a fan through the middle, in case the parent under the face is stepped rather
+    #  than flat and its nearest point is not on the boundary at all.
+    centre = tuple(sum(p[k] for p in polygon)/len(polygon) for k in range(3))
+    for corner in polygon:
+        for step in (0.25, 0.5, 0.75):
+            points.append(tuple(centre[k]+(corner[k]-centre[k])*step for k in range(3)))
+    return points
+
+
+def protrusion(piece, parents, direction):
+    """How far `piece` stands out of `parents` where they are closest, or None."""
+    axis = AXES[direction]
+    nearest = None
+    for polygon in piece.faces_towards(axis):
+        for point in face_samples(polygon, SAMPLE_PITCH):
+            inward = (-axis[0], -axis[1], -axis[2])
+            for parent in parents:
+                reach = parent.entry(point, inward)
+                if reach is not None and (nearest is None or reach < nearest):
+                    nearest = reach
+    return nearest
+
+
+def check_anchoring(mesh):
+    """Refuse to write a machine with a part floating off the thing it is bolted to."""
+    pieces = [Piece(group, what, polygons) for group, what, polygons in mesh.solids]
+    problems = []
+    checked = 0
+    for piece in pieces:
+        key = (piece.group, piece.what)
+        if key in ROOTS:
+            continue
+        if key not in ATTACHMENTS:
+            problems.append("%s says nothing about what holds it up; add it to "
+                            "ATTACHMENTS or to ROOTS"%piece.name())
+            continue
+        mount = ATTACHMENTS[key]
+        parents = [other for other in pieces if other is not piece
+                   and other.what in mount.parents
+                   and frame_of(other.group)==frame_of(piece.group)]
+        if not parents:
+            problems.append("%s is bolted to %s, and there is no such part in its frame"
+                            % (piece.name(), " or ".join(mount.parents)))
+            continue
+        checked += 1
+        gap = min(separation(piece, parent) for parent in parents)
+        if gap > CONTACT_TOL:
+            problems.append("%s stands %.3f units off %s -- it is a part floating in "
+                            "mid-air"%(piece.name(), gap, " or ".join(mount.parents)))
+            continue
+        #  A direction with nothing under it is not measured: one of a mirrored pair faces
+        #  the parent's far side, and only its outboard face is a face of the machine.  A
+        #  part with nothing under *any* of the faces it names is a different matter --
+        #  either it is buried or it is not where it says it is.
+        measured = {direction: protrusion(piece, parents, direction)
+                    for direction in mount.faces}
+        if mount.faces and all(stands is None for stands in measured.values()):
+            problems.append("%s has nothing under its %s face; either it is sunk inside "
+                            "%s or it is nowhere near it"
+                            % (piece.name(), " or ".join(mount.faces),
+                               " or ".join(mount.parents)))
+        for direction, stands in sorted(measured.items()):
+            if stands is not None and abs(stands-mount.proud) > PROUD_TOL:
+                problems.append(
+                    "%s stands %.3f units out of %s on its %s face and claims %.3f -- "
+                    "%s"%(piece.name(), stands, " or ".join(mount.parents), direction,
+                          mount.proud,
+                          "there is air under it" if stands > mount.proud
+                          else "it is sunk into the steel"))
+    for piece in pieces:
+        for other in pieces:
+            if piece is not other and frame_of(piece.group)==frame_of(other.group) \
+                    and other.contains(piece):
+                problems.append("%s is entirely inside %s, so it is drawn every frame and "
+                                "never seen"%(piece.name(), other.name()))
+    if problems:
+        raise SystemExit("\n".join(
+            ["%d parts of the machine are not attached to what they say they are:"
+             % len(problems)]+["  "+line for line in problems[:40]]
+            + (["  ... and %d more"%(len(problems)-40)] if len(problems) > 40 else [])
+            + ["Seat the part against its parent's surface *where the part is* -- a beam",
+               "that tapers is narrower there than the number it was built from -- and",
+               "stand it out by what its Mount claims.  See the note on BOSS_PROUD."]))
+    return checked
+
+
 def build_model():
     mesh = Mesh()
     volume = build_undercarriage(mesh)
@@ -1234,39 +1846,88 @@ def rect(px, x0, y0, x1, y1, colour):
                 px[x, y] = colour
 
 
-def paint_panel(px, region, base, lit, dark, shade, seed):
+def paint_panel(px, region, base, seed, pitch=16):
     """
     Panelled steel, painted as a *repeating* pattern rather than as a framed panel.
 
     Every face takes a sub-rectangle from wherever it happens to fit, so a border drawn
     round the region would come out as a line across the middle of some face somewhere.
-    A seam grid and a scatter of wear does the same job -- it says "panel" at any crop --
-    and the scatter is seeded so the checked-in sheet is the same file every run.
+    A seam grid does the same job -- it says "panel" at any crop -- and what wear there is
+    is seeded so the checked-in sheet is the same file every run.
+
+    **This is the fix for "very harsh lines in the textures".**  Three things were painting
+    it that way and all three are gone:
+
+      * a full-width dark row every fourth line and a light one every eighth, which is not
+        panelling at all.  At a texel to the unit that is a stripe every quarter of a foot
+        down every painted surface on the machine, and it is what made the bodywork read as
+        crossed planks rather than as sheet steel;
+      * seams drawn in a shade three or four steps off the base -- YELLOW_SHADE against
+        YELLOW, or OUTLINE, which is very nearly black -- where a join in a painted panel
+        catches perhaps a tenth less light than the panel does.  They are drawn with
+        shaded() now, so the contrast is a property of the paint rather than a palette
+        entry picked by eye;
+      * a scuff on one texel in ninety, in three tones, plus rust.  Forty-five bright
+        specks on a 64x64 region reads as noise at two blocks and as dirt at ten.  What is
+        left is a quarter of that, all of it within a shade of the base.
     """
     x, y, w, h = REGIONS[region]
     rng = random.Random(seed)
+    seam = shaded(base, SEAM)
+    bolt = shaded(base, BOLT)
     rect(px, x, y, x+w-1, y+h-1, base)
-    for row in range(y, y+h):
-        if (row-y)%4==3:
-            rect(px, x, row, x+w-1, row, dark)
-        elif (row-y)%8==1:
-            rect(px, x, row, x+w-1, row, lit)
-    # Seams every sixteen units, with bolts down them: the pitch a real panel is
-    # built at, and the thing that gives a large flat face a sense of scale.
-    for row in range(y, y+h, 16):
-        rect(px, x, row, x+w-1, row, shade)
+    # Seams at the pitch a real panel is built at, with bolts down them: the one thing
+    # that gives a large flat face a sense of scale.
+    for row in range(y, y+h, pitch):
+        rect(px, x, row, x+w-1, row, seam)
         for col in range(x+3, x+w, 8):
-            px[col, row] = lit
-            if row+1 < y+h:
-                px[col, row+1] = shade
-    for col in range(x, x+w, 16):
-        rect(px, col, y, col, y+h-1, shade)
-    for _ in range(w*h//90):
+            px[col, row] = bolt
+    for col in range(x, x+w, pitch):
+        rect(px, col, y, col, y+h-1, seam)
+    for _ in range(w*h//360):
         sx, sy = rng.randrange(x, x+w), rng.randrange(y, y+h)
-        px[sx, sy] = rng.choice((lit, dark, shade))
-    for _ in range(w*h//600):
-        sx, sy = rng.randrange(x+1, x+w-3), rng.randrange(y+1, y+h-1)
-        rect(px, sx, sy, sx+2, sy, RUST)
+        px[sx, sy] = shaded(base, SCUFF if rng.random() < 0.5 else BOLT)
+
+
+def paint_boss(px):
+    """
+    A pin seen end on: rings about the centre of the region, because that is where a
+    cylinder's cap is mapped from.
+
+    **The dark cross-hatched discs a playtester reported were this region's fault as much
+    as the geometry's.**  Every cap on the machine took its texels radially from the middle
+    of "plate", and the middle of "plate" is where a seam row crosses a seam column -- so
+    every pin, every boss and the slew ring wore a dark cross through its face.  Rings are
+    the only pattern that survives being sampled that way, and they happen to be what a
+    machined pin face looks like.
+
+    Sized for every disc that uses it, from a tool pin at 2.4 to the slew ring at 13: past
+    the boss itself it is plain plate, so a big disc is a plate with a boss in the middle
+    and a small one is all boss.
+    """
+    x, y, w, h = REGIONS["boss"]
+    cx, cy = x+w/2-0.5, y+h/2-0.5
+    shoulder = shaded(IRON, 0.74)
+    for row in range(y, y+h):
+        for col in range(x, x+w):
+            r = math.hypot(col-cx, row-cy)
+            if r < 1.6:
+                colour = STEEL_LIT           # the pin's own end, turned bright
+            elif r < 2.7:
+                colour = STEEL
+            elif r < 3.3:
+                colour = shoulder            # the step down from the pin to its boss
+            elif 7.0 <= r < 7.6:
+                colour = shoulder            # and the edge of the boss itself, for the
+            else:                            # discs big enough to have one: the slew ring
+                colour = IRON
+            px[col, row] = colour
+    #  Six bolts round the boss, which is what holds a retaining plate on.
+    for i in range(6):
+        angle = 2*math.pi*i/6
+        bx, by = int(round(cx+4.8*math.cos(angle))), int(round(cy+4.8*math.sin(angle)))
+        px[bx, by] = STEEL_LIT
+        px[bx, by+1] = shoulder
 
 
 def paint_hazard(px):
@@ -1274,15 +1935,20 @@ def paint_hazard(px):
     for row in range(y, y+h):
         for col in range(x, x+w):
             px[col, row] = HAZARD if ((col-x)+(row-y))%12 < 6 else YELLOW_DARK
+    #  The band between one hazard panel and the next.  It was OUTLINE, which against the
+    #  cream of the stripes is the hardest line anywhere on the machine; the stripes
+    #  themselves are the contrast this face is for and the join does not need to compete.
     for row in range(y, y+h, 16):
-        rect(px, x, row, x+w-1, row, OUTLINE)
+        rect(px, x, row, x+w-1, row, YELLOW_SHADE)
 
 
 def paint_vent(px, region, base, dark, pitch, seed):
-    paint_panel(px, region, base, STEEL_LIT, dark, OUTLINE, seed)
+    paint_panel(px, region, base, seed)
     x, y, w, h = REGIONS[region]
+    #  A louvre is a real slot in real steel, so this is the one place a near-black line
+    #  is the truth.  It is a slot two texels deep rather than a line across a panel.
     for row in range(y+1, y+h-1, pitch):
-        rect(px, x, row, x+w-1, row, OUTLINE)
+        rect(px, x, row, x+w-1, row, shaded(base, 0.45))
         rect(px, x, row+1, x+w-1, row+1, dark)
 
 
@@ -1462,37 +2128,42 @@ def paint_trim(px):
 
 def paint_cowl(px):
     """The engine cowl's flank: a hatch, its hinges, and two banks of louvres."""
-    paint_panel(px, "cowl", YELLOW, YELLOW_LIT, YELLOW_DARK, YELLOW_SHADE, 41)
+    paint_panel(px, "cowl", YELLOW, 41)
     x, y, w, h = REGIONS["cowl"]
-    # The hatch, most of the flank, with a handle.
+    edge_lit, edge_dark = shaded(YELLOW, BOLT), shaded(YELLOW, SEAM)
+    # The hatch, most of the flank, with a handle.  Its outline is the join round a door
+    # in a painted panel: a shade lighter along the top and left, a shade darker along the
+    # bottom and right, which is what an edge in one flat colour looks like.
     rect(px, x+4, y+8, x+w-5, y+h-9, YELLOW)
     for col in range(x+4, x+w-4):
-        px[col, y+8] = YELLOW_LIT
-        px[col, y+h-9] = YELLOW_SHADE
+        px[col, y+8] = edge_lit
+        px[col, y+h-9] = edge_dark
     for row in range(y+8, y+h-8):
-        px[x+4, row] = YELLOW_LIT
-        px[x+w-5, row] = YELLOW_SHADE
+        px[x+4, row] = edge_lit
+        px[x+w-5, row] = edge_dark
     for row in (y+14, y+h-15):
         rect(px, x+6, row, x+11, row+1, STEEL_DARK)
     rect(px, x+w-12, y+h//2-1, x+w-8, y+h//2+1, STEEL)
     px[x+w-12, y+h//2] = STEEL_LIT
-    # Louvres, because the machine has a radiator behind this.
+    # Louvres, because the machine has a radiator behind this.  A louvre is a slot rather
+    # than a line, so it keeps its dark -- but in the livery's own olive, not in black.
     for row in range(y+20, y+h-20, 4):
-        rect(px, x+14, row, x+w-16, row, OUTLINE)
+        rect(px, x+14, row, x+w-16, row, YELLOW_SHADE)
         rect(px, x+14, row+1, x+w-16, row+1, YELLOW_DARK)
 
 
 def paint_cab_side(px):
     """The cab's outer skin: the door, its window frame and the grab handle."""
-    paint_panel(px, "cab_side", YELLOW, YELLOW_LIT, YELLOW_DARK, YELLOW_SHADE, 77)
+    paint_panel(px, "cab_side", YELLOW, 77)
     x, y, w, h = REGIONS["cab_side"]
+    edge_lit, edge_dark = shaded(YELLOW, BOLT), shaded(YELLOW, SEAM)
     rect(px, x+3, y+3, x+w-4, y+h-4, YELLOW)
     for col in range(x+3, x+w-3):
-        px[col, y+3] = YELLOW_LIT
-        px[col, y+h-4] = YELLOW_SHADE
+        px[col, y+3] = edge_lit
+        px[col, y+h-4] = edge_dark
     for row in range(y+3, y+h-3):
-        px[x+3, row] = YELLOW_LIT
-        px[x+w-4, row] = YELLOW_SHADE
+        px[x+3, row] = edge_lit
+        px[x+w-4, row] = edge_dark
     # The window in the door, and the seal round it.  Opaque: this is the door's steel
     # skin, and a see-through texel here is a hole in the bodywork rather than a window.
     rect(px, x+8, y+8, x+w-9, y+h//2, opaque(GLASS))
@@ -1505,17 +2176,17 @@ def paint_cab_side(px):
     rect(px, x+7, y+h//2+1, x+w-8, y+h//2+1, STEEL_DARK)
     # The grab handle beside it.
     rect(px, x+w-7, y+10, x+w-6, y+h//2-2, STEEL_LIT)
-    px[x+w-7, y+10] = OUTLINE
-    px[x+w-7, y+h//2-2] = OUTLINE
+    px[x+w-7, y+10] = STEEL_DARK
+    px[x+w-7, y+h//2-2] = STEEL_DARK
 
 
 def paint_counterweight(px):
     """The counterweight's flank: cast, ribbed, and lifted by two shackles."""
-    paint_panel(px, "counterweight", YELLOW, YELLOW_LIT, YELLOW_DARK, YELLOW_SHADE, 13)
+    paint_panel(px, "counterweight", YELLOW, 13)
     x, y, w, h = REGIONS["counterweight"]
     for row in range(y+6, y+h-6, 10):
-        rect(px, x+4, row, x+w-5, row, YELLOW_SHADE)
-        rect(px, x+4, row+1, x+w-5, row+1, YELLOW_LIT)
+        rect(px, x+4, row, x+w-5, row, shaded(YELLOW, SEAM))
+        rect(px, x+4, row+1, x+w-5, row+1, shaded(YELLOW, BOLT))
     rect(px, x+w//2-6, y+2, x+w//2+5, y+5, STEEL_DARK)
     rect(px, x+w//2-5, y+3, x+w//2+4, y+3, STEEL_LIT)
 
@@ -1538,11 +2209,16 @@ def paint_bucket(px):
 def build_sheet():
     img = Image.new("RGBA", (SHEET, SHEET), (0, 0, 0, 0))
     px = img.load()
-    paint_panel(px, "yellow", YELLOW, YELLOW_LIT, YELLOW_DARK, YELLOW_SHADE, 1)
-    paint_panel(px, "yellow_dark", YELLOW_DARK, YELLOW, YELLOW_SHADE, OUTLINE, 2)
-    paint_panel(px, "steel", STEEL, STEEL_LIT, STEEL_DARK, OUTLINE, 3)
-    paint_panel(px, "steel_dark", STEEL_DARK, STEEL, IRON, OUTLINE, 4)
-    paint_panel(px, "plate", IRON, STEEL_LIT, STEEL_DARK, OUTLINE, 5)
+    paint_panel(px, "yellow", YELLOW, 1)
+    paint_panel(px, "yellow_dark", YELLOW_DARK, 2)
+    paint_panel(px, "steel", STEEL, 3)
+    paint_panel(px, "steel_dark", STEEL_DARK, 4)
+    #  Machined plate is not panelled: it is rolled steel that has been cut and drilled,
+    #  and the pins, links and rails cut from it are small enough that a seam grid at any
+    #  pitch lands as a stripe across them.  A 32 pitch is one line at the far edge of the
+    #  largest face that takes it, and nothing at all on most.
+    paint_panel(px, "plate", IRON, 5, pitch=32)
+    paint_boss(px)
     paint_hazard(px)
     paint_vent(px, "vent", STEEL, STEEL_DARK, 4, 6)
     paint_grille(px)
@@ -1674,6 +2350,7 @@ def main():
     used = check_layout()
     mesh, volume = build_model()
     checked = check_coplanar(mesh)
+    anchored = check_anchoring(mesh)
 
     model_dir = os.path.join(args.assets, "models", "entity")
     os.makedirs(model_dir, exist_ok=True)
@@ -1686,6 +2363,8 @@ def main():
     for name, faces in mesh.groups:
         print("    %-16s %4d quads"%(name, len(faces)))
     print("  %d faces checked, no two of them fighting over a plane"%checked)
+    print("  %d attached parts checked, every one of them seated on the part it names"
+          % anchored)
 
     entity_dir = os.path.join(args.assets, "textures", "entity")
     os.makedirs(entity_dir, exist_ok=True)
