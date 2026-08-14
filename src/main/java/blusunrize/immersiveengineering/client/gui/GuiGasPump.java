@@ -164,7 +164,11 @@ public class GuiGasPump extends GuiIEContainerBase
 		if(button.id==ID_APPLY)
 			send(false);
 		else if(button.id==ID_RESET)
+		{
+			//send() ships whatever is in the price field, so zero it for the reset to cover the price too
+			priceField.setText("0");
 			send(true);
+		}
 	}
 
 	private void send(boolean resetOdometer)
