@@ -37,7 +37,16 @@ Self-checks, all of them the sort of failure nothing at runtime reports:
   * every solid is a closed, edge-manifold shell enclosing a positive volume, which is
     what catches a cylinder cap fanned the wrong way or a belt loop that failed to close;
   * the scrolling track belt's UVs stay inside their strip at every offset it can be
-    drawn at.
+    drawn at;
+  * the glazing region is painted with partial alpha and every other region is fully
+    opaque, which is the check that would have caught a windscreen nobody can see out
+    of and a hole in the bodywork respectively.
+
+**The glazing is its own group.**  `house_glass` is authored in the house's frame, exactly
+as the rest of the cab is, so it slews with it; it is separate only so the renderer can
+draw it last, blended, after every opaque group of the machine.  Blending an opaque group
+is a no-op and blending in the middle of the machine would leave whatever had not been
+drawn yet missing from behind the glass.
 
 No real-world manufacturer's marks: the livery is generic construction yellow and the
 only lettering is "LD".
@@ -72,14 +81,37 @@ IRON = (86, 88, 94, 255)
 OUTLINE = (34, 34, 38, 255)
 RUBBER = (46, 46, 50, 255)
 RUBBER_LIT = (64, 64, 70, 255)
-GLASS = (74, 104, 120, 255)
-GLASS_LIT = (108, 146, 164, 255)
-GLASS_DARK = (48, 70, 84, 255)
+
+# The glazing, and the one colour on the sheet that is not opaque.
+#
+# **The alpha is the fix for a playtest report**: the cab windows were painted at full
+# opacity, so a machine whose windows are real holes in real steel still could not be
+# seen out of from the seat.  ~38% is enough tint to read as glass against the sky and
+# little enough to drive by.  The seal rows are more opaque, which is what makes a pane
+# read as glazed into a frame rather than as a coloured film.
+#
+# Everything that samples these colours *outside* the glass region -- the window painted
+# on the door skin, the cab window on the item icon -- takes opaque() of them, because
+# those are opaque steel wearing a picture of a window and a partial alpha there is a
+# hole in the bodywork.
+GLASS_ALPHA = 96
+GLASS_SEAL_ALPHA = 180
+GLASS = (122, 152, 170, GLASS_ALPHA)
+GLASS_LIT = (168, 198, 214, GLASS_ALPHA)
+GLASS_DARK = (86, 116, 134, GLASS_ALPHA)
+GLASS_SEAL = (86, 116, 134, GLASS_SEAL_ALPHA)
+
 HAZARD = (232, 226, 214, 255)
 LAMP = (248, 226, 140, 255)
 RUST = (128, 84, 46, 255)
 
 SHEET = 256
+
+
+def opaque(colour):
+    """The same colour with nothing to see through.  See the note on GLASS_ALPHA."""
+    return colour[0], colour[1], colour[2], 255
+
 
 # ---------------------------------------------------------------------------
 # The atlas.
@@ -624,6 +656,10 @@ def build_tracks(mesh):
 def build_house(mesh):
     """Everything that slews: deck, engine, counterweight, cab, and the arm off the front."""
     faces = mesh.group("house")
+    # The glazing, in the same frame and drawn under the same transform, kept apart only
+    # so it can be drawn last and blended.  Declared here, next to the group it belongs
+    # to, so that the two are never accidentally authored about different pivots.
+    glass = mesh.group("house_glass")
     volume = 0.0
 
     # The deck: the floor everything else stands on, and the turntable under it.
@@ -669,12 +705,12 @@ def build_house(mesh):
     volume += add_cylinder(mesh, faces, "exhaust cap", -10.5, -5.5, 4, -21, 2.6, 8,
                            "steel_dark", "steel_dark")
 
-    volume += build_cab(mesh, faces)
+    volume += build_cab(mesh, faces, glass)
     volume += build_handrails(mesh, faces)
     return volume
 
 
-def build_cab(mesh, faces):
+def build_cab(mesh, faces, glass):
     """
     The operator's cab: a steel frame with glass in the holes, not a painted box.
 
@@ -683,6 +719,12 @@ def build_cab(mesh, faces):
     posts, a roof, a floor and separate panes read as a cab because the light gets
     through the gaps between them.  The seat is inside it -- CrawlerGeometry.CAB_* is
     read off these numbers, and a test asserts the operator ends up between these walls.
+
+    **Every pane goes into `glass`, not into `faces`.**  They are still closed thin
+    boxes rather than single quads, deliberately: a box has an outward-facing surface on
+    each side of the pane, so it is lit and visible from inside the cab and from outside
+    it without the renderer having to turn face culling off, and the closed-solid check
+    below stays true of every piece of the machine without an exemption.
     """
     volume = 0.0
     volume += add_box(mesh, faces, "cab floor",
@@ -703,15 +745,15 @@ def build_cab(mesh, faces):
     # operator can see the arm they are working with.
     volume += add_box(mesh, faces, "cab inner wall",
                       (CAB_X0, -24, CAB_Z0+2, CAB_X0+1.5, CAB_FLOOR, CAB_Z1-2), "yellow")
-    volume += add_box(mesh, faces, "cab inner glass",
+    volume += add_box(mesh, glass, "cab inner glass",
                       (CAB_X0+0.4, CAB_TOP+2, CAB_Z0+2, CAB_X0+1.1, -24, CAB_Z1-2),
                       "glass")
     # The windscreen, which on an excavator runs the full height of the front.
-    volume += add_box(mesh, faces, "windscreen",
+    volume += add_box(mesh, glass, "windscreen",
                       (CAB_X0+2, CAB_TOP+2, CAB_Z0+0.4, CAB_X1-2, CAB_FLOOR, CAB_Z0+1.1),
                       "glass")
     # The door: glazed above the handle, panelled below it.
-    volume += add_box(mesh, faces, "door glass",
+    volume += add_box(mesh, glass, "door glass",
                       (CAB_X1-1.1, CAB_TOP+2, CAB_Z0+2, CAB_X1-0.4, -22, CAB_Z1-2),
                       "glass")
     volume += add_box(mesh, faces, "door panel",
@@ -1004,6 +1046,16 @@ def paint_grille(px):
 
 
 def paint_glass(px):
+    """
+    The cab glazing: a tint you can see through, not a blue-grey wall.
+
+    **This is the region the whole blended pass exists for.**  Every other colour on the
+    sheet is opaque and the renderer draws it with blending off; this one is painted at
+    GLASS_ALPHA and its group is drawn last with blending on.  Painting it opaque was the
+    reported bug -- the panes were real geometry with real holes around them and the
+    operator still could not see out, because a fully opaque texel is opaque however it
+    is blended.
+    """
     x, y, w, h = REGIONS["glass"]
     rect(px, x, y, x+w-1, y+h-1, GLASS)
     # A diagonal highlight, which is the whole of what makes flat colour read as glass.
@@ -1014,8 +1066,14 @@ def paint_glass(px):
                 px[col, row] = GLASS_LIT
             elif d%17 < 5:
                 px[col, row] = GLASS_DARK
+    # The seals.  Every glazed face takes its sub-rectangle from this region's top left
+    # corner, so a line down the top and left edges of the region is a glazing bar along
+    # the top and leading edge of every pane -- and being the more opaque thing on the
+    # region, it is what makes the pane read as glazed into a frame.
     for row in range(y, y+h, 16):
-        rect(px, x, row, x+w-1, row, GLASS_DARK)
+        rect(px, x, row, x+w-1, row, GLASS_SEAL)
+    for col in range(x, x+w, 16):
+        rect(px, col, y, col, y+h-1, GLASS_SEAL)
 
 
 def paint_hub(px):
@@ -1183,13 +1241,14 @@ def paint_cab_side(px):
     for row in range(y+3, y+h-3):
         px[x+3, row] = YELLOW_LIT
         px[x+w-4, row] = YELLOW_SHADE
-    # The window in the door, and the seal round it.
-    rect(px, x+8, y+8, x+w-9, y+h//2, GLASS)
+    # The window in the door, and the seal round it.  Opaque: this is the door's steel
+    # skin, and a see-through texel here is a hole in the bodywork rather than a window.
+    rect(px, x+8, y+8, x+w-9, y+h//2, opaque(GLASS))
     for col in range(x+8, x+w-8):
-        px[col, y+8] = GLASS_LIT
+        px[col, y+8] = opaque(GLASS_LIT)
     for row in range(y+8, y+h//2+1):
-        px[x+8, row] = GLASS_LIT
-        px[x+w-9, row] = GLASS_DARK
+        px[x+8, row] = opaque(GLASS_LIT)
+        px[x+w-9, row] = opaque(GLASS_DARK)
     rect(px, x+7, y+7, x+w-8, y+7, STEEL_DARK)
     rect(px, x+7, y+h//2+1, x+w-8, y+h//2+1, STEEL_DARK)
     # The grab handle beside it.
@@ -1248,7 +1307,36 @@ def build_sheet():
     paint_cab_side(px)
     paint_counterweight(px)
     paint_bucket(px)
+    check_glazing(px)
     return img
+
+
+def check_glazing(px):
+    """
+    Exactly one region is see-through, and it is see-through everywhere.
+
+    Both halves matter and neither is reported by anything at runtime.  A fully opaque
+    glazing region is the bug this was written for: the renderer blends the glass group
+    faithfully and the operator still cannot see out.  A partly transparent texel
+    anywhere else is the opposite failure -- the machine drawn with a hole in it, or a
+    panel dimmed by whatever happens to be behind it, depending on which pass eats it.
+    """
+    for name, (x, y, w, h) in sorted(REGIONS.items()):
+        glazed = name=="glass"
+        for row in range(y, y+h):
+            for col in range(x, x+w):
+                alpha = px[col, row][3]
+                if glazed and not 0 < alpha < 255:
+                    raise SystemExit(
+                        "the glazing at %d,%d has an alpha of %d; the cab windows have "
+                        "to be seen out of and %s" % (col, row, alpha,
+                                                      "0 is a hole" if alpha==0
+                                                      else "255 is a wall"))
+                if not glazed and alpha!=255:
+                    raise SystemExit(
+                        "region %s at %d,%d has an alpha of %d; only the glazing may be "
+                        "see-through, and everything else is drawn in a pass that does "
+                        "not blend" % (name, col, row, alpha))
 
 
 def build_item():
@@ -1273,7 +1361,8 @@ def build_item():
     rect(px, 4, 9, 11, 9, YELLOW_LIT)
     rect(px, 11, 9, 12, 11, HAZARD)
     rect(px, 8, 6, 11, 8, STEEL)
-    rect(px, 9, 7, 10, 7, GLASS_LIT)
+    #  Opaque: an item icon is composited by the GUI, not by the crawler's renderer.
+    rect(px, 9, 7, 10, 7, opaque(GLASS_LIT))
     px[8, 6] = STEEL_LIT
     for i in range(4):
         px[7-i, 8-i] = YELLOW

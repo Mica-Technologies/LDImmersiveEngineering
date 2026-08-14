@@ -114,6 +114,21 @@ class CrawlerAssetsTest
 		return rows;
 	}
 
+	/**
+	 * @return one of the generator's atlas regions as {@code x, y, w, h}
+	 * <p>
+	 * Read out of the Python rather than restated here, so a region that is moved on the sheet
+	 * moves for this test too and the test keeps asking about the pixels it means to ask about.
+	 */
+	private static int[] region(String python, String name)
+	{
+		Matcher m = Pattern.compile("\""+name+"\"\\s*:\\s*\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*(\\d+)\\)")
+				.matcher(python);
+		assertTrue(m.find(), "the generator has no region called \""+name+"\"");
+		return new int[]{Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)),
+				Integer.parseInt(m.group(3)), Integer.parseInt(m.group(4))};
+	}
+
 	/** @return the value of a {@code NAME = number} constant, in either language */
 	private static double constant(String source, String name)
 	{
@@ -200,6 +215,62 @@ class CrawlerAssetsTest
 			assertEquals((int)declared, sheet.getWidth(), "the generator lays out a different sheet");
 			assertEquals((int)declared, sheet.getHeight(), "the generator lays out a different sheet");
 		}
+
+		@Test
+		@DisplayName("the cab glazing is painted with an alpha you can see through")
+		void glazingIsTransparent()
+		{
+			//	=================================
+			//	The test that would have caught an opaque windscreen.
+			//	=================================
+			//
+			// The cab's windows are real openings in real steel and the renderer draws them in a
+			// blended pass, and neither of those does anything at all if the texels are painted
+			// opaque -- which is how they shipped, and what the operator reported as not being
+			// able to see out while driving. Nothing at runtime says so; the machine simply has
+			// blue-grey walls where its windows are.
+			BufferedImage sheet = image("textures/entity/hydraulic_crawler.png");
+			int[] glass = region(read(GENERATOR), "glass");
+			int partial = 0;
+			for(int y = glass[1]; y < glass[1]+glass[3]; y++)
+				for(int x = glass[0]; x < glass[0]+glass[2]; x++)
+				{
+					int alpha = (sheet.getRGB(x, y) >>> 24)&0xFF;
+					assertTrue(alpha > 0, "the glazing at "+x+","+y+" is fully transparent, which is "
+							+"a hole in the cab rather than a window");
+					assertTrue(alpha < 255, "the glazing at "+x+","+y+" is fully opaque, so the cab "
+							+"cannot be seen out of no matter how the glass group is blended");
+					//A tint dark enough to read as glass and light enough to drive through.
+					if(alpha >= 0.25*255&&alpha <= 0.55*255)
+						partial++;
+				}
+			assertTrue(partial > glass[2]*glass[3]/2,
+					"only "+partial+" of "+(glass[2]*glass[3])+" glazing texels are in the band a "
+							+"window is tinted at; the rest are so faint or so solid that the pane "
+							+"reads as absent or as a wall");
+		}
+
+		@Test
+		@DisplayName("nothing but the glazing is see-through")
+		void everythingElseIsOpaque()
+		{
+			//The other half, and the opposite failure: a partial alpha anywhere the machine is
+			//drawn in its opaque pass is a hole in the bodywork or a panel dimmed by the sky
+			//behind it, depending on which threshold eats it. Only the glass may blend.
+			BufferedImage sheet = image("textures/entity/hydraulic_crawler.png");
+			String python = read(GENERATOR);
+			int[] glass = region(python, "glass");
+			for(String name : new String[]{"yellow", "steel", "cab_side", "walkway", "belt", "trim"})
+			{
+				int[] r = region(python, name);
+				for(int y = r[1]; y < r[1]+r[3]; y++)
+					for(int x = r[0]; x < r[0]+r[2]; x++)
+						assertEquals(255, (sheet.getRGB(x, y) >>> 24)&0xFF,
+								"region "+name+" at "+x+","+y+" is not opaque, and it is drawn in a "
+										+"pass that does not blend");
+			}
+			assertTrue(glass[2] > 0&&glass[3] > 0, "the glazing region has no pixels in it");
+		}
 	}
 
 	@Nested
@@ -280,6 +351,9 @@ class CrawlerAssetsTest
 			Set<String> expected = new LinkedHashSet<>();
 			expected.add("undercarriage");
 			expected.add("house");
+			//The cab glazing, which is the house's own geometry kept in a group of its own so
+			//the renderer can draw it last with blending on.
+			expected.add("house_glass");
 			expected.add("boom");
 			expected.add("stick");
 			for(String side : new String[]{"left", "right"})
@@ -301,6 +375,43 @@ class CrawlerAssetsTest
 			for(String group : found)
 				assertTrue(expected.contains(group),
 						"the model has a group \""+group+"\" that nothing draws");
+		}
+
+		@Test
+		@DisplayName("the glazing group is drawn last, blended, and the state is put back")
+		void glassIsDrawnLastAndBlended()
+		{
+			//	=================================
+			//	Half of "see-through" is the texture and half is this pass.
+			//	=================================
+			//
+			// A sheet painted with real alpha drawn without blending is opaque paint, which is
+			// what the cab shipped as. This reads the source rather than running it because
+			// ModelHydraulicCrawler is client-only and every line of it is GL state, but the
+			// three things that can silently go missing are all visible in the text: the pass
+			// existing at all, it happening after the opaque groups, and it being handed back.
+			String java = read(MODEL_SRC);
+			assertTrue(java.contains("\"house_glass\""),
+					"nothing in the model names the glazing group, so the cab has no windows");
+
+			int enable = java.indexOf("enableBlend");
+			int draw = java.indexOf("model.render(HOUSE_GLASS)");
+			int restore = java.indexOf("alphaFunc", draw+1);
+			int disable = java.indexOf("disableBlend");
+			assertTrue(enable >= 0, "the glazing is never blended, so its alpha does nothing");
+			assertTrue(draw > enable, "the glazing group is drawn outside the blended pass");
+			assertTrue(restore > draw&&restore < disable,
+					"the alpha threshold the glass pass lowers is never put back, so every entity "
+							+"drawn after the crawler keeps texels the world means to discard");
+			assertTrue(disable > draw,
+					"blending is left on after the crawler, which tints every entity and every "
+							+"piece of HUD drawn after it");
+
+			int glassPass = java.indexOf("renderGlass();");
+			int lastOpaque = java.lastIndexOf("model.render(groupFor(attachment))");
+			assertTrue(glassPass > lastOpaque&&lastOpaque > 0,
+					"the glass is drawn before the arm, so whatever the blend should have shown "
+							+"through it had not been drawn yet");
 		}
 	}
 

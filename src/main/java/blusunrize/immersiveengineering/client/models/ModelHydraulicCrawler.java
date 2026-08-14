@@ -14,6 +14,7 @@ import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+import org.lwjgl.opengl.GL11;
 
 /**
  * The Hydraulic Crawler's body: two tracks with the wheels turning inside them, a house that
@@ -36,6 +37,11 @@ import net.minecraftforge.fml.relauncher.SideOnly;
  * <p>
  * The pivots are duplicated in the generator, because a Python script cannot read a Java
  * constant, and {@code CrawlerAssetsTest} asserts the two copies agree.
+ * <p>
+ * <strong>It is drawn in two passes: everything, and then the glass.</strong> The cab's glazing
+ * is its own group so that it can be drawn last with blending on -- see {@link #renderGlass()}.
+ * That is the only reason it is separate; it is authored in the house's frame and drawn under
+ * the house's transform, so it slews with the cab it is glazed into.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
@@ -107,7 +113,23 @@ public class ModelHydraulicCrawler
 			"immersiveengineering:models/entity/hydraulic_crawler.obj");
 
 	private static final String UNDERCARRIAGE = "undercarriage";
+	private static final String HOUSE = "house";
+	/**
+	 * The cab glazing: the house's windows, authored in the house's frame and drawn under the
+	 * house's transform, separate only so it can be drawn last and blended.
+	 */
+	private static final String HOUSE_GLASS = "house_glass";
 	private static final String[] SIDES = {"left", "right"};
+
+	/**
+	 * Vanilla's own alpha threshold, and what the world render is left at.
+	 * <p>
+	 * Restored after the glass rather than assumed, because a pass that leaves it anywhere else
+	 * shows up as every entity drawn after this one having its low-alpha texels kept or cut.
+	 */
+	private static final float WORLD_ALPHA_CUTOFF = 0.1F;
+	/** One step above nothing: keep every texel the glazing is painted with. */
+	private static final float GLASS_ALPHA_CUTOFF = 1F/255F;
 
 	private final EntityOBJModel model = new EntityOBJModel(MODEL);
 
@@ -142,7 +164,7 @@ public class ModelHydraulicCrawler
 		GlStateManager.pushMatrix();
 		GlStateManager.translate(0, SLEW_HEIGHT, 0);
 		GlStateManager.rotate(slew, 0, 1, 0);
-		model.render("house");
+		model.render(HOUSE);
 
 		//Each section is pinned at the end of the one before, so an angle on a joint sweeps
 		//everything downstream of it -- which is what steel does and is why the renderer only
@@ -165,7 +187,56 @@ public class ModelHydraulicCrawler
 
 		GlStateManager.popMatrix();
 		GlStateManager.popMatrix();
+
+		//Back in the house's frame, with every opaque group of the machine already drawn.
+		renderGlass();
 		GlStateManager.popMatrix();
+	}
+
+	/**
+	 * The cab glazing, blended, after everything else on the machine.
+	 * <p>
+	 * <strong>Both halves of "see-through" are needed and neither is enough on its own.</strong>
+	 * The glazing region of the sheet is painted with partial alpha -- the generator checks that
+	 * it is, and that nothing else is -- and this is the pass that honours it. Drawn the way the
+	 * rest of the machine is drawn, an alpha of 96 is simply written to the framebuffer as
+	 * opaque paint, which is exactly what the playtest reported: a cab with real holes in real
+	 * steel that the operator still could not see out of.
+	 * <p>
+	 * <strong>Last, and inside the house's transform.</strong> Blending shows what is already in
+	 * the framebuffer, so anything drawn after the glass is not behind it -- it is missing from
+	 * behind it. That puts this after the arm as well as after the house, which is why it is here
+	 * and not next to {@code model.render(HOUSE)}. The transform is still the house's, so the
+	 * windows slew with the cab they are glazed into and cannot drift from it.
+	 * <p>
+	 * <strong>Culling stays on.</strong> Each pane is a closed thin box, so there is an
+	 * outward-facing quad on each side of it: the operator sees the inner one and the world sees
+	 * the outer one, each lit by its own outward normal. Turning culling off would add the
+	 * far side of every pane to the pass, blending the same tint over the same pixels twice and
+	 * darkening the glass for no gain.
+	 * <p>
+	 * Depth writes stay on too. Within one entity the glass is drawn last, so it blends over the
+	 * machine's own steel correctly; and with depth on, the far face of a pane is rejected against
+	 * the near one rather than tinting through it.
+	 * <p>
+	 * Everything this touches is put back: the world's render is one long stream of state, and a
+	 * blend or an alpha threshold left on leaks into every entity drawn after this one and into
+	 * the HUD.
+	 */
+	private void renderGlass()
+	{
+		GlStateManager.enableBlend();
+		GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA,
+				GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
+		//The alpha *test* is the other way a partial alpha disappears: the world is drawn with a
+		//threshold that discards anything fainter than a tenth, so a pane painted at three
+		//tenths survives today and a fainter one would silently vanish. Drop it for this pass.
+		GlStateManager.alphaFunc(GL11.GL_GREATER, GLASS_ALPHA_CUTOFF);
+
+		model.render(HOUSE_GLASS);
+
+		GlStateManager.alphaFunc(GL11.GL_GREATER, WORLD_ALPHA_CUTOFF);
+		GlStateManager.disableBlend();
 	}
 
 	/**

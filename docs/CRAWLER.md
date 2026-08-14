@@ -168,8 +168,21 @@ fitted one is drawn.
 | `track_left`, `track_right` | Their tread scrolls with the ground each track has covered |
 | `wheel_<side>_0..5` | Each turns about its own axle, at the rate its own radius demands |
 | `house` | Slews |
+| `house_glass` | Slews with the house; drawn last, blended |
 | `boom`, `stick` | Rotate about their pins, each carrying everything downstream |
 | `tool_bucket`, `tool_grapple`, `tool_breaker` | The fitted one rotates about the tool pin |
+
+**The cab glazing is a group of its own because the glass is drawn in its own pass.** It shipped
+opaque, and a playtester in the seat could not see out to drive: the windows were real openings
+in real steel, but the glazing was painted at full alpha and drawn in the same pass as the
+bodywork, so it came out as a blue-grey wall. Both halves had to change. The generator now paints
+the glazing region at about 38% and checks that it is the only region on the sheet that is not
+opaque — a partial alpha anywhere else is a hole in the machine. The renderer draws
+`house_glass` last, after every opaque group including the arm, with blending on and the world's
+alpha threshold dropped, and puts both back afterwards; anything drawn after the glass is not
+behind it, it is missing from behind it. The panes stay closed thin boxes rather than single
+quads, so each has an outward-facing surface on both sides and reads and lights correctly from
+the seat and from outside without turning face culling off.
 
 **Every pivot is the number the box model used**, and that is the whole of what makes this a
 change of appearance rather than of behaviour. The arm's hitboxes are placed along its centreline
@@ -193,8 +206,8 @@ keeps a flat vertex array per group, and draws a group at a time — which leave
 the renderer's hands, which is the reason for using an OBJ on something that moves at all.
 
 **The generator checks what nothing at runtime would.** Overlapping atlas regions, a face wound
-inside out, a UV that has left its region, a shell with a hole in it: none of those are errors
-Minecraft reports. It draws them.
+inside out, a UV that has left its region, a shell with a hole in it, a windscreen painted at an
+alpha nobody can see through: none of those are errors Minecraft reports. It draws them.
 
 ---
 

@@ -39,6 +39,11 @@ import javax.annotation.Nullable;
  * The model itself is an OBJ read once and drawn a group at a time -- see
  * {@link blusunrize.immersiveengineering.client.models.EntityOBJModel} -- so what used to be a pose
  * set on a box hierarchy is now a single call with everything that moves in its arguments.
+ * <p>
+ * That one call draws two passes: the machine, and then the cab glazing, blended, last. The GL
+ * state that needs -- blending, and a lowered alpha threshold -- is turned on and put back inside
+ * {@code ModelHydraulicCrawler}, next to the draw it belongs to and inside the house's transform,
+ * so nothing leaks out of this method into the entities and the HUD drawn after it.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
