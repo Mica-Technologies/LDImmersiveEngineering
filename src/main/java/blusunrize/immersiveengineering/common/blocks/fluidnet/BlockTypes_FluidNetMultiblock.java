@@ -39,7 +39,8 @@ public enum BlockTypes_FluidNetMultiblock implements IStringSerializable, BlockI
 	@Override
 	public boolean listForCreative()
 	{
-		//Obtained by hammering four Fluid Console Housings, never from the creative list.
+		//Obtained by hammering a Fluid Console Housing and the three engineering blocks together,
+		//never from the creative list.
 		return false;
 	}
 }

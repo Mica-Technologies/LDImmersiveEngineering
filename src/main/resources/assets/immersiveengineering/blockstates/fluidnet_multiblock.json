@@ -2,60 +2,80 @@
 	"forge_marker": 1,
 	"defaults": {
 		"transform": "forge:default-block",
-		"model": "immersiveengineering:grid/console_panel",
+		"custom": { "flip-v": true },
+		"model": "immersiveengineering:fluidnet/terminal.obj",
 		"textures": {
-			"side": "immersiveengineering:blocks/fluidnet_console_side",
-			"top": "immersiveengineering:blocks/fluidnet_console_top",
-			"front": "immersiveengineering:blocks/fluidnet_console_panel"
+			"particle": "immersiveengineering:blocks/fluidnet_terminal"
 		}
 	},
 	"variants": {
 		"inventory,type=fluid_console": [
 			{
-				"model": "cube_all",
-				"textures": {
-					"all": "immersiveengineering:blocks/fluidnet_console_screen"
+				"model": "immersiveengineering:fluidnet/terminal.obj",
+				"transform": {
+					"scale": 0.25,
+					"rotation": [
+						{
+							"x": 20
+						},
+						{
+							"y": 135
+						}
+					],
+					"translation": [
+						0,
+						-0.25,
+						0
+					]
 				}
 			}
 		],
 		"type": {
 			"fluid_console": {}
 		},
-		"boolean1": {
-			"false": {
-				"textures": {
-					"front": "immersiveengineering:blocks/fluidnet_console_screen_left"
-				}
-			},
-			"true": {
-				"textures": {
-					"front": "immersiveengineering:blocks/fluidnet_console_screen_right"
-				}
-			}
-		},
 		"boolean0": {
 			"false": {
 				"textures": {
-					"front": "immersiveengineering:blocks/fluidnet_console_panel"
+					"#screen": "immersiveengineering:blocks/fluidnet_terminal_screen_off"
 				}
 			},
 			"true": {}
 		},
 		"facing": {
-			"north": {},
-			"east": {
-				"y": 90
+			"north": {
+				"transform": {
+					"rotation": {
+						"y": 0
+					}
+				}
 			},
 			"south": {
-				"y": 180
+				"transform": {
+					"rotation": {
+						"y": 180
+					}
+				}
 			},
 			"west": {
-				"y": 270
+				"transform": {
+					"rotation": {
+						"y": 90
+					}
+				}
+			},
+			"east": {
+				"transform": {
+					"rotation": {
+						"y": -90
+					}
+				}
 			}
 		},
 		"_0multiblockslave": {
 			"false": {},
-			"true": {}
+			"true": {
+				"model": "immersiveengineering:ie_empty"
+			}
 		}
 	}
 }

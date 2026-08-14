@@ -21,6 +21,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparat
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGuiTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
+import blusunrize.immersiveengineering.common.blocks.multiblocks.MultiblockFluidConsole;
 import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWrapper;
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
@@ -260,11 +261,24 @@ public class TileEntityFluidConsole extends TileEntityMultiblockPart<TileEntityF
 		return false;
 	}
 
+	/**
+	 * The four cells are four different blocks now, so this has to answer per part rather than with
+	 * one stack -- otherwise taking a console apart would pay out four housings and eat the
+	 * engineering blocks.
+	 * <p>
+	 * Read out of the structure the multiblock declares, the way {@code TileEntityMultiblockMetal}
+	 * does, so the drops cannot disagree with the recipe or with the manual page: all three are the
+	 * same array.
+	 */
 	@Override
 	public ItemStack getOriginalBlock()
 	{
-		return new ItemStack(IEContent.blockFluidNetDevice, 1,
-				BlockTypes_FluidNetDevice.CONSOLE_HOUSING.getMeta());
+		if(pos < 0)
+			return new ItemStack(IEContent.blockFluidNetDevice, 1,
+					BlockTypes_FluidNetDevice.CONSOLE_HOUSING.getMeta());
+		ItemStack stack = MultiblockFluidConsole.instance.getStructureManual()
+				[FluidConsoleGeometry.heightOf(pos)][0][FluidConsoleGeometry.widthOf(pos)];
+		return stack.copy();
 	}
 
 	@Override

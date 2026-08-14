@@ -101,41 +101,12 @@ def console_housing():
     return img
 
 
-def _recolour(img):
-    """Turn the grid's screen into the fluid console's.
-
-    The only warm pixels on that screen are the orange status LEDs (ORANGE) and
-    their unused shade (ORANGE_DARK) -- everything else is already grey or teal
-    glass -- so recolouring those two is enough without redrawing anything.
-    """
-    px = img.load()
-    for y in range(img.height):
-        for x in range(img.width):
-            if px[x, y]==grid.ORANGE:
-                px[x, y] = FLUID
-            elif px[x, y]==grid.ORANGE_DARK:
-                px[x, y] = FLUID_DARK
-    return img
-
-
-def console_screen():
-    """The whole screen on one block, for the item model."""
-    return _recolour(grid.console_screen())
-
-
-def console_screen_left():
-    """The left-hand block of the display, split the same way the grid's is.
-
-    The fluid console is the grid console's mirror down to the block count, so
-    it had the same two-complete-screens bug and gets the same fix. Anything
-    here that stops mirroring is a bug in one of them.
-    """
-    return _recolour(grid.console_screen_left())
-
-
-def console_screen_right():
-    """The right-hand block of the display."""
-    return _recolour(grid.console_screen_right())
+# The console's screen used to be built here, by recolouring the grid console's
+# split screen halves two pixels at a time. Both consoles are single OBJ models
+# now and their displays are their own artwork: the formed Fluid Control Console
+# comes out of docs/tools/make_fluid_console_assets.py, which draws level gauges
+# rather than a power bar graph. Only the *unformed* housing is a block face, and
+# it is still made here because it is still a cube.
 
 
 TEXTURES = {
@@ -145,9 +116,6 @@ TEXTURES = {
     "fluidnet_device_outlet_front": outlet_front,
     "fluidnet_device_valve_front": valve_front,
     "fluidnet_console_housing": console_housing,
-    "fluidnet_console_screen": console_screen,
-    "fluidnet_console_screen_left": console_screen_left,
-    "fluidnet_console_screen_right": console_screen_right,
 }
 
 
@@ -163,10 +131,10 @@ def main():
         image = builder()
         image.save(path, "PNG", optimize=True)
         print("wrote", path)
-        # Same rule as the grid script, and it has to be: this console_screen
-        # is the grid's animation sheet with two pixels recoloured, so if it
-        # ends up taller than it is wide it needs the exact same .mcmeta or it
-        # squashes in-game just like the grid one would.
+        # Same rule as every other generator here: nothing this file writes is
+        # animated today, but a stacked sheet with no .mcmeta is not an error
+        # Minecraft reports -- it is every frame smeared into one texture -- so
+        # the guard stays rather than being something to remember later.
         if image.height!=image.width:
             meta_path = path+".mcmeta"
             with open(meta_path, "w") as f:

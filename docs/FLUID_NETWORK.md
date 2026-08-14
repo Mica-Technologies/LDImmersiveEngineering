@@ -100,7 +100,7 @@ console and `/ie fluidnet fluid` surface the refusal rather than swallowing it.
 | **Fluid Inlet** | Takes fluid out of the world and into its main. Draws from the block it is bolted to, and accepts a pipe run into any face. |
 | **Fluid Outlet** | Takes fluid out of a main and delivers it to the world, trying the mount face first. |
 | **Main Valve** | Carries no fluid. A redstone shut-off one way round, a pressure indicator the other. |
-| **Fluid Console Housing** | Four in a 2×2 wall, hammered, become a Fluid Control Console. |
+| **Fluid Console Housing** | The terminal of a Fluid Control Console: top left of a 2×2 wall with the three engineering blocks, hammered. |
 
 **None of them is `ITickable`.** All fluid movement happens in `FluidNetTickHandler`'s single
 server-tick pass over the devices that are actually online. That is the whole performance argument
@@ -147,7 +147,37 @@ Both directions are change-gated, so a steady network issues no block updates at
 
 `common/blocks/fluidnet/TileEntityFluidConsole.java`, GUI in `client/gui/GuiFluidConsole.java`.
 
-A 2×2 wall panel, four tabs: **Overview**, **Mains**, **Fittings**, **Stats**. The grid's console
+A 2×2 wall of four *different* blocks, struck anywhere on its front face with an Engineer's
+Hammer:
+
+|  |  |
+|---|---|
+| **Fluid Console Housing** (the terminal) | **Redstone Engineering Block** |
+| **Light Engineering Block** | **Heavy Engineering Block** |
+
+The same kit of parts, in the same places, as the [Grid Management
+Console](VIRTUAL_GRID.md#the-console) — read as hardware rather than as a recipe: the terminal is
+the screen, the redstone block is the instrument rack beside it, and the light and heavy blocks are
+the desk and the pump cabinet underneath. Four copies of one housing — which is what this used to
+be — made a wall of identical cabinets and a recipe that said nothing.
+
+The formed console is **one OBJ model**, drawn entirely by its master while the other three blocks
+render nothing, exactly as stock IE draws a tank or a metal press. There is no seam down the middle
+because there is nothing there to seam: the desk runs the full two blocks, and so does the screen.
+The display is the fluid network's own — a header main across the top, eleven tank level gauges
+hanging off it, flow pips marching along the bottom, and the delivery main under them, in the
+fittings' cool blue rather than the grid's orange. Losing power swaps the screen texture for a dead
+one rather than changing the model.
+
+Taking it apart — hammer or pickaxe — returns the four component blocks to where they were.
+
+> **Migration.** Consoles formed before this change were laid out along `facing.rotateYCCW()` of an
+> outward-pointing facing, while `TileEntityMultiblockPart` walks a structure along
+> `facing.rotateY()` of an inward one — so disassembling one freed a single column and left the
+> other two blocks formed, stuck and undroppable. The geometry follows IE's convention now. **An
+> existing console carries the old offsets: break it and rebuild it.**
+
+Four tabs: **Overview**, **Mains**, **Fittings**, **Stats**. The grid's console
 has six; failover chains and the long-form stats page stay on the command for now, and what a main
 carries earns a place on the main editor instead — it is the one question the grid never has to ask.
 
@@ -295,7 +325,9 @@ The mirror extends to the tests: `FluidNetTestSupport` is `GridTestSupport` with
 | The per-tick pass | `api/fluid/network/FluidNetEngine.java` |
 | Server-wide registry | `api/fluid/network/VirtualFluidNet.java` |
 | Block, metas, fittings | `common/blocks/fluidnet/` |
-| Console multiblock shape | `common/blocks/multiblocks/MultiblockFluidConsole.java` |
+| Console multiblock shape | `common/blocks/multiblocks/MultiblockFluidConsole.java`, `common/blocks/fluidnet/FluidConsoleGeometry.java` |
+| Console model and textures | `docs/tools/make_fluid_console_assets.py` (shell shared with `make_terminal_assets.py`) |
+| Fitting textures | `docs/tools/make_fluidnet_textures.py` |
 | Console GUI / container | `client/gui/GuiFluidConsole.java`, `common/gui/ContainerFluidConsole.java`, `ContainerFluidNetBase.java` |
 | GUI packets | `common/util/network/MessageFluidNetSync.java`, `MessageFluidNetAction.java` |
 | Client-side copy of the network | `common/util/fluidnet/ClientFluidNetCache.java` |
