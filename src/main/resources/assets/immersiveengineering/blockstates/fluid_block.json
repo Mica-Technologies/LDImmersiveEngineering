@@ -50,6 +50,9 @@
 		"ie_sour_gas": [{
 			"custom": { "fluid": "ie_sour_gas" }
 		}],
+		"ie_steam": [{
+			"custom": { "fluid": "ie_steam" }
+		}],
 		"concrete": [{
 			"custom": { "fluid": "concrete" }
 		}],
