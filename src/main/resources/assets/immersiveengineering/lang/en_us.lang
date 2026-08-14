@@ -2033,6 +2033,7 @@ ie.manual.entry.crawler3=§lThe tools.§r §6G§r changes attachment, §6V§r wo
 ie.manual.entry.crawler4=§lDiesel, and nothing else.§r Right-click the machine with a container of §6Diesel§r to fuel it - the refined cut, not Biodiesel. The Gas Station Pump will fill it.<br>The engine burns while anyone is aboard, and the attachment burns more. Below §6400mB§r the tool stops but the tracks keep turning: that reserve exists so the machine cannot strand you a long way from home, in a thing that cannot be pushed.<br>§lTaking it away.§r §6Sneak and right-click with an Engineer's Hammer.§r It comes back as an item, with its diesel still in it.
 chat.immersiveengineering.info.crawlerWrongFuel=The Crawler runs on Diesel and will take nothing else.
 chat.immersiveengineering.info.crawlerTankFull=The tank is already full.
+chat.immersiveengineering.info.crawlerFuelled=Fuelling: %s / %s mB Diesel (%s%%)
 desc.immersiveengineering.info.crawlerFuel=Diesel: %s / %s mB
 item.immersiveengineering.hydraulic_crawler.info=A tracked machine you climb into and drive. Place it on clear ground, right-click to get in.<br><br>WASD drives, look to slew the cab. R/C raise and lower the arm, X/Z reach in and out, G changes attachment and V works it.<br><br>Runs on Diesel. Sneak and right-click with an Engineer's Hammer to take it away again.
 chat.immersiveengineering.info.petroleum.tankDisassembled=Storage Tank taken apart. Its contents are kept.

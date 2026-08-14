@@ -731,9 +731,19 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		if(offered==null||offered.amount <= 0)
 			return false;
 
-		//Anything that actually moved needs nothing said about it: the gauge is the feedback.
+		//Something moved: say how far along the tank now is. The gauge would be the natural
+		//feedback, but it lives on the operator's HUD and the person filling the machine is
+		//standing outside it -- a fill that takes a dozen cans gave no sign of progress until the
+		//next one was refused as full. No-spam, so a stream of clicks reads as one line counting
+		//up rather than a wall of chat.
 		if(FluidUtil.interactWithFluidHandler(player, hand, fuel))
+		{
+			if(!world.isRemote)
+				ChatUtils.sendServerNoSpamMessages(player, new TextComponentTranslation(
+						Lib.CHAT_INFO+"crawlerFuelled", fuel.getFluidAmount(), fuel.getCapacity(),
+						100*fuel.getFluidAmount()/Math.max(1, fuel.getCapacity())));
 			return true;
+		}
 
 		//Refused, and said so. Which of the two reasons it is matters: "wrong fuel" on a machine
 		//whose tank is simply full would send somebody looking for the wrong problem.
