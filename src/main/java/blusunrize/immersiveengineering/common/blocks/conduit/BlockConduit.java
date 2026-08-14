@@ -47,6 +47,11 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 				IEProperties.SIDECONNECTION[0], IEProperties.SIDECONNECTION[1],
 				IEProperties.SIDECONNECTION[2], IEProperties.SIDECONNECTION[3],
 				IEProperties.SIDECONNECTION[4], IEProperties.SIDECONNECTION[5],
+				//The junction box's own view of the same six faces -- which ones a run physically
+				//touches, rather than which ones are patched. See RUNCONNECTION's own comment.
+				IEProperties.RUNCONNECTION[0], IEProperties.RUNCONNECTION[1],
+				IEProperties.RUNCONNECTION[2], IEProperties.RUNCONNECTION[3],
+				IEProperties.RUNCONNECTION[4], IEProperties.RUNCONNECTION[5],
 				//Unlisted, and the only way the ground feeder's model can find out what it is
 				//supposed to look like: the disguise lives on the tile entity, not in the state.
 				IEProperties.TILEENTITY_PASSTHROUGH);
@@ -119,15 +124,28 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		}
 		if(tile instanceof TileEntityJunctionBox)
 		{
-			//The same six properties, carrying "this face is patched" rather than "this face is
-			//joined". Two meanings for one property is worth a second look, but the two block types
-			//are drawn by different blockstate files and neither can see the other's, so there is
-			//nowhere for them to be confused -- and the alternative is six more properties on a block
-			//that already declares eight.
+			//The same six SIDECONNECTION properties the run uses, carrying "this face is patched"
+			//here rather than "this face is joined". Two meanings for one property is worth a second
+			//look, but the two block types are drawn by different blockstate files and neither can
+			//see the other's, so there is nowhere for them to be confused.
 			ConduitPatch patch = ((TileEntityJunctionBox)tile).getPatch();
 			for(EnumFacing side : EnumFacing.VALUES)
 				state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
 						patch.isPatched(side));
+			//The box's own idea of which faces a run actually touches -- see
+			//ConduitGeometry.joinsJunctionBox for why this cannot be read off the patch table: a run
+			//passing through unconfigured is exactly the common case, and its faces still need to
+			//meet the box's model rather than leave a gap where a conduit's arm reaches flush.
+			for(EnumFacing side : EnumFacing.VALUES)
+			{
+				TileEntity neighbour = world.getTileEntity(pos.offset(side));
+				EnumFacing neighbourMount = neighbour instanceof TileEntityConduit
+						?((TileEntityConduit)neighbour).facing: null;
+				EnumFacing.Axis feederAxis = neighbour instanceof TileEntityGroundFeeder
+						?((TileEntityGroundFeeder)neighbour).getAxis(): null;
+				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()],
+						ConduitGeometry.joinsJunctionBox(side, neighbourMount, feederAxis));
+			}
 		}
 		return state;
 	}

@@ -796,4 +796,158 @@ class ConduitAssetsTest
 			}
 		}
 	}
+
+	/**
+	 * ISSUE 10: a box's model was inset from the block boundary on every face but the one it
+	 * already sits flush against, so a run's flush arm always stopped short of the box's actual
+	 * surface -- a visible gap that read as a run failing to terminate, worst of all directly
+	 * above or below a box, where the box's squat height left the largest gap of all.
+	 * <p>
+	 * These stubs are the box's own housing extended to close that gap on whichever faces need
+	 * it, keyed by {@code runconnection_*} -- a second, unrelated set of properties from the
+	 * patch plates' {@code sideconnection_*}, since {@link BlockConduit} already uses that name
+	 * for "this face is patched" on a box. Nothing here is hardcoded to "down is already flush":
+	 * every expectation is read back out of the box's own generated model, so a future change to
+	 * the box's size moves these tests with it instead of leaving them to quietly stop meaning
+	 * anything.
+	 */
+	@Nested
+	@DisplayName("the junction box's run stubs")
+	class RunStubs
+	{
+		private JsonArray parts()
+		{
+			return read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
+		}
+
+		/**
+		 * @return the model a face's stub is drawn with, or null if the blockstate has no part for it
+		 */
+		private String stubModelFor(EnumFacing face)
+		{
+			String property = "runconnection_"+face.getName();
+			for(JsonElement element : parts())
+			{
+				JsonObject part = element.getAsJsonObject();
+				if(!part.has("when"))
+					continue;
+				JsonObject when = part.getAsJsonObject("when");
+				if(when.has(property)&&"true".equals(when.get(property).getAsString()))
+					return part.getAsJsonObject("apply").get("model").getAsString();
+			}
+			return null;
+		}
+
+		private int[] boxBounds()
+		{
+			JsonObject element = read("models/block/conduit/junction_box.json")
+					.getAsJsonArray("elements").get(0).getAsJsonObject();
+			JsonArray from = element.getAsJsonArray("from");
+			JsonArray to = element.getAsJsonArray("to");
+			return new int[]{from.get(0).getAsInt(), from.get(1).getAsInt(), from.get(2).getAsInt(),
+					to.get(0).getAsInt(), to.get(1).getAsInt(), to.get(2).getAsInt()};
+		}
+
+		/**
+		 * @return true if the box's own model already reaches the block boundary on that face, so
+		 * there is nothing for a stub to bridge
+		 */
+		private boolean boxAlreadyTouches(EnumFacing face, int[] box)
+		{
+			int axis = face.getAxis().ordinal();
+			return face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE
+					?box[axis]==0
+					:box[axis+3]==16;
+		}
+
+		@Test
+		@DisplayName("a stub is offered on every face the box does not already touch, and none it does")
+		void stubsCoverExactlyTheGap()
+		{
+			int[] box = boxBounds();
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				boolean flush = boxAlreadyTouches(face, box);
+				String model = stubModelFor(face);
+				if(flush)
+					assertNull(model, "the box already reaches the block edge on "+face
+							+"; a stub there is a seam nobody would ever see the point of");
+				else
+					assertNotNull(model, "no stub for "+face+": a run terminating there leaves "
+							+"the gap the playtest report was about");
+			}
+		}
+
+		@Test
+		@DisplayName("every stub model exists")
+		void everyStubModelExists()
+		{
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				String model = stubModelFor(face);
+				if(model==null)
+					continue;
+				assertTrue(new File(ASSETS+modelPath(model)).isFile(), "missing stub model: "+model);
+			}
+		}
+
+		@Test
+		@DisplayName("a stub reaches from the box's own face to the block edge, at the box's own width")
+		void stubBridgesTheGap()
+		{
+			int[] box = boxBounds();
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				String model = stubModelFor(face);
+				if(model==null)
+					continue;
+				JsonObject element = read(modelPath(model)).getAsJsonArray("elements").get(0)
+						.getAsJsonObject();
+				JsonArray from = element.getAsJsonArray("from");
+				JsonArray to = element.getAsJsonArray("to");
+				int axis = face.getAxis().ordinal();
+				if(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+				{
+					assertEquals(0, from.get(axis).getAsInt(),
+							face+" stub does not reach the block edge");
+					assertEquals(box[axis], to.get(axis).getAsInt(),
+							face+" stub overlaps or misses the box");
+				}
+				else
+				{
+					assertEquals(box[axis+3], from.get(axis).getAsInt(),
+							face+" stub overlaps or misses the box");
+					assertEquals(16, to.get(axis).getAsInt(),
+							face+" stub does not reach the block edge");
+				}
+				//Off its own axis the stub is exactly the box's own cross-section, so the housing
+				//reads as one shape reaching out rather than a second box bolted to the first.
+				for(int i = 0; i < 3; i++)
+				{
+					if(i==axis)
+						continue;
+					assertEquals(box[i], from.get(i).getAsInt(), face+" stub is not the box's own width");
+					assertEquals(box[i+3], to.get(i).getAsInt(), face+" stub is not the box's own width");
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("a stub uses the box's own texture, not the conduit's")
+		void stubLooksLikeTheBox()
+		{
+			//A stub is the box's housing reaching out to meet the run, not a length of tubing --
+			//texturing it as tube would read as a conduit arm the box never grew, which is the
+			//exact confusion this whole fix exists to remove.
+			for(EnumFacing face : EnumFacing.VALUES)
+			{
+				String model = stubModelFor(face);
+				if(model==null)
+					continue;
+				JsonObject textures = read(modelPath(model)).getAsJsonObject("textures");
+				assertEquals("immersiveengineering:blocks/conduit_junction_box",
+						textures.get("box").getAsString(), face+" stub does not reuse the box's texture");
+			}
+		}
+	}
 }

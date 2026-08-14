@@ -56,6 +56,18 @@ public class IEProperties
 			PropertyBoolInverted.create("sideconnection_east")
 	};
 
+	//The conduit junction box's own idea of which faces a run is physically touching, as opposed to
+	//SIDECONNECTION above, which the box already uses to mean "this face is patched". The two cannot
+	//share one property: a box can have a run arriving on a face that is not patched at all.
+	public static final PropertyBoolInverted[] RUNCONNECTION = {
+			PropertyBoolInverted.create("runconnection_down"),
+			PropertyBoolInverted.create("runconnection_up"),
+			PropertyBoolInverted.create("runconnection_north"),
+			PropertyBoolInverted.create("runconnection_south"),
+			PropertyBoolInverted.create("runconnection_west"),
+			PropertyBoolInverted.create("runconnection_east")
+	};
+
 	//An array of non-descript booleans for mirroring, active textures, etc.
 	public static final PropertyBoolInverted[] BOOLEANS = {
 			PropertyBoolInverted.create("boolean0"),

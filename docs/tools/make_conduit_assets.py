@@ -228,7 +228,9 @@ def build_junction_box(assets, depth, half):
         "elements": [{"from": frm, "to": to, "faces": faces}],
     })
     build_patch_models(assets, frm, to)
-    # Multipart: the box always, plus a coloured plate on each patched face.
+    run_faces = build_run_stub_models(assets, frm, to)
+    # Multipart: the box always, plus a coloured plate on each patched face, plus a stub toward
+    # each face a run is physically touching.
     #
     # A `variants` file would have to resolve the *whole* property string the state mapper hands
     # it -- type, facing and all six sideconnection flags, because BlockConduit declares them for
@@ -244,6 +246,15 @@ def build_junction_box(assets, depth, half):
         parts.append({
             "when": {"sideconnection_%s" % face: "true"},
             "apply": {"model": MODEL_REF % ("junction_patch_%s" % face)},
+        })
+    # The run stubs key off runconnection_*, a second and unrelated set of properties BlockConduit
+    # also fills on a box -- see IEProperties.RUNCONNECTION. Only the faces build_run_stub_models
+    # actually wrote get a part: the box already reaches the block's own bottom, so there is no gap
+    # to close there and no model to name.
+    for face in run_faces:
+        parts.append({
+            "when": {"runconnection_%s" % face: "true"},
+            "apply": {"model": MODEL_REF % ("junction_run_%s" % face)},
         })
     write_json(os.path.join(assets, "blockstates", "conduit_junction_box.json"), {
         "multipart": parts,
@@ -295,6 +306,57 @@ def build_patch_models(assets, frm, to):
             "textures": {"patch": "immersiveengineering:blocks/conduit_patch"},
             "elements": [{"from": lo, "to": hi, "faces": faces}],
         })
+
+
+def run_stub_bounds(frm, to, face):
+    """Where a stub toward one face sits: the box's own cross-section, extended from the box's
+    edge out to the block boundary that face's arm reaches.
+
+    Returns None on a face the box already reaches by itself -- the box sits flush against the
+    bottom of its cell, so "down" has nothing to bridge and generating a zero-thickness box there
+    would be a model that parses and draws nothing.
+    """
+    lo, hi = list(frm), list(to)
+    i = "xyz".index(AXIS_OF[face])
+    if face in NEGATIVE:
+        hi[i], lo[i] = frm[i], 0
+    else:
+        lo[i], hi[i] = to[i], 16
+    if lo[i] == hi[i]:
+        return None
+    return lo, hi
+
+
+def build_run_stub_models(assets, frm, to):
+    """One model per face that needs to close the gap between the box and a conduit's flush arm.
+
+    Before this the box was the one surface a run reaches that never grew to meet it: a conduit
+    already draws an arm all the way to the block edge on a face it joins the box across (see
+    TileEntityConduit.connectsTo and the commit that added it), but the box's own model stopped
+    short of that same edge on every face except the one it already sits flush against. The gap
+    read as a run that had not finished, or as a second one starting apart from the first -- worse
+    on top or below a box, where the box's squat height leaves the largest gap of all.
+
+    Textured and coloured like the box itself: a stub is the box's own housing reaching out, not a
+    length of tubing, so it uses the box's texture rather than the conduit's.
+    """
+    out = os.path.join(assets, "models", "block", "conduit")
+    written = []
+    for face in FACINGS:
+        bounds = run_stub_bounds(frm, to, face)
+        if bounds is None:
+            continue
+        lo, hi = bounds
+        faces = {f: {"texture": "#box"} for f in FACINGS}
+        write_json(os.path.join(out, "junction_run_%s.json" % face), {
+            "textures": {
+                "box": "immersiveengineering:blocks/conduit_junction_box",
+                "particle": "immersiveengineering:blocks/conduit_junction_box",
+            },
+            "elements": [{"from": lo, "to": hi, "faces": faces}],
+        })
+        written.append(face)
+    return written
 
 
 def build_patch_texture(assets):

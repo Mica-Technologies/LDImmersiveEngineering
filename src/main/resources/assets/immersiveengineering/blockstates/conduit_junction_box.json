@@ -52,6 +52,46 @@
 			"apply": {
 				"model": "immersiveengineering:conduit/junction_patch_east"
 			}
+		},
+		{
+			"when": {
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_run_up"
+			}
+		},
+		{
+			"when": {
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_run_north"
+			}
+		},
+		{
+			"when": {
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_run_south"
+			}
+		},
+		{
+			"when": {
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_run_west"
+			}
+		},
+		{
+			"when": {
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/junction_run_east"
+			}
 		}
 	]
 }

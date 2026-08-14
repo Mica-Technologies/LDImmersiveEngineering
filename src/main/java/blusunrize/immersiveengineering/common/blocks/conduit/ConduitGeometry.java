@@ -165,6 +165,35 @@ public class ConduitGeometry
 	}
 
 	/**
+	 * Whether a junction box should draw a run physically arriving on face {@code dir}.
+	 * <p>
+	 * The box's own version of {@link #connects}: a conduit joins the box if the step from the box
+	 * to the conduit lies in the conduit's own plane -- the same rule {@code ConduitRoute} walks the
+	 * world with -- and a ground feeder joins it if the step runs along the feeder's axis. Two boxes
+	 * touching each other are never joined; a run ends at the first box it meets, and a box is not a
+	 * length of conduit.
+	 * <p>
+	 * This exists because the two halves of a joint used to be decided differently: the conduit drew
+	 * an arm reaching the box (see {@code TileEntityConduit.connectsTo}), but the box itself had no
+	 * matching idea of which of its faces a run actually touched, so its model never grew to meet
+	 * that arm. The gap between a flush conduit end and an unmoved box read as a run that had not
+	 * finished, or as a second one starting next to it.
+	 *
+	 * @param dir           the direction from the box toward the neighbour
+	 * @param neighbourMount the neighbour's mounting face, if it is a conduit; null otherwise
+	 * @param feederAxis    the neighbour's axis, if it is a ground feeder; null otherwise
+	 */
+	public static boolean joinsJunctionBox(EnumFacing dir, @Nullable EnumFacing neighbourMount,
+										   @Nullable EnumFacing.Axis feederAxis)
+	{
+		if(neighbourMount!=null)
+			return isInPlane(neighbourMount, dir);
+		if(feederAxis!=null)
+			return dir.getAxis()==feederAxis;
+		return false;
+	}
+
+	/**
 	 * The name a generated model file uses for one arm.
 	 * <p>
 	 * Lower case and mount-first, matching the blockstate this fork's asset script writes. It lives
@@ -180,5 +209,15 @@ public class ConduitGeometry
 	public static String hubModelName(EnumFacing mount)
 	{
 		return "conduit_"+mount.getName()+"_hub";
+	}
+
+	/**
+	 * The name a generated model file uses for the junction box's stub toward one face -- the piece
+	 * that closes the gap between the box's own model and the block edge a conduit's arm reaches, on
+	 * whichever faces the box does not already touch on its own.
+	 */
+	public static String junctionRunModelName(EnumFacing dir)
+	{
+		return "junction_run_"+dir.getName();
 	}
 }

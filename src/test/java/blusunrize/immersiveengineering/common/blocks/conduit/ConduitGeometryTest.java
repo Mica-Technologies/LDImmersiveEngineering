@@ -163,6 +163,53 @@ class ConduitGeometryTest
 	}
 
 	@Nested
+	@DisplayName("what a junction box thinks is touching it")
+	class JoiningABox
+	{
+		@Test
+		@DisplayName("a conduit joins the box if the step is in the conduit's own plane")
+		void conduitInPlaneJoins()
+		{
+			//A conduit mounted on a north wall runs up, down, east and west -- so a box above or
+			//below it, or to either side, all join. This is the exact case from the playtest report:
+			//a box on top of or underneath a run looked disconnected even though the run reached it.
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.UP, EnumFacing.NORTH, null));
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.DOWN, EnumFacing.NORTH, null));
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.EAST, EnumFacing.NORTH, null));
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.WEST, EnumFacing.NORTH, null));
+		}
+
+		@Test
+		@DisplayName("a conduit does not join across its own mounting axis")
+		void conduitOffPlaneDoesNotJoin()
+		{
+			//A box sitting off the wall a conduit is clipped to -- the direction a plane change would
+			//need a second box for -- is not a join, the same as two conduits meeting there are not.
+			assertFalse(ConduitGeometry.joinsJunctionBox(EnumFacing.NORTH, EnumFacing.NORTH, null));
+			assertFalse(ConduitGeometry.joinsJunctionBox(EnumFacing.SOUTH, EnumFacing.NORTH, null));
+		}
+
+		@Test
+		@DisplayName("a feeder joins the box along its own axis and no other")
+		void feederOnAxisJoins()
+		{
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.UP, null, EnumFacing.Axis.Y));
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.DOWN, null, EnumFacing.Axis.Y));
+			assertFalse(ConduitGeometry.joinsJunctionBox(EnumFacing.NORTH, null, EnumFacing.Axis.Y));
+		}
+
+		@Test
+		@DisplayName("nothing, or another box, does not join")
+		void nothingJoins()
+		{
+			//Covers both a bare neighbour and a second box touching this one: a run ends at the
+			//first box it meets, and a box is not a length of conduit.
+			for(EnumFacing dir : EnumFacing.VALUES)
+				assertFalse(ConduitGeometry.joinsJunctionBox(dir, null, null));
+		}
+	}
+
+	@Nested
 	@DisplayName("shapes")
 	class Shapes
 	{
