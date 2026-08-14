@@ -22,8 +22,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,6 +55,8 @@ class CrawlerAssetsTest
 	private static final String ASSETS = "src/main/resources/assets/immersiveengineering/";
 	private static final String MODEL_SRC =
 			"src/main/java/blusunrize/immersiveengineering/client/models/ModelHydraulicCrawler.java";
+	private static final String RENDER_SRC =
+			"src/main/java/blusunrize/immersiveengineering/client/render/EntityRenderHydraulicCrawler.java";
 	private static final String GENERATOR = "docs/tools/make_crawler_obj.py";
 	private static final String OBJ = ASSETS+"models/entity/hydraulic_crawler.obj";
 
@@ -136,6 +141,63 @@ class CrawlerAssetsTest
 				.matcher(source);
 		assertTrue(m.find(), "no constant "+name+" to compare");
 		return Double.parseDouble(m.group(1));
+	}
+
+	/** @return the value of a {@code String NAME = "value";} constant */
+	private static String stringConstant(String source, String name)
+	{
+		Matcher m = Pattern.compile(Pattern.quote(name)+"\\s*=\\s*\"([^\"]*)\"").matcher(source);
+		assertTrue(m.find(), "no constant "+name+" to resolve; a group name has been built some other "
+				+"way and this test can no longer say what is drawn");
+		return m.group(1);
+	}
+
+	/**
+	 * @return the source with its comments removed
+	 * <p>
+	 * Every test below counts draws and matrix operations by reading the source, and this file's
+	 * comments quote both -- a javadoc that mentions {@code model.render(HOUSE)} would otherwise be
+	 * counted as a draw of the house, and the accounting would be off by exactly the number of times
+	 * the code was explained well.
+	 */
+	private static String code(String source)
+	{
+		return source.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("(?m)//[^\n]*", "");
+	}
+
+	/** @return every quoted string on the lines between the two markers */
+	private static List<String> quoted(String source, String start, String end)
+	{
+		int from = source.indexOf(start);
+		assertTrue(from >= 0, "could not find \""+start+"\"; it has been renamed or reformatted and "
+				+"this test is no longer reading it");
+		int to = source.indexOf(end, from+start.length());
+		assertTrue(to > from, "could not find the end of the table beginning at \""+start+"\"");
+		List<String> found = new ArrayList<>();
+		Matcher m = Pattern.compile("\"([^\"]*)\"").matcher(source.substring(from+start.length(), to));
+		while(m.find())
+			found.add(m.group(1));
+		return found;
+	}
+
+	private static int occurrences(String source, String needle)
+	{
+		int found = 0;
+		for(int at = source.indexOf(needle); at >= 0; at = source.indexOf(needle, at+1))
+			found++;
+		return found;
+	}
+
+	/**
+	 * @return the OBJ's group names, in file order
+	 */
+	private static List<String> groups()
+	{
+		List<String> names = new ArrayList<>();
+		Matcher m = Pattern.compile("(?m)^o (\\S+)").matcher(read(OBJ));
+		while(m.find())
+			names.add(m.group(1));
+		return names;
 	}
 
 	@Nested
@@ -277,18 +339,6 @@ class CrawlerAssetsTest
 	@DisplayName("the model")
 	class Model
 	{
-		/**
-		 * @return the OBJ's group names, in file order
-		 */
-		private List<String> groups()
-		{
-			List<String> names = new ArrayList<>();
-			Matcher m = Pattern.compile("(?m)^o (\\S+)").matcher(read(OBJ));
-			while(m.find())
-				names.add(m.group(1));
-			return names;
-		}
-
 		@Test
 		@DisplayName("it exists, and is quads with texture coordinates on every corner")
 		void wellFormed()
@@ -412,6 +462,178 @@ class CrawlerAssetsTest
 			assertTrue(glassPass > lastOpaque&&lastOpaque > 0,
 					"the glass is drawn before the arm, so whatever the blend should have shown "
 							+"through it had not been drawn yet");
+		}
+	}
+
+	@Nested
+	@DisplayName("the draw pass")
+	class Draws
+	{
+		/**
+		 * The attachment this accounting assumes is fitted. Exactly one of the three is ever drawn --
+		 * {@code groupFor(attachment)} picks it -- so the other two are steel the frame does not
+		 * contain, and collapsing all three onto one name is what lets "every group exactly once" be
+		 * a statement about a frame rather than about the file.
+		 */
+		private final String fitted = "tool_"+CrawlerAttachment.VALUES[0].getName();
+
+		/**
+		 * @return every group named by one {@code model.render} argument, with the loops around it
+		 * expanded
+		 * <p>
+		 * The renderer builds most of its group names, so the argument is an expression rather than a
+		 * name: {@code "wheel_"+side+"_"+i} inside two loops is twelve draws. Expanding it here, off
+		 * the model's own {@code SIDES} and {@code WHEELS} tables, is what makes the count below a
+		 * count of draws and not a count of source lines.
+		 */
+		private List<String> named(String java, String argument, List<String> sides, int wheels)
+		{
+			if(argument.startsWith("groupFor("))
+				return Collections.singletonList(fitted);
+			if(!argument.startsWith("\""))
+				return Collections.singletonList(stringConstant(java, argument));
+			List<String> names = new ArrayList<>(Collections.singletonList(""));
+			for(String piece : argument.split("\\+"))
+			{
+				String token = piece.trim();
+				List<String> options;
+				if(token.startsWith("\""))
+					options = Collections.singletonList(token.substring(1, token.length()-1));
+				else if(token.equals("side"))
+					options = sides;
+				else if(token.equals("i"))
+				{
+					options = new ArrayList<>();
+					for(int i = 0; i < wheels; i++)
+						options.add(Integer.toString(i));
+				}
+				else
+					throw new AssertionError("a group name is built from \""+token+"\", which this "
+							+"test cannot resolve; whatever it stands for is drawn an unknown number "
+							+"of times a frame");
+				List<String> grown = new ArrayList<>();
+				for(String prefix : names)
+					for(String option : options)
+						grown.add(prefix+option);
+				names = grown;
+			}
+			return names;
+		}
+
+		@Test
+		@DisplayName("every group is drawn exactly once a frame")
+		void everyGroupDrawnOnce()
+		{
+			//	=================================
+			//	The accounting that says a duplicate is a duplicate.
+			//	=================================
+			//
+			// A group drawn twice is not a doubled outline: the second draw carries whatever transform
+			// the stack happens to hold, so it lands wherever that puts it -- which, for a machine
+			// posed in model units under a 1/16 scale, can be tens of blocks away and read as a second
+			// machine floating in a field. Nothing at runtime reports it, and from most angles it is
+			// off screen. So the count is pinned here, off the source, where a second draw of anything
+			// has to be added to this table on purpose.
+			String java = code(read(MODEL_SRC));
+			List<String> sides = quoted(java, "SIDES = {", "};");
+			int wheels = table(java, "WHEELS = {", "};").size();
+			assertEquals(2, sides.size(), "the machine has "+sides.size()+" sides, which it does not");
+			assertTrue(wheels >= 4, "found only "+wheels+" wheels; the table has probably been "
+					+"reformatted out from under this test");
+
+			Map<String, Integer> drawn = new LinkedHashMap<>();
+			Matcher m = Pattern.compile("model\\.render\\(([^,)]*)").matcher(java);
+			int calls = 0;
+			while(m.find())
+			{
+				calls++;
+				for(String group : named(java, m.group(1).trim(), sides, wheels))
+					drawn.merge(group, 1, Integer::sum);
+			}
+			assertEquals(8, calls,
+					"the model has "+calls+" draw calls rather than the eight this accounting knows "
+							+"about -- the undercarriage, a belt, a wheel, the house, the boom, the "
+							+"stick, the fitted tool and the glazing. A new one is a new piece of the "
+							+"machine and belongs in this test; a repeated one is the bug this test "
+							+"exists for");
+
+			Set<String> expected = new LinkedHashSet<>();
+			for(String group : groups())
+				expected.add(group.startsWith("tool_")?fitted: group);
+			assertEquals(expected, drawn.keySet(),
+					"the set of groups drawn in a frame is not the set the model file holds");
+			for(Map.Entry<String, Integer> entry : drawn.entrySet())
+				assertEquals(1, entry.getValue().intValue(),
+						"\""+entry.getKey()+"\" is drawn "+entry.getValue()+" times a frame; every "
+								+"copy after the first is painted wherever the stack happens to be");
+		}
+
+		@Test
+		@DisplayName("nothing is drawn outside a balanced push and pop")
+		void matrixStackBalances()
+		{
+			//A pop without a push takes the world's own matrix off the stack, and a push without a pop
+			//leaves the machine's frame under everything drawn after it. Either way the error shows up
+			//somewhere other than on the crawler, which is the hardest kind of render bug to place.
+			for(String source : new String[]{MODEL_SRC, RENDER_SRC})
+			{
+				String java = code(read(source));
+				Matcher m = Pattern.compile("GlStateManager\\.(pushMatrix|popMatrix)\\(\\)").matcher(java);
+				int depth = 0, pushes = 0;
+				while(m.find())
+					if(m.group(1).equals("pushMatrix"))
+					{
+						depth++;
+						pushes++;
+					}
+					else
+					{
+						depth--;
+						assertTrue(depth >= 0, source+" pops a matrix it never pushed, so the machine "
+								+"is drawn under the transform of whatever was rendered before it");
+					}
+				assertTrue(pushes > 0, source+" pushes no matrix at all");
+				assertEquals(0, depth, source+" leaves "+depth+" matrices on the stack, which every "
+						+"entity and every piece of HUD drawn after the crawler is then drawn under");
+			}
+		}
+
+		@Test
+		@DisplayName("the model scale wraps every pose the model makes")
+		void scaleWrapsEveryPose()
+		{
+			//	=================================
+			//	Why the order of these five lines is a test.
+			//	=================================
+			//
+			// Everything ModelHydraulicCrawler translates by -- the slew ring, the arm's pivots, the
+			// wheel spacing -- is in model units, sixteen to the block. They only mean that because
+			// the scale is already on the stack when the model runs. A translate that got in ahead of
+			// the scale would be applied in blocks instead: the wheels alone would be flung nineteen
+			// blocks up the machine's own axis, which is a second set of running gear parked in a
+			// field with no way to tell from the machine that it came from there.
+			String java = code(read(RENDER_SRC));
+			assertEquals(1, occurrences(java, "GlStateManager.translate("),
+					"the entity renderer translates more than once; only the one that places the "
+							+"machine may happen outside the model scale");
+			assertEquals(1, occurrences(java, "GlStateManager.scale("),
+					"the entity renderer scales more than once");
+			assertEquals(1, occurrences(java, "GlStateManager.rotate("),
+					"the entity renderer rotates more than once; the house's own slew belongs to the "
+							+"model, inside the scale");
+			int push = java.indexOf("GlStateManager.pushMatrix()");
+			int translate = java.indexOf("GlStateManager.translate(");
+			int scale = java.indexOf("GlStateManager.scale(");
+			int rotate = java.indexOf("GlStateManager.rotate(");
+			int draw = java.indexOf("model.render(");
+			int pop = java.indexOf("GlStateManager.popMatrix()");
+			assertTrue(push >= 0&&push < translate, "the machine is placed outside the push that is "
+					+"meant to contain it");
+			assertTrue(translate < scale, "the machine is scaled before it is placed, so the world "
+					+"position is scaled too and it is drawn a sixteenth of the way to the origin");
+			assertTrue(scale < rotate&&rotate < draw, "the model is drawn before it is scaled and "
+					+"turned, so every model unit is a block");
+			assertTrue(draw < pop, "the machine's own transform is popped before it is drawn");
 		}
 	}
 

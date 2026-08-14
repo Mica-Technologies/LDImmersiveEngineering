@@ -97,6 +97,19 @@ public final class CrawlerGeometry
 	public static final double TRACK_CENTRE = 18;
 
 	/**
+	 * Where the track-roll accumulators wrap back towards zero, in model units.
+	 * <p>
+	 * The renderer turns raw roll into wheel angles and a belt scroll, and a float that has
+	 * accumulated a few thousand blocks of driving no longer carries the precision either needs.
+	 * The wrap step is 24&pi;&middot;113: exactly 452 turns of a radius-3 road wheel and 339 of a
+	 * radius-4 sprocket (24&pi; is one turn of each, times 113), and because &pi;&asymp;355/113,
+	 * within seven hundred-thousandths of a unit of a whole number of 8-unit belt periods -- so
+	 * the wrap itself moves nothing anyone can see. It fires roughly every 530 blocks of travel,
+	 * which keeps the accumulator small enough that a float is exact to a thousandth of a unit.
+	 */
+	public static final float TRACK_ROLL_WRAP = (float)(24*Math.PI*113);
+
+	/**
 	 * Where the operator sits, relative to the centre of the machine.
 	 * <p>
 	 * <strong>Read off the model's cab box rather than guessed.</strong> The cab spans model x 1 to 15

@@ -952,6 +952,25 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		float units = (float)(travelled/CrawlerGeometry.UNIT);
 		trackLeft += units+(float)slip;
 		trackRight += units-(float)slip;
+		//The accumulators only ever grow, and a float that has grown for a few thousand blocks of
+		//driving no longer has the precision the belt scroll and wheel angles are computed from --
+		//the tracks would visibly quantise on a machine that has simply been driven a long way.
+		//Wrapped by a step that is an exact whole number of turns for both wheel radii and within
+		//a ten-thousandth of a pixel of a whole number of belt periods, so the step itself moves
+		//nothing anyone can see. prev moves with it, or the frame of the wrap would interpolate
+		//across the whole step.
+		if(Math.abs(trackLeft) > CrawlerGeometry.TRACK_ROLL_WRAP)
+		{
+			float step = Math.copySign(CrawlerGeometry.TRACK_ROLL_WRAP, trackLeft);
+			trackLeft -= step;
+			prevTrackLeft -= step;
+		}
+		if(Math.abs(trackRight) > CrawlerGeometry.TRACK_ROLL_WRAP)
+		{
+			float step = Math.copySign(CrawlerGeometry.TRACK_ROLL_WRAP, trackRight);
+			trackRight -= step;
+			prevTrackRight -= step;
+		}
 	}
 
 	/**

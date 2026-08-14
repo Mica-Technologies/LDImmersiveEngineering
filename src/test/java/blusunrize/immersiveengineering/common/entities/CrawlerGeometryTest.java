@@ -191,4 +191,44 @@ class CrawlerGeometryTest
 			assertEquals(0, CrawlerGeometry.shortestTurn(42, 402), EPSILON);
 		}
 	}
+
+	@Nested
+	@DisplayName("The track roll wrap")
+	class TrackRollWrap
+	{
+		/**
+		 * The wrap step must be invisible: an exact whole number of turns for every wheel radius
+		 * the model uses (3 and 4 -- ModelHydraulicCrawler.WHEELS, pinned here as literals the
+		 * same way the Agreement tests pin the generator's numbers), and as good as a whole
+		 * number of the 8-unit belt periods, or every wrap would visibly snap the running gear.
+		 */
+		@Test
+		@DisplayName("a wrap is whole turns of every wheel and whole periods of the belt")
+		void wrapMovesNothingVisible()
+		{
+			double wrap = CrawlerGeometry.TRACK_ROLL_WRAP;
+			for(double radius : new double[]{3, 4})
+			{
+				double turns = wrap/(2*Math.PI*radius);
+				assertEquals(Math.round(turns), turns, 1e-4,
+						"wrap is not whole turns of a radius-"+radius+" wheel");
+			}
+			double periods = wrap/8;
+			//355/113 buys about seven hundred-thousandths of a unit; a thousandth of a pixel of
+			//slack here keeps the assertion honest without depending on float rounding.
+			assertEquals(Math.round(periods), periods, 1e-3,
+					"wrap is not whole belt periods");
+		}
+
+		@Test
+		@DisplayName("the wrap fires long before a float loses the belt")
+		void wrapKeepsFloatsExact()
+		{
+			//Just past the wrap, the accumulator's float spacing must still be far finer than a
+			//single sheet pixel, or wrapping there would already be too late.
+			float justPastWrap = CrawlerGeometry.TRACK_ROLL_WRAP*1.5F;
+			assertTrue(Math.ulp(justPastWrap) < 1/64F,
+					"float spacing at the wrap point is "+Math.ulp(justPastWrap));
+		}
+	}
 }
