@@ -212,12 +212,70 @@ public class ConduitGeometry
 	}
 
 	/**
+	 * Which surface a junction box sits against, given what is around it.
+	 * <p>
+	 * <strong>A box has to be in the run's plane or it cannot meet the run.</strong> A conduit hugs
+	 * the face it is clipped to -- three pixels of it, no more -- so a box that does not hug the same
+	 * face is not merely offset from the run, it is in a part of the block the run never enters. That
+	 * was the whole of a defect this feature shipped with: the box was modelled as a lump standing on
+	 * the floor of its own cell whichever way it was bolted, so on a wall or a ceiling the run's arm
+	 * arrived at a boundary with nothing on the other side of it, and the piece grown out to close
+	 * that gap grew along the floor, three pixels clear of the wall the run was on.
+	 * <p>
+	 * Read off the neighbours rather than stored: it costs no block state -- {@code facing} is already
+	 * declared for every meta of this block and nothing else fills it in for a box -- and it needs no
+	 * placement rule, no tile entity field and no packet. It also cannot go stale, which a stored
+	 * mount would: a box is placed before the run reaches it as often as after.
+	 * <p>
+	 * A box where two planes meet -- which is what a box is <em>for</em> -- can only sit in one of
+	 * them, so the order is fixed rather than first-found: the same box in the same corner has to look
+	 * the same on two different days.
+	 *
+	 * @param neighbourMounts the mounting face of the conduit joining on each side, indexed by
+	 *                        {@code EnumFacing.ordinal()}, null where no run joins there
+	 *
+	 * @return the face to draw the box against; {@link EnumFacing#DOWN} when nothing joins it, which
+	 * is a box sitting on the floor of its cell and is what a box with no runs has always looked like
+	 */
+	public static EnumFacing junctionBoxMount(EnumFacing[] neighbourMounts)
+	{
+		for(EnumFacing candidate : MOUNT_PREFERENCE)
+			for(EnumFacing side : EnumFacing.VALUES)
+				if(neighbourMounts[side.ordinal()]==candidate&&isInPlane(candidate, side))
+					return candidate;
+		return EnumFacing.DOWN;
+	}
+
+	/**
+	 * The order a box picks a plane in when more than one run reaches it. Floors, then ceilings, then
+	 * walls -- the same order {@link ConduitPlacement} picks a surface in, for the same reason.
+	 */
+	private static final EnumFacing[] MOUNT_PREFERENCE = {
+			EnumFacing.DOWN, EnumFacing.UP,
+			EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.WEST, EnumFacing.EAST};
+
+	/** The name a generated model file uses for the box's housing on one mounting face. */
+	public static String junctionBoxModelName(EnumFacing mount)
+	{
+		return "junction_box_"+mount.getName();
+	}
+
+	/** The name a generated model file uses for one patch plate on a box mounted that way. */
+	public static String junctionPatchModelName(EnumFacing mount, EnumFacing face)
+	{
+		return "junction_patch_"+mount.getName()+"_"+face.getName();
+	}
+
+	/**
 	 * The name a generated model file uses for the junction box's stub toward one face -- the piece
 	 * that closes the gap between the box's own model and the block edge a conduit's arm reaches, on
 	 * whichever faces the box does not already touch on its own.
+	 * <p>
+	 * Per mount as well as per face: where the gap is, and what shape the piece closing it has to be
+	 * to actually meet the arm, are both decided by the surface the box is against.
 	 */
-	public static String junctionRunModelName(EnumFacing dir)
+	public static String junctionRunModelName(EnumFacing mount, EnumFacing dir)
 	{
-		return "junction_run_"+dir.getName();
+		return "junction_run_"+mount.getName()+"_"+dir.getName();
 	}
 }

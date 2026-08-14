@@ -89,6 +89,53 @@ class ConduitAssetsTest
 		return "models/block/"+path+".json";
 	}
 
+	/**
+	 * One part of the junction box's blockstate, picked out by the plane the box is in and the flag
+	 * that turns the part on.
+	 * <p>
+	 * Every part of that file is keyed on {@code facing} as well as on its own flag, because where
+	 * the housing is decides where a plate sits and what a stub has to bridge. See
+	 * {@code ConduitGeometry.junctionBoxMount} for where the facing comes from -- the box has none
+	 * of its own.
+	 *
+	 * @param mount    the surface the box is bolted to
+	 * @param property the connection flag the part waits on, or null for the housing itself
+	 *
+	 * @return the model that part draws, or null if the blockstate has no such part
+	 */
+	private static String junctionPart(EnumFacing mount, String property)
+	{
+		for(JsonElement element : read("blockstates/conduit_junction_box.json")
+				.getAsJsonArray("multipart"))
+		{
+			JsonObject part = element.getAsJsonObject();
+			if(!part.has("when"))
+				continue;
+			JsonObject when = part.getAsJsonObject("when");
+			if(!when.has("facing")||!mount.getName().equals(when.get("facing").getAsString()))
+				continue;
+			if(property==null?keys(when).size()==1
+					:when.has(property)&&"true".equals(when.get(property).getAsString()))
+				return part.getAsJsonObject("apply").get("model").getAsString();
+		}
+		return null;
+	}
+
+	/**
+	 * The junction box's own housing on that mount, as {minX, minY, minZ, maxX, maxY, maxZ} in
+	 * pixels, read back out of the generated model rather than restated here.
+	 */
+	private static int[] junctionHousing(EnumFacing mount)
+	{
+		JsonObject element = read("models/block/conduit/"
+				+ConduitGeometry.junctionBoxModelName(mount)+".json")
+				.getAsJsonArray("elements").get(0).getAsJsonObject();
+		JsonArray from = element.getAsJsonArray("from");
+		JsonArray to = element.getAsJsonArray("to");
+		return new int[]{from.get(0).getAsInt(), from.get(1).getAsInt(), from.get(2).getAsInt(),
+				to.get(0).getAsInt(), to.get(1).getAsInt(), to.get(2).getAsInt()};
+	}
+
 	@Nested
 	@DisplayName("the block's blockstate")
 	class BlockState
@@ -338,20 +385,41 @@ class ConduitAssetsTest
 		}
 
 		@Test
-		@DisplayName("its model and texture exist")
+		@DisplayName("its model and texture exist, one housing per surface it can be bolted to")
 		void modelAndTextureExist()
 		{
-			JsonArray parts = read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
-			//The unconditional one, rather than the only one: the box also carries a conditional
-			//plate per patched face, which PatchPlates below covers.
-			String model = null;
-			for(JsonElement element : parts)
-				if(!element.getAsJsonObject().has("when"))
-					model = element.getAsJsonObject().getAsJsonObject("apply").get("model").getAsString();
-			assertNotNull(model, "the box has no unconditional part, so an unpatched one draws nothing");
-			assertTrue(new File(ASSETS+modelPath(model)).isFile(),
-					"the box blockstate names a model nobody wrote: "+model);
+			//The housing is keyed on facing rather than drawn unconditionally, because a box that
+			//does not hug the same surface as its run cannot meet it -- see RunStubs below. The six
+			//are exhaustive, so a box always draws something whatever the state says.
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				String model = housingModelFor(mount);
+				assertNotNull(model, "no housing for a box mounted "+mount.getName()
+						+", so a box in that plane would draw as nothing but its plates");
+				assertTrue(new File(ASSETS+modelPath(model)).isFile(),
+						"the box blockstate names a model nobody wrote: "+model);
+				assertEquals(ConduitGeometry.junctionBoxModelName(mount),
+						model.substring(model.lastIndexOf('/')+1),
+						"the assets and ConduitGeometry disagree about what the housing is called");
+			}
 			assertTrue(new File(ASSETS+"textures/blocks/conduit_junction_box.png").isFile());
+		}
+
+		/** @return the model the box's own housing is drawn with on that mount, or null if none */
+		private String housingModelFor(EnumFacing mount)
+		{
+			for(JsonElement element : read("blockstates/conduit_junction_box.json")
+					.getAsJsonArray("multipart"))
+			{
+				JsonObject part = element.getAsJsonObject();
+				if(!part.has("when"))
+					continue;
+				JsonObject when = part.getAsJsonObject("when");
+				if(keys(when).size()==1&&when.has("facing")
+						&&mount.getName().equals(when.get("facing").getAsString()))
+					return part.getAsJsonObject("apply").get("model").getAsString();
+			}
+			return null;
 		}
 
 		@Test
@@ -381,10 +449,14 @@ class ConduitAssetsTest
 		{
 			//A player scanning a wall has to be able to pick the box out, because it is the only
 			//part they can interact with.
-			JsonObject model = read("models/block/conduit/junction_box.json");
-			String texture = model.getAsJsonObject("textures").get("box").getAsString();
-			assertNotEquals("immersiveengineering:blocks/conduit", texture,
-					"the box reuses the tube texture and would vanish into a run");
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				JsonObject model = read("models/block/conduit/"
+						+ConduitGeometry.junctionBoxModelName(mount)+".json");
+				String texture = model.getAsJsonObject("textures").get("box").getAsString();
+				assertNotEquals("immersiveengineering:blocks/conduit", texture,
+						"the box reuses the tube texture and would vanish into a run");
+			}
 		}
 
 		@Test
@@ -672,60 +744,51 @@ class ConduitAssetsTest
 	@DisplayName("the junction box's patch plates")
 	class PatchPlates
 	{
-		private JsonArray parts()
-		{
-			return read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
-		}
-
 		/**
-		 * @return the model a face's plate is drawn with, or null if the blockstate has no part for it
+		 * @return the model a face's plate is drawn with on a box bolted to that mount, or null if
+		 * the blockstate has no part for it
 		 */
-		private String plateModelFor(EnumFacing face)
+		private String plateModelFor(EnumFacing mount, EnumFacing face)
 		{
-			String property = "sideconnection_"+face.getName();
-			for(JsonElement element : parts())
-			{
-				JsonObject part = element.getAsJsonObject();
-				if(!part.has("when"))
-					continue;
-				JsonObject when = part.getAsJsonObject("when");
-				if(when.has(property)&&"true".equals(when.get(property).getAsString()))
-					return part.getAsJsonObject("apply").get("model").getAsString();
-			}
-			return null;
+			return junctionPart(mount, "sideconnection_"+face.getName());
 		}
 
 		@Test
-		@DisplayName("the box itself is still drawn unconditionally")
+		@DisplayName("the box itself is still drawn whatever plane it is in")
 		void boxIsAlwaysDrawn()
 		{
-			boolean unconditional = false;
-			for(JsonElement element : parts())
-				if(!element.getAsJsonObject().has("when"))
-					unconditional = true;
-			assertTrue(unconditional,
-					"every part is conditional, so an unpatched box would draw as nothing at all");
+			//The six housing parts are exhaustive over facing, which is what makes them as
+			//unconditional as the single part they replaced: a box always draws one of them.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				assertNotNull(junctionPart(mount, null),
+						"a box mounted "+mount.getName()+" draws no housing at all, only plates");
 		}
 
 		@Test
-		@DisplayName("every face has a plate")
+		@DisplayName("every face has a plate, in every plane the box can sit in")
 		void everyFaceIsCovered()
 		{
-			for(EnumFacing face : EnumFacing.VALUES)
-				assertNotNull(plateModelFor(face),
-						"no plate for "+face.getName()+": patching that face would change nothing you "
-								+"can see, which is the bug this whole thing exists to fix");
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+					assertNotNull(plateModelFor(mount, face),
+							"no plate for "+face.getName()+" on a box mounted "+mount.getName()
+									+": patching that face would change nothing you can see, which is "
+									+"the bug this whole thing exists to fix");
 		}
 
 		@Test
 		@DisplayName("every plate model exists")
 		void everyPlateModelExists()
 		{
-			for(EnumFacing face : EnumFacing.VALUES)
-			{
-				String path = modelPath(plateModelFor(face));
-				assertTrue(new File(ASSETS+path).isFile(), "missing plate model: "+path);
-			}
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					String path = modelPath(plateModelFor(mount, face));
+					assertTrue(new File(ASSETS+path).isFile(), "missing plate model: "+path);
+					assertEquals(ConduitGeometry.junctionPatchModelName(mount, face),
+							path.substring(path.lastIndexOf('/')+1).replace(".json", ""),
+							"the assets and ConduitGeometry disagree about what a plate is called");
+				}
 		}
 
 		@Test
@@ -740,43 +803,49 @@ class ConduitAssetsTest
 			// generator's face order and EnumFacing's have to agree. If they ever drift, every plate
 			// still draws and every plate is still coloured -- just the wrong colour on the wrong
 			// face, with nothing logged and nothing to see but a box that lies about its wiring.
-			for(EnumFacing face : EnumFacing.VALUES)
-			{
-				JsonObject model = read(modelPath(plateModelFor(face)));
-				JsonObject faces = model.getAsJsonArray("elements").get(0).getAsJsonObject()
-						.getAsJsonObject("faces");
-				for(String key : keys(faces))
-					assertEquals(face.ordinal(), faces.getAsJsonObject(key).get("tintindex").getAsInt(),
-							"the plate for "+face.getName()+" is tinted as though it were "
-									+"EnumFacing.byIndex("+faces.getAsJsonObject(key).get("tintindex")
-											.getAsInt()+")");
-			}
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					JsonObject model = read(modelPath(plateModelFor(mount, face)));
+					JsonObject faces = model.getAsJsonArray("elements").get(0).getAsJsonObject()
+							.getAsJsonObject("faces");
+					for(String key : keys(faces))
+						assertEquals(face.ordinal(),
+								faces.getAsJsonObject(key).get("tintindex").getAsInt(),
+								"the plate for "+face.getName()+" on a box mounted "+mount.getName()
+										+" is tinted as though it were another face");
+				}
 		}
 
 		@Test
 		@DisplayName("a plate stands proud of the face it marks and of no other")
 		void plateSitsOnItsOwnFace()
 		{
-			for(EnumFacing face : EnumFacing.VALUES)
+			for(EnumFacing mount : EnumFacing.VALUES)
 			{
-				JsonObject element = read(modelPath(plateModelFor(face)))
-						.getAsJsonArray("elements").get(0).getAsJsonObject();
-				int axis = face.getAxis().ordinal();
-				double from = element.getAsJsonArray("from").get(axis).getAsDouble();
-				double to = element.getAsJsonArray("to").get(axis).getAsDouble();
-				//Thin along its own axis -- a plate, not a second box. Anything thicker would poke
-				//through the far side and mark two faces at once.
-				assertTrue(to-from > 0&&to-from <= 1,
-						"the plate for "+face.getName()+" is "+(to-from)+" pixels thick");
-				//And outside the box, so it is visible at all. The box runs 3..13 horizontally and
-				//0..8 vertically, so a plate on a negative face sits at or below its lower bound and
-				//one on a positive face at or above its upper.
-				if(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
-					assertTrue(from < (face.getAxis()==EnumFacing.Axis.Y?0: 3)+0.001,
-							"the plate for "+face.getName()+" is buried inside the box");
-				else
-					assertTrue(to > (face.getAxis()==EnumFacing.Axis.Y?8: 13)-0.001,
-							"the plate for "+face.getName()+" is buried inside the box");
+				int[] box = junctionHousing(mount);
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					JsonObject element = read(modelPath(plateModelFor(mount, face)))
+							.getAsJsonArray("elements").get(0).getAsJsonObject();
+					int axis = face.getAxis().ordinal();
+					double from = element.getAsJsonArray("from").get(axis).getAsDouble();
+					double to = element.getAsJsonArray("to").get(axis).getAsDouble();
+					//Thin along its own axis -- a plate, not a second box. Anything thicker would
+					//poke through the far side and mark two faces at once.
+					assertTrue(to-from > 0&&to-from <= 1,
+							"the plate for "+face.getName()+" is "+(to-from)+" pixels thick");
+					//And outside the housing, so it is visible at all. Read off the housing rather
+					//than written out, so a change to the box's size moves the plates with it.
+					if(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+						assertTrue(from < box[axis]+0.001,
+								"the plate for "+face.getName()+" on a box mounted "+mount.getName()
+										+" is buried inside the housing");
+					else
+						assertTrue(to > box[axis+3]-0.001,
+								"the plate for "+face.getName()+" on a box mounted "+mount.getName()
+										+" is buried inside the housing");
+				}
 			}
 		}
 
@@ -784,72 +853,60 @@ class ConduitAssetsTest
 		@DisplayName("the texture the plates name exists")
 		void plateTextureExists()
 		{
-			for(EnumFacing face : EnumFacing.VALUES)
-			{
-				JsonObject textures = read(modelPath(plateModelFor(face))).getAsJsonObject("textures");
-				for(String key : keys(textures))
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
 				{
-					String reference = textures.get(key).getAsString();
-					String path = "textures/"+reference.substring(reference.indexOf(':')+1)+".png";
-					assertTrue(new File(ASSETS+path).isFile(), "missing plate texture: "+path);
+					JsonObject textures = read(modelPath(plateModelFor(mount, face)))
+							.getAsJsonObject("textures");
+					for(String key : keys(textures))
+					{
+						String reference = textures.get(key).getAsString();
+						String path = "textures/"+reference.substring(reference.indexOf(':')+1)+".png";
+						assertTrue(new File(ASSETS+path).isFile(), "missing plate texture: "+path);
+					}
 				}
-			}
 		}
 	}
 
 	/**
 	 * ISSUE 10: a box's model was inset from the block boundary on every face but the one it
 	 * already sits flush against, so a run's flush arm always stopped short of the box's actual
-	 * surface -- a visible gap that read as a run failing to terminate, worst of all directly
-	 * above or below a box, where the box's squat height left the largest gap of all.
+	 * surface -- a visible gap that read as a run failing to terminate.
 	 * <p>
-	 * These stubs are the box's own housing extended to close that gap on whichever faces need
-	 * it, keyed by {@code runconnection_*} -- a second, unrelated set of properties from the
-	 * patch plates' {@code sideconnection_*}, since {@link BlockConduit} already uses that name
-	 * for "this face is patched" on a box. Nothing here is hardcoded to "down is already flush":
-	 * every expectation is read back out of the box's own generated model, so a future change to
-	 * the box's size moves these tests with it instead of leaving them to quietly stop meaning
-	 * anything.
+	 * ISSUE 10a, found in a dev client with the first fix in: closing that gap along the box's own
+	 * axes is not enough, because the box was modelled as a lump standing on the floor of its cell
+	 * whichever surface it was bolted to. A conduit occupies the first three pixels off <em>its</em>
+	 * surface and nothing else, so on a wall or a ceiling the stub grew past the arm rather than
+	 * into it -- three pixels clear of the wall the run was on, in a part of the block the run never
+	 * enters. On a floor run the two coincided, which is why it read as correct in every test here
+	 * and wrong in the world. The box now hugs the same surface its runs do (see
+	 * {@code ConduitGeometry.junctionBoxMount}, which derives that from the runs rather than storing
+	 * it), and {@link #stubMeetsTheArmItIsFor} is the test that would have caught the difference:
+	 * it measures the stub against {@link ConduitBounds}, the arm's own source of truth, rather than
+	 * against the box alone.
+	 * <p>
+	 * The stubs are keyed by {@code runconnection_*} -- a second, unrelated set of properties from
+	 * the patch plates' {@code sideconnection_*}, since {@link BlockConduit} already uses that name
+	 * for "this face is patched" on a box -- and by {@code facing}, which is the plane. Nothing here
+	 * is hardcoded to "down is already flush": every expectation is read back out of the box's own
+	 * generated model, so a future change to the box's size moves these tests with it instead of
+	 * leaving them to quietly stop meaning anything.
 	 */
 	@Nested
 	@DisplayName("the junction box's run stubs")
 	class RunStubs
 	{
-		private JsonArray parts()
-		{
-			return read("blockstates/conduit_junction_box.json").getAsJsonArray("multipart");
-		}
-
 		/**
-		 * @return the model a face's stub is drawn with, or null if the blockstate has no part for it
+		 * @return the model a face's stub is drawn with on a box in that plane, or null if the
+		 * blockstate has no part for it
 		 */
-		private String stubModelFor(EnumFacing face)
+		private String stubModelFor(EnumFacing mount, EnumFacing face)
 		{
-			String property = "runconnection_"+face.getName();
-			for(JsonElement element : parts())
-			{
-				JsonObject part = element.getAsJsonObject();
-				if(!part.has("when"))
-					continue;
-				JsonObject when = part.getAsJsonObject("when");
-				if(when.has(property)&&"true".equals(when.get(property).getAsString()))
-					return part.getAsJsonObject("apply").get("model").getAsString();
-			}
-			return null;
-		}
-
-		private int[] boxBounds()
-		{
-			JsonObject element = read("models/block/conduit/junction_box.json")
-					.getAsJsonArray("elements").get(0).getAsJsonObject();
-			JsonArray from = element.getAsJsonArray("from");
-			JsonArray to = element.getAsJsonArray("to");
-			return new int[]{from.get(0).getAsInt(), from.get(1).getAsInt(), from.get(2).getAsInt(),
-					to.get(0).getAsInt(), to.get(1).getAsInt(), to.get(2).getAsInt()};
+			return junctionPart(mount, "runconnection_"+face.getName());
 		}
 
 		/**
-		 * @return true if the box's own model already reaches the block boundary on that face, so
+		 * @return true if the box's own housing already reaches the block boundary on that face, so
 		 * there is nothing for a stub to bridge
 		 */
 		private boolean boxAlreadyTouches(EnumFacing face, int[] box)
@@ -860,21 +917,52 @@ class ConduitAssetsTest
 					:box[axis+3]==16;
 		}
 
+		/** @return the stub's element as {minX, minY, minZ, maxX, maxY, maxZ} in pixels */
+		private int[] stubBounds(String model)
+		{
+			JsonObject element = read(modelPath(model)).getAsJsonArray("elements").get(0)
+					.getAsJsonObject();
+			JsonArray from = element.getAsJsonArray("from");
+			JsonArray to = element.getAsJsonArray("to");
+			return new int[]{from.get(0).getAsInt(), from.get(1).getAsInt(), from.get(2).getAsInt(),
+					to.get(0).getAsInt(), to.get(1).getAsInt(), to.get(2).getAsInt()};
+		}
+
 		@Test
 		@DisplayName("a stub is offered on every face the box does not already touch, and none it does")
 		void stubsCoverExactlyTheGap()
 		{
-			int[] box = boxBounds();
-			for(EnumFacing face : EnumFacing.VALUES)
+			for(EnumFacing mount : EnumFacing.VALUES)
 			{
-				boolean flush = boxAlreadyTouches(face, box);
-				String model = stubModelFor(face);
-				if(flush)
-					assertNull(model, "the box already reaches the block edge on "+face
-							+"; a stub there is a seam nobody would ever see the point of");
-				else
-					assertNotNull(model, "no stub for "+face+": a run terminating there leaves "
-							+"the gap the playtest report was about");
+				int[] box = junctionHousing(mount);
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					boolean flush = boxAlreadyTouches(face, box);
+					String model = stubModelFor(mount, face);
+					if(flush)
+						assertNull(model, "a box mounted "+mount.getName()+" already reaches the block "
+								+"edge on "+face+"; a stub there is a seam nobody would see the point of");
+					else
+						assertNotNull(model, "no stub for "+face+" on a box mounted "+mount.getName()
+								+": a run terminating there leaves the gap the playtest was about");
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("the face a box already touches is the one it is bolted to, and only that one")
+		void theFlushFaceIsTheMount()
+		{
+			//The housing hugs its surface, so it is flush there and inset everywhere else. Stated as
+			//a test because the stub set is derived from it: if the box ever stopped hugging, the
+			//stubs would silently start bridging the wrong gaps again.
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				int[] box = junctionHousing(mount);
+				for(EnumFacing face : EnumFacing.VALUES)
+					assertEquals(face==mount, boxAlreadyTouches(face, box),
+							"a box mounted "+mount.getName()+" is "
+									+(boxAlreadyTouches(face, box)?"flush":"inset")+" on "+face);
 			}
 		}
 
@@ -882,54 +970,114 @@ class ConduitAssetsTest
 		@DisplayName("every stub model exists")
 		void everyStubModelExists()
 		{
-			for(EnumFacing face : EnumFacing.VALUES)
-			{
-				String model = stubModelFor(face);
-				if(model==null)
-					continue;
-				assertTrue(new File(ASSETS+modelPath(model)).isFile(), "missing stub model: "+model);
-			}
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					String model = stubModelFor(mount, face);
+					if(model==null)
+						continue;
+					assertTrue(new File(ASSETS+modelPath(model)).isFile(), "missing stub model: "+model);
+					assertEquals(ConduitGeometry.junctionRunModelName(mount, face),
+							model.substring(model.lastIndexOf('/')+1),
+							"the assets and ConduitGeometry disagree about what a stub is called");
+				}
 		}
 
 		@Test
 		@DisplayName("a stub reaches from the box's own face to the block edge, at the box's own width")
 		void stubBridgesTheGap()
 		{
-			int[] box = boxBounds();
-			for(EnumFacing face : EnumFacing.VALUES)
+			for(EnumFacing mount : EnumFacing.VALUES)
 			{
-				String model = stubModelFor(face);
-				if(model==null)
-					continue;
-				JsonObject element = read(modelPath(model)).getAsJsonArray("elements").get(0)
-						.getAsJsonObject();
-				JsonArray from = element.getAsJsonArray("from");
-				JsonArray to = element.getAsJsonArray("to");
-				int axis = face.getAxis().ordinal();
-				if(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+				int[] box = junctionHousing(mount);
+				for(EnumFacing face : EnumFacing.VALUES)
 				{
-					assertEquals(0, from.get(axis).getAsInt(),
-							face+" stub does not reach the block edge");
-					assertEquals(box[axis], to.get(axis).getAsInt(),
-							face+" stub overlaps or misses the box");
-				}
-				else
-				{
-					assertEquals(box[axis+3], from.get(axis).getAsInt(),
-							face+" stub overlaps or misses the box");
-					assertEquals(16, to.get(axis).getAsInt(),
-							face+" stub does not reach the block edge");
-				}
-				//Off its own axis the stub is exactly the box's own cross-section, so the housing
-				//reads as one shape reaching out rather than a second box bolted to the first.
-				for(int i = 0; i < 3; i++)
-				{
-					if(i==axis)
+					String model = stubModelFor(mount, face);
+					if(model==null)
 						continue;
-					assertEquals(box[i], from.get(i).getAsInt(), face+" stub is not the box's own width");
-					assertEquals(box[i+3], to.get(i).getAsInt(), face+" stub is not the box's own width");
+					int[] stub = stubBounds(model);
+					int axis = face.getAxis().ordinal();
+					if(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+					{
+						assertEquals(0, stub[axis], face+" stub does not reach the block edge");
+						assertEquals(box[axis], stub[axis+3], face+" stub overlaps or misses the box");
+					}
+					else
+					{
+						assertEquals(box[axis+3], stub[axis], face+" stub overlaps or misses the box");
+						assertEquals(16, stub[axis+3], face+" stub does not reach the block edge");
+					}
+					//Off its own axis the stub is exactly the box's own cross-section, so the housing
+					//reads as one shape reaching out rather than a second box bolted to the first.
+					for(int i = 0; i < 3; i++)
+					{
+						if(i==axis)
+							continue;
+						assertEquals(box[i], stub[i], face+" stub is not the box's own width");
+						assertEquals(box[i+3], stub[i+3], face+" stub is not the box's own width");
+					}
 				}
 			}
+		}
+
+		@Test
+		@DisplayName("a stub actually meets the arm it is there for, in every plane")
+		void stubMeetsTheArmItIsFor()
+		{
+			//	=================================
+			//	The one that matters, and the one that was missing.
+			//	=================================
+			//
+			// Every other test here measures the box against itself, which is exactly how a stub
+			// that bridged nothing passed them all: the run's arm was never in the arithmetic. This
+			// one measures against ConduitBounds -- where the arm's own shape comes from -- so the
+			// two halves of the joint have to agree or the test fails.
+			//
+			// The arm arrives from a conduit clipped to the same surface the box is on, which is
+			// the case a run ending in a box *is*. It reaches the boundary between the two blocks,
+			// so its cross-section is what the stub has to cover on the far side of that boundary.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : ConduitGeometry.inPlane(mount))
+				{
+					String model = stubModelFor(mount, face);
+					assertNotNull(model, "no stub for a run arriving on "+face.getName()
+							+" of a box mounted "+mount.getName());
+					int[] stub = stubBounds(model);
+					int[] arm = armCrossSection(mount, face);
+					int faceAxis = face.getAxis().ordinal();
+					for(int axis = 0; axis < 3; axis++)
+					{
+						if(axis==faceAxis)
+							continue;
+						assertTrue(stub[axis] <= arm[axis]&&stub[axis+3] >= arm[axis+3],
+								"the stub for a "+mount.getName()+"-mounted box, where a run arrives "
+										+"on its "+face.getName()+" face, spans "+stub[axis]+".."
+										+stub[axis+3]+" on "+"xyz".charAt(axis)+" while the run's arm "
+										+"is at "+arm[axis]+".."+arm[axis+3]+" -- the two never touch, "
+										+"so the gap stays open however far the stub reaches");
+					}
+				}
+		}
+
+		/**
+		 * The cross-section of the arm a conduit draws toward a junction box, in pixels, taken from
+		 * {@link ConduitBounds} rather than restated -- the same numbers the arm is modelled and
+		 * hitboxed with.
+		 *
+		 * @param mount the surface both the conduit and the box are on
+		 * @param face  the box's face the arm arrives at
+		 */
+		private int[] armCrossSection(EnumFacing mount, EnumFacing face)
+		{
+			//From the conduit's side, the box is the other way: it is that conduit's arm toward
+			//face.getOpposite() that reaches the boundary between them.
+			int arm = ConduitGeometry.armIndex(mount, face.getOpposite());
+			assertTrue(arm >= 0, "a run cannot arrive on "+face+" of a "+mount+"-mounted box");
+			float[] bounds = ConduitBounds.of(mount, 1 << arm);
+			int[] out = new int[6];
+			for(int i = 0; i < 6; i++)
+				out[i] = Math.round(bounds[i]*16);
+			return out;
 		}
 
 		@Test
@@ -939,15 +1087,17 @@ class ConduitAssetsTest
 			//A stub is the box's housing reaching out to meet the run, not a length of tubing --
 			//texturing it as tube would read as a conduit arm the box never grew, which is the
 			//exact confusion this whole fix exists to remove.
-			for(EnumFacing face : EnumFacing.VALUES)
-			{
-				String model = stubModelFor(face);
-				if(model==null)
-					continue;
-				JsonObject textures = read(modelPath(model)).getAsJsonObject("textures");
-				assertEquals("immersiveengineering:blocks/conduit_junction_box",
-						textures.get("box").getAsString(), face+" stub does not reuse the box's texture");
-			}
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					String model = stubModelFor(mount, face);
+					if(model==null)
+						continue;
+					JsonObject textures = read(modelPath(model)).getAsJsonObject("textures");
+					assertEquals("immersiveengineering:blocks/conduit_junction_box",
+							textures.get("box").getAsString(),
+							face+" stub does not reuse the box's texture");
+				}
 		}
 	}
 }

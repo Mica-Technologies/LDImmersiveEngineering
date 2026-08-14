@@ -207,6 +207,103 @@ class ConduitGeometryTest
 			for(EnumFacing dir : EnumFacing.VALUES)
 				assertFalse(ConduitGeometry.joinsJunctionBox(dir, null, null));
 		}
+
+		@Test
+		@DisplayName("the wall run that was reported: a box at the end of it joins westward")
+		void theReportedWallRun()
+		{
+			//	=================================
+			//	Straight from a dev-client session.
+			//	=================================
+			//
+			// A run along a wall facing south -- so every length of it is clipped to its own north
+			// face -- ending in a box one block further east. The box looks west at a conduit
+			// mounted north, and has to say yes, in the same breath as it says yes to the box
+			// directly above the run one block along.
+			//
+			// Both were checked in-game and this is not where the fault was. The rule is here so
+			// that the next person reading the two of them together can see that at a glance
+			// rather than working it out again: what was wrong was the *shape* the yes produced,
+			// which JunctionBoxMount below and ConduitAssetsTest.RunStubs now hold.
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.WEST, EnumFacing.NORTH, null),
+					"a box at the east end of a north-mounted wall run does not see the run");
+			assertTrue(ConduitGeometry.joinsJunctionBox(EnumFacing.DOWN, EnumFacing.NORTH, null),
+					"a box directly above a north-mounted wall run does not see the run");
+		}
+	}
+
+	@Nested
+	@DisplayName("which surface a junction box sits against")
+	class JunctionBoxMount
+	{
+		private EnumFacing[] nothing()
+		{
+			return new EnumFacing[EnumFacing.VALUES.length];
+		}
+
+		@Test
+		@DisplayName("a box with no runs sits on the floor of its cell")
+		void bareBoxIsFloorMounted()
+		{
+			//Which is what a box has always looked like, so an untouched one in an old world does
+			//not move the first time somebody walks past it.
+			assertEquals(EnumFacing.DOWN, ConduitGeometry.junctionBoxMount(nothing()));
+		}
+
+		@Test
+		@DisplayName("a box takes the plane of the run that reaches it")
+		void takesTheRunsPlane()
+		{
+			//	=================================
+			//	The one that matters.
+			//	=================================
+			//
+			// A conduit occupies the first three pixels off the face it is clipped to and nothing
+			// else. A box in a different plane from its run is therefore not merely offset from it:
+			// it is in a part of the block the run never enters, and no amount of growing the box
+			// toward the boundary can make the two meet. That was the defect -- a wall run ended
+			// flush at a boundary with the box's housing three pixels clear of the wall behind it.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing side : ConduitGeometry.inPlane(mount))
+				{
+					EnumFacing[] around = nothing();
+					around[side.ordinal()] = mount;
+					assertEquals(mount, ConduitGeometry.junctionBoxMount(around),
+							"a box with a "+mount.getName()+"-mounted run to its "+side.getName()
+									+" does not sit in that run's plane");
+				}
+		}
+
+		@Test
+		@DisplayName("a box where two planes meet picks the same one every time")
+		void planeChangeIsStable()
+		{
+			//A box is *for* changing planes, so it will routinely be reached by two runs it cannot
+			//both sit in. Being wrong for one of them is unavoidable; being wrong differently on
+			//two different days is not.
+			//A floor run arriving from the west and a wall run arriving from above: both join, and
+			//the box can only be in one of the two planes.
+			EnumFacing[] around = nothing();
+			around[EnumFacing.WEST.ordinal()] = EnumFacing.DOWN;
+			around[EnumFacing.UP.ordinal()] = EnumFacing.NORTH;
+			assertEquals(EnumFacing.DOWN, ConduitGeometry.junctionBoxMount(around));
+			//And the answer does not depend on which side the runs happen to be on.
+			EnumFacing[] mirrored = nothing();
+			mirrored[EnumFacing.NORTH.ordinal()] = EnumFacing.DOWN;
+			mirrored[EnumFacing.DOWN.ordinal()] = EnumFacing.NORTH;
+			assertEquals(EnumFacing.DOWN, ConduitGeometry.junctionBoxMount(mirrored));
+		}
+
+		@Test
+		@DisplayName("a run that could not be in that plane is ignored")
+		void offPlaneNeighbourIsIgnored()
+		{
+			//A conduit is never joined across its own mounting axis -- see joinsJunctionBox -- so a
+			//mount recorded on such a side is not a run reaching this box and must not move it.
+			EnumFacing[] around = nothing();
+			around[EnumFacing.NORTH.ordinal()] = EnumFacing.NORTH;
+			assertEquals(EnumFacing.DOWN, ConduitGeometry.junctionBoxMount(around));
+		}
 	}
 
 	@Nested

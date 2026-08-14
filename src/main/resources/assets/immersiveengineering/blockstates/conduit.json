@@ -10,7 +10,7 @@
 		],
 		"inventory,type=junction_box": [
 			{
-				"model": "immersiveengineering:conduit/junction_box"
+				"model": "immersiveengineering:conduit/junction_box_down"
 			}
 		],
 		"inventory,type=ground_feeder": [

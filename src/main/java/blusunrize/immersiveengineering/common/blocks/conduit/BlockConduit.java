@@ -136,6 +136,7 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 			//ConduitGeometry.joinsJunctionBox for why this cannot be read off the patch table: a run
 			//passing through unconfigured is exactly the common case, and its faces still need to
 			//meet the box's model rather than leave a gap where a conduit's arm reaches flush.
+			EnumFacing[] neighbourMounts = new EnumFacing[EnumFacing.VALUES.length];
 			for(EnumFacing side : EnumFacing.VALUES)
 			{
 				TileEntity neighbour = world.getTileEntity(pos.offset(side));
@@ -143,9 +144,19 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 						?((TileEntityConduit)neighbour).facing: null;
 				EnumFacing.Axis feederAxis = neighbour instanceof TileEntityGroundFeeder
 						?((TileEntityGroundFeeder)neighbour).getAxis(): null;
-				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()],
-						ConduitGeometry.joinsJunctionBox(side, neighbourMount, feederAxis));
+				boolean joins = ConduitGeometry.joinsJunctionBox(side, neighbourMount, feederAxis);
+				if(joins)
+					neighbourMounts[side.ordinal()] = neighbourMount;
+				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()], joins);
 			}
+			//And which surface the box is drawn against, taken from the runs that reach it rather
+			//than from anything the box stores. A box in a different plane from its run cannot meet
+			//it at all -- the tubing hugs its face, so the gap is across the block, not along it --
+			//and this is the property that puts the two in the same plane. See
+			//ConduitGeometry.junctionBoxMount. Nothing else fills FACING_ALL for a box: the tile
+			//entity is deliberately not an IDirectionalTile, so this is the only writer.
+			state = applyProperty(state, IEProperties.FACING_ALL,
+					ConduitGeometry.junctionBoxMount(neighbourMounts));
 		}
 		return state;
 	}

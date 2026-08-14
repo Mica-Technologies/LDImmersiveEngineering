@@ -206,56 +206,96 @@ def build_blockstate(assets):
     return parts
 
 
+# Half the junction box's width across the surface it is mounted on, in pixels.  Five, because
+# six to ten would be lost against a run and four would not read as hardware from across a room.
+BOX_HALF = 5
+
+
+def box_bounds(mount, depth):
+    """Where the junction box's housing sits when it is bolted to that face, as [from, to].
+
+    **The box hugs its surface, exactly as the conduit does.**  It stands `2*depth+2` off the
+    face it is clipped to and is centred across it, so a run clipped to the same face passes
+    through the housing's own cross-section rather than beside it.
+
+    That is the whole of the fix this shape exists for.  The box used to be modelled as one
+    lump standing on the floor of its own cell whichever way it was bolted -- which is right
+    for a floor run and wrong for every other, because a conduit only occupies the first three
+    pixels off its surface.  A box that did not hug the same face was not merely offset from
+    the run: it was in a part of the block the run never reaches, so the run's arm arrived at
+    the boundary with nothing on the other side of it, and the piece grown out to close that
+    gap grew along the floor, three pixels clear of the wall the run was on.  On a floor run
+    all of this coincided and looked correct, which is why it shipped.
+
+    For `down` this is bit-for-bit the shape the box has always had, so a box with no runs on
+    it -- and every box in a world saved before this -- looks exactly as it did.
+    """
+    lo = [8 - BOX_HALF] * 3
+    hi = [8 + BOX_HALF] * 3
+    axis = "xyz".index(AXIS_OF[mount])
+    stand_off = 2 * depth + 2
+    if mount in NEGATIVE:
+        lo[axis], hi[axis] = 0, stand_off
+    else:
+        lo[axis], hi[axis] = 16 - stand_off, 16
+    return lo, hi
+
+
 def build_junction_box(assets, depth, half):
-    """The junction box: a squat surface box, and the blockstate that draws it.
+    """The junction box: a squat surface box per mounting face, and the blockstate that draws it.
 
     Plainer than the conduit on purpose.  It is a thing you walk up to and right-click with
     a dye, so it wants to read as a box with a lid rather than as more tubing, and it wants
     to be visible from across a room.  A cube inset on every side, drawn with its own
-    texture, does both and costs one model.
+    texture, does both and costs one model per face it can be bolted to.
+
+    Six of everything, keyed on `facing`, which costs no block state at all: BlockConduit
+    already declares `facing` for every meta and nothing else fills it in for a box.  The box
+    has no facing of its own -- no tile entity field, no placement rule, no packet -- it is
+    derived from the runs that reach it, in `ConduitGeometry.junctionBoxMount`.
     """
-    size = 5  # half-width in pixels; 6..10 would be lost against a run
-    frm = [8 - size, 0, 8 - size]
-    to = [8 + size, 2 * depth + 2, 8 + size]
-    faces = {}
-    for face in ("down", "up", "north", "south", "west", "east"):
-        faces[face] = {"texture": "#box"}
-    write_json(os.path.join(assets, "models", "block", "conduit", "junction_box.json"), {
-        "textures": {
-            "box": "immersiveengineering:blocks/conduit_junction_box",
-            "particle": "immersiveengineering:blocks/conduit_junction_box",
-        },
-        "elements": [{"from": frm, "to": to, "faces": faces}],
-    })
-    build_patch_models(assets, frm, to)
-    run_faces = build_run_stub_models(assets, frm, to)
-    # Multipart: the box always, plus a coloured plate on each patched face, plus a stub toward
-    # each face a run is physically touching.
+    out = os.path.join(assets, "models", "block", "conduit")
+    faces = {face: {"texture": "#box"} for face in FACINGS}
+    # Multipart: one housing per mounting face, plus a coloured plate on each patched face, plus a
+    # stub toward each face a run is physically touching -- all three keyed on the mount as well,
+    # since where the housing is decides where a plate sits and what a stub has to bridge.
     #
     # A `variants` file would have to resolve the *whole* property string the state mapper hands
-    # it -- type, facing and all six sideconnection flags, because BlockConduit declares them for
+    # it -- type, facing and all twelve connection flags, because BlockConduit declares them for
     # every meta -- which in the Forge format means a submap per property or the variant simply
-    # does not resolve.  Multipart ignores the variant string entirely and reads the state, so a
-    # part with no `when` is both correct and the shorter thing to write.
+    # does not resolve.  Multipart ignores the variant string entirely and reads the state.
     #
     # The plates reuse the same absolute sideconnection_* properties the run does; BlockConduit
     # fills them from the patch table rather than from a connection mask when the tile is a box.
-    # Same properties, same file format, one meaning per block type.
-    parts = [{"apply": {"model": MODEL_REF % "junction_box"}}]
-    for face in FACINGS:
-        parts.append({
-            "when": {"sideconnection_%s" % face: "true"},
-            "apply": {"model": MODEL_REF % ("junction_patch_%s" % face)},
+    # Same properties, same file format, one meaning per block type.  The stubs key off
+    # runconnection_*, a second and unrelated set -- see IEProperties.RUNCONNECTION.
+    parts = []
+    for mount in FACINGS:
+        frm, to = box_bounds(mount, depth)
+        write_json(os.path.join(out, "junction_box_%s.json" % mount), {
+            "textures": {
+                "box": "immersiveengineering:blocks/conduit_junction_box",
+                "particle": "immersiveengineering:blocks/conduit_junction_box",
+            },
+            "elements": [{"from": frm, "to": to, "faces": faces}],
         })
-    # The run stubs key off runconnection_*, a second and unrelated set of properties BlockConduit
-    # also fills on a box -- see IEProperties.RUNCONNECTION. Only the faces build_run_stub_models
-    # actually wrote get a part: the box already reaches the block's own bottom, so there is no gap
-    # to close there and no model to name.
-    for face in run_faces:
         parts.append({
-            "when": {"runconnection_%s" % face: "true"},
-            "apply": {"model": MODEL_REF % ("junction_run_%s" % face)},
+            "when": {"facing": mount},
+            "apply": {"model": MODEL_REF % ("junction_box_%s" % mount)},
         })
+        for face in build_patch_models(assets, mount, frm, to):
+            parts.append({
+                "when": {"facing": mount, "sideconnection_%s" % face: "true"},
+                "apply": {"model": MODEL_REF % ("junction_patch_%s_%s" % (mount, face))},
+            })
+        # Only the faces build_run_stub_models actually wrote get a part: the box already reaches
+        # the block edge on the face it is bolted to, so there is no gap to close there and no
+        # model to name.
+        for face in build_run_stub_models(assets, mount, frm, to):
+            parts.append({
+                "when": {"facing": mount, "runconnection_%s" % face: "true"},
+                "apply": {"model": MODEL_REF % ("junction_run_%s_%s" % (mount, face))},
+            })
     write_json(os.path.join(assets, "blockstates", "conduit_junction_box.json"), {
         "multipart": parts,
     })
@@ -287,8 +327,8 @@ def patch_bounds(frm, to, face):
     return lo, hi
 
 
-def build_patch_models(assets, frm, to):
-    """One plate model per face, each tinted through its own tint index.
+def build_patch_models(assets, mount, frm, to):
+    """One plate model per face of a box bolted to `mount`, each tinted through its own tint index.
 
     Six models and six tint indices rather than ninety-six models, because the colour is not in
     the model at all: the plate is painted near-white and `BlockConduit.getRenderColour` supplies
@@ -299,22 +339,29 @@ def build_patch_models(assets, frm, to):
     Java side needs no mapping table -- it reads EnumFacing.byIndex(tintIndex) straight off.
     """
     out = os.path.join(assets, "models", "block", "conduit")
+    written = []
     for index, face in enumerate(FACINGS):
         lo, hi = patch_bounds(frm, to, face)
         faces = {f: {"texture": "#patch", "tintindex": index} for f in FACINGS}
-        write_json(os.path.join(out, "junction_patch_%s.json" % face), {
+        write_json(os.path.join(out, "junction_patch_%s_%s.json" % (mount, face)), {
             "textures": {"patch": "immersiveengineering:blocks/conduit_patch"},
             "elements": [{"from": lo, "to": hi, "faces": faces}],
         })
+        written.append(face)
+    return written
 
 
 def run_stub_bounds(frm, to, face):
     """Where a stub toward one face sits: the box's own cross-section, extended from the box's
     edge out to the block boundary that face's arm reaches.
 
-    Returns None on a face the box already reaches by itself -- the box sits flush against the
-    bottom of its cell, so "down" has nothing to bridge and generating a zero-thickness box there
-    would be a model that parses and draws nothing.
+    Because the housing hugs the surface it is bolted to, that cross-section is also the one a
+    conduit clipped to the same surface arrives on -- the tubing runs inside the housing's own
+    footprint -- so the stub meets the arm rather than passing beside it.  See `box_bounds`.
+
+    Returns None on the face the box already reaches by itself, which is the one it is bolted
+    to: there is nothing to bridge there and a zero-thickness box would be a model that parses
+    and draws nothing.
     """
     lo, hi = list(frm), list(to)
     i = "xyz".index(AXIS_OF[face])
@@ -327,15 +374,18 @@ def run_stub_bounds(frm, to, face):
     return lo, hi
 
 
-def build_run_stub_models(assets, frm, to):
+def build_run_stub_models(assets, mount, frm, to):
     """One model per face that needs to close the gap between the box and a conduit's flush arm.
 
     Before this the box was the one surface a run reaches that never grew to meet it: a conduit
     already draws an arm all the way to the block edge on a face it joins the box across (see
     TileEntityConduit.connectsTo and the commit that added it), but the box's own model stopped
     short of that same edge on every face except the one it already sits flush against. The gap
-    read as a run that had not finished, or as a second one starting apart from the first -- worse
-    on top or below a box, where the box's squat height leaves the largest gap of all.
+    read as a run that had not finished, or as a second one starting apart from the first.
+
+    A stub only closes that gap if it is in the run's plane, which is why there is one set per
+    mounting face rather than one set: a stub grown from a floor-standing housing toward a wall
+    run passes three pixels behind the arm it is supposed to meet and closes nothing.
 
     Textured and coloured like the box itself: a stub is the box's own housing reaching out, not a
     length of tubing, so it uses the box's texture rather than the conduit's.
@@ -348,7 +398,7 @@ def build_run_stub_models(assets, frm, to):
             continue
         lo, hi = bounds
         faces = {f: {"texture": "#box"} for f in FACINGS}
-        write_json(os.path.join(out, "junction_run_%s.json" % face), {
+        write_json(os.path.join(out, "junction_run_%s_%s.json" % (mount, face)), {
             "textures": {
                 "box": "immersiveengineering:blocks/conduit_junction_box",
                 "particle": "immersiveengineering:blocks/conduit_junction_box",
@@ -485,8 +535,10 @@ def build_item_blockstate(assets):
         },
         "variants": {
             "inventory,type=conduit_run": [{}],
+            # The floor-mounted housing: an item has no surroundings either, so there is no run
+            # for the box to pick a plane from, and a box with no runs is a box on the floor.
             "inventory,type=junction_box": [{
-                "model": MODEL_REF % "junction_box",
+                "model": MODEL_REF % "junction_box_down",
             }],
             # The item shows the bare cube rather than the smart model: an item has no
             # surroundings, so there is nothing for a disguise to be.

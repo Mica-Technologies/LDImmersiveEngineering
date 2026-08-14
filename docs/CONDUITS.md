@@ -54,7 +54,14 @@ so a corridor with boxes at every corner is a chain, not a mesh.
 
 ## The junction box
 
-A patch panel with six faces. Each face is one of three things:
+A patch panel with six faces. **It sits in the plane of the runs that reach it** — bolt one to the
+end of a wall run and the box hugs that wall, exactly as the conduit does, and grows out to meet the
+run where the run actually is. A box nothing reaches sits on the floor of its cell. That plane is
+derived from the neighbours every time the box is drawn rather than stored anywhere, so a box placed
+before its run and one placed after it end up looking the same; a box where two planes meet can only
+sit in one of them and picks floors over ceilings over walls. See `ConduitGeometry.junctionBoxMount`.
+
+Each face is one of three things:
 
 | Right-click with | Effect |
 |---|---|
