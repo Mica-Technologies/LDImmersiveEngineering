@@ -32,10 +32,16 @@ public class BlockGridMultiblock extends BlockIEMultiblock<BlockTypes_GridMultib
 	{
 		super("grid_multiblock", Material.IRON,
 				PropertyEnum.create("type", BlockTypes_GridMultiblock.class), ItemBlockIEBase.class,
-				IEProperties.BOOLEANS[0], IEProperties.BOOLEANS[1], Properties.AnimationProperty,
+				IEProperties.BOOLEANS[0], Properties.AnimationProperty,
 				IEProperties.OBJ_TEXTURE_REMAP);
 		setHardness(3.0F);
 		setResistance(15.0F);
+		//The console is one OBJ model drawn by its master across all four of its blocks, so
+		//none of them may be a normal cube: an opaque block here culls the faces of the model
+		//standing in front of it and lights the whole console from the master's corner. Every
+		//IE multiblock that renders as one piece does exactly this -- see BlockMetalMultiblocks.
+		setAllNotNormalBlock();
+		lightOpacity = 0;
 	}
 
 	@Override
@@ -44,22 +50,22 @@ public class BlockGridMultiblock extends BlockIEMultiblock<BlockTypes_GridMultib
 		return EnumPushReaction.BLOCK;
 	}
 
+	/**
+	 * boolean0 is "the screen is lit".
+	 * <p>
+	 * The console is one model now, drawn entirely by its master, so nothing here has to say
+	 * which quarter of a picture a block is wearing any more -- that was what boolean0 and
+	 * boolean1 used to carry, and it was the mechanism behind a console that looked like two
+	 * consoles. The one thing still worth varying per state is whether the display is alive,
+	 * which the blockstate does by swapping the screen material's texture.
+	 */
 	@Override
 	public IBlockState getActualState(IBlockState state, IBlockAccess world, BlockPos pos)
 	{
 		state = super.getActualState(state, world, pos);
-		//The console's face is split across the structure: the upper row carries the screen,
-		//the lower row the switch bank. Structure indices 2 and 3 are the upper row.
 		TileEntity te = world.getTileEntity(pos);
 		if(te instanceof TileEntityGridConsole)
-		{
-			int index = ((TileEntityGridConsole)te).pos;
-			state = state.withProperty(IEProperties.BOOLEANS[0], GridConsoleGeometry.isUpperRow(index));
-			//And which half of the screen it wears. The blockstate applies boolean1 before boolean0,
-			//so the lower row's own entry puts the switch panel back over whichever half this chose --
-			//see the file, where that ordering is the whole mechanism.
-			state = state.withProperty(IEProperties.BOOLEANS[1], GridConsoleGeometry.isRightColumn(index));
-		}
+			state = state.withProperty(IEProperties.BOOLEANS[0], ((TileEntityGridConsole)te).isPowered());
 		return state;
 	}
 

@@ -20,7 +20,7 @@ each other, so neither can regress the other, and a build can use both.
 | **Grid Feed Unit** | Takes flux out of the world and into its segment. |
 | **Grid Service Unit** | Takes flux out of its segment and delivers it back to the world. |
 | **Grid Signal Unit** | Carries no flux. Bridges its segment to redstone, in either direction. |
-| **Grid Management Console** | 2×2 wall multiblock. The control room for the whole grid. |
+| **Grid Management Console** | 2×2 wall multiblock, built from one terminal and IE's three engineering blocks. The control room for the whole grid. |
 
 The three units are 10×12×6 pixel sheet-metal boxes that bolt to any solid face, including IE's
 wooden and steel posts — that is the pole-mount look, with no special-case code. Facing follows the
@@ -168,7 +168,26 @@ segment off across a restart.
 
 ## The console
 
-Four Console Housings in a 2×2 wall, struck on the front face with an Engineer's Hammer.
+A 2×2 wall of four *different* blocks, struck anywhere on its front face with an Engineer's
+Hammer:
+
+|  |  |
+|---|---|
+| **Console Housing** (the terminal) | **Redstone Engineering Block** |
+| **Light Engineering Block** | **Heavy Engineering Block** |
+
+Read as hardware rather than as a recipe: the terminal is the screen, the redstone block is the
+instrument rack beside it, and the light and heavy blocks are the desk and the power cabinet
+underneath. Four copies of one housing — which is what this used to be — made a wall of identical
+cabinets and a recipe that said nothing.
+
+The formed console is **one OBJ model**, drawn entirely by its master while the other three blocks
+render nothing, exactly as stock IE draws a tank or a metal press. There is no seam down the middle
+because there is nothing there to seam: the desk runs the full two blocks, and so does the screen,
+its bar graph and its scanlines. Losing power swaps the screen texture for a dead one rather than
+changing the model.
+
+Taking it apart — hammer or pickaxe — returns the four component blocks to where they were.
 
 Six tabs: **Overview** (every segment at a glance), **Segments** (the editor — name, colour,
 switch, caps, loss, buffer, schedule, lock), **Devices** (per-device priority, cap, critical,
@@ -285,6 +304,7 @@ needed. Chunk-loaded devices never go offline.
 | GUIs | `client/gui/GuiGridConsole.java`, `GuiGridDevice.java` |
 | Commands | `common/util/commands/CommandGrid.java` |
 | Texture generator | `docs/tools/make_grid_textures.py` |
+| Console model and textures | `docs/tools/make_terminal_assets.py` |
 | Tests | `src/test/java/blusunrize/immersiveengineering/api/energy/grid/`, `common/blocks/grid/GridAssetsTest.java` |
 
 The engine is expressed purely in terms of the model and `IGridEndpoint` — it never touches `World`

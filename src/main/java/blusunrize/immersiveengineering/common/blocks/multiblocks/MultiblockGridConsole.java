@@ -18,8 +18,11 @@ import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridMultiblock;
 import blusunrize.immersiveengineering.common.blocks.grid.GridConsoleGeometry;
+import blusunrize.immersiveengineering.common.blocks.grid.GridConsoleGeometry.Part;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridConsole;
+import blusunrize.immersiveengineering.common.blocks.metal.BlockTypes_MetalDecoration0;
 import blusunrize.immersiveengineering.common.util.Utils;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms;
@@ -33,11 +36,21 @@ import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
 /**
- * The Grid Management Console: four Console Housing blocks in a 2 wide x 2 tall wall,
- * hammered on the face that becomes the screen.
+ * The Grid Management Console: one Console Housing and one each of IE's three engineering
+ * blocks, in a 2 wide x 2 tall wall, hammered on the face that becomes the screen.
+ * <pre>
+ *     Console Housing     Redstone Engineering
+ *     Light Engineering   Heavy Engineering
+ * </pre>
+ * Four identical housings was the old recipe and it read as "stack four of these", which is
+ * not what a control room is: the terminal is the screen, the redstone block is the
+ * instrument rack next to it, and the light and heavy blocks are the desk and the cabinet
+ * under them.
  * <p>
  * Structure indices are H*L*W with L (depth) fixed at 1, so {@code pos} is simply
- * {@code h*2 + w}. The master is the bottom-left block as seen from the front.
+ * {@code h*2 + w}. The master is the bottom-left block as seen from the front, and
+ * {@code facing} points into the wall -- see {@link GridConsoleGeometry}, where that
+ * convention and the reason for it live.
  *
  * @author LDImmersiveEngineering -- virtual grid
  */
@@ -48,14 +61,52 @@ public class MultiblockGridConsole implements IMultiblock
 	/**
 	 * H, L, W
 	 */
-	static ItemStack[][][] structure = new ItemStack[2][1][2];
+	static ItemStack[][][] structure = new ItemStack[GridConsoleGeometry.HEIGHT][GridConsoleGeometry.DEPTH][GridConsoleGeometry.WIDTH];
+
+	/**
+	 * The same four components as block and meta, resolved once. {@code isBlockTrigger} runs
+	 * for every registered multiblock on every hammer click, and it is not the place to be
+	 * building four ItemStacks.
+	 */
+	private static final Block[] COMPONENT_BLOCKS = new Block[Part.values().length];
+	private static final int[] COMPONENT_METAS = new int[Part.values().length];
 
 	static
 	{
-		for(int h = 0; h < 2; h++)
-			for(int w = 0; w < 2; w++)
-				structure[h][0][w] = new ItemStack(IEContent.blockGridDevice, 1,
+		for(int h = 0; h < GridConsoleGeometry.HEIGHT; h++)
+			for(int w = 0; w < GridConsoleGeometry.WIDTH; w++)
+				structure[h][0][w] = componentFor(GridConsoleGeometry.partAt(h, w));
+		for(Part part : Part.values())
+		{
+			ItemStack component = componentFor(part);
+			COMPONENT_BLOCKS[part.ordinal()] = Block.getBlockFromItem(component.getItem());
+			COMPONENT_METAS[part.ordinal()] = component.getItemDamage();
+		}
+	}
+
+	/**
+	 * The block one part of the console is built from. The arrangement itself lives in
+	 * {@link GridConsoleGeometry}, which can be loaded (and tested) without a running game;
+	 * only the mapping to real items is here.
+	 */
+	public static ItemStack componentFor(Part part)
+	{
+		switch(part)
+		{
+			case TERMINAL:
+				return new ItemStack(IEContent.blockGridDevice, 1,
 						BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta());
+			case LOGIC:
+				return new ItemStack(IEContent.blockMetalDecoration0, 1,
+						BlockTypes_MetalDecoration0.RS_ENGINEERING.getMeta());
+			case DESK:
+				return new ItemStack(IEContent.blockMetalDecoration0, 1,
+						BlockTypes_MetalDecoration0.LIGHT_ENGINEERING.getMeta());
+			case POWER:
+				return new ItemStack(IEContent.blockMetalDecoration0, 1,
+						BlockTypes_MetalDecoration0.HEAVY_ENGINEERING.getMeta());
+		}
+		return ItemStack.EMPTY;
 	}
 
 	@Override
@@ -100,11 +151,20 @@ public class MultiblockGridConsole implements IMultiblock
 				ItemCameraTransforms.TransformType.GUI);
 	}
 
+	/**
+	 * Any of the four components triggers, so the hammer works anywhere on the layout rather
+	 * than only on the one block that happens to be the terminal. The engineering blocks are
+	 * already triggers for the excavator, the refinery and the lightning rod; the handler
+	 * simply tries each candidate multiblock until one of them matches.
+	 */
 	@Override
 	public boolean isBlockTrigger(IBlockState state)
 	{
-		return Utils.blockstateMatches(state, IEContent.blockGridDevice,
-				BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta());
+		for(Part part : Part.values())
+			if(Utils.blockstateMatches(state, COMPONENT_BLOCKS[part.ordinal()],
+					COMPONENT_METAS[part.ordinal()]))
+				return true;
+		return false;
 	}
 
 	@Override
@@ -114,33 +174,31 @@ public class MultiblockGridConsole implements IMultiblock
 		//top/bottom hit outright rather than guessing an orientation.
 		if(side.getAxis()==EnumFacing.Axis.Y)
 			return false;
-		EnumFacing front = side;
-		EnumFacing right = front.rotateYCCW();
+		//IE's convention: a formed multiblock's facing points into the structure, away from
+		//whoever hammered it, and the structure is laid out along facing and facing.rotateY().
+		EnumFacing facing = side.getOpposite();
 
 		//The clicked block may be any of the four, so try every origin that would put it
 		//inside the square.
-		for(BlockPos origin : GridConsoleGeometry.candidateOrigins(pos, right))
-			if(matches(world, origin, right)&&form(world, origin, front, right, player))
+		for(BlockPos origin : GridConsoleGeometry.candidateOrigins(pos, facing))
+			if(matches(world, origin, facing)&&form(world, origin, facing, player))
 				return true;
 		return false;
 	}
 
-	private boolean matches(World world, BlockPos origin, EnumFacing right)
+	private boolean matches(World world, BlockPos origin, EnumFacing facing)
 	{
-		for(BlockPos cell : GridConsoleGeometry.cells(origin, right))
-			if(!isHousing(world, cell))
+		BlockPos[] cells = GridConsoleGeometry.cells(origin, facing);
+		for(int i = 0; i < cells.length; i++)
+		{
+			int part = GridConsoleGeometry.partAt(i).ordinal();
+			if(!Utils.isBlockAt(world, cells[i], COMPONENT_BLOCKS[part], COMPONENT_METAS[part]))
 				return false;
+		}
 		return true;
 	}
 
-	private static boolean isHousing(World world, BlockPos pos)
-	{
-		return Utils.isBlockAt(world, pos, IEContent.blockGridDevice,
-				BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta());
-	}
-
-	private boolean form(World world, BlockPos origin, EnumFacing front, EnumFacing right,
-						 EntityPlayer player)
+	private boolean form(World world, BlockPos origin, EnumFacing facing, EntityPlayer player)
 	{
 		ItemStack hammer = player.getHeldItemMainhand().getItem()
 				.getToolClasses(player.getHeldItemMainhand()).contains(Lib.TOOL_HAMMER)
@@ -150,7 +208,8 @@ public class MultiblockGridConsole implements IMultiblock
 
 		IBlockState state = IEContent.blockGridMultiblock
 				.getStateFromMeta(BlockTypes_GridMultiblock.GRID_CONSOLE.getMeta())
-				.withProperty(IEProperties.FACING_HORIZONTAL, front);
+				.withProperty(IEProperties.FACING_HORIZONTAL, facing);
+		EnumFacing right = facing.rotateY();
 		for(int h = 0; h < GridConsoleGeometry.HEIGHT; h++)
 			for(int w = 0; w < GridConsoleGeometry.WIDTH; w++)
 			{
@@ -161,7 +220,7 @@ public class MultiblockGridConsole implements IMultiblock
 				{
 					TileEntityGridConsole part = (TileEntityGridConsole)te;
 					part.formed = true;
-					part.facing = front;
+					part.facing = facing;
 					part.pos = GridConsoleGeometry.structureIndex(h, w);
 					part.offset = new int[]{
 							target.getX()-origin.getX(),
@@ -175,8 +234,10 @@ public class MultiblockGridConsole implements IMultiblock
 	}
 
 	static final IngredientStack[] materials = new IngredientStack[]{
-			new IngredientStack(new ItemStack(IEContent.blockGridDevice, 4,
-					BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta()))};
+			new IngredientStack(componentFor(Part.TERMINAL)),
+			new IngredientStack(componentFor(Part.LOGIC)),
+			new IngredientStack(componentFor(Part.DESK)),
+			new IngredientStack(componentFor(Part.POWER))};
 
 	@Override
 	public IngredientStack[] getTotalMaterials()

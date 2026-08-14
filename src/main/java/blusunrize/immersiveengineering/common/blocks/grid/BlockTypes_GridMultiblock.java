@@ -44,7 +44,8 @@ public enum BlockTypes_GridMultiblock implements IStringSerializable, BlockIEBas
 	@Override
 	public boolean listForCreative()
 	{
-		//Obtained by hammering four Console Housings, never from the creative list.
+		//Obtained by hammering a Console Housing and the three engineering blocks together,
+		//never from the creative list.
 		return false;
 	}
 }
