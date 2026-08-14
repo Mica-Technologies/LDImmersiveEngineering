@@ -1,0 +1,12 @@
+newmtl pump_crate
+map_Ka immersiveengineering:blocks/petroleum_gas_pump
+newmtl pump_base
+map_Ka immersiveengineering:blocks/petroleum_gas_pump_base
+newmtl pump_body
+map_Ka immersiveengineering:blocks/petroleum_gas_pump_body
+newmtl pump_panel
+map_Ka immersiveengineering:blocks/petroleum_gas_pump_panel
+newmtl pump_gear
+map_Ka immersiveengineering:blocks/petroleum_gas_pump_gear
+newmtl pump_globe
+map_Ka immersiveengineering:blocks/petroleum_gas_pump_globe

@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.common.blocks.petroleum;
 
+import blusunrize.immersiveengineering.client.models.IOBJModelCallback;
 import blusunrize.immersiveengineering.common.blocks.BlockIETileProvider;
 import blusunrize.immersiveengineering.common.blocks.ItemBlockIEBase;
 import net.minecraft.block.material.Material;
@@ -31,8 +32,12 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 {
 	public BlockPetroleumDevice()
 	{
+		//IOBJModelCallback.PROPERTY is what lets the Gas Station Pump hide and turn the groups of
+		//its OBJ model per block. Without it on the block, getExtendedState throws when it tries
+		//to hand the tile to the model -- an unlisted property has to be declared here first.
 		super("petroleum_device", Material.IRON,
-				PropertyEnum.create("type", BlockTypes_PetroleumDevice.class), ItemBlockIEBase.class);
+				PropertyEnum.create("type", BlockTypes_PetroleumDevice.class), ItemBlockIEBase.class,
+				IOBJModelCallback.PROPERTY);
 		this.setHardness(3.0F);
 		this.setResistance(15.0F);
 		this.lightOpacity = 0;
@@ -48,6 +53,10 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 			this.setMetaBlockLayer(vessel.getMeta(), BlockRenderLayer.CUTOUT);
 		}
 		this.setMetaBlockLayer(BlockTypes_PetroleumDevice.WELLHEAD.getMeta(), BlockRenderLayer.CUTOUT);
+		//The assembled pump is a slim cabinet standing two blocks tall, drawn from the lower one.
+		//A full-cube block there would let the world light the upper block as though it were solid
+		//and leave the pump's head standing in its own shadow.
+		this.setNotNormalBlock(BlockTypes_PetroleumDevice.GAS_PUMP.getMeta());
 	}
 
 	/**
@@ -79,6 +88,11 @@ public class BlockPetroleumDevice extends BlockIETileProvider<BlockTypes_Petrole
 		TileEntity te = world.getTileEntity(pos);
 		if(te instanceof TileEntityStorageTank)
 			((TileEntityStorageTank)te).disassemble();
+		//Breaking either half of an assembled Gas Station Pump takes it apart, so the half left
+		//standing goes back to being a loose block rather than a headless pump still drawing a
+		//cabinet that is no longer there.
+		if(te instanceof TileEntityGasPump)
+			((TileEntityGasPump)te).disassemble();
 		super.breakBlock(world, pos, state);
 	}
 

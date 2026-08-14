@@ -161,6 +161,24 @@ class PetroleumDevicesTest
 			assertTrue(TileEntityGasPump.CAPACITY < BuriedTankGeometry.DOMESTIC.capacity,
 					"a pump that held as much as a buried tank would make the tank pointless");
 		}
+
+		/**
+		 * The pump's model is authored facing north and turned to its facing by the tile entity,
+		 * in two places at once -- the baked model and the renderer that writes the price on the
+		 * panel. Getting the direction backwards puts the price on the far side of the pump from
+		 * the road, and nothing in the game reports it.
+		 */
+		@Test
+		@DisplayName("the model turns from north to the pump's facing, the way a rotation about +Y goes")
+		void modelRotationFollowsTheFacing()
+		{
+			//Horizontal indices: south 0, west 1, north 2, east 3.
+			assertEquals(0f, GasPumpAccounting.modelRotation(2), "north is how the model is drawn");
+			assertEquals(180f, GasPumpAccounting.modelRotation(0), "south is the opposite of north");
+			//A rotation about +Y by +90 degrees carries -Z round to -X: north becomes west.
+			assertEquals(90f, GasPumpAccounting.modelRotation(1), "west is a quarter turn from north");
+			assertEquals(-90f, GasPumpAccounting.modelRotation(3), "east is a quarter turn the other way");
+		}
 	}
 
 	@Nested

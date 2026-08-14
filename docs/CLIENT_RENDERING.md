@@ -297,6 +297,7 @@ The TESRs fall into two patterns:
 | `TileRenderTeslaCoil` | Lightning arcs as `GL_LINE_STRIP` (glow + core) per active animation in a client-side effect map (`TileRenderTeslaCoil.java:33-89`). |
 | `TileRenderWorkbench` | Items on the workbench, or a blueprint recipe line-drawing (distance-gated) (`TileRenderWorkbench.java:48-155`). |
 | `TileRenderShaderBanner` | Vanilla `ModelBanner` with a shader-composited texture, swaying by world time; composite texture cached per shader (`TileRenderShaderBanner.java:36-107`). |
+| `TileRenderGasPump` | The price and the lifetime meter on an assembled Gas Station Pump's display panel — text only. The pump's body is a baked OBJ, not drawn here (`TileRenderGasPump.java`). |
 
 ### Render support classes
 

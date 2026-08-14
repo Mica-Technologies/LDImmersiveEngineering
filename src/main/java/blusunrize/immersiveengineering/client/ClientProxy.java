@@ -586,6 +586,9 @@ public class ClientProxy extends CommonProxy
 		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityCoresample.class, new TileRenderCoresample());
 		//CLOTH
 		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityShaderBanner.class, new TileRenderShaderBanner());
+		//PETROLEUM
+		//Only the price on the pump's panel: the pump itself is a baked OBJ like any other block.
+		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityGasPump.class, new TileRenderGasPump());
 
 		//		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityWallmount.class, new TileRenderWallmount());
 		//

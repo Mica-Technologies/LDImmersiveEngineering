@@ -120,6 +120,26 @@ public final class GasPumpAccounting
 	}
 
 	/**
+	 * How far the pump's model has to turn to face a given direction, in degrees about +Y.
+	 * <p>
+	 * Taken as a horizontal index rather than an {@code EnumFacing} so that the one piece of the
+	 * pump's geometry that is easy to get backwards is also the one piece of it a test can reach:
+	 * a model rotated the wrong way round is a pump whose price panel faces the wall, and nothing
+	 * anywhere would report it.
+	 * <p>
+	 * The model is authored facing <strong>north</strong>, which is horizontal index 2 and the
+	 * tile's default facing, so north must come out at zero. The sign follows the right-hand rule
+	 * a rotation about +Y obeys in both the baked model and the renderer: +90 degrees carries
+	 * north round to west.
+	 *
+	 * @param horizontalIndex {@link net.minecraft.util.EnumFacing#getHorizontalIndex()}
+	 */
+	public static float modelRotation(int horizontalIndex)
+	{
+		return 90f*(2-horizontalIndex);
+	}
+
+	/**
 	 * @return true if a nozzle racked on a pump at {@code pumpX/Y/Z} will reach {@code targetX/Y/Z}
 	 * <p>
 	 * Squared throughout, so this never takes a square root and never disagrees with itself about a

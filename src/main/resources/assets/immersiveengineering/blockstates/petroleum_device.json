@@ -103,8 +103,10 @@
 				}
 			},
 			"gas_pump": {
+				"model": "immersiveengineering:petroleum/gas_pump.obj.ie",
+				"custom": {"flip-v": true},
 				"textures": {
-					"all": "immersiveengineering:blocks/petroleum_gas_pump"
+					"particle": "immersiveengineering:blocks/petroleum_gas_pump"
 				}
 			},
 			"forecourt_sign": {
