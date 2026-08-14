@@ -593,7 +593,23 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		if(refuel(player, hand))
 			return true;
 		if(!world.isRemote&&getControllingPassenger()==null)
+		{
+			// Start facing wherever the driver is looking. The tracks' own heading -- rotationYaw -- only ever moves under A and D; nothing had ever
+			// pointed it at the operator's view before now, so it was still wherever it was left, almost
+			// always by somebody else, at a completely unrelated angle. The house and arm slew to match
+			// the new operator's view the instant they climb in, because that is what look-to-aim means,
+			// but the tracks did not, and W drives along the tracks. The result was a machine that, from
+			// a driver who had just walked up and mounted it facing any direction but the one it was
+			// already pointed, reliably moved opposite wherever they were looking the moment they
+			// pressed it -- reported, correctly, as the controls being reversed. They were not; the
+			// tracks and the view had simply never been introduced.
+			//
+			// Set once, on mounting, and not kept in sync afterwards: doing this every tick would make
+			// A and D fight a heading that snapped straight back to the rider's view, which is the one
+			// thing skid steer is for.
+			rotationYaw = player.rotationYaw;
 			player.startRiding(this);
+		}
 		//True on both sides regardless, or the click falls through to the held item and the operator
 		//places a block against the machine they were trying to get into.
 		return true;

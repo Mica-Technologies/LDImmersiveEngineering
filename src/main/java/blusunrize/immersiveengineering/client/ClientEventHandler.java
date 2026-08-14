@@ -70,6 +70,7 @@ import net.minecraft.client.renderer.vertex.DefaultVertexFormats;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
+import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
@@ -110,6 +111,7 @@ import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToSe
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.oredict.OreDictionary;
 import org.apache.commons.lang3.tuple.Pair;
+import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GLContext;
@@ -214,6 +216,23 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 	/** The Crawler control state last sent, so an idle machine costs no packets at all. */
 	private byte lastCrawlerFlags;
 
+	/**
+	 * The Crawler's own six keys, walked together wherever the guard below needs all of them.
+	 * <p>
+	 * A method rather than a static array: {@link ClientProxy}'s keybind fields are themselves set
+	 * during {@code ClientProxy}'s own init, and building this list eagerly at
+	 * {@code ClientEventHandler}'s class-load would risk running before that, depending on which class
+	 * Forge happens to touch first. Called only while somebody is already riding, long after both are
+	 * up, this has no such ordering to get wrong.
+	 */
+	private static KeyBinding[] crawlerKeybinds()
+	{
+		return new KeyBinding[]{
+				ClientProxy.keybind_crawlerArmUp, ClientProxy.keybind_crawlerArmDown,
+				ClientProxy.keybind_crawlerAction, ClientProxy.keybind_crawlerSwap,
+				ClientProxy.keybind_crawlerExtend, ClientProxy.keybind_crawlerRetract};
+	}
+
 	@SubscribeEvent
 	public void onClientTick(TickEvent.ClientTickEvent event)
 	{
@@ -223,6 +242,48 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 			sendCrawlerControls();
 			CrawlerHud.tick(ClientUtils.mc().player);
 		}
+	}
+
+	/**
+	 * Give the Crawler's six keys priority over anything else bound to the same physical key, for as
+	 * long as somebody is driving it.
+	 * <p>
+	 * <strong>Two problems, one cause.</strong> Forge keeps exactly one "live" {@code KeyBinding} per
+	 * physical key code: {@code KeyBinding.setKeyBindState} only ever updates whichever binding most
+	 * recently claimed that code, so when two mods share a key, only one of them ever sees it pressed
+	 * -- and which one is a matter of mod load order, not of anything either mod did wrong. If that one
+	 * is never the Crawler's, a key held down does nothing and there is no error to find, because
+	 * nothing has gone wrong from Forge's point of view. {@link #isCrawlerKeyDown} sidesteps that by
+	 * reading the hardware directly instead of asking Forge who owns the code.
+	 * <p>
+	 * That fixes what the Crawler receives. It says nothing about what anybody else does with the same
+	 * press -- a gun mod bound to R would still reload while the arm went up, load order permitting. So
+	 * the six keys are also cleared here, every tick somebody is driving: whichever binding is holding
+	 * the live slot for that code, ours or somebody else's, reports released for the rest of the tick.
+	 * <p>
+	 * <strong>Early, and first.</strong> {@code Phase.START} and {@code HIGHEST} priority, so this runs
+	 * before the mods it is guarding against have read anything this tick -- doing it after they had
+	 * would guard nothing.
+	 * <p>
+	 * <strong>Never WASD.</strong> The tracks are driven off {@code moveForward}/{@code moveStrafing},
+	 * which come from the same vanilla keys as everyone else's forward key. Clearing those would
+	 * silence the Crawler's own steering along with whatever it was guarding against, which is the
+	 * inversion this guard exists to avoid causing.
+	 * <p>
+	 * <strong>Nothing to release on dismount.</strong> The clearing only runs while riding, so the tick
+	 * after somebody gets out, vanilla's own poll repopulates the true state from the hardware and
+	 * nothing is left stuck down.
+	 */
+	@SubscribeEvent(priority = EventPriority.HIGHEST)
+	public void onClientTickEarly(TickEvent.ClientTickEvent event)
+	{
+		if(event.phase!=TickEvent.Phase.START)
+			return;
+		EntityPlayer player = ClientUtils.mc().player;
+		if(player==null||!(player.getRidingEntity() instanceof EntityHydraulicCrawler))
+			return;
+		for(KeyBinding key : crawlerKeybinds())
+			KeyBinding.setKeyBindState(key.getKeyCode(), false);
 	}
 
 	/**
@@ -246,19 +307,19 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 			return;
 		}
 		byte flags = 0;
-		if(ClientProxy.keybind_crawlerArmUp.isKeyDown())
+		if(isCrawlerKeyDown(ClientProxy.keybind_crawlerArmUp))
 			flags |= EntityHydraulicCrawler.FLAG_ARM_UP;
-		if(ClientProxy.keybind_crawlerArmDown.isKeyDown())
+		if(isCrawlerKeyDown(ClientProxy.keybind_crawlerArmDown))
 			flags |= EntityHydraulicCrawler.FLAG_ARM_DOWN;
-		if(ClientProxy.keybind_crawlerAction.isKeyDown())
+		if(isCrawlerKeyDown(ClientProxy.keybind_crawlerAction))
 			flags |= EntityHydraulicCrawler.FLAG_TRIGGER;
 		//Sent as held even though the server acts on the edge: the server needs to see the release to
 		//arm the next press, and level state is the only thing this channel carries reliably.
-		if(ClientProxy.keybind_crawlerSwap.isKeyDown())
+		if(isCrawlerKeyDown(ClientProxy.keybind_crawlerSwap))
 			flags |= EntityHydraulicCrawler.FLAG_SWAP;
-		if(ClientProxy.keybind_crawlerExtend.isKeyDown())
+		if(isCrawlerKeyDown(ClientProxy.keybind_crawlerExtend))
 			flags |= EntityHydraulicCrawler.FLAG_EXTEND;
-		if(ClientProxy.keybind_crawlerRetract.isKeyDown())
+		if(isCrawlerKeyDown(ClientProxy.keybind_crawlerRetract))
 			flags |= EntityHydraulicCrawler.FLAG_RETRACT;
 		//Send while held, and once more on release so the server stops immediately rather than waiting
 		//out the timeout -- a control that took a third of a second to let go of would feel broken.
@@ -266,6 +327,27 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 			return;
 		lastCrawlerFlags = flags;
 		ImmersiveEngineering.packetHandler.sendToServer(new MessageCrawlerInput(flags));
+	}
+
+	/**
+	 * @return whether one of the Crawler's own keys is down, read off the hardware rather than off
+	 * {@code KeyBinding.isKeyDown()}
+	 * <p>
+	 * See {@link #onClientTickEarly}: Forge keeps one "live" binding per physical key, and if another
+	 * mod's binding on the same key is the one holding that slot, the Crawler's own binding never sees
+	 * the press at all -- Forge is not wrong about anything, it simply was not asked about this key.
+	 * The hardware has no such ambiguity, and matches what vanilla's own poll would have set had the
+	 * Crawler's binding been the one left holding the slot.
+	 * <p>
+	 * Mouse buttons -- valid for a rebound key, just not the default for any of these six -- are not
+	 * something this fork has a hardware read for, so those fall back to Forge's own bookkeeping.
+	 */
+	private static boolean isCrawlerKeyDown(KeyBinding key)
+	{
+		int code = key.getKeyCode();
+		if(code > 0&&code < 256)
+			return Keyboard.isKeyDown(code);
+		return key.isKeyDown();
 	}
 
 	@SubscribeEvent
