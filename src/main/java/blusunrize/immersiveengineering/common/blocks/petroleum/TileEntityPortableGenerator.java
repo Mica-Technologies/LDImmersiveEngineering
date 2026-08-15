@@ -184,8 +184,13 @@ public class TileEntityPortableGenerator extends TileEntityIEBase implements ITi
 				//counter is what keeps those two rhythms apart.
 				if(burnTimer <= 0)
 				{
-					int burn = CityMode.petroleum()?1: FUEL_PER_BURN;
-					if(tank.drainInternal(burn, true)!=null)
+					//City mode: fuel is presence, not accounting -- the same rule a city-mode tank
+					//follows. A generator holding fuel runs on it forever; an empty one is still
+					//empty. It used to take a token sip instead, and with a four-bucket tank that
+					//sip emptied the thing in a couple of hours, which read as the mode not applying
+					//to this block at all: nobody hand-filling a portable generator in a decorative
+					//city wants to come back to it dark. See CityMode.generators().
+					if(CityMode.generators()||tank.drainInternal(FUEL_PER_BURN, true)!=null)
 						burnTimer = BURN_INTERVAL;
 				}
 				if(burnTimer > 0)

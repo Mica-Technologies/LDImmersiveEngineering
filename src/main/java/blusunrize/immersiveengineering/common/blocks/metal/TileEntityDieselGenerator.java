@@ -50,14 +50,6 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 	public FluidTank[] tanks = new FluidTank[]{new FluidTank(24000)};
 	public boolean active = false;
 
-	/**
-	 * City mode fuel sip: how much fuel is drained, and how often. One millibucket every second empties
-	 * a full 24-bucket tank over roughly six and a half hours of runtime -- slow enough to be cosmetic,
-	 * visible enough that a tank still drains and refuelling is still part of running a generator.
-	 */
-	private static final int CITY_FUEL_SIP_AMOUNT = 1;
-	private static final int CITY_FUEL_SIP_INTERVAL = 20;
-
 	public float animation_fanRotationStep = 0;
 	public float animation_fanRotation = 0;
 	public int animation_fanFadeIn = 0;
@@ -133,13 +125,16 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 				int burnTime = DieselHandler.getBurnTime(tanks[0].getFluid().getFluid());
 				if(burnTime > 0)
 				{
-					//City mode: fuel is cosmetic. Instead of deriving a per-tick burn rate from the fluid
-					//and draining the tank every single tick -- which also dirties the tank every tick --
-					//the generator only checks that fuel is present and takes a token sip on an interval,
-					//so tanks still visibly empty and refuelling still matters. Output is already a flat
-					//config value, so nothing else needs to change.
+					//City mode: fuel is presence, not accounting -- the same rule a city-mode tank
+					//follows. Instead of deriving a per-tick burn rate from the fluid and draining the
+					//tank every single tick -- which also dirties the tank every tick -- the generator
+					//only checks that fuel is present and never draws it down: a generator holding fuel
+					//runs on it forever, an empty one is still empty. (It used to take a token sip so
+					//tanks would still visibly empty; that read, to the people running the city, as
+					//the mode not applying to generators at all.) Output is already a flat config value,
+					//so nothing else needs to change.
 					boolean cosmeticFuel = CityMode.generators();
-					int fluidConsumed = cosmeticFuel?CITY_FUEL_SIP_AMOUNT: 1000/burnTime;
+					int fluidConsumed = cosmeticFuel?0: 1000/burnTime;
 					int output = IEConfig.Machines.dieselGen_output;
 					int connected = 0;
 					TileEntity[] receivers = new TileEntity[3];
@@ -152,7 +147,9 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 								connected++;
 						}
 					}
-					if(connected > 0&&tanks[0].getFluidAmount() >= fluidConsumed)
+					//At least one millibucket must be there even when nothing is drawn: "holding
+					//fuel" is the whole of the city-mode fuel test, and it has to be a real one.
+					if(connected > 0&&tanks[0].getFluidAmount() >= Math.max(1, fluidConsumed))
 					{
 						if(!active)
 						{
@@ -161,8 +158,6 @@ public class TileEntityDieselGenerator extends TileEntityMultiblockMetal<TileEnt
 						}
 						if(!cosmeticFuel)
 							tanks[0].drain(fluidConsumed, true);
-						else if(world.getTotalWorldTime()%CITY_FUEL_SIP_INTERVAL==0)
-							tanks[0].drain(CITY_FUEL_SIP_AMOUNT, true);
 						int splitOutput = output/connected;
 						int leftover = output%connected;
 						for(int i = 0; i < 3; i++)

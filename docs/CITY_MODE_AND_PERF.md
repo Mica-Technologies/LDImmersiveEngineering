@@ -107,7 +107,7 @@ It covers seven subsystems:
 |---|---|
 | **Wires** | One lossless push per connector instead of loss, distance weighting, proportional split, a double simulate/real pass and a network-wide broadcast. |
 | **Floodlights** | Beams are re-traced only when the light switches or a neighbour changes, never on a timer, and the number of light blocks one lamp may place is capped. |
-| **Generators** | Fuel becomes cosmetic — a presence check and a token sip instead of a per-tick burn rate and a per-tick tank drain. |
+| **Generators** | Fuel becomes presence rather than accounting — a generator holding fuel runs on it forever and never draws the tank down; an empty one is still empty. |
 | **Machines** | Multiblocks with nothing to do stop re-scanning the recipe list every tick, and the scan interval widens. A switched-on machine also animates steadily rather than per-batch, and its energy buffer follows its redstone switch. |
 | **Virtual grid** | Segments stop accounting for flux and switch to presence: a segment is energized or it is not, and its Service Units deliver freely. See [Virtual Power Grid](#virtual-power-grid). |
 | **Fluid pipes** | A pipe hands its fluid to the endpoints on its network in order until it runs out, instead of simulating a fill against every one of them and then splitting the result in proportion. See [Fluid Pipes](#fluid-pipes). |
@@ -317,9 +317,10 @@ neither of them**:
    The tank only ever accepts registered fuels, so this is a real test — you cannot run a city on
    water.
 
-What `cityModeGenerators` changes is only the *rate* of the drain that follows: 1 mB every 20
-ticks instead of `1000/burnTime` mB every tick. A full 24-bucket tank then lasts roughly six and a
-half hours of runtime rather than minutes. See [Generators](#generators).
+What `cityModeGenerators` changes is only what happens *after* those two gates pass: nothing is
+drained. The tank keeps whatever it holds, so a generator that has been fuelled once runs on that
+fuel indefinitely — the same "holding some means unlimited, empty is still empty" rule that
+city-mode tanks follow. See [Generators](#generators).
 
 The back-pressure that makes the demand gate work is the connector's buffer. A connector's
 `FluxStorage` holds exactly one tick of input (256/1024/4096 FE) and its `receiveEnergy` returns 0
@@ -481,7 +482,8 @@ setups get there.
 
 ## Generators
 
-Gated behind `cityModeGenerators`. Implemented in `TileEntityDieselGenerator`.
+Gated behind `cityModeGenerators`. Implemented in `TileEntityDieselGenerator` and, for the
+hand-fuelled Portable Generator, `TileEntityPortableGenerator`.
 
 Be clear about the motivation: **this is a gameplay change, not a meaningful performance win.** See
 "Why these four, in this order" above — generators are too few to matter. What it buys is the
@@ -490,10 +492,15 @@ semantics: fuel as set dressing.
 **Stock:** derives a per-tick burn rate from the fluid (`1000/burnTime`) and drains the tank
 **every tick**, which also dirties the tank every tick.
 
-**City mode:** checks that fuel is present and drains **1 mB every 20 ticks**. A full 24-bucket
-tank lasts roughly six and a half hours of runtime — cosmetic, but visible enough that tanks still
-drain and refuelling is still part of running a generator. Output was already a flat config value
-and is unchanged.
+**City mode:** checks that fuel is present and **drains nothing**. A generator that holds any
+fuel at all runs on it forever; one that is empty stays off until somebody fills it. Output was
+already a flat config value and is unchanged.
+
+Earlier builds took a token sip instead (1 mB every 20 ticks on the Diesel Generator, 1 mB per burn
+interval on the Portable Generator) so that tanks would still visibly drain. In play that read as
+the mode simply not applying to generators: a Portable Generator's four-bucket tank ran dry in a
+couple of hours, and a decorative city is exactly the place where nobody wants to come back to a
+dark generator. Presence-not-accounting is also the rule tanks already follow, so the two now agree.
 
 **The load gate is deliberately kept.** "Only run when something actually wants power" is a
 *performance* feature, not a realism one — it is what makes an idle generator free. Removing it
@@ -701,7 +708,7 @@ counted.
 | Energy meters | read loss-attenuated throughput | read full throughput |
 | Floodlight beams | re-traced every 512 ticks | re-traced only on switch / neighbour change |
 | Floodlight light count | uncapped | capped at 64 per lamp |
-| Generator fuel burn | per-tick rate derived from the fluid | 1 mB every 20 ticks, cosmetic |
+| Generator fuel burn | per-tick rate derived from the fluid | none — fuel must be present, is never consumed |
 | Generator load gate | only runs under load | **unchanged — deliberately kept** |
 | Generator output | flat config value | unchanged |
 | Idle machine recipe scan | every tick | every 32 ticks, but only once the machine has started nothing for 200 ticks |
