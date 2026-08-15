@@ -2,15 +2,16 @@
 """
 Regenerates the conduit block's texture, models and blockstate.
 
-Conduit is surface-mounted tubing: it lies flat against a face and turns in right
-angles, which is the shape IE's catenary wires cannot make and the reason the block
-exists.  It is drawn by an ordinary multipart blockstate -- a hub pad against the
-mounting face plus one arm per joined direction -- rather than by a renderer.  Thirty
+Conduit is surface-mounted tubing: it lies flat against a face, turns in right angles,
+and wraps around the corners of what it is clipped to, which is the shape IE's catenary
+wires cannot make and the reason the block exists.  It is drawn by an ordinary multipart
+blockstate -- a hub pad against the mounting face plus one arm per joined direction, in
+whichever of its three forms that arm has -- rather than by a renderer.  Seventy-eight
 small models, every one an axis-aligned box, and nothing drawn per frame.
 
-Everything here is generated because the alternative is thirty hand-written JSON files
-whose only difference is six numbers, and a typo in one of them shows up as a single
-mis-shaped elbow somewhere in a base.
+Everything here is generated because the alternative is seventy-eight hand-written JSON
+files whose only difference is six numbers, and a typo in one of them shows up as a
+single mis-shaped elbow somewhere in a base.
 
 **The geometry constants are the ones the hitbox uses.**  They are read out of
 ConduitBounds.java rather than restated, because a model and a selection box that
@@ -117,22 +118,88 @@ def box(mount, depth, half, arm=None):
     return ([lo["x"], lo["y"], lo["z"]], [hi["x"], hi["y"], hi["z"]])
 
 
+def riser_box(mount, depth, half, arm):
+    """The climbing half of an inner corner: the piece that turns up at the end of an arm.
+
+    A floor run reaching a wall carries on up it, and the turn happens inside the lower
+    cell.  So: the same cross-section the tubing has everywhere, stood on end against the
+    block the arm points at, running from the top of the horizontal tubing right out to
+    the far face of the cell -- which is where the conduit clipped to that wall one cell
+    up has its own arm coming down to meet it.
+
+    It starts where the horizontal arm stops rather than overlapping it.  Two boxes
+    sharing a corner would put two coplanar faces in the same place, and a corner that
+    z-fights reads as a broken model rather than as a corner.
+    """
+    lo = {"x": 8 - half, "y": 8 - half, "z": 8 - half}
+    hi = {"x": 8 + half, "y": 8 + half, "z": 8 + half}
+    axis = AXIS_OF[mount]
+    # Along the mounting axis: from the back of the tubing out to the opposite face.
+    lo[axis], hi[axis] = (depth, 16) if mount in NEGATIVE else (0, 16 - depth)
+    arm_axis = AXIS_OF[arm]
+    # Along the arm: hard against the block being climbed, one tubing depth thick.
+    lo[arm_axis], hi[arm_axis] = (0, depth) if arm in NEGATIVE else (16 - depth, 16)
+    return ([lo["x"], lo["y"], lo["z"]], [hi["x"], hi["y"], hi["z"]])
+
+
+def wrap_box(mount, depth, half, arm):
+    """The cube that fills an outer corner, which lies outside this block entirely.
+
+    Both halves of an outer corner are ordinary arms reaching the same edge from two
+    sides of the block they are both clipped to, and the little cube where they meet
+    belongs to neither: the arm stops at the boundary and the other one starts one cell
+    over and a cell down.  Without something in it there is a conduit-sized notch at
+    every wrapped corner.
+
+    So one of the two grows into it -- `ConduitGeometry.drawsCornerCap` picks which, and
+    it has to be exactly one, because two identical cubes in one place is z-fighting
+    rather than a corner.  Both would name the same cube: it is the corner, not a piece
+    of either arm.
+
+    It is deliberately *not* in `ConduitBounds`.  1.12 gives a block one bounding box,
+    and growing this one past the block boundary would make a conduit selectable and
+    breakable from a cell it does not occupy.
+    """
+    lo, hi = box(mount, depth, half, arm)
+    uv_lo, uv_hi = list(lo), list(hi)
+    axis = "xyz".index(AXIS_OF[arm])
+    if arm in NEGATIVE:
+        hi[axis], lo[axis] = 0, -depth
+        uv_lo[axis], uv_hi[axis] = 0, depth
+    else:
+        lo[axis], hi[axis] = 16, 16 + depth
+        uv_lo[axis], uv_hi[axis] = 16 - depth, 16
+    # UVs come from where the cube *would* be if it were inside the block.  Faces are
+    # given explicit UVs taken from their own coordinates, and a coordinate outside 0..16
+    # is outside the sprite -- on an atlas that samples whatever texture happens to be
+    # next door.  Taken from the last few pixels of the arm instead, the cap carries the
+    # tube's stripe straight around the corner.
+    return (lo, hi, uv_lo, uv_hi)
+
+
 def model_json(*boxes):
     """A model of one or more boxes, every face textured.
 
     Faces are given explicit UVs taken from the box itself, so the tube's stripe runs
     along the run rather than being stretched differently on each length of it.
+
+    A box may carry a second pair of corners to take its UVs from instead.  Only the
+    outer-corner cap needs it, and it needs it because it is the one piece that lies
+    outside its own block: a UV outside 0..16 samples past the edge of the sprite, which
+    on a stitched atlas means whatever texture was placed next to this one.
     """
     elements = []
-    for frm, to in boxes:
+    for entry in boxes:
+        frm, to = entry[0], entry[1]
+        uv_frm, uv_to = (entry[2], entry[3]) if len(entry) == 4 else (frm, to)
         faces = {}
         for face in ("down", "up", "north", "south", "west", "east"):
             if face in ("down", "up"):
-                uv = [frm[0], frm[2], to[0], to[2]]
+                uv = [uv_frm[0], uv_frm[2], uv_to[0], uv_to[2]]
             elif face in ("north", "south"):
-                uv = [frm[0], 16 - to[1], to[0], 16 - frm[1]]
+                uv = [uv_frm[0], 16 - uv_to[1], uv_to[0], 16 - uv_frm[1]]
             else:
-                uv = [frm[2], 16 - to[1], to[2], 16 - frm[1]]
+                uv = [uv_frm[2], 16 - uv_to[1], uv_to[2], 16 - uv_frm[1]]
             faces[face] = {"texture": "#conduit", "uv": uv}
         elements.append({"from": frm, "to": to, "faces": faces})
     return {
@@ -152,7 +219,14 @@ def write_json(path, body):
 
 
 def build_models(assets, depth, half):
-    """The thirty pieces: six hubs and twenty-four arms."""
+    """The seventy-eight pieces: six hubs, and each of twenty-four arms in three forms.
+
+    An arm is straight, or it climbs the block in front of it (an inner corner), or it
+    carries on a little past the block edge to cap an outer one.  Three whole models
+    rather than a straight arm plus an optional extra part, because a multipart part
+    either applies or it does not: straight and climbing are two states of one arm, not
+    one arm with something added.
+    """
     out = os.path.join(assets, "models", "block", "conduit")
     written = []
     for mount in FACINGS:
@@ -165,6 +239,14 @@ def build_models(assets, depth, half):
             write_json(os.path.join(out, name + ".json"),
                        model_json(box(mount, depth, half, arm)))
             written.append(name)
+            write_json(os.path.join(out, name + "_riser.json"),
+                       model_json(box(mount, depth, half, arm),
+                                  riser_box(mount, depth, half, arm)))
+            written.append(name + "_riser")
+            write_json(os.path.join(out, name + "_wrap.json"),
+                       model_json(box(mount, depth, half, arm),
+                                  wrap_box(mount, depth, half, arm)))
+            written.append(name + "_wrap")
 
     # The held item and the creative-tab icon: a straight length lying on the floor,
     # which is what placing one actually gives you. Assembled from the same three boxes
@@ -178,12 +260,24 @@ def build_models(assets, depth, half):
 
 
 def build_blockstate(assets):
-    """The block's multipart blockstate: the hub always, each arm when its side connects.
+    """The block's multipart blockstate: the hub always, and each arm in whichever form it has.
 
     Multipart rather than variants because the alternative is enumerating 6 facings x 16
     connection combinations by hand.  The `when` clauses use the same absolute
-    sideconnection_* properties BlockConduit fills in from the tile entity, so reading
-    one against the other needs no translation.
+    sideconnection_* and runconnection_* properties BlockConduit fills in from the tile
+    entity, so reading one against the other needs no translation.
+
+    **Two properties per arm, spelling four states.**  Since runs learned to turn corners
+    an arm is one of four things, and the pair reads:
+
+        sideconnection = the tubing crosses this cell boundary in the plane of the surface
+        runconnection  = the arm toward this face turns a corner
+
+    so false/false is no arm, true/false a straight one, false/true a riser -- which stops
+    at the edge and climbs -- and true/true a straight arm that carries on past the edge to
+    cap an outer corner.  Nothing was added to the block state to pay for corners: Forge
+    builds the cartesian product of every listed property at startup, and this block already
+    declares fourteen.
 
     It lives in conduit_run.json rather than conduit.json, and BlockConduit's custom state
     mapper is what points at it -- the same split IE's fences use.  A multipart file cannot
@@ -198,10 +292,19 @@ def build_blockstate(assets):
             "apply": {"model": MODEL_REF % ("conduit_%s_hub" % mount)},
         })
         for arm in in_plane(mount):
-            parts.append({
-                "when": {"facing": mount, "sideconnection_%s" % arm: "true"},
-                "apply": {"model": MODEL_REF % ("conduit_%s_%s" % (mount, arm))},
-            })
+            for suffix, side, run in (("", "true", "false"),
+                                      ("_riser", "false", "true"),
+                                      ("_wrap", "true", "true")):
+                parts.append({
+                    "when": {
+                        "facing": mount,
+                        "sideconnection_%s" % arm: side,
+                        "runconnection_%s" % arm: run,
+                    },
+                    "apply": {
+                        "model": MODEL_REF % ("conduit_%s_%s%s" % (mount, arm, suffix)),
+                    },
+                })
     write_json(os.path.join(assets, "blockstates", "conduit_run.json"), {"multipart": parts})
     return parts
 

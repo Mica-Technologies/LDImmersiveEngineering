@@ -82,6 +82,19 @@ public class ConduitRoute
 		{
 			return null;
 		}
+
+		/**
+		 * Whether a conduit could clip to that block on that face -- which is also what a run needs
+		 * in the corner of an inner turn, since the riser lies against it on its way up.
+		 * <p>
+		 * Defaulted to false so a probe over a world with no walls in it -- most of the older
+		 * tests -- keeps answering the questions it was written to answer. A world where nothing is
+		 * solid has no inner corners in it, which is the right answer for a world with no walls.
+		 */
+		default boolean isMountable(BlockPos pos, EnumFacing face)
+		{
+			return false;
+		}
 	}
 
 	/**
@@ -141,10 +154,13 @@ public class ConduitRoute
 	/**
 	 * Walk out from a junction box and find the boxes it is joined to.
 	 * <p>
-	 * A conduit next to the box joins it if the step between them lies in the conduit's own plane --
-	 * the same rule two conduits use with each other, so a box is simply something a run may end at.
-	 * From there the walk follows conduit to conduit while they share a mounting face, because
-	 * {@link ConduitGeometry#connects} says a run stays on one surface.
+	 * A conduit next to the box joins it if the step between them lies in the conduit's own plane,
+	 * so a box is simply something a run may end at. <strong>A run arrives at a box face on and
+	 * never around a corner</strong> -- a box is a cube in the middle of its cell, so a run wrapping
+	 * round the outside of one would have nowhere to arrive; put the box at the corner instead.
+	 * <p>
+	 * From there the walk follows the run, which since the corner rules landed may leave the surface
+	 * it started on: see {@link #explore}.
 	 *
 	 * @return each reachable box and the number of conduit blocks between it and the start. The
 	 * starting box is never in the result, and neither is a box reachable only through another box:
@@ -252,6 +268,13 @@ public class ConduitRoute
 	/**
 	 * The walk itself, shared by both entry points above: follow conduit until it runs out, noting
 	 * every junction box met on the way and never walking through one.
+	 * <p>
+	 * Nine probes a node rather than four, because a run turns corners on its own: four steps along
+	 * the surface, four diagonally around an outer corner, and one out of the surface for the
+	 * inner one. That is a building-time cost and nothing else -- nothing here runs per tick, and
+	 * {@link #MAX_NODES} still bounds the whole walk -- and what it buys is the property the cost of
+	 * this feature rests on staying true with corners in it: <strong>a run between two boxes is
+	 * still one edge in the wire graph, however many times it turns.</strong>
 	 */
 	private static void explore(BlockPos start, Deque<BlockPos> open, Set<BlockPos> visited,
 								Map<BlockPos, Integer> distance, Map<BlockPos, Integer> found,
@@ -267,42 +290,112 @@ public class ConduitRoute
 			for(EnumFacing dir : ConduitGeometry.inPlane(mount))
 			{
 				Landing landing = across(here, dir, probe);
-				if(landing==null)
-					continue;
-				BlockPos next = landing.pos;
-				if(next.equals(start)||visited.contains(next))
-					continue;
-				int step = distance.get(here)+landing.blocks;
-				Node node = probe.nodeAt(next);
-				if(node==Node.JUNCTION)
+				if(landing!=null)
 				{
-					//First one wins, and shorter wins over longer: two paths to the same box are
-					//one connection, at the length of the route somebody would actually trace.
-					Integer existing = found.get(next);
-					if(existing==null||existing > step)
-						found.put(next, step);
-					continue;
+					BlockPos next = landing.pos;
+					int step = distance.get(here)+landing.blocks;
+					Node node = probe.nodeAt(next);
+					if(node==Node.JUNCTION)
+					{
+						//First one wins, and shorter wins over longer: two paths to the same box are
+						//one connection, at the length of the route somebody would actually trace.
+						if(!next.equals(start))
+						{
+							Integer existing = found.get(next);
+							if(existing==null||existing > step)
+								found.put(next, step);
+						}
+					}
+					else if(node==Node.CONDUIT&&!next.equals(start)&&!visited.contains(next))
+					{
+						//	=================================
+						//	Whether the run may change surface here
+						//	=================================
+						//Three ways for it to, and the flat case is still much the commonest:
+						//
+						//  - the same surface carries on into the next cell;
+						//  - the next cell is clipped to the face this step is walking onto, which
+						//    is a wall seen from the floor at its foot -- an inner corner, and it
+						//    needs a block in the corner to turn around;
+						//  - a feeder was crossed on the way, which licenses any plane containing
+						//    the step. That is the point of the block: a run coming down a wall and
+						//    out along the ceiling below is what somebody puts one through a floor
+						//    to do.
+						EnumFacing nextMount = probe.mountAt(next);
+						boolean crossedAFeeder = landing.blocks > 1;
+						boolean joins;
+						if(crossedAFeeder)
+							joins = ConduitGeometry.isInPlane(nextMount, dir);
+						else
+							joins = ConduitGeometry.connects(mount, nextMount, dir)
+									||(ConduitGeometry.joinsInnerCorner(mount, nextMount, dir)
+									&&cornerSupported(here, mount, nextMount, dir, probe));
+						if(joins)
+						{
+							visited.add(next);
+							distance.put(next, step);
+							open.add(next);
+						}
+					}
 				}
-				if(node!=Node.CONDUIT)
-					continue;
+
 				//	=================================
-				//	Whether the run may change surface
+				//	Around the outside of the corner
 				//	=================================
-				//A run stays on one surface, so ordinarily the next conduit has to be clipped to the
-				//same face. Crossing a feeder is the exception, and it is the point of the block: a
-				//run coming down a wall and out along the ceiling below is exactly what somebody
-				//puts a feeder through a floor to do. The far conduit still has to have the step in
-				//its own plane -- the same thing a junction box asks -- so the feeder licenses a
-				//plane change without licensing a conduit that faces the wrong way entirely.
-				boolean crossedAFeeder = landing.blocks > 1;
-				if(crossedAFeeder
-						?!ConduitGeometry.isInPlane(probe.mountAt(next), dir)
-						:!ConduitGeometry.connects(mount, probe.mountAt(next), dir))
-					continue;
-				visited.add(next);
-				distance.put(next, step);
-				open.add(next);
+				//The other half of the same idea, and the one that does not walk along a face at
+				//all: the run reaches the edge of the block it is bolted to and follows that
+				//block's next face round, so the piece it meets is a diagonal neighbour clipped to
+				//the same supporting block. A junction box is never picked up this way -- a box is
+				//a cube in the middle of its cell and a run has to arrive at one face on.
+				BlockPos wrapped = ConduitGeometry.outerCornerCell(here, mount, dir);
+				if(!wrapped.equals(start)&&!visited.contains(wrapped)
+						&&probe.nodeAt(wrapped)==Node.CONDUIT
+						&&probe.mountAt(wrapped)==ConduitGeometry.outerCornerMount(dir))
+				{
+					visited.add(wrapped);
+					distance.put(wrapped, distance.get(here)+1);
+					open.add(wrapped);
+				}
+			}
+
+			//	=================================
+			//	Up the wall this one is running into
+			//	=================================
+			//The climbing half of an inner corner, and the one step in the whole walk that leaves
+			//the plane: the piece a riser meets is one cell out along this conduit's own mounting
+			//axis, which is not one of its four arms at all. There is at most one -- a cell has one
+			//neighbour that way -- so this is one probe per node rather than four.
+			BlockPos above = here.offset(mount.getOpposite());
+			if(!above.equals(start)&&!visited.contains(above)&&probe.nodeAt(above)==Node.CONDUIT)
+			{
+				EnumFacing aboveMount = probe.mountAt(above);
+				if(ConduitGeometry.joinsInnerCorner(mount, aboveMount, mount.getOpposite())
+						&&cornerSupported(here, mount, aboveMount, mount.getOpposite(), probe))
+				{
+					visited.add(above);
+					distance.put(above, distance.get(here)+1);
+					open.add(above);
+				}
 			}
 		}
+	}
+
+	/**
+	 * Whether the block an inner corner turns around is actually there.
+	 * <p>
+	 * Asked from both ends of the joint about the same block, which is why
+	 * {@link ConduitGeometry#innerCornerSupport} works it out rather than each end doing it: a walk
+	 * that agreed with the renderer at one end and not at the other would give a run that draws
+	 * joined and carries nothing.
+	 */
+	private static boolean cornerSupported(BlockPos pos, EnumFacing mount, EnumFacing otherMount,
+										   EnumFacing towards, Probe probe)
+	{
+		BlockPos corner = ConduitGeometry.innerCornerSupport(pos, mount, otherMount, towards);
+		//Empty of conduit hardware as well as solid: a ground feeder is a solid cube a run goes
+		//through rather than round, and a box is not solid at all.
+		return probe.nodeAt(corner)==Node.NOTHING
+				&&probe.isMountable(corner,
+				ConduitGeometry.innerCornerSupportFace(mount, otherMount, towards));
 	}
 }

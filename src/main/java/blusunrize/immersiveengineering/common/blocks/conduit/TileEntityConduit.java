@@ -31,11 +31,15 @@ import java.util.List;
 /**
  * A length of surface-mounted conduit.
  * <p>
- * It holds two things and no more: which face it is clipped to, and which of the four directions in
- * that face it is joined to a neighbour in. Deliberately nothing else -- the conductors a run
- * carries live on the wire graph's {@code Connection}, not on the blocks along the way, which is
- * what keeps a corridor full of circuits from costing anything per tick. See
- * {@code api/energy/wires/conduit} and the plan's decision 1.
+ * It holds two things and no more: which face it is clipped to, and what each of the four arms in
+ * that face is doing. Deliberately nothing else -- the conductors a run carries live on the wire
+ * graph's {@code Connection}, not on the blocks along the way, which is what keeps a corridor full
+ * of circuits from costing anything per tick. See {@code api/energy/wires/conduit} and the plan's
+ * decision 1.
+ * <p>
+ * There are three ways for an arm to be joined and they are decided independently: flat along the
+ * surface, up an inner corner, and around an outer one. See {@link ConduitGeometry} for the rules
+ * and {@link ConduitArms} for how four modes fit in the state the block already had.
  * <p>
  * The connection mask is recomputed when a neighbour changes rather than every tick. There is no
  * {@code update} here at all, and that is the point: a conduit is scenery with a graph edge
@@ -53,30 +57,34 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	public EnumFacing facing = EnumFacing.DOWN;
 
 	/**
-	 * One bit per {@link ConduitGeometry#inPlane} index. Derived from the world, saved anyway: a
-	 * chunk can load with its neighbours still absent, and a run that drew itself as four
-	 * disconnected stubs until something happened to poke it would look broken.
+	 * What each of the four arms is doing. Derived from the world, saved anyway: a chunk can load
+	 * with its neighbours still absent, and a run that drew itself as four disconnected stubs until
+	 * something happened to poke it would look broken.
 	 */
-	private int connections;
+	private final ConduitArms arms = new ConduitArms();
 
 	public int getConnections()
 	{
-		return connections;
+		return arms.getConnections();
 	}
 
 	public boolean isConnected(EnumFacing dir)
 	{
-		int index = ConduitGeometry.armIndex(facing, dir);
-		return index >= 0&&(connections&(1 << index))!=0;
+		return arms.isConnected(ConduitGeometry.armIndex(facing, dir));
+	}
+
+	public ConduitGeometry.ArmMode armMode(EnumFacing dir)
+	{
+		return arms.mode(ConduitGeometry.armIndex(facing, dir));
 	}
 
 	public ConduitGeometry.Shape getShape()
 	{
-		return ConduitGeometry.shapeOf(facing, connections);
+		return ConduitGeometry.shapeOf(facing, arms.getConnections());
 	}
 
 	/**
-	 * Rebuild the mask from what is actually next door.
+	 * Rebuild the arms from what is actually next door.
 	 *
 	 * @return true if anything changed, so the caller can skip a block update it does not need
 	 */
@@ -84,25 +92,39 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	{
 		if(world==null)
 			return false;
-		int found = 0;
+		ConduitArms found = new ConduitArms();
 		EnumFacing[] plane = ConduitGeometry.inPlane(facing);
 		for(int i = 0; i < plane.length; i++)
-			if(connectsTo(plane[i]))
-				found |= 1 << i;
-		if(found==connections)
-			return false;
-		connections = found;
-		return true;
+		{
+			EnumFacing dir = plane[i];
+			//Three ways to be joined in one direction, and the three are decided independently: a
+			//run may reach a wall and climb it where a flat neighbour would have been, and may
+			//round an outer corner in a direction that also holds a junction box. What differs is
+			//only which of them gets to say what the arm looks like -- see ConduitGeometry.armMode.
+			boolean wrap = wrapsAt(dir);
+			found.set(i, ConduitGeometry.armMode(
+					connectsTo(dir)||turnsFlatAt(dir), risesAt(dir), wrap,
+					wrap&&ConduitGeometry.drawsCornerCap(facing, ConduitGeometry.outerCornerMount(dir))));
+		}
+		return arms.copyFrom(found);
 	}
 
+	/**
+	 * The block at {@code pos}, or null where asking would be expensive or wrong.
+	 * <p>
+	 * isBlockLoaded, not getTileEntity straight away: asking about an unloaded chunk would generate
+	 * it, and a conduit run along a border would drag chunks in behind it forever.
+	 */
+	@Nullable
+	private TileEntity tileAt(BlockPos pos)
+	{
+		return world.isBlockLoaded(pos)?world.getTileEntity(pos): null;
+	}
+
+	/** The flat case: the run carries on along the same surface. */
 	private boolean connectsTo(EnumFacing dir)
 	{
-		BlockPos neighbour = getPos().offset(dir);
-		//isBlockLoaded, not getTileEntity straight away: asking about an unloaded chunk would
-		//generate it, and a conduit run along a border would drag chunks in behind it forever.
-		if(!world.isBlockLoaded(neighbour))
-			return false;
-		TileEntity te = world.getTileEntity(neighbour);
+		TileEntity te = tileAt(getPos().offset(dir));
 		//A box is the far end of a run, so the arm pointing at one is drawn like any other. Without
 		//this every run rendered as two loose stubs with a gap at each box -- the run worked, since
 		//ConduitRoute walks the world rather than this mask, but it read as broken while you built
@@ -119,6 +141,64 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		if(!(te instanceof TileEntityConduit))
 			return false;
 		return ConduitGeometry.connects(facing, ((TileEntityConduit)te).facing, dir);
+	}
+
+	/**
+	 * The flat half of an inner corner: this conduit is the one on the wall, and the piece it meets
+	 * is clipped to the very face this arm is pointing at -- a floor, seen from a wall.
+	 */
+	private boolean turnsFlatAt(EnumFacing dir)
+	{
+		BlockPos neighbour = getPos().offset(dir);
+		TileEntity te = tileAt(neighbour);
+		if(!(te instanceof TileEntityConduit))
+			return false;
+		EnumFacing otherMount = ((TileEntityConduit)te).facing;
+		return ConduitGeometry.joinsInnerCorner(facing, otherMount, dir)
+				&&cornerIsSupported(ConduitGeometry.innerCornerSupport(getPos(), facing, otherMount, dir),
+				ConduitGeometry.innerCornerSupportFace(facing, otherMount, dir));
+	}
+
+	/**
+	 * The climbing half: this conduit is the one on the floor, its arm reaches the wall in front of
+	 * it and turns up, and the piece it meets is one cell out along its own mounting axis.
+	 */
+	private boolean risesAt(EnumFacing dir)
+	{
+		BlockPos above = getPos().offset(facing.getOpposite());
+		TileEntity te = tileAt(above);
+		if(!(te instanceof TileEntityConduit)||((TileEntityConduit)te).facing!=dir)
+			return false;
+		return cornerIsSupported(getPos().offset(dir), dir.getOpposite());
+	}
+
+	/**
+	 * The other corner: the run reaches the edge of the block it is mounted on and follows that
+	 * block's next face round. The partner is a diagonal neighbour clipped to the same block.
+	 */
+	private boolean wrapsAt(EnumFacing dir)
+	{
+		TileEntity te = tileAt(ConduitGeometry.outerCornerCell(getPos(), facing, dir));
+		return te instanceof TileEntityConduit
+				&&((TileEntityConduit)te).facing==ConduitGeometry.outerCornerMount(dir);
+	}
+
+	/**
+	 * Whether there is a block in the corner for a riser to climb, and nothing else claiming it.
+	 * <p>
+	 * Solid, so a run does not turn corners around a wall somebody has not built; and empty of
+	 * conduit hardware, so a run reaching a ground feeder passes through it -- which is what a
+	 * feeder is for -- rather than climbing it.
+	 */
+	private boolean cornerIsSupported(BlockPos corner, EnumFacing face)
+	{
+		if(!world.isBlockLoaded(corner))
+			return false;
+		TileEntity te = tileAt(corner);
+		if(te instanceof TileEntityConduit||te instanceof TileEntityJunctionBox
+				||te instanceof TileEntityGroundFeeder)
+			return false;
+		return world.getBlockState(corner).isSideSolid(world, corner, face);
 	}
 
 	@Override
@@ -173,7 +253,7 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		nbt.setInteger("facing", facing.ordinal());
-		nbt.setInteger("connections", connections);
+		arms.writeToNBT(nbt);
 	}
 
 	@Override
@@ -184,7 +264,7 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		int ordinal = nbt.getInteger("facing");
 		facing = ordinal >= 0&&ordinal < EnumFacing.VALUES.length
 				?EnumFacing.VALUES[ordinal]: EnumFacing.DOWN;
-		connections = nbt.getInteger("connections")&0xF;
+		arms.readFromNBT(nbt);
 	}
 
 	@Override
@@ -281,7 +361,7 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	@Override
 	public float[] getBlockBounds()
 	{
-		return ConduitBounds.of(facing, connections);
+		return ConduitBounds.of(facing, arms.getConnections(), arms.getRisers());
 	}
 
 	@Override
@@ -301,8 +381,9 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	{
 		List<String> lines = new ArrayList<>();
 		lines.add(TextFormatting.GOLD+"Conduit"+TextFormatting.RESET+": "+describeShape());
-		//Said here because it is the question a plane change provokes, and the answer is a block
-		//rather than a rule: runs stay on one surface, and a junction box is how you leave it.
+		//A bare length is the one state worth saying out loud: it looks exactly like a joined one
+		//from any distance, and it is what somebody who has just mounted a length to the wrong
+		//surface is looking at.
 		if(getShape()==ConduitGeometry.Shape.BARE)
 			lines.add(TextFormatting.YELLOW+"Not joined to anything yet."+TextFormatting.RESET);
 		return lines;

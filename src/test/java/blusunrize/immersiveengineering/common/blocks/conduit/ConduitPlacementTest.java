@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Which surface a freshly placed conduit clips to.
@@ -186,12 +187,12 @@ class ConduitPlacementTest
 		}
 
 		@Test
-		@DisplayName("a step off the surface is not a continuation")
+		@DisplayName("a step off the surface in the open is not a continuation")
 		void stepOffSurfaceFallsBack()
 		{
 			world.floor(0).conduit(0, 1, 0, EnumFacing.DOWN);
-			//Clicking the exposed top of a floor conduit. UP is along that conduit's mounting axis,
-			//not along its surface, so there is no run to continue and the old rule answers.
+			//Clicking the exposed top of a floor conduit in the middle of a room. There is no wall
+			//to climb, so there is no corner to turn and the old rule answers.
 			assertEquals(EnumFacing.DOWN, place(0, 2, 0, EnumFacing.UP));
 		}
 
@@ -203,6 +204,84 @@ class ConduitPlacementTest
 			//DOWN with nothing underneath, so the rule declines and the old answer stands.
 			world.wall(0, 0, 0).conduit(0, 1, 0, EnumFacing.DOWN);
 			assertEquals(EnumFacing.SOUTH, place(0, 1, -1, EnumFacing.NORTH));
+		}
+	}
+
+	@Nested
+	@DisplayName("turning a corner off the end of a run")
+	class TurningACorner
+	{
+		@Test
+		@DisplayName("clicking the top of the last floor length climbs the wall it has reached")
+		void climbsTheWall()
+		{
+			//	=================================
+			//	The gesture the corner rules needed.
+			//	=================================
+			//A floor run has reached a wall, and the obvious next click is the exposed top of the
+			//last length. That used to answer DOWN, laying the new piece flat on top of a conduit --
+			//which is not a surface, so the piece hung there joined to nothing. Clicking the wall
+			//itself always worked and still does; this makes the other way of saying it work too.
+			world.floor(0).conduit(0, 1, 0, EnumFacing.DOWN).wall(1, 1, 0).wall(1, 2, 0);
+			assertEquals(EnumFacing.EAST, place(0, 2, 0, EnumFacing.UP));
+		}
+
+		@Test
+		@DisplayName("the surface it picks actually turns the corner")
+		void theCornerIsReal()
+		{
+			world.floor(0).conduit(0, 1, 0, EnumFacing.DOWN).wall(1, 1, 0).wall(1, 2, 0);
+			EnumFacing mount = place(0, 2, 0, EnumFacing.UP);
+			//The step from the new piece back down to the run it is continuing.
+			assertTrue(ConduitGeometry.joinsInnerCorner(mount, EnumFacing.DOWN, EnumFacing.DOWN),
+					"the piece it placed does not join the run it was placed off");
+			assertEquals(new BlockPos(1, 1, 0),
+					ConduitGeometry.innerCornerSupport(new BlockPos(0, 2, 0), mount,
+							EnumFacing.DOWN, EnumFacing.DOWN),
+					"the corner it turns is not around the wall that was there");
+		}
+
+		@Test
+		@DisplayName("it needs the wall beside the run as well as beside the new piece")
+		void needsBothHalvesOfTheWall()
+		{
+			//Only the upper block of the wall is there -- an overhang. The riser has nothing to hug
+			//on its way up, so this is not the gesture and the old answer stands.
+			world.floor(0).conduit(0, 1, 0, EnumFacing.DOWN).wall(1, 2, 0);
+			assertEquals(EnumFacing.DOWN, place(0, 2, 0, EnumFacing.UP));
+		}
+
+		@Test
+		@DisplayName("a feeder is not a corner to turn")
+		void feederInTheCornerIsNotAWall()
+		{
+			//A feeder is solid, so it passes the "is there a block there" test on its own. A run
+			//reaching one goes through it rather than climbing it, so this must decline.
+			world.floor(0).conduit(0, 1, 0, EnumFacing.DOWN).feeder(1, 1, 0, EnumFacing.Axis.X)
+					.wall(1, 2, 0);
+			assertEquals(EnumFacing.DOWN, place(0, 2, 0, EnumFacing.UP));
+		}
+
+		@Test
+		@DisplayName("it works off a wall run as well, which is the same corner the other way up")
+		void offAWallRun()
+		{
+			//A run down the inside of a north wall, reaching the floor. Clicking the exposed south
+			//face of the bottom length should lay the next piece on that floor rather than hang it
+			//in the air clipped to the conduit.
+			world.floor(0).wall(0, 1, 0).conduit(0, 1, 1, EnumFacing.NORTH);
+			assertEquals(EnumFacing.DOWN, place(0, 1, 2, EnumFacing.SOUTH));
+		}
+
+		@Test
+		@DisplayName("clicking the far side of an edge still just clips to the wall")
+		void wrappingAnEdgeNeedsNoNewRule()
+		{
+			//The outer corner needs nothing here at all: the block round the edge is bare wall, and
+			//the plain rule has always clipped a conduit to the face it was put against. Asserted
+			//so that a later tidy-up of these branches cannot quietly take it away.
+			world.wall(0, 0, 0).conduit(0, 1, 0, EnumFacing.DOWN);
+			assertEquals(EnumFacing.WEST, place(1, 0, 0, EnumFacing.EAST));
 		}
 	}
 

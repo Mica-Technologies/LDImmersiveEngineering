@@ -1,0 +1,144 @@
+{
+	"textures": {
+		"conduit": "immersiveengineering:blocks/conduit",
+		"particle": "immersiveengineering:blocks/conduit"
+	},
+	"elements": [
+		{
+			"from": [
+				13,
+				6,
+				10
+			],
+			"to": [
+				16,
+				10,
+				16
+			],
+			"faces": {
+				"down": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						10,
+						16,
+						16
+					]
+				},
+				"up": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						10,
+						16,
+						16
+					]
+				},
+				"north": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						6,
+						16,
+						10
+					]
+				},
+				"south": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						6,
+						16,
+						10
+					]
+				},
+				"west": {
+					"texture": "#conduit",
+					"uv": [
+						10,
+						6,
+						16,
+						10
+					]
+				},
+				"east": {
+					"texture": "#conduit",
+					"uv": [
+						10,
+						6,
+						16,
+						10
+					]
+				}
+			}
+		},
+		{
+			"from": [
+				13,
+				6,
+				16
+			],
+			"to": [
+				16,
+				10,
+				19
+			],
+			"faces": {
+				"down": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						13,
+						16,
+						16
+					]
+				},
+				"up": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						13,
+						16,
+						16
+					]
+				},
+				"north": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						6,
+						16,
+						10
+					]
+				},
+				"south": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						6,
+						16,
+						10
+					]
+				},
+				"west": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						6,
+						16,
+						10
+					]
+				},
+				"east": {
+					"texture": "#conduit",
+					"uv": [
+						13,
+						6,
+						16,
+						10
+					]
+				}
+			}
+		}
+	]
+}

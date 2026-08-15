@@ -70,4 +70,15 @@ class ConduitWorldProbe implements ConduitRoute.Probe
 		TileEntity te = at(pos);
 		return te instanceof TileEntityGroundFeeder?((TileEntityGroundFeeder)te).getAxis(): null;
 	}
+
+	/**
+	 * Solidity, the same question {@code ConduitPlacement} asks and the same one
+	 * {@code TileEntityConduit} asks before it draws a riser. Unloaded is "no", for the reason
+	 * {@link #at} gives: a walk must not generate the chunk it is looking into.
+	 */
+	@Override
+	public boolean isMountable(BlockPos pos, EnumFacing face)
+	{
+		return world.isBlockLoaded(pos)&&world.getBlockState(pos).isSideSolid(world, pos, face);
+	}
 }

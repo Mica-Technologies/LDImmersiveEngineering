@@ -29,12 +29,13 @@ import javax.annotation.Nullable;
  * Surface-mounted conduit: the indoor counterpart to IE's catenary wires.
  * <p>
  * A wire sags between two points, which is right across a valley and wrong along a ceiling. This
- * lies flat against a face and turns in right angles, and that is the entire reason it exists.
+ * lies flat against a face, turns in right angles and wraps around the corners of whatever it is
+ * clipped to, and that is the entire reason it exists.
  * <p>
  * The block is drawn by an ordinary multipart blockstate -- a hub against the mounting face plus
- * one arm per joined direction -- rather than by a renderer. Thirty small models, all axis-aligned
- * boxes generated alongside the texture, and nothing drawn per frame. A catenary renderer would be
- * both the wrong shape and far more expensive.
+ * one arm per joined direction, in whichever of its three forms that arm has -- rather than by a
+ * renderer. Seventy-eight small models, all axis-aligned boxes generated alongside the texture, and
+ * nothing drawn per frame. A catenary renderer would be both the wrong shape and far more expensive.
  *
  * @author LDImmersiveEngineering -- conduits
  */
@@ -114,12 +115,43 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		if(tile instanceof TileEntityConduit)
 		{
 			TileEntityConduit conduit = (TileEntityConduit)tile;
+			//	=================================
+			//	Four arm modes in two boolean properties
+			//	=================================
 			//Written out in absolute facings rather than as arm indices: the blockstate file reads far
 			//better as "sideconnection_north" than as "arm2", and the mapping between the two is
 			//exactly what ConduitGeometry.armIndex is for.
+			//
+			//An arm is one of four things since runs learned to turn corners, and the pair of
+			//booleans below spells all four:
+			//
+			//    sideconnection = the tubing crosses this cell boundary in the plane of the surface
+			//    runconnection  = the arm toward this face turns a corner
+			//
+			//    false/false  nothing            true/false  a straight arm
+			//    false/true   a riser, which     true/true   a straight arm that carries on past
+			//                 stops at the edge              the edge to cap an outer corner
+			//                 and climbs
+			//
+			//**No property was added to pay for corners, and that is not tidiness.** Forge builds
+			//the cartesian product of every listed property at startup, and this block already
+			//declares fourteen; a third value on a per-face property would have multiplied its
+			//state count by eleven, and a seventh boolean array by sixty-four.
+			//
+			//RUNCONNECTION means something else entirely on a junction box -- "a run touches this
+			//face" -- and that is safe for the reason SIDECONNECTION's two meanings are safe: the
+			//two block types are drawn by different blockstate files and neither can see the other's.
 			for(EnumFacing side : EnumFacing.VALUES)
+			{
+				ConduitGeometry.ArmMode mode = conduit.armMode(side);
 				state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
-						conduit.isConnected(side));
+						mode==ConduitGeometry.ArmMode.STRAIGHT||mode==ConduitGeometry.ArmMode.WRAP);
+				//Filled in for a run as well as for a box, and it has to be: an unset property keeps
+				//whatever the default state carries, and a stale true here would draw a riser into
+				//the ceiling.
+				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()],
+						mode==ConduitGeometry.ArmMode.RISER||mode==ConduitGeometry.ArmMode.WRAP);
+			}
 			return state;
 		}
 		if(tile instanceof TileEntityJunctionBox)

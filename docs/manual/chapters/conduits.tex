@@ -22,16 +22,28 @@ conduit's surface rather than clipping to the conduit itself, so you can lay a c
 along the run instead of hunting for the bare wall between lengths. The first length off a junction
 box does the same thing --- it looks for the surface behind it rather than clipping to the box.
 
-\textbf{A run stays on one surface.} Conduit on a floor does not climb the wall by itself. That is
-deliberate: a plane change goes through a junction box, which is a real block and what you would put
-at a corner anyway.
+\textbf{A run wraps around corners.} It reaches a wall and climbs it; it reaches the end of the beam
+it is running along and follows that beam's end face down. Neither needs a junction box, and both
+happen between two lengths of conduit.
+
+An \textbf{inner} corner --- the floor meeting the wall --- is turned inside the lower length's own
+cell, so it needs a block in the corner to turn around. A doorway at the foot of the wall leaves
+nothing to turn around, and the run stops there. An \textbf{outer} corner --- the end of the beam ---
+needs nothing: the two lengths are diagonal neighbours bolted to two faces of the same block.
+
+Click anywhere sensible and you get the piece that turns the corner: the wall the run is heading
+for, the far side of the edge it is running along, or the exposed face of the last length.
+
+A run still arrives at a junction box \emph{face on} rather than around a corner. A box is a cube in
+the middle of its cell, so put the box \textbf{at} the corner instead --- it sits in the plane of
+whichever run reaches it, and both runs meet it flush.
 
 Runs are discovered, not drawn. Laying conduit between two boxes creates the connection; pulling a
 length out of the middle breaks it. There is no coil and no linking tool --- the run is the thing
 you built.
 
 \begin{mbplan}{A run seen from above, on a floor}{C = conduit, J = junction box. The run turns in
-the plane of the surface it is clipped to; leaving that surface needs the box.}
+the plane of the surface it is clipped to, and wraps onto the next surface where that one stops.}
 \mblayer{}{J,C,C,C,C,J;.,.,.,.,.,C;.,.,.,.,.,J}
 \end{mbplan}
 
@@ -105,10 +117,14 @@ A run passes through along \textbf{one axis}, which an Engineer's Hammer turns. 
 the grain of a run stops it exactly as a stone block would, and stops it visibly: the conduit does
 not draw its arm into one it cannot enter.
 
-\textbf{Crossing a feeder is the one place a run may change surface without a box.} The conduit on
-the far side still has to have the crossing in its own plane --- the same thing a junction box asks
---- so a run can come down a north wall and continue down an east one, but it cannot continue into
-conduit lying flat on the floor of the shaft.
+\textbf{Crossing a feeder changes surface without a corner.} A run turns corners on its own, but a
+corner is two faces of one block; a feeder is what lets a run come out of a floor on a surface with
+no relation to the one it went in on. The conduit on the far side still has to have the crossing in
+its own plane --- the same thing a junction box asks --- so a run can come down a north wall and
+continue down an east one, but it cannot continue into conduit lying flat on the floor of the shaft.
+
+A feeder is also \emph{passed through} rather than climbed. It is a solid cube, so a run reaching one
+would otherwise take it for a wall to turn up.
 
 \begin{mbplan}{A run leaving a building, seen from the side}{C = conduit on a wall, G = ground
 feeder, J = junction box. The feeder fills the floor; the run crosses it and carries on below.}

@@ -161,9 +161,17 @@ class ConduitAssetsTest
 		}
 
 		@Test
-		@DisplayName("there is a hub for every mount and an arm for every direction in its plane")
+		@DisplayName("there is a hub for every mount and all three arm forms for every direction")
 		void everyMountAndArmIsCovered()
 		{
+			//	=================================
+			//	Two properties, four arm states
+			//	=================================
+			//An arm is one of four things since runs learned to turn corners, and the pair of
+			//booleans BlockConduit fills in spells all four: sideconnection is "the tubing crosses
+			//this cell boundary in the plane of the surface", runconnection is "the arm toward this
+			//face turns a corner". So a part has to test both, and a part testing only one would
+			//draw a straight arm over a riser.
 			JsonArray parts = read("blockstates/conduit_run.json").getAsJsonArray("multipart");
 			Set<String> hubs = new HashSet<>();
 			Set<String> arms = new HashSet<>();
@@ -176,25 +184,38 @@ class ConduitAssetsTest
 				Set<String> conditions = keys(when);
 				conditions.remove("facing");
 				if(conditions.isEmpty())
-					hubs.add(facing);
-				else
 				{
-					assertEquals(1, conditions.size(), "an arm should test one side, not "+conditions);
-					String side = conditions.iterator().next();
-					assertTrue(side.startsWith("sideconnection_"),
-							"an arm keys off "+side+", which BlockConduit does not fill in");
-					arms.add(facing+"/"+side.substring("sideconnection_".length()));
+					hubs.add(facing);
+					continue;
 				}
+				assertEquals(2, conditions.size(),
+						"an arm has to pin down both of its flags, not "+conditions);
+				String side = null;
+				String run = null;
+				for(String key : conditions)
+					if(key.startsWith("sideconnection_"))
+						side = key.substring("sideconnection_".length());
+					else if(key.startsWith("runconnection_"))
+						run = key.substring("runconnection_".length());
+				assertNotNull(side, "an arm part has no sideconnection flag: "+conditions);
+				assertNotNull(run, "an arm part has no runconnection flag: "+conditions);
+				assertEquals(side, run, "an arm tests two different faces at once");
+				String sideValue = when.get("sideconnection_"+side).getAsString();
+				String runValue = when.get("runconnection_"+run).getAsString();
+				assertFalse("false".equals(sideValue)&&"false".equals(runValue),
+						"a part draws an arm for a direction with no arm in it");
+				arms.add(facing+"/"+side+"/"+sideValue+runValue);
 			}
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
 				assertTrue(hubs.contains(mount.getName()), "no hub for a conduit mounted "+mount);
 				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
-					assertTrue(arms.contains(mount.getName()+"/"+dir.getName()),
-							"no arm for "+mount+" running "+dir);
+					for(String form : new String[]{"truefalse", "falsetrue", "truetrue"})
+						assertTrue(arms.contains(mount.getName()+"/"+dir.getName()+"/"+form),
+								"no "+form+" arm for "+mount+" running "+dir);
 			}
 			assertEquals(6, hubs.size());
-			assertEquals(6*ConduitGeometry.ARMS, arms.size());
+			assertEquals(3*6*ConduitGeometry.ARMS, arms.size());
 		}
 
 		@Test
@@ -209,9 +230,11 @@ class ConduitAssetsTest
 				EnumFacing mount = EnumFacing.byName(when.get("facing").getAsString());
 				for(String key : keys(when))
 				{
-					if(!key.startsWith("sideconnection_"))
+					String prefix = key.startsWith("sideconnection_")?"sideconnection_"
+							:key.startsWith("runconnection_")?"runconnection_": null;
+					if(prefix==null)
 						continue;
-					EnumFacing dir = EnumFacing.byName(key.substring("sideconnection_".length()));
+					EnumFacing dir = EnumFacing.byName(key.substring(prefix.length()));
 					assertTrue(ConduitGeometry.isInPlane(mount, dir),
 							mount+" offers an arm toward "+dir+", which is off its surface");
 				}
@@ -292,6 +315,19 @@ class ConduitAssetsTest
 					to.get(0).getAsInt(), to.get(1).getAsInt(), to.get(2).getAsInt()};
 		}
 
+		/** One box of a model that has more than one, as {minX..maxZ} in pixels. */
+		private int[] spanOf(String name, int index)
+		{
+			JsonArray elements = read("models/block/conduit/"+name+".json")
+					.getAsJsonArray("elements");
+			assertEquals(2, elements.size(), name+" should be an arm and one piece more");
+			JsonObject box = elements.get(index).getAsJsonObject();
+			JsonArray from = box.getAsJsonArray("from");
+			JsonArray to = box.getAsJsonArray("to");
+			return new int[]{from.get(0).getAsInt(), from.get(1).getAsInt(), from.get(2).getAsInt(),
+					to.get(0).getAsInt(), to.get(1).getAsInt(), to.get(2).getAsInt()};
+		}
+
 		@Test
 		@DisplayName("every generated model parses and has a texture")
 		void everyModelIsWellFormed()
@@ -301,8 +337,124 @@ class ConduitAssetsTest
 				JsonObject hub = read("models/block/conduit/"+ConduitGeometry.hubModelName(mount)+".json");
 				assertTrue(hub.has("textures"), "a conduit model has no textures block");
 				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
 					read("models/block/conduit/"+ConduitGeometry.armModelName(mount, dir)+".json");
+					read("models/block/conduit/"+ConduitGeometry.riserModelName(mount, dir)+".json");
+					read("models/block/conduit/"+ConduitGeometry.wrapModelName(mount, dir)+".json");
+				}
 			}
+		}
+
+		@Test
+		@DisplayName("a riser climbs to the far face and matches the hitbox that follows it")
+		void riserMatchesTheBounds()
+		{
+			//The inner corner, drawn: the arm along the surface, then the same tubing stood on end
+			//against the block it points at, running out to the boundary the piece on the wall comes
+			//down to. Checked against ConduitBounds because that is the box you click.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					String name = ConduitGeometry.riserModelName(mount, dir);
+					int[] hub = span(ConduitGeometry.hubModelName(mount));
+					int[] arm = spanOf(name, 0);
+					int[] climb = spanOf(name, 1);
+					int mountAxis = mount.getAxis().ordinal();
+					int armAxis = dir.getAxis().ordinal();
+					int bit = 1 << ConduitGeometry.armIndex(mount, dir);
+					float[] bounds = ConduitBounds.of(mount, bit, bit);
+					//Against the hub as well as the two new boxes: an arm stops where the hub starts
+					//rather than spanning the block, so the piece nearest the middle of the run is
+					//always the hub's own model.
+					for(int i = 0; i < 3; i++)
+					{
+						int min = Math.min(hub[i], Math.min(arm[i], climb[i]));
+						int max = Math.max(hub[i+3], Math.max(arm[i+3], climb[i+3]));
+						assertEquals(bounds[i]*16, min, 1e-4,
+								mount+"/"+dir+" riser starts outside its own hitbox on axis "+i);
+						assertEquals(bounds[i+3]*16, max, 1e-4,
+								mount+"/"+dir+" riser ends outside its own hitbox on axis "+i);
+					}
+					//It starts where the arm stops rather than overlapping it: two boxes sharing a
+					//corner put two coplanar faces in the same place, and a corner that z-fights
+					//reads as a broken model rather than as a corner.
+					if(mount.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+						assertEquals(arm[mountAxis+3], climb[mountAxis],
+								mount+"/"+dir+" riser overlaps the arm it grows out of");
+					else
+						assertEquals(arm[mountAxis], climb[mountAxis+3],
+								mount+"/"+dir+" riser overlaps the arm it grows out of");
+					//And it hugs the block it is climbing, one tubing depth thick.
+					assertEquals(ConduitBounds.DEPTH, climb[armAxis+3]-climb[armAxis],
+							mount+"/"+dir+" riser is not the thickness of the tubing");
+				}
+		}
+
+		@Test
+		@DisplayName("a wrap caps the corner outside its own block, which is the only piece that does")
+		void wrapCapsTheCorner()
+		{
+			//The cap is deliberately outside the block: it fills the cube where two arms reach the
+			//same edge from two sides, and that cube belongs to neither cell. It is also the one
+			//piece not in ConduitBounds -- 1.12 gives a block one bounding box, and growing this one
+			//past the boundary would make a conduit breakable from a cell it does not occupy.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					String name = ConduitGeometry.wrapModelName(mount, dir);
+					int[] arm = spanOf(name, 0);
+					int[] cap = spanOf(name, 1);
+					int armAxis = dir.getAxis().ordinal();
+					if(dir.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+					{
+						assertEquals(0, cap[armAxis+3], mount+"/"+dir+" cap is not against the edge");
+						assertEquals(-ConduitBounds.DEPTH, cap[armAxis],
+								mount+"/"+dir+" cap is not one tubing depth deep");
+					}
+					else
+					{
+						assertEquals(16, cap[armAxis], mount+"/"+dir+" cap is not against the edge");
+						assertEquals(16+ConduitBounds.DEPTH, cap[armAxis+3],
+								mount+"/"+dir+" cap is not one tubing depth deep");
+					}
+					//Off the arm's axis the cap is exactly the arm, so the corner has the run's own
+					//cross-section rather than a lump on the end of it.
+					for(int i = 0; i < 3; i++)
+						if(i!=armAxis)
+						{
+							assertEquals(arm[i], cap[i], mount+"/"+dir+" cap is not the run's width");
+							assertEquals(arm[i+3], cap[i+3], mount+"/"+dir+" cap is not the run's width");
+						}
+				}
+		}
+
+		@Test
+		@DisplayName("every face's UVs stay inside the sprite, cap included")
+		void uvsStayInsideTheSprite()
+		{
+			//The trap the cap sets: faces here are given explicit UVs taken from their own
+			//coordinates, and the cap's coordinates run past 16. A UV outside 0..16 samples past the
+			//edge of the sprite, which on a stitched atlas is whatever texture was placed next to
+			//this one -- a corner wearing a piece of some other block, with nothing in the log.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+					for(String name : new String[]{ConduitGeometry.armModelName(mount, dir),
+							ConduitGeometry.riserModelName(mount, dir),
+							ConduitGeometry.wrapModelName(mount, dir)})
+						for(JsonElement element : read("models/block/conduit/"+name+".json")
+								.getAsJsonArray("elements"))
+						{
+							JsonObject faces = element.getAsJsonObject().getAsJsonObject("faces");
+							for(Map.Entry<String, JsonElement> face : faces.entrySet())
+								for(JsonElement uv : face.getValue().getAsJsonObject()
+										.getAsJsonArray("uv"))
+								{
+									float value = uv.getAsFloat();
+									assertTrue(value >= 0f&&value <= 16f,
+											name+"'s "+face.getKey()+" face samples outside the "
+													+"sprite at "+value);
+								}
+						}
 		}
 
 		@Test

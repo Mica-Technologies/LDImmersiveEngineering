@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.common.blocks.conduit;
 
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.BlockPos;
 
 import javax.annotation.Nullable;
 
@@ -20,15 +21,32 @@ import javax.annotation.Nullable;
  * every rule here follows from, and it is the whole reason conduits exist -- IE's wires are
  * catenaries, which are right across a valley and wrong along a ceiling.
  * <p>
- * <strong>Runs stay in one plane.</strong> A conduit on the floor does not climb the wall by
- * itself; a plane change goes through a junction box, which is a real block and the thing the
- * reference image puts at every corner anyway. That is a design decision rather than a limitation
- * worked around: an in-plane run is four possible neighbours and an axis-aligned box, where a
- * plane-changing one is an L-shaped transition per pair of faces, which is where the fiddliness of
- * this whole feature would otherwise live.
+ * <strong>A run wraps around corners.</strong> It reaches a wall and climbs it; it reaches the edge
+ * of a beam and follows the beam's side down. Both happen without a junction box, and both happen
+ * inside the two cells that meet at the corner rather than through a third block.
  * <p>
- * World-free on purpose, like the rest of the conduit code -- the rules are arithmetic on facings,
- * so they can be tested without a game running.
+ * This reverses the rule the feature shipped with -- "a run stays on one surface; a plane change
+ * goes through a junction box" -- which a playtester reported as the conduit not behaving like the
+ * wiring it is modelled on. The old rule was cheap and defensible on paper, and wrong in the hand:
+ * the gesture somebody makes when a run meets a pole is to keep laying conduit, and being handed a
+ * dead stub for it reads as the feature being broken rather than as a design decision. Junction
+ * boxes remain what they always were -- where a bundle splits or breaks out -- rather than a toll
+ * on every corner in a build.
+ * <p>
+ * Two shapes of corner, and they are not the same shape:
+ * <ul>
+ * <li><strong>Inner</strong> -- a floor run meets a wall and climbs it. The two conduits are
+ * stacked one cell apart along the mounting axis, and the corner is turned <em>inside</em> the
+ * lower cell by a {@link ArmMode#RISER}: the arm runs to the wall and then up the wall's face.</li>
+ * <li><strong>Outer</strong> -- a run reaches the edge of the block it is mounted on and follows
+ * that block's next face round. The two conduits are <em>diagonal</em> neighbours clipped to two
+ * faces of the same supporting block, and each simply reaches the edge they share.</li>
+ * </ul>
+ * <p>
+ * World-free on purpose, like the rest of the conduit code -- the rules are arithmetic on facings
+ * and positions, so they can be tested without a game running. The two rules that need to know
+ * whether a block is there ({@link #innerCornerSupport}) hand back the position to ask about rather
+ * than asking themselves.
  *
  * @author LDImmersiveEngineering -- conduits
  */
@@ -39,11 +57,47 @@ public class ConduitGeometry
 	}
 
 	/**
-	 * How many neighbours a conduit can have: the four directions in its own plane. The two along
-	 * the mounting axis are excluded -- one is the surface it is clipped to, and the other is the
-	 * open air a plane change would go through, which is a junction box's job.
+	 * How many arms a conduit can have: the four directions in its own plane. The two along the
+	 * mounting axis are excluded -- one is the surface it is clipped to, and the other is open air.
+	 * <p>
+	 * A corner does not add a fifth arm. Both kinds are turned by an arm that already points along
+	 * the surface: an inner corner by that arm climbing at the end of it, an outer one by it
+	 * carrying on past the edge. That is what keeps the state four flags wide instead of six.
 	 */
 	public static final int ARMS = 4;
+
+	/**
+	 * What one arm of a conduit does, which is the whole of the difference wrapping made.
+	 * <p>
+	 * Four values in two bits, and the two bits are the two boolean block properties the run
+	 * already had a use for -- see {@code BlockConduit}. Nothing was added to the block state to
+	 * pay for corners, which matters more than it looks: Forge builds the cartesian product of
+	 * every listed property at startup, so a third value on a per-face property would have
+	 * multiplied this block's state count by eleven.
+	 */
+	public enum ArmMode
+	{
+		/** No arm at all. */
+		NONE,
+		/** An arm running from the hub to the block edge, in the plane of the mounting face. */
+		STRAIGHT,
+		/**
+		 * An arm that reaches the block in front of it and then turns 90 degrees to climb that
+		 * block's face, inside this cell -- the inner corner. Its partner is the conduit clipped to
+		 * that face one cell out along the mounting axis, and the two meet at the boundary between
+		 * them.
+		 */
+		RISER,
+		/**
+		 * A straight arm that carries on a little past the block edge to cap an outer corner.
+		 * <p>
+		 * Both halves of an outer corner are plain arms reaching the same edge from two sides, so
+		 * without this there is a conduit-sized notch missing at the corner itself. Exactly one of
+		 * the two draws the cap -- see {@link #drawsCornerCap} -- because two identical cubes in the
+		 * same place is z-fighting rather than a corner.
+		 */
+		WRAP
+	}
 
 	/**
 	 * The four in-plane directions for each mount face, indexed by {@code mount.ordinal()}.
@@ -96,11 +150,11 @@ public class ConduitGeometry
 	}
 
 	/**
-	 * Whether two conduits, adjacent in the world, join up.
+	 * Whether two conduits, adjacent in the world, join along a flat surface.
 	 * <p>
 	 * They do when they lie on the same surface and the step from one to the other runs along it.
-	 * Two conduits on different faces meeting at a corner do <em>not</em> join -- put a junction
-	 * box there. Saying so plainly beats a run that looks continuous and is not.
+	 * This is the plain case and always was; the two corner rules below are what a run does when
+	 * the surface itself stops.
 	 *
 	 * @param mount     the face this conduit is clipped to
 	 * @param otherMount the face the neighbour is clipped to
@@ -110,6 +164,169 @@ public class ConduitGeometry
 								   @Nullable EnumFacing towards)
 	{
 		return otherMount==mount&&isInPlane(mount, towards);
+	}
+
+	//	=================================
+	//		INNER CORNERS
+	//	=================================
+
+	/**
+	 * Whether two conduits, adjacent in the world and clipped to two perpendicular faces, join by
+	 * climbing the corner between them.
+	 * <p>
+	 * A floor run reaching a wall and continuing up it. The two cells are stacked along the
+	 * <em>lower</em> conduit's mounting axis, not laid along its surface, which is why this is a
+	 * separate rule rather than a loosening of {@link #connects}: the pair is
+	 * <em>floor conduit at P</em> and <em>wall conduit at P minus the floor conduit's mount</em>.
+	 * <p>
+	 * There are two ways to be standing at that joint and both are covered here, so that a walk and
+	 * a renderer starting from either end reach the same answer:
+	 * <ul>
+	 * <li>from the piece that <em>rises</em>: the step leaves its own surface ({@code towards} is
+	 * the opposite of its mount) and the neighbour is clipped to the face this one's arm climbs.</li>
+	 * <li>from the piece on the <em>wall</em>: the step runs along its surface toward a neighbour
+	 * clipped to the very face it is stepping onto.</li>
+	 * </ul>
+	 * <p>
+	 * <strong>It is not the whole rule.</strong> The corner also needs a block to be in the corner
+	 * -- the one the riser hugs on its way up. {@link #innerCornerSupport} says which, and every
+	 * caller has to ask, or a run would turn corners in mid-air around a wall that is not there.
+	 *
+	 * @param mount      the face this conduit is clipped to
+	 * @param otherMount the face the neighbour is clipped to
+	 * @param towards    the direction from this conduit to the neighbour
+	 */
+	public static boolean joinsInnerCorner(EnumFacing mount, @Nullable EnumFacing otherMount,
+										   @Nullable EnumFacing towards)
+	{
+		if(otherMount==null||towards==null||otherMount.getAxis()==mount.getAxis())
+			return false;
+		//The riser's side: stepping straight out of its own surface, onto the piece stuck to the
+		//wall its arm climbs. The arm direction is the neighbour's mount, which is why that has to
+		//be in this conduit's plane.
+		if(towards==mount.getOpposite())
+			return isInPlane(mount, otherMount);
+		//The wall's side: stepping along its own surface onto a piece clipped to the face it is
+		//stepping toward. A floor is exactly that, seen from a wall.
+		return towards==otherMount&&isInPlane(otherMount, mount);
+	}
+
+	/**
+	 * The block an inner corner is turned around, which has to be there for the corner to exist.
+	 * <p>
+	 * It is the block the riser hugs on its way up: the one in front of the lower conduit, under
+	 * the upper conduit's own surface. Both ends of the joint name the same block, which is the
+	 * point of deriving it here rather than at each end -- two ends disagreeing about whether the
+	 * wall is there would give a run that draws joined and carries nothing.
+	 * <p>
+	 * <strong>It must also be empty of conduit hardware.</strong> A ground feeder is a solid cube a
+	 * run passes straight through, so a run reaching one carries on through it rather than climbing
+	 * it; a junction box is not solid at all. Callers check {@code nodeAt} as well as solidity, and
+	 * the face to ask about is the one the riser lies against.
+	 *
+	 * @param pos        where this conduit is
+	 * @param mount      the face this conduit is clipped to
+	 * @param otherMount the face the neighbour is clipped to
+	 * @param towards    the direction from this conduit to the neighbour
+	 *
+	 * @return the position of the block the corner turns around
+	 */
+	public static BlockPos innerCornerSupport(BlockPos pos, EnumFacing mount, EnumFacing otherMount,
+											  EnumFacing towards)
+	{
+		//From the riser's side the corner block is simply the one its arm points at.
+		if(towards==mount.getOpposite())
+			return pos.offset(otherMount);
+		//From the wall's side it is one step along the run and then one step into this conduit's own
+		//surface -- the block directly below the one this piece is bolted to.
+		return pos.offset(towards).offset(mount);
+	}
+
+	/** The face of {@link #innerCornerSupport} a riser lies against, for the solidity test. */
+	public static EnumFacing innerCornerSupportFace(EnumFacing mount, EnumFacing otherMount,
+													EnumFacing towards)
+	{
+		return towards==mount.getOpposite()?otherMount.getOpposite(): mount.getOpposite();
+	}
+
+	//	=================================
+	//		OUTER CORNERS
+	//	=================================
+
+	/**
+	 * Where the conduit continuing a run around an outer corner sits.
+	 * <p>
+	 * <strong>Diagonally.</strong> A run along the top of a beam that reaches the beam's end
+	 * carries on down the beam's end face, and the cell that face's conduit occupies touches this
+	 * one only along an edge. Both are clipped to the <em>same supporting block</em> -- the last
+	 * block of the beam -- on two of its faces, which is what makes the join real rather than a
+	 * coincidence of position: {@code pos+mount} and {@code (pos+dir+mount)+(-dir)} are one block.
+	 * <p>
+	 * The formula is its own inverse. Feeding it the partner's position, mount and arm direction
+	 * gives this conduit back, so neither end has to be told it is the second one.
+	 *
+	 * @param pos   where this conduit is
+	 * @param mount the face this conduit is clipped to
+	 * @param dir   the arm direction, in this conduit's plane
+	 */
+	public static BlockPos outerCornerCell(BlockPos pos, EnumFacing mount, EnumFacing dir)
+	{
+		return pos.offset(dir).offset(mount);
+	}
+
+	/** The face a conduit wrapping an outer corner out of {@code dir} has to be clipped to. */
+	public static EnumFacing outerCornerMount(EnumFacing dir)
+	{
+		return dir.getOpposite();
+	}
+
+	/**
+	 * Which half of an outer corner draws the little cap that fills the corner itself.
+	 * <p>
+	 * Both halves are plain arms reaching the same edge from two sides, and the cube where they
+	 * meet belongs to neither. One of them has to grow into it; if both did, two identical cubes
+	 * would occupy the same space and z-fight, which reads as a flickering corner rather than as a
+	 * corner. The order is fixed rather than first-come so the same corner looks the same on two
+	 * different days -- the same reason {@link #junctionBoxMount} has one.
+	 *
+	 * @param mount      the face this conduit is clipped to
+	 * @param otherMount the face the other half of the corner is clipped to
+	 */
+	public static boolean drawsCornerCap(EnumFacing mount, EnumFacing otherMount)
+	{
+		return preference(mount) < preference(otherMount);
+	}
+
+	private static int preference(EnumFacing face)
+	{
+		for(int i = 0; i < MOUNT_PREFERENCE.length; i++)
+			if(MOUNT_PREFERENCE[i]==face)
+				return i;
+		return MOUNT_PREFERENCE.length;
+	}
+
+	/**
+	 * What one arm looks like, given what was found around it.
+	 * <p>
+	 * Stated once, here, because the renderer, the hitbox and the saved state all have to agree
+	 * about it and there are three ways to be joined in one direction.
+	 *
+	 * @param straight whether anything joins this arm along the surface -- a conduit, a box, a
+	 *                 feeder, or the flat half of an inner corner
+	 * @param riser    whether this arm climbs the block in front of it to meet a conduit above
+	 * @param wrap     whether this arm continues around an outer corner
+	 * @param cap      whether this half of that outer corner is the one drawing the corner cube
+	 */
+	public static ArmMode armMode(boolean straight, boolean riser, boolean wrap, boolean cap)
+	{
+		//A riser wins if it is there at all: it needs a solid block in front of it, which is
+		//exactly what stops anything else joining along that arm, so this decides nothing in
+		//practice and says what to draw in the one contrived case where a wrap coexists with it.
+		if(riser)
+			return ArmMode.RISER;
+		if(wrap&&cap)
+			return ArmMode.WRAP;
+		return straight||wrap?ArmMode.STRAIGHT: ArmMode.NONE;
 	}
 
 	/**
@@ -178,6 +395,12 @@ public class ConduitGeometry
 	 * matching idea of which of its faces a run actually touched, so its model never grew to meet
 	 * that arm. The gap between a flush conduit end and an unmoved box read as a run that had not
 	 * finished, or as a second one starting next to it.
+	 * <p>
+	 * <strong>A run arrives at a box face on, and never around a corner.</strong> Corners are turned
+	 * between two lengths of conduit; a box is a cube in the middle of its cell with six faces to
+	 * patch, and a run wrapping round the outside of one would have nowhere to arrive. Put the box
+	 * <em>at</em> the corner instead -- it sits in the plane of whichever run reaches it and both
+	 * runs meet it flush, which is the gesture the box was always for.
 	 *
 	 * @param dir           the direction from the box toward the neighbour
 	 * @param neighbourMount the neighbour's mounting face, if it is a conduit; null otherwise
@@ -204,6 +427,22 @@ public class ConduitGeometry
 	public static String armModelName(EnumFacing mount, EnumFacing dir)
 	{
 		return "conduit_"+mount.getName()+"_"+dir.getName();
+	}
+
+	/**
+	 * The arm that climbs the block in front of it: the inner corner, drawn as one model rather
+	 * than as the straight arm plus a piece, because a multipart part either applies or does not
+	 * and {@link ArmMode#STRAIGHT} and {@link ArmMode#RISER} are different states of one arm.
+	 */
+	public static String riserModelName(EnumFacing mount, EnumFacing dir)
+	{
+		return armModelName(mount, dir)+"_riser";
+	}
+
+	/** The straight arm plus the cube that fills an outer corner. See {@link #drawsCornerCap}. */
+	public static String wrapModelName(EnumFacing mount, EnumFacing dir)
+	{
+		return armModelName(mount, dir)+"_wrap";
 	}
 
 	public static String hubModelName(EnumFacing mount)

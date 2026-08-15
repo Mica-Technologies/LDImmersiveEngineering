@@ -11,7 +11,8 @@
 		{
 			"when": {
 				"facing": "down",
-				"sideconnection_north": "true"
+				"sideconnection_north": "true",
+				"runconnection_north": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_down_north"
@@ -20,7 +21,28 @@
 		{
 			"when": {
 				"facing": "down",
-				"sideconnection_south": "true"
+				"sideconnection_north": "false",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_north_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_north": "true",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_north_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_south": "true",
+				"runconnection_south": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_down_south"
@@ -29,7 +51,28 @@
 		{
 			"when": {
 				"facing": "down",
-				"sideconnection_west": "true"
+				"sideconnection_south": "false",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_south_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_south": "true",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_south_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_west": "true",
+				"runconnection_west": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_down_west"
@@ -38,10 +81,51 @@
 		{
 			"when": {
 				"facing": "down",
-				"sideconnection_east": "true"
+				"sideconnection_west": "false",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_west_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_west": "true",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_west_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_east": "true",
+				"runconnection_east": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_down_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_east": "false",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_east_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "down",
+				"sideconnection_east": "true",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_down_east_wrap"
 			}
 		},
 		{
@@ -55,7 +139,8 @@
 		{
 			"when": {
 				"facing": "up",
-				"sideconnection_north": "true"
+				"sideconnection_north": "true",
+				"runconnection_north": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_up_north"
@@ -64,7 +149,28 @@
 		{
 			"when": {
 				"facing": "up",
-				"sideconnection_south": "true"
+				"sideconnection_north": "false",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_north_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_north": "true",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_north_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_south": "true",
+				"runconnection_south": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_up_south"
@@ -73,7 +179,28 @@
 		{
 			"when": {
 				"facing": "up",
-				"sideconnection_west": "true"
+				"sideconnection_south": "false",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_south_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_south": "true",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_south_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_west": "true",
+				"runconnection_west": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_up_west"
@@ -82,10 +209,51 @@
 		{
 			"when": {
 				"facing": "up",
-				"sideconnection_east": "true"
+				"sideconnection_west": "false",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_west_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_west": "true",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_west_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_east": "true",
+				"runconnection_east": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_up_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_east": "false",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_east_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "up",
+				"sideconnection_east": "true",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_up_east_wrap"
 			}
 		},
 		{
@@ -99,7 +267,8 @@
 		{
 			"when": {
 				"facing": "north",
-				"sideconnection_down": "true"
+				"sideconnection_down": "true",
+				"runconnection_down": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_north_down"
@@ -108,7 +277,28 @@
 		{
 			"when": {
 				"facing": "north",
-				"sideconnection_up": "true"
+				"sideconnection_down": "false",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_down_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_down": "true",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_down_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_up": "true",
+				"runconnection_up": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_north_up"
@@ -117,7 +307,28 @@
 		{
 			"when": {
 				"facing": "north",
-				"sideconnection_west": "true"
+				"sideconnection_up": "false",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_up_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_up": "true",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_up_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_west": "true",
+				"runconnection_west": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_north_west"
@@ -126,10 +337,51 @@
 		{
 			"when": {
 				"facing": "north",
-				"sideconnection_east": "true"
+				"sideconnection_west": "false",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_west_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_west": "true",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_west_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_east": "true",
+				"runconnection_east": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_north_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_east": "false",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_east_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "north",
+				"sideconnection_east": "true",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_north_east_wrap"
 			}
 		},
 		{
@@ -143,7 +395,8 @@
 		{
 			"when": {
 				"facing": "south",
-				"sideconnection_down": "true"
+				"sideconnection_down": "true",
+				"runconnection_down": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_south_down"
@@ -152,7 +405,28 @@
 		{
 			"when": {
 				"facing": "south",
-				"sideconnection_up": "true"
+				"sideconnection_down": "false",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_down_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_down": "true",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_down_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_up": "true",
+				"runconnection_up": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_south_up"
@@ -161,7 +435,28 @@
 		{
 			"when": {
 				"facing": "south",
-				"sideconnection_west": "true"
+				"sideconnection_up": "false",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_up_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_up": "true",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_up_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_west": "true",
+				"runconnection_west": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_south_west"
@@ -170,10 +465,51 @@
 		{
 			"when": {
 				"facing": "south",
-				"sideconnection_east": "true"
+				"sideconnection_west": "false",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_west_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_west": "true",
+				"runconnection_west": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_west_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_east": "true",
+				"runconnection_east": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_south_east"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_east": "false",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_east_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "south",
+				"sideconnection_east": "true",
+				"runconnection_east": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_south_east_wrap"
 			}
 		},
 		{
@@ -187,7 +523,8 @@
 		{
 			"when": {
 				"facing": "west",
-				"sideconnection_down": "true"
+				"sideconnection_down": "true",
+				"runconnection_down": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_west_down"
@@ -196,7 +533,28 @@
 		{
 			"when": {
 				"facing": "west",
-				"sideconnection_up": "true"
+				"sideconnection_down": "false",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_down_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_down": "true",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_down_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_up": "true",
+				"runconnection_up": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_west_up"
@@ -205,7 +563,28 @@
 		{
 			"when": {
 				"facing": "west",
-				"sideconnection_north": "true"
+				"sideconnection_up": "false",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_up_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_up": "true",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_up_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_north": "true",
+				"runconnection_north": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_west_north"
@@ -214,10 +593,51 @@
 		{
 			"when": {
 				"facing": "west",
-				"sideconnection_south": "true"
+				"sideconnection_north": "false",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_north_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_north": "true",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_north_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_south": "true",
+				"runconnection_south": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_west_south"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_south": "false",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_south_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "west",
+				"sideconnection_south": "true",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_west_south_wrap"
 			}
 		},
 		{
@@ -231,7 +651,8 @@
 		{
 			"when": {
 				"facing": "east",
-				"sideconnection_down": "true"
+				"sideconnection_down": "true",
+				"runconnection_down": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_east_down"
@@ -240,7 +661,28 @@
 		{
 			"when": {
 				"facing": "east",
-				"sideconnection_up": "true"
+				"sideconnection_down": "false",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_down_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_down": "true",
+				"runconnection_down": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_down_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_up": "true",
+				"runconnection_up": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_east_up"
@@ -249,7 +691,28 @@
 		{
 			"when": {
 				"facing": "east",
-				"sideconnection_north": "true"
+				"sideconnection_up": "false",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_up_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_up": "true",
+				"runconnection_up": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_up_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_north": "true",
+				"runconnection_north": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_east_north"
@@ -258,10 +721,51 @@
 		{
 			"when": {
 				"facing": "east",
-				"sideconnection_south": "true"
+				"sideconnection_north": "false",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_north_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_north": "true",
+				"runconnection_north": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_north_wrap"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_south": "true",
+				"runconnection_south": "false"
 			},
 			"apply": {
 				"model": "immersiveengineering:conduit/conduit_east_south"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_south": "false",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_south_riser"
+			}
+		},
+		{
+			"when": {
+				"facing": "east",
+				"sideconnection_south": "true",
+				"runconnection_south": "true"
+			},
+			"apply": {
+				"model": "immersiveengineering:conduit/conduit_east_south_wrap"
 			}
 		}
 	]

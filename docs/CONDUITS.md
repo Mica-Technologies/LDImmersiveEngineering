@@ -18,7 +18,8 @@ tubing.
 ## The short version
 
 1. Craft **Conduit** (8 at a time) and place it against a wall, floor or ceiling.
-2. Lengths joined along the same surface make a **run**. A run stays on one surface.
+2. Lengths joined along a surface make a **run**, and a run **wraps around corners** — up the wall
+   it reaches, and around the edge of the beam it is running along.
 3. A run ends at a **Junction Box**. Lay conduit between two boxes and the run connects itself —
    there is no coil and no linking tool.
 4. Put an **LV / MV / HV Connector** — or a **Grid Feed / Service Unit** — against a bare face of a
@@ -43,10 +44,41 @@ for the surface behind it rather than clipping to the box. Clicking bare wall is
 is a wider rule rather than a different one. See `ConduitPlacement`, which owns it and takes the
 world as an interface so the decision is tested against a drawn building.
 
-**A run stays on one surface.** Conduit on a floor does not climb the wall by itself. That is
-deliberate rather than a shortfall: a plane change goes through a junction box, which is a real
-block and what you would put at a corner anyway. It is also what keeps a run to an axis-aligned
-shape instead of an L-shaped transition per pair of faces.
+### A run wraps around corners
+
+A run does not stop where its surface does. Two shapes of corner, and they are not the same shape:
+
+| | What happens | Where the next length goes |
+|---|---|---|
+| **Inner** | A floor run reaches a wall and climbs it | On the wall, one cell up from the last floor length |
+| **Outer** | A run reaches the end of the beam it is on and follows the beam's end face down | On that face — a *diagonal* neighbour, bolted to the same last block of the beam |
+
+Both are turned between two lengths of conduit, with no junction box involved. An inner corner is
+turned *inside* the lower length's own cell: its arm runs to the wall and then up the wall's face,
+which is why an inner corner **needs a block in the corner to turn around**. Take that block away —
+a doorway at the foot of the wall — and there is no corner and no join, which is the honest answer
+rather than tubing bending through thin air.
+
+An outer corner needs nothing at all: both halves are ordinary arms reaching the same edge from two
+sides of the block they are both clipped to. One of the two grows a small cap into the corner cube
+itself so the turn has no notch in it; which one is fixed rather than first-come, because two caps
+in one place would z-fight.
+
+**Clicking anywhere sensible works.** The wall a run is heading for, the far side of the edge it is
+running along, or the exposed face of the last length — all three place the piece that turns the
+corner. The last of those is the one that used to hand you a stub floating over the run.
+
+> This reverses the rule the feature shipped with: *a run stays on one surface; a plane change goes
+> through a junction box*. That was cheap and defensible on paper and wrong in the hand — the
+> gesture somebody makes when a run meets a pole is to keep laying conduit, and being handed a dead
+> stub for it reads as the feature being broken. Junction boxes are for splitting and breaking out,
+> not a toll on every corner. Reported by a playtester against SimpleLogic's wires, which hug a pole
+> and go round its edges.
+
+**A run still arrives at a junction box face on**, never around a corner: a box is a cube in the
+middle of its cell, so a run wrapping round the outside of one would have nowhere to arrive. Put the
+box *at* the corner instead — it sits in the plane of whichever run reaches it and both runs meet it
+flush, which is the gesture the box was always for.
 
 Runs are **discovered, not drawn**. Placing the last length between two boxes creates the
 connection; pulling a length out of the middle breaks it. A run ends at the *first* box it meets,
@@ -204,9 +236,14 @@ Two rules follow from the axis:
   the grain of a run stops it exactly as a stone block would — and stops it *visibly*, because the
   conduit draws its arm on the same test the walk uses, so a run halted by a sideways feeder also
   looks halted.
-- **Crossing a feeder is the one place a run may change surface.** The conduit on the far side still
-  has to have the crossing in its own plane — the same thing a junction box asks — so a feeder
-  licenses a plane change without licensing a conduit facing the wrong way entirely.
+- **Crossing a feeder changes surface without a corner.** A run may turn corners on its own now, but
+  a corner is a corner — two faces of one block. A feeder is the one thing that lets a run come out
+  of a floor on a surface with no geometric relationship to the one it went in on. The conduit on
+  the far side still has to have the crossing in its own plane — the same thing a junction box asks
+  — so a feeder licenses that without licensing a conduit facing the wrong way entirely.
+- **A feeder is passed through, not climbed.** It is a solid cube, so it would otherwise pass the
+  test for "is there a block in the corner to turn around". A run reaching one goes through it,
+  which is the entire point of the block.
 
 ### Waking the boxes
 
@@ -240,8 +277,9 @@ replaces.** Two structural properties hold it up.
 
 - **One edge per run.** Sixteen conductors down a corridor are a single `Connection` in the wire
   graph, not sixteen. Everything that walks that graph sees the graph it saw before conduits
-  existed, however many circuits a corridor carries. The conduit blocks between two boxes are
-  never nodes.
+  existed, however many circuits a corridor carries — and however many times the run turns a
+  corner, which costs `ConduitRoute` a few more probes when somebody builds something and nothing
+  at all per tick. The conduit blocks between two boxes are never nodes.
 - **Idle is free.** A junction box carrying nothing does one integer comparison per tick. A base
   with two hundred boxes and three live circuits costs two hundred comparisons.
 

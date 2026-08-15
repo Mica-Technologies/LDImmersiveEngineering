@@ -29,6 +29,12 @@ import javax.annotation.Nullable;
  * is what somebody continuing a run means by the gesture. Clicking bare wall still behaves exactly
  * as before, which is what makes this a strictly wider rule rather than a different one.
  * <p>
+ * Runs turning corners on their own added one more gesture and no more exceptions. Clicking the
+ * wall a run is heading for, or the far side of the beam it is running along, already answered
+ * correctly -- both are bare wall. What did not was clicking the <em>exposed face</em> of the last
+ * length, which is the same instruction said differently, and used to lay the new piece flat on top
+ * of a conduit. That is the branch below.
+ * <p>
  * World-free -- the world arrives as a {@link Surroundings} -- so the decision can be tested against
  * a drawn building rather than a real one, the same way {@link ConduitRoute} is.
  *
@@ -108,6 +114,32 @@ public final class ConduitPlacement
 		if(neighbour!=null&&ConduitGeometry.isInPlane(neighbour, clickedSide)
 				&&around.isMountable(placed.offset(neighbour), neighbour.getOpposite()))
 			return neighbour;
+
+		//	=================================
+		//	Turning the corner off a run's end
+		//	=================================
+		//The gesture that goes with runs wrapping around corners: a floor run reaches a wall, and
+		//the next length goes on the wall. Clicking the wall itself already answered correctly --
+		//the plain rule below does it -- but clicking the exposed top of the last floor length is
+		//the same gesture and used to answer DOWN, laying the new piece flat on top of a conduit,
+		//which is not a surface at all. A stub floating over a run is exactly what the report about
+		//conduit "not wrapping around" was pointing at.
+		//
+		//The face picked is the one that makes the corner: a wall the new length can clip to, with
+		//the same wall carrying on down beside the length that was clicked, since that lower block
+		//is what the riser hugs on its way up. Requiring both is what stops this from answering at
+		//all in the middle of a room, where the old answer is still the right one.
+		if(neighbour!=null&&clickedSide==neighbour.getOpposite())
+		{
+			for(EnumFacing face : PREFERENCE)
+				if(ConduitGeometry.isInPlane(neighbour, face)
+						&&around.isMountable(placed.offset(face), face.getOpposite())
+						&&around.isMountable(clicked.offset(face), face.getOpposite())
+						//A ground feeder is solid and is not a corner to turn: a run reaching one
+						//goes through it, which is the whole point of the block.
+						&&around.feederAxisAt(clicked.offset(face))==null)
+					return face;
+		}
 
 		//	=================================
 		//	Starting a run off a ground feeder

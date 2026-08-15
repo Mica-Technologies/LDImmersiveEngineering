@@ -10,6 +10,7 @@ package blusunrize.immersiveengineering.common.blocks.conduit;
 
 import blusunrize.immersiveengineering.common.blocks.conduit.ConduitGeometry.Shape;
 import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.BlockPos;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -123,11 +124,11 @@ class ConduitGeometryTest
 		}
 
 		@Test
-		@DisplayName("two conduits on different surfaces do not join")
-		void differentSurfacesDoNotJoin()
+		@DisplayName("two conduits on different surfaces do not join flat")
+		void differentSurfacesDoNotJoinFlat()
 		{
-			//The deliberate limit: a run stays in one plane and a plane change goes through a
-			//junction box. Saying so plainly beats a run that looks continuous and is not.
+			//Flat is flat: two conduits on different faces are either turning a corner, which the
+			//two rules below answer, or they are not joined at all.
 			assertFalse(ConduitGeometry.connects(EnumFacing.DOWN, EnumFacing.NORTH, EnumFacing.NORTH));
 			assertFalse(ConduitGeometry.connects(EnumFacing.DOWN, EnumFacing.UP, EnumFacing.NORTH));
 		}
@@ -159,6 +160,211 @@ class ConduitGeometryTest
 						assertEquals(ConduitGeometry.connects(mount, other, towards),
 								ConduitGeometry.connects(other, mount, towards.getOpposite()),
 								mount+" to "+other+" via "+towards+" is not symmetric");
+		}
+	}
+
+	@Nested
+	@DisplayName("inner corners: a run reaching a wall and climbing it")
+	class InnerCorners
+	{
+		@Test
+		@DisplayName("a floor run joins the wall piece above it, in every mount and direction")
+		void everyInnerCorner()
+		{
+			//The pair is: this conduit at P clipped to mount, and the wall piece one cell out along
+			//its own mounting axis, clipped to the face this one's arm runs at. Both ends have to
+			//say so, because the walk starts from whichever end it happens to start from.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					assertTrue(ConduitGeometry.joinsInnerCorner(mount, dir, mount.getOpposite()),
+							"a "+mount+" run climbing "+dir+" does not reach the piece above it");
+					assertTrue(ConduitGeometry.joinsInnerCorner(dir, mount, mount),
+							"the "+dir+" wall piece does not reach the "+mount+" run below it");
+				}
+		}
+
+		@Test
+		@DisplayName("both ends name the same block in the corner")
+		void bothEndsAgreeOnTheWall()
+		{
+			//A corner is turned around a block, and if the two ends disagreed about which, one would
+			//draw the corner and the other would not carry anything through it.
+			BlockPos floor = new BlockPos(0, 1, 0);
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					BlockPos wall = floor.offset(mount.getOpposite());
+					assertEquals(floor.offset(dir),
+							ConduitGeometry.innerCornerSupport(floor, mount, dir, mount.getOpposite()),
+							"the climbing end looks for the wall in the wrong place");
+					assertEquals(floor.offset(dir),
+							ConduitGeometry.innerCornerSupport(wall, dir, mount, mount),
+							"the wall end looks for the corner block in the wrong place");
+					assertEquals(dir.getOpposite(),
+							ConduitGeometry.innerCornerSupportFace(mount, dir, mount.getOpposite()));
+					assertEquals(dir.getOpposite(),
+							ConduitGeometry.innerCornerSupportFace(dir, mount, mount));
+				}
+		}
+
+		@Test
+		@DisplayName("joining round a corner is symmetric")
+		void innerCornersAreSymmetric()
+		{
+			//Same sweep the flat rule gets, and for the same reason: if one end thinks it joins and
+			//the other does not, the run draws an arm into a blank face.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing other : EnumFacing.VALUES)
+					for(EnumFacing towards : EnumFacing.VALUES)
+						assertEquals(ConduitGeometry.joinsInnerCorner(mount, other, towards),
+								ConduitGeometry.joinsInnerCorner(other, mount, towards.getOpposite()),
+								mount+" to "+other+" via "+towards+" is not symmetric");
+		}
+
+		@Test
+		@DisplayName("two conduits on the same surface are not a corner")
+		void flatIsNotACorner()
+		{
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+					assertFalse(ConduitGeometry.joinsInnerCorner(mount, mount, dir),
+							"a straight run was read as a corner");
+		}
+
+		@Test
+		@DisplayName("two conduits facing opposite ways are never a corner")
+		void oppositeMountsAreNotACorner()
+		{
+			//A floor and the ceiling above it are parallel, not perpendicular: there is no corner
+			//between them to turn, whatever the step is.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing towards : EnumFacing.VALUES)
+					assertFalse(ConduitGeometry.joinsInnerCorner(mount, mount.getOpposite(), towards));
+		}
+
+		@Test
+		@DisplayName("nothing joins to nothing")
+		void nullsDoNotJoin()
+		{
+			assertFalse(ConduitGeometry.joinsInnerCorner(EnumFacing.DOWN, null, EnumFacing.UP));
+			assertFalse(ConduitGeometry.joinsInnerCorner(EnumFacing.DOWN, EnumFacing.NORTH, null));
+		}
+
+		@Test
+		@DisplayName("the corner is not also a flat join, so an arm is never two things")
+		void cornersAndFlatsAreExclusive()
+		{
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing other : EnumFacing.VALUES)
+					for(EnumFacing towards : EnumFacing.VALUES)
+						assertFalse(ConduitGeometry.connects(mount, other, towards)
+										&&ConduitGeometry.joinsInnerCorner(mount, other, towards),
+								mount+" to "+other+" via "+towards+" is both flat and a corner");
+		}
+	}
+
+	@Nested
+	@DisplayName("outer corners: a run following an edge round")
+	class OuterCorners
+	{
+		@Test
+		@DisplayName("the partner is diagonal, and both are clipped to the same block")
+		void bothHugTheSameBlock()
+		{
+			//This is what makes an outer corner a joint rather than two conduits that happen to be
+			//near each other: the block they are both bolted to is one block.
+			BlockPos here = new BlockPos(2, 3, 4);
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					BlockPos there = ConduitGeometry.outerCornerCell(here, mount, dir);
+					EnumFacing thereMount = ConduitGeometry.outerCornerMount(dir);
+					assertEquals(here.offset(mount), there.offset(thereMount),
+							mount+"/"+dir+": the two halves are not on the same block");
+					assertEquals(2, here.distanceSq(there.getX(), there.getY(), there.getZ()), 1e-6,
+							mount+"/"+dir+": the two halves are not diagonal neighbours");
+				}
+		}
+
+		@Test
+		@DisplayName("the rule is its own inverse, so neither end is the second one")
+		void wrappingIsSymmetric()
+		{
+			BlockPos here = new BlockPos(-3, 7, 11);
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					BlockPos there = ConduitGeometry.outerCornerCell(here, mount, dir);
+					EnumFacing thereMount = ConduitGeometry.outerCornerMount(dir);
+					//From the far end, the arm that comes back this way is the one pointing away
+					//from the surface this conduit is on.
+					EnumFacing back = mount.getOpposite();
+					assertTrue(ConduitGeometry.isInPlane(thereMount, back),
+							"the returning arm is not in the far conduit's plane");
+					assertEquals(here, ConduitGeometry.outerCornerCell(there, thereMount, back));
+					assertEquals(mount, ConduitGeometry.outerCornerMount(back));
+				}
+		}
+
+		@Test
+		@DisplayName("exactly one half of a corner draws the cap")
+		void oneCapPerCorner()
+		{
+			//Two cubes in the same place is z-fighting, and none at all is a notch. Both are the
+			//sort of thing that is obvious in a screenshot and impossible to find in code.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					EnumFacing other = ConduitGeometry.outerCornerMount(dir);
+					assertNotEquals(ConduitGeometry.drawsCornerCap(mount, other),
+							ConduitGeometry.drawsCornerCap(other, mount),
+							mount+" and "+other+" both draw the cap, or neither does");
+				}
+		}
+	}
+
+	@Nested
+	@DisplayName("what an arm ends up looking like")
+	class ArmModes
+	{
+		@Test
+		@DisplayName("nothing found is no arm")
+		void nothingIsNothing()
+		{
+			assertEquals(ConduitGeometry.ArmMode.NONE,
+					ConduitGeometry.armMode(false, false, false, false));
+		}
+
+		@Test
+		@DisplayName("a plain neighbour is a straight arm")
+		void flatIsStraight()
+		{
+			assertEquals(ConduitGeometry.ArmMode.STRAIGHT,
+					ConduitGeometry.armMode(true, false, false, false));
+		}
+
+		@Test
+		@DisplayName("a riser wins, because nothing else can be joined that way")
+		void riserWins()
+		{
+			//A riser needs a solid block in front of it, which is exactly what stops anything else
+			//joining along that arm. This says what to draw in the one contrived case anyway.
+			assertEquals(ConduitGeometry.ArmMode.RISER,
+					ConduitGeometry.armMode(false, true, false, false));
+			assertEquals(ConduitGeometry.ArmMode.RISER,
+					ConduitGeometry.armMode(true, true, true, true));
+		}
+
+		@Test
+		@DisplayName("a wrap is a straight arm, and a capped one on exactly one side")
+		void wrapCaps()
+		{
+			assertEquals(ConduitGeometry.ArmMode.WRAP,
+					ConduitGeometry.armMode(false, false, true, true));
+			assertEquals(ConduitGeometry.ArmMode.STRAIGHT,
+					ConduitGeometry.armMode(false, false, true, false),
+					"the half that does not draw the cap still has an arm");
 		}
 	}
 
@@ -456,6 +662,43 @@ class ConduitGeometryTest
 						assertTrue(box[axis+3] >= 0f&&box[axis+3] <= 1f, mount+"/"+m+" max out of block");
 						assertTrue(box[axis+3] > box[axis], mount+"/"+m+" is inside out on axis "+axis);
 					}
+				}
+		}
+
+		@Test
+		@DisplayName("a riser is the one thing that does grow it, right out to the far face")
+		void risersClimb()
+		{
+			//The whole shape of an inner corner: the tubing turns up at the end of the arm and runs
+			//to the boundary the piece on the wall comes down to meet it at. If the box did not
+			//follow, half the corner would be unclickable.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					int arm = 1 << ConduitGeometry.armIndex(mount, dir);
+					float[] flat = ConduitBounds.of(mount, arm, 0);
+					float[] climbing = ConduitBounds.of(mount, arm, arm);
+					int axis = mount.getAxis().ordinal();
+					if(mount.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+					{
+						assertEquals(flat[axis], climbing[axis], 1e-6, "a riser left its surface");
+						assertEquals(1f, climbing[axis+3], 1e-6,
+								mount+"/"+dir+": the riser stops short of the boundary above it");
+					}
+					else
+					{
+						assertEquals(0f, climbing[axis], 1e-6,
+								mount+"/"+dir+": the riser stops short of the boundary below it");
+						assertEquals(flat[axis+3], climbing[axis+3], 1e-6, "a riser left its surface");
+					}
+					//Across the run it is still tubing: a riser that widened the box would read as
+					//the corner being a different object from the run.
+					for(int i = 0; i < 3; i++)
+						if(i!=axis)
+						{
+							assertEquals(flat[i], climbing[i], 1e-6, "a riser widened the run");
+							assertEquals(flat[i+3], climbing[i+3], 1e-6, "a riser widened the run");
+						}
 				}
 		}
 
