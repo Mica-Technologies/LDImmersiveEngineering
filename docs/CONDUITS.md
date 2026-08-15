@@ -365,7 +365,11 @@ decorative build the answer to "is this corridor lit" is yes, and the arithmetic
 it was spent proving something nobody was going to look at.
 
 A conductor still goes dark about a second after whatever fed it stops, so a switched circuit still
-visibly switches.
+visibly switches. Being fed *at all* is what lights it — an LV connector's 256 a tick keeps a
+conductor lit exactly as an HV one's does — and the second is a second, not an amount the source has
+to keep up with. (Earlier builds charged the decay against what had actually been credited, which was
+far more than any LV or MV wire delivers in a tick, so a conductor fed by one went dark on the very
+tick it was lit and the run read as dead in city mode.)
 
 A wire strung to a box crosses the two subsystems, and each keeps its own flag: whether the *push*
 onto the wire is the lossless one is `cityModeWires`, because that is a property of the wire network

@@ -175,8 +175,23 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * A twentieth of a channel, so a circuit whose source stops is visibly out within a second. A
 	 * latch with no decay would leave a corridor lit by a generator somebody dismantled last week,
 	 * which is exactly the sort of quiet wrongness city mode is not allowed to introduce.
+	 * <p>
+	 * This is a <em>time</em>, not an amount a source has to keep up with. In city mode any credit
+	 * at all sets the conductor to full (see {@link #credit}), and it then has twenty ticks to be fed
+	 * again -- so an LV connector's 256 a tick keeps a conductor lit exactly as an HV one's does. It
+	 * used to be a plain debit against whatever had been credited, and since a twentieth of a channel
+	 * is far more than any single LV or MV wire delivers in a tick, a conductor fed by one went dark
+	 * on the very tick it was lit and the run read as dead. Only {@link #CITY_HOP} is charged along
+	 * the run itself, so presence reaches the far end of a long corridor.
 	 */
 	private static final int CITY_DECAY = Math.max(1, CHANNEL_CAPACITY/20);
+
+	/**
+	 * What one hop along a run costs a conductor's presence in city mode: next to nothing. The decay
+	 * above is what makes a run go dark, hop by hop from the source, once the source stops; the hop
+	 * charge only has to be non-zero so that presence never runs in a circle forever.
+	 */
+	private static final int CITY_HOP = 1;
 
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
@@ -620,9 +635,22 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	// Energy
 	// ------------------------------------------------------------------
 
+	/**
+	 * Set on load, cleared on the first server tick, when {@link #rebuildRuns()} and
+	 * {@link #reconcileWires()} can be trusted: see {@link #onLoad()} for why they cannot run there.
+	 */
+	private boolean reconcilePending;
+
 	@Override
 	public void update()
 	{
+		if(reconcilePending&&world!=null&&!world.isRemote)
+		{
+			reconcilePending = false;
+			rebuildRuns();
+			if(reconcileWires())
+				markDirty();
+		}
 		//The cheap exit, and the reason a base full of idle conduit costs nothing: one comparison.
 		if(world==null||world.isRemote||liveMask==0)
 			return;
@@ -679,9 +707,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * City mode's version of {@link #passAlong}: hand the neighbour the fact that this conductor is
 	 * live, rather than a quantity of flux.
 	 * <p>
-	 * The peer is topped up to full rather than given a share, so presence spreads along a run at
-	 * one box per tick and every box on it reports the same thing. No gradient, no loss, no
-	 * arithmetic beyond a comparison.
+	 * The peer is brought up to what this box holds, less {@link #CITY_HOP}, rather than given a
+	 * share, so presence spreads along a run at one box per tick and every box on it reports much
+	 * the same thing; when the source stops, the decay in {@link #update()} takes the run down from
+	 * the source end at the same pace. No gradient to speak of, no loss, no arithmetic beyond a
+	 * comparison.
 	 */
 	private void energise(Connection run, WireChannel channel)
 	{
@@ -692,9 +722,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return;
 		TileEntityJunctionBox peer = (TileEntityJunctionBox)te;
 		int index = channel.ordinal();
-		if(peer.held[index] >= held[index]-CITY_DECAY)
+		int give = held[index]-CITY_HOP;
+		if(give <= 0||peer.held[index] >= give)
 			return;
-		peer.held[index] = held[index]-CITY_DECAY;
+		peer.held[index] = give;
 		peer.liveMask |= channel.getMask();
 	}
 
@@ -832,7 +863,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		int taken = JunctionBoxLogic.credit(held[index], amount, CHANNEL_CAPACITY);
 		if(taken <= 0)
 			return 0;
-		held[index] += taken;
+		//City mode: presence, not accounting. Being fed at all is what makes a conductor live, so
+		//any credit fills it, and CITY_DECAY then measures how long it stays lit unfed. Outside city
+		//mode the figure is real flux and is added as such.
+		held[index] = CityMode.conduits()?CHANNEL_CAPACITY: held[index]+taken;
 		liveMask |= channel.getMask();
 		return taken;
 	}
@@ -1070,13 +1104,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		forgetMount();
 		if(world==null||world.isRemote)
 			return;
-		rebuildRuns();
-		//The wire graph is IE's and is saved with the world; the face each wire is on is ours. If the
-		//two have drifted -- a table lost, or a wire added by something that never went through
-		//connectCable -- this is where they are put back in step, rather than at some later moment
-		//when a circuit quietly carries nothing.
-		if(reconcileWires())
-			markDirty();
+		//The runs are re-walked and the wire table is put back in step with the graph on the first
+		//tick rather than here. The spawn chunks load before FMLServerStartedEvent, which is where
+		//IE reads its wire graph back in, so a box in one of them sees an empty graph from here: it
+		//would drop the run it saved, and it would forget every wire it has -- and save that --
+		//while the wires themselves come back a moment later. By the first tick the graph is in and
+		//the neighbouring chunks are far more likely to be too. See rebuildRuns and reconcileWires.
+		reconcilePending = true;
 		//Also on load, not only on a neighbour change: a box placed against a connector that was
 		//already there hears nothing afterwards, and settled hardware never fires another update.
 		if(autoPatch())
@@ -1378,8 +1412,24 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 						free = i;
 				if(free < 0)
 					break;
-				changed |= wires.set(EnumFacing.byIndex(free), con.end, type);
+				EnumFacing face = EnumFacing.byIndex(free);
+				changed |= wires.set(face, con.end, type);
+				//An adopted wire is a wire strung to a bare face, and gets what connectCable gives one:
+				//the lowest free conductor. Without this the table knows the wire and the patch does
+				//not, and the circuit is silently dead -- the graph accepts energy for a face that
+				//has no conductor to put it on.
+				if(!patch.isPatched(face))
+				{
+					int channel = JunctionBoxLogic.firstFreeChannel(patchedMask(), WireChannel.VALUES.length);
+					if(channel >= 0)
+					{
+						patch.set(face, WireChannel.byIndex(channel));
+						changed = true;
+					}
+				}
 			}
+		if(changed&&world!=null)
+			markContainingBlockForUpdate(null);
 		return changed;
 	}
 
