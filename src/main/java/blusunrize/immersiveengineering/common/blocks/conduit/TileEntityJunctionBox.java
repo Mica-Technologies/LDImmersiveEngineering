@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.common.blocks.conduit;
 
 import blusunrize.immersiveengineering.ImmersiveEngineering;
+import blusunrize.immersiveengineering.common.util.network.MessageRequestBlockUpdate;
 import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.DimensionBlockPos;
 import blusunrize.immersiveengineering.api.Lib;
@@ -1390,9 +1391,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//client works out where a catenary leaves the box from it.
 		nbt.setTag("wires", wires.writeToNBT());
 		//Saved because a run that emptied itself on every reload would leak whatever was in flight,
-		//and a box holding a tick's worth is holding a tick's worth of somebody's coal.
-		if(!descPacket)
-			nbt.setIntArray("held", held);
+		//and a box holding a tick's worth is holding a tick's worth of somebody's coal. Sent to the
+		//client as well, with what moved last tick, because the readouts are drawn client-side and
+		//a box that always said "0 IF/t" while carrying a full circuit looked dead. Sixteen ints
+		//twice, and only when something asks -- see getOverlayText.
+		nbt.setIntArray("held", held);
+		if(descPacket)
+			nbt.setIntArray("lastMoved", lastMoved);
 		//Saved so a run comes back up in the state its levers left it, rather than dark until
 		//somebody happens to change a block next to one of its inputs.
 		nbt.setIntArray("signal", signal);
@@ -1419,7 +1424,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			//invisible or would drive comparators into nonsense.
 			signal[i] = i < signals.length?Math.max(0, Math.min(15, signals[i])): 0;
 		if(descPacket)
-			return;
+		{
+			int[] moved = nbt.getIntArray("lastMoved");
+			for(int i = 0; i < lastMoved.length; i++)
+				lastMoved[i] = i < moved.length?Math.max(0, moved[i]): 0;
+		}
 		int[] stored = nbt.getIntArray("held");
 		liveMask = 0;
 		for(int i = 0; i < held.length; i++)
@@ -1439,6 +1448,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	@Override
 	public String[] getOverlayText(EntityPlayer player, RayTraceResult mop, boolean hammer)
 	{
+		//The figures come from the server, and only while somebody is reading them: once a second
+		//ask for a fresh description packet, the same way the voltmeter does. A box nobody is
+		//looking at sends nothing.
+		if(world!=null&&world.isRemote&&world.getTotalWorldTime()%20==0)
+			ImmersiveEngineering.packetHandler.sendToServer(new MessageRequestBlockUpdate(getPos()));
 		EnumFacing side = mop==null?null: mop.sideHit;
 		WireChannel here = patch.get(side);
 		return new String[]{
