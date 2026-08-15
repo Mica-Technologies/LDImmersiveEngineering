@@ -137,6 +137,10 @@ BAR_COUNT = len(BAR_HEIGHTS[0])
 # a stutter.
 SWEEP_ROWS = (1, 4, 7, 9)
 
+# What the refresh line looks like where it crosses a bar: a lighter tint of the
+# glow, so that it reads as a line *over* the graph rather than vanishing into it.
+SWEEP_OVER_BAR = (196, 244, 236, 255)
+
 
 # ---------------------------------------------------------------------------
 # Drawing helpers.  make_grid_textures' own are hard-wired to a 16x16 canvas,
@@ -378,12 +382,15 @@ def screen_frame(index):
         rect(px, bx, top, bx + 1, top, SCREEN_GLOW, bounds)
     rect(px, 0, baseline, SCREEN_SPRITE - 1, baseline, SCANLINE, bounds)
 
-    # The refresh line, applied last and only over plain glass so the graph does
-    # not appear to flicker along with it.
+    # The refresh line, applied last and over everything.  It used to be painted
+    # only onto plain glass so the graph would not flicker along with it, and the
+    # result read as a line passing *behind* the bars -- a retrace is the beam,
+    # and the beam is in front of whatever it lit a moment ago.  Over glass it is
+    # the screen's glow; over a bar it is a lighter tint of that glow, so the
+    # line stays visible against the one place the plain glow would vanish.
     sweep = SWEEP_ROWS[index % len(SWEEP_ROWS)]
     for x in range(SCREEN_SPRITE):
-        if px[x, sweep] in (GLASS, GLASS_DARK):
-            px[x, sweep] = SCREEN_GLOW
+        px[x, sweep] = SCREEN_GLOW if px[x, sweep] in (GLASS, GLASS_DARK) else SWEEP_OVER_BAR
     return img
 
 

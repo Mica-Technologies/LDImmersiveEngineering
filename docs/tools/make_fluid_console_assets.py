@@ -113,6 +113,10 @@ GAUGE_LEVELS = [
 # grid's: an uneven last step reads as a CRT retrace rather than a stutter.
 SWEEP_ROWS = (1, 4, 7, 9)
 
+# The refresh line where it crosses a gauge or a main: a lighter tint of the glow,
+# so that it reads as a line over the readout rather than vanishing into it.
+SWEEP_OVER_READOUT = (200, 236, 250, 255)
+
 
 # ---------------------------------------------------------------------------
 # The atlas.  Region layout is the terminal's, because the model is the
@@ -274,12 +278,14 @@ def screen_frame(index):
     # The delivery main the gauges stand on, edge to edge.
     rect(px, 0, BASELINE_ROW, SCREEN_SPRITE-1, BASELINE_ROW, FLUID, bounds)
 
-    # The refresh line, applied last and only over plain glass so the readouts do
-    # not appear to flicker along with it.
+    # The refresh line, applied last and over everything, for the same reason the
+    # grid terminal's is (see make_terminal_assets.screen_frame): a retrace that
+    # skips the readouts reads as a line passing behind them.  Over glass it is the
+    # fluid glow; over a gauge or main it is a lighter tint of it, so it stays
+    # visible where the plain glow would vanish into the readout.
     sweep = SWEEP_ROWS[index % len(SWEEP_ROWS)]
     for x in range(SCREEN_SPRITE):
-        if px[x, sweep] in (GLASS, GLASS_DARK):
-            px[x, sweep] = FLUID_GLOW
+        px[x, sweep] = FLUID_GLOW if px[x, sweep] in (GLASS, GLASS_DARK) else SWEEP_OVER_READOUT
     return img
 
 
