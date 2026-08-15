@@ -40,6 +40,8 @@ class CityModeTest
 	@BeforeEach
 	void captureOriginals()
 	{
+		//Every assertion here is about the local config, so no server may be speaking over it.
+		CityMode.clearServerOverride();
 		origMaster = IEConfig.cityMode;
 		origWires = IEConfig.cityModeWires;
 		origFloodlights = IEConfig.cityModeFloodlights;
@@ -51,6 +53,7 @@ class CityModeTest
 	@AfterEach
 	void restoreOriginals()
 	{
+		CityMode.clearServerOverride();
 		IEConfig.cityMode = origMaster;
 		IEConfig.cityModeWires = origWires;
 		IEConfig.cityModeFloodlights = origFloodlights;
@@ -122,12 +125,16 @@ class CityModeTest
 	// ---------------------------------------------------------------- defaults
 
 	@Test
-	@DisplayName("the shipped defaults are: master off, every subsystem opted in")
+	@DisplayName("the shipped defaults are: master on, every subsystem opted in")
 	void shippedDefaults()
 	{
 		// read from the freshly captured originals rather than the live fields, so this
 		// still describes the shipped state even if a previous test misbehaved
-		assertFalse(origMaster, "cityMode should ship disabled");
+		//
+		// This fork ships city mode ON: it exists for a city pack, whose dedicated server runs it,
+		// and a default of off is what made single-player worlds silently disagree with that
+		// server. Flipping it back would reintroduce that bug for anyone without a config file.
+		assertTrue(origMaster, "cityMode should ship enabled -- this is a city-pack fork");
 		assertTrue(origWires, "cityModeWires should ship enabled (it only applies under the master)");
 		assertTrue(origFloodlights, "cityModeFloodlights should ship enabled");
 		assertTrue(origGenerators, "cityModeGenerators should ship enabled");
@@ -136,8 +143,17 @@ class CityModeTest
 	}
 
 	@Test
-	@DisplayName("with the shipped defaults nothing is simplified")
-	void shippedDefaultsSimplifyNothing()
+	@DisplayName("with the shipped defaults every subsystem is simplified")
+	void shippedDefaultsSimplifyEverything()
+	{
+		config(true, true);
+		assertTrue(CityMode.enabled());
+		assertEverythingSimplified();
+	}
+
+	@Test
+	@DisplayName("turning the master off in the config restores stock behaviour")
+	void masterOffIsStock()
 	{
 		config(false, true);
 		assertFalse(CityMode.enabled());

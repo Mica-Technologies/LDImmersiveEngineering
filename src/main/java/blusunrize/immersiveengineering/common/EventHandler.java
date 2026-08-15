@@ -40,6 +40,7 @@ import blusunrize.immersiveengineering.common.items.ItemIEShield;
 import blusunrize.immersiveengineering.common.items.ItemRevolver;
 import blusunrize.immersiveengineering.common.util.*;
 import blusunrize.immersiveengineering.common.util.IEDamageSources.ElectricDamageSource;
+import blusunrize.immersiveengineering.common.util.network.MessageCityModeSync;
 import blusunrize.immersiveengineering.common.util.network.MessageMinecartShaderSync;
 import blusunrize.immersiveengineering.common.util.network.MessageMineralListSync;
 import net.minecraft.block.material.Material;
@@ -507,6 +508,11 @@ public class EventHandler
 				if(e.getKey()!=null&&e.getValue()!=null)
 					packetMap.put(e.getKey(), e.getValue());
 			ImmersiveEngineering.packetHandler.sendToAll(new MessageMineralListSync(packetMap));
+			//City mode is a property of the world, not of the client looking at it: the machine
+			//rules are half server-side and half client-side, and the client's own config has no
+			//reason to match ours. Tell it what we are actually running. See MessageCityModeSync.
+			if(event.player instanceof EntityPlayerMP)
+				MessageCityModeSync.sendTo((EntityPlayerMP)event.player);
 		}
 	}
 

@@ -22,6 +22,7 @@ import blusunrize.immersiveengineering.common.Config.IEConfig.Machines;
 import blusunrize.immersiveengineering.common.blocks.metal.TileEntityConnectorLV;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
+import blusunrize.immersiveengineering.common.util.network.MessageCityModeSync;
 import blusunrize.immersiveengineering.common.world.IEWorldGen;
 import com.google.common.collect.Maps;
 import net.minecraftforge.common.config.Config.*;
@@ -81,8 +82,10 @@ public class Config
 
 		@Comment({"\"City mode\": trades Immersive Engineering's simulation detail for server tick time. Intended for decorative / city packs that want the look of the mod without paying for its physics.",
 				"This is the master switch. When it is off, nothing below applies and behaviour is identical to stock. When it is on, each subsystem listed below is simplified unless you turn that subsystem back off individually.",
+				"DEFAULT: ON. This build exists for a city pack, so it ships with city mode enabled; set this to false for stock Immersive Engineering behaviour.",
+				"A server pushes this setting and all the cityMode* flags below to every client on login, so the dedicated server, its clients and single-player worlds all agree without anyone editing a config. Editing a client's own copy therefore only affects the single-player worlds that client opens.",
 				"Existing worlds are unaffected either way -- city mode adds no saved data and changes no persisted state."})
-		public static boolean cityMode = false;
+		public static boolean cityMode = true;
 
 		@Comment({"City mode: wires. A powered connector pushes energy straight to the devices on its network with no per-wire loss and no distance/path weighting -- the realistic-grid simulation (loss, proportional distribution, the double simulate/transfer pass, the network-wide energy broadcast) is skipped.",
 				"Side effects worth knowing: wires can no longer burn out from overload, voltage tiers stop limiting throughput, and wire shock damage is sourced from the local connector rather than the whole network.",
@@ -831,6 +834,11 @@ public class Config
 		WireType.wireColouration =
 				(IEConfig.wireColouration.length!=IEConfig.wireColourationDefault.length)?IEConfig.wireColourationDefault: IEConfig.wireColouration;
 		WireType.wireLength = IEConfig.wireLength;
+
+		//City mode is pushed to clients rather than read from their own config (see
+		//MessageCityModeSync), so a reload has to re-push it or an in-game edit would only take
+		//effect on the half of each rule that runs server-side. No-op before a server exists.
+		MessageCityModeSync.sendToAll();
 	}
 
 	public static void validateAndMapValues(Class confClass)

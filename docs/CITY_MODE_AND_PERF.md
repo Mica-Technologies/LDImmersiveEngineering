@@ -39,12 +39,25 @@ The rows below are about gameplay, plus a couple of settings worth deliberately 
 
 ```
 enableWireDamage = true
-cityMode         = false
+cityMode         = true
 ```
 
-Everything on, full realistic grid, wire damage working. Since the damage figures are now computed
-on demand, leaving that feature enabled costs essentially nothing: the work happens when an entity
-touches a live wire, which is rare, instead of on every connector every tick.
+This fork exists for a city pack, so **city mode ships on**. Wire damage ships on with it: since the
+damage figures are now computed on demand, leaving that feature enabled costs essentially nothing —
+the work happens when an entity touches a live wire, which is rare, instead of on every connector
+every tick.
+
+The default used to be `cityMode = false`, and that was the source of a reported bug worth
+understanding. The pack ships no `immersiveengineering.cfg`, so every client sat on the shipped
+default while the dedicated server had been switched on by hand. Single-player worlds run on the
+client's own integrated server, so they got stock behaviour — machines stuttering, buffers not
+following their levers — while the same build on the server did not. Two things fixed it: the
+default flip, and the client sync below.
+
+> **A default flip does not rewrite an existing config file.** Forge writes only the keys that are
+> missing, so anyone who already has a `config/immersiveengineering.cfg` containing
+> `B:cityMode=false` keeps that value. Delete the file, or set the key to `true`, to pick the new
+> default up.
 
 ### If you don't want wire shock damage
 
@@ -113,27 +126,59 @@ It covers seven subsystems:
 | **Fluid pipes** | A pipe hands its fluid to the endpoints on its network in order until it runs out, instead of simulating a fill against every one of them and then splitting the result in proportion. See [Fluid Pipes](#fluid-pipes). |
 | **Conduits** | Bundles stop moving units of flux and switch to presence, exactly as the grid does: a conductor is energised or it is not. See [Conduits](#conduits). |
 
-**It is off by default**, and off means byte-identical to stock.
+**It is on by default in this fork**, which exists for a city pack. Turning the master off means
+byte-identical to stock.
 
 ```
 Config → Immersive Engineering → general
-    cityMode             (default: false)   ← master switch
+    cityMode             (default: true)    ← master switch
     cityModeWires        (default: true)
+    cityModePipes        (default: true)
+    cityModeConduits     (default: true)
+    cityModeTanks        (default: true)
     cityModeFloodlights  (default: true)
     cityModeGenerators   (default: true)
     cityModeMachines     (default: true)
     cityModeVirtualGrid  (default: true)
+    cityModePetroleum    (default: true)
 ```
 
-`cityMode` is the master switch. The five sub-flags default to on, so enabling the master alone
-turns on everything; a subsystem is simplified only when the master is on **and** that sub-flag
-has not been turned off. Switching the master off is therefore always sufficient to restore stock
-behaviour. All six are plain booleans read live, so they take effect on config reload without a
-world restart, and none of them touch saved data in either direction.
+`cityMode` is the master switch. The sub-flags default to on, so enabling the master alone turns on
+everything; a subsystem is simplified only when the master is on **and** that sub-flag has not been
+turned off. Switching the master off is therefore always sufficient to restore stock behaviour. All
+of them are plain booleans read live, so they take effect on config reload without a world restart,
+and none of them touch saved data in either direction.
 
 Every call site resolves the pairing through `common/util/CityMode.java`
-(`CityMode.wires()`, `.floodlights()`, `.generators()`, `.machines()`, `.grid()`) rather than
+(`CityMode.wires()`, `.floodlights()`, `.generators()`, `.machines()`, `.grid()`, …) rather than
 repeating the conjunction.
+
+### Client sync
+
+City mode is a property of the **world**, not of the person looking at it, and roughly half of what
+it does is client-side: whether a machine animates and loops its sound
+(`TileEntityMultiblockMetal.shouldRenderAsActive`), what the grid and fluid consoles draw. IE's
+config is per-installation, so a client's copy has no reason to match the server's — and a pack that
+ships no config file guarantees it will not, once the server has been switched on by hand.
+
+So the server pushes its flags and the client obeys them:
+
+- On `PlayerLoggedInEvent`, `EventHandler.onLogin` sends **`MessageCityModeSync`** (S→C) to the
+  joining player. It carries the master switch as a boolean and the sub-flags as an int bitmask
+  keyed by `CityMode.Subsystem.ordinal()`.
+- The client installs it via `CityMode.applyServerOverride(flags)`. Every accessor in `CityMode`
+  consults that override first and falls back to the local config only when there is none.
+- `Config.onConfigUpdate()` re-sends to everyone online, so an in-game config edit reaches clients
+  without a relog.
+- `ClientEventHandler.onLogoutClient` (`ClientDisconnectionFromServerEvent`) clears the override, so
+  the next single-player world a player opens is governed by their own config again.
+
+The packet flows in single player too — the integrated server sends it to its one player. Both sides
+read the same statics there, so the override it installs is a copy of the config it was built from
+and changes nothing. That is deliberate: one code path, with no "is this the integrated server"
+special case to get wrong.
+
+`CityMode.Subsystem` ordinals are the wire format. Constants may be appended, never reordered.
 
 ### Why these four, in this order
 
@@ -944,7 +989,8 @@ version:
 ## Testing checklist
 
 **On-demand wire damage** — this replaced a per-tick broadcast, so it is the change most worth
-testing. All with defaults (`enableWireDamage = true`, `cityMode = false`):
+testing. All with stock power (`enableWireDamage = true`, `cityMode = false` — note this is no
+longer the shipped default, so set it explicitly):
 
 - [ ] Standing in a live wire still hurts, and roughly as much as before — copper least, steel
       most. This is the core check: the damage figure is now computed by a different mechanism.

@@ -182,9 +182,26 @@ class ConduitCostTest
 			String box = source("common/blocks/conduit/TileEntityJunctionBox.java");
 			assertTrue(box.contains("CityMode.conduits()"),
 					"the conduit's city mode is declared but nothing reads it");
-			String mode = source("common/util/CityMode.java");
-			assertTrue(mode.contains("IEConfig.cityMode&&IEConfig.cityModeConduits"),
-					"conduits() does not respect the master switch");
+			//Checked by behaviour rather than by reading the source: since the flags may now also
+			//arrive from a server, "respects the master switch" is a property of the resolver, not
+			//of a particular line of text in it.
+			boolean origMaster = blusunrize.immersiveengineering.common.Config.IEConfig.cityMode;
+			boolean origConduits = blusunrize.immersiveengineering.common.Config.IEConfig.cityModeConduits;
+			try
+			{
+				blusunrize.immersiveengineering.common.util.CityMode.clearServerOverride();
+				blusunrize.immersiveengineering.common.Config.IEConfig.cityModeConduits = true;
+				blusunrize.immersiveengineering.common.Config.IEConfig.cityMode = true;
+				assertTrue(blusunrize.immersiveengineering.common.util.CityMode.conduits(),
+						"conduits() does not follow its own sub-flag");
+				blusunrize.immersiveengineering.common.Config.IEConfig.cityMode = false;
+				assertFalse(blusunrize.immersiveengineering.common.util.CityMode.conduits(),
+						"conduits() does not respect the master switch");
+			} finally
+			{
+				blusunrize.immersiveengineering.common.Config.IEConfig.cityMode = origMaster;
+				blusunrize.immersiveengineering.common.Config.IEConfig.cityModeConduits = origConduits;
+			}
 		}
 	}
 

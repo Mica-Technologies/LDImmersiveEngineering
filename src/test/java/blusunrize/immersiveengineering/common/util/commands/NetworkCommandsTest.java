@@ -13,6 +13,8 @@ import blusunrize.immersiveengineering.api.energy.grid.GridSegment;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
 import blusunrize.immersiveengineering.api.fluid.network.FluidMain;
 import blusunrize.immersiveengineering.api.fluid.network.FluidPolicy;
+import blusunrize.immersiveengineering.common.Config.IEConfig;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import net.minecraft.command.ICommand;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -180,10 +182,22 @@ class NetworkCommandsTest
 		}
 
 		@Test
-		@DisplayName("an ordinary segment reads as on")
+		@DisplayName("an ordinary segment reads as on outside city mode")
 		void ordinaryReadsOn()
 		{
-			assertTrue(strip(CommandGrid.describeState(segment())).contains("on"));
+			//Stated rather than assumed: city mode ships on in this fork, and under it a healthy
+			//segment reads by presence ("energized" / "no source") instead. See cityModeReadsPresence.
+			withCityMode(false, () -> assertTrue(strip(CommandGrid.describeState(segment())).contains("on")));
+		}
+
+		@Test
+		@DisplayName("under city mode an ordinary segment reads by presence instead")
+		void cityModeReadsPresence()
+		{
+			withCityMode(true, () -> {
+				String state = strip(CommandGrid.describeState(segment()));
+				assertTrue(state.contains("energized")||state.contains("no source"), state);
+			});
 		}
 
 		@Test
@@ -257,10 +271,20 @@ class NetworkCommandsTest
 		}
 
 		@Test
-		@DisplayName("an ordinary main reads as open")
+		@DisplayName("an ordinary main reads as open outside city mode")
 		void ordinaryReadsOpen()
 		{
-			assertEquals("open", strip(CommandFluidNet.describeState(main())));
+			withCityMode(false, () -> assertEquals("open", strip(CommandFluidNet.describeState(main()))));
+		}
+
+		@Test
+		@DisplayName("under city mode an ordinary main reads by presence instead, mirroring the grid")
+		void cityModeReadsPresence()
+		{
+			withCityMode(true, () -> {
+				String state = strip(CommandFluidNet.describeState(main()));
+				assertTrue(state.contains("pressurised")||state.contains("no source"), state);
+			});
 		}
 
 		@Test
@@ -318,5 +342,32 @@ class NetworkCommandsTest
 	private static String strip(String text)
 	{
 		return text.replaceAll("§.", "");
+	}
+
+	/**
+	 * Runs a block with city mode forced on or off, restoring whatever was there before.
+	 * <p>
+	 * The state descriptions branch on it, so a test that does not say which mode it means is a
+	 * test that silently changes meaning when the shipped default moves -- which is exactly what
+	 * happened when this fork turned city mode on by default.
+	 */
+	private static void withCityMode(boolean on, Runnable body)
+	{
+		boolean master = IEConfig.cityMode;
+		boolean grid = IEConfig.cityModeVirtualGrid;
+		boolean petroleum = IEConfig.cityModePetroleum;
+		try
+		{
+			CityMode.clearServerOverride();
+			IEConfig.cityMode = on;
+			IEConfig.cityModeVirtualGrid = true;
+			IEConfig.cityModePetroleum = true;
+			body.run();
+		} finally
+		{
+			IEConfig.cityMode = master;
+			IEConfig.cityModeVirtualGrid = grid;
+			IEConfig.cityModePetroleum = petroleum;
+		}
 	}
 }

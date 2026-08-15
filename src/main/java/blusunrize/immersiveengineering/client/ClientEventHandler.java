@@ -38,6 +38,7 @@ import blusunrize.immersiveengineering.common.blocks.metal.TileEntitySampleDrill
 import blusunrize.immersiveengineering.common.blocks.wooden.TileEntityTurntable;
 import blusunrize.immersiveengineering.common.items.IEItemInterfaces.IBulletContainer;
 import blusunrize.immersiveengineering.common.items.*;
+import blusunrize.immersiveengineering.common.util.CityMode;
 import blusunrize.immersiveengineering.common.util.EnergyHelper;
 import blusunrize.immersiveengineering.common.util.IEPotions;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
@@ -108,6 +109,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent.Phase;
 import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientConnectedToServerEvent;
+import net.minecraftforge.fml.common.network.FMLNetworkEvent.ClientDisconnectionFromServerEvent;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.oredict.OreDictionary;
 import org.apache.commons.lang3.tuple.Pair;
@@ -1603,6 +1605,19 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 	public void onLoginClientPre(ClientConnectedToServerEvent ev)
 	{
 		justLoggedIn = true;
+	}
+
+	/**
+	 * Forget the city-mode flags the server we just left told us to use.
+	 * <p>
+	 * Without this, the first world a player opens after visiting a city server would inherit that
+	 * server's settings instead of their own config -- and, worse, would keep them until the game
+	 * was restarted. See {@link CityMode} and {@code MessageCityModeSync}.
+	 */
+	@SubscribeEvent
+	public void onLogoutClient(ClientDisconnectionFromServerEvent ev)
+	{
+		CityMode.clearServerOverride();
 	}
 
 	@SubscribeEvent
