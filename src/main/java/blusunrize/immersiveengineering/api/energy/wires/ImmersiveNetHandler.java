@@ -24,6 +24,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
@@ -431,8 +432,12 @@ public class ImmersiveNetHandler
 				double dx = node.getX()+.5+Math.signum(con.end.getX()-con.start.getX());
 				double dy = node.getY()+.5+Math.signum(con.end.getY()-con.start.getY());
 				double dz = node.getZ()+.5+Math.signum(con.end.getZ()-con.start.getZ());
-				if(doDrops&&world.getGameRules().getBoolean("doTileDrops"))
-					world.spawnEntity(new EntityItem(world, dx, dy, dz, con.cableType.getWireCoil(con)));
+				//An empty coil is a real answer, not a missing one: a conduit bundle is made by
+				//laying conduit and has no coil to give back. Spawning an item entity holding
+				//nothing would put a ghost on the ground for a tick for every run on a broken box.
+				ItemStack coil = con.cableType.getWireCoil(con);
+				if(doDrops&&!coil.isEmpty()&&world.getGameRules().getBoolean("doTileDrops"))
+					world.spawnEntity(new EntityItem(world, dx, dy, dz, coil));
 			}
 		}
 		IESaveData.setDirty(world.provider.getDimension());

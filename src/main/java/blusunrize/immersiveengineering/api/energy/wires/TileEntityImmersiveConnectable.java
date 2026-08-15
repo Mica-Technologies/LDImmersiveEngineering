@@ -372,74 +372,28 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 		}
 	}
 
+	//	=================================
+	//		SHARED WITH NODES THAT CANNOT EXTEND THIS CLASS
+	//	=================================
+	// The bodies moved to ApiUtils rather than being copied. The conduit junction box is a wire
+	// endpoint too, and it cannot extend this class -- it is already a patch panel, a redstone node
+	// and a flux receiver built on TileEntityIEBase -- so it calls the same three methods. One
+	// implementation, in the way WireNetTransfer is already one implementation of the push.
+
 	private void loadConnsFromNBT(NBTTagCompound nbt)
 	{
-		if(world!=null&&world.isRemote&&!Minecraft.getMinecraft().isSingleplayer()&&nbt!=null)
-		{
-			NBTTagList connectionList = nbt.getTagList("connectionList", 10);
-			ImmersiveNetHandler.INSTANCE.clearConnectionsOriginatingFrom(Utils.toCC(this), world);
-			for(int i = 0; i < connectionList.tagCount(); i++)
-			{
-				NBTTagCompound conTag = connectionList.getCompoundTagAt(i);
-				Connection con = Connection.readFromNBT(conTag);
-				if(con!=null)
-				{
-					ImmersiveNetHandler.INSTANCE.addConnection(world, Utils.toCC(this), con);
-				}
-				else
-					IELogger.error("CLIENT read connection as null from {}", nbt);
-			}
-		}
+		ApiUtils.loadConnsFromNBT(world, Utils.toCC(this), nbt);
 	}
 
 	private void writeConnsToNBT(NBTTagCompound nbt)
 	{
-		if(world!=null&&!world.isRemote&&nbt!=null)
-		{
-			NBTTagList connectionList = new NBTTagList();
-			Set<Connection> conL = ImmersiveNetHandler.INSTANCE.getConnections(world, Utils.toCC(this));
-			if(conL!=null)
-				for(Connection con : conL)
-					connectionList.appendTag(con.writeToNBT());
-			nbt.setTag("connectionList", connectionList);
-		}
+		ApiUtils.writeConnsToNBT(world, Utils.toCC(this), nbt);
 	}
 
 	public Set<Connection> genConnBlockstate()
 	{
-		Set<Connection> conns = ImmersiveNetHandler.INSTANCE.getConnections(world, pos);
-		if(conns==null)
-			return ImmutableSet.of();
-		Set<Connection> ret = new HashSet<Connection>()
-		{
-			@Override
-			public boolean equals(Object o)
-			{
-				if(o==this)
-					return true;
-				if(!(o instanceof HashSet))
-					return false;
-				HashSet<Connection> other = (HashSet<Connection>)o;
-				if(other.size()!=this.size())
-					return false;
-				for(Connection c : this)
-					if(!other.contains(c))
-						return false;
-				return true;
-			}
-		};
 		//TODO thread safety!
-		for(Connection c : conns)
-		{
-			IImmersiveConnectable end = ApiUtils.toIIC(c.end, world, false);
-			if(end==null)
-				continue;
-			// generate subvertices
-			c.getSubVertices(world);
-			ret.add(c);
-		}
-
-		return ret;
+		return ApiUtils.genConnBlockstate(world, pos);
 	}
 
 	@Override

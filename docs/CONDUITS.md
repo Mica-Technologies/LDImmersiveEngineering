@@ -22,9 +22,10 @@ tubing.
    it reaches, and around the edge of the beam it is running along.
 3. A run ends at a **Junction Box**. Lay conduit between two boxes and the run connects itself —
    there is no coil and no linking tool.
-4. Put an **LV / MV / HV Connector** — or a **Grid Feed / Service Unit** — against a bare face of a
-   box. The box breaks a free conductor out to that face by itself, and wears its plate so you can
-   see which. That is all most circuits need.
+4. String an **LV / MV / HV wire** straight to a face of the box, or put a **Connector** of that
+   tier — or a **Grid Feed / Service Unit** — against one. The box breaks a free conductor out to
+   that face by itself, and wears its plate so you can see which. That is all most circuits need.
+   One wire per face, so a box carries up to six circuits.
 5. To choose *which* conductor instead, right-click the face with a **dye** first.
 6. To get a run through a floor without a box showing, set a **Ground Feeder** into it. It wears
    whatever is around it.
@@ -141,11 +142,72 @@ the same conductor arriving at two connectors would be a short, not a feature.
 *leaves*, not whether it exists, so a box dropped in purely to turn a corner or change surface
 needs no configuration at all.
 
+### Wires straight to a face
+
+**A junction box is a wire endpoint in its own right.** Point a coil at the face you want and the
+wire attaches there, with no connector bolted to the wall beside it.
+
+This closes the same seam the Grid Feed and Service Units closed in
+`commit 701d113d0`: a connector that exists only so that a wire has something to attach to is a
+block and a rule with nothing behind them but the order the two features were written in. It also
+answers the playtest report directly — wires *did* work beside a box and *did not* work at the box,
+which reads as the feature being half-finished, because it was.
+
+The rules:
+
+- **One wire per face.** A face is one breakout on one conductor; two wires on it would be two
+  circuits sharing a conductor, which is a short. Six faces is therefore six wires and six circuits.
+- **The face is the face you clicked.** `TargetingInfo.side` is already carried through
+  `canConnectCable` and `connectCable`, so the gesture says which circuit is meant and nothing has
+  to be configured afterwards.
+- **Not the face it is bolted to.** The housing lies flush against that one, so a wire there would
+  leave from inside the block the box is screwed to. In practice that face is usually not even
+  clickable; a box with no runs on it is drawn standing on the floor of its cell, so `down` is the
+  one it refuses. The rule is applied when a wire is attached and never afterwards — a box's plane
+  moves when the runs reaching it move, and yanking a circuit because somebody laid conduit on the
+  far side would be a wire cut by an unrelated action.
+- **LV, MV and HV only.** Structural cable holds things up and redstone wire carries no flux;
+  neither has anything to do on a conductor. Same acceptance set as a Grid Feed or Service Unit.
+- **Attaching to a bare face auto-patches it**, exactly as hanging a connector does, on the lowest
+  free conductor. A face that is already patched keeps its colour.
+- **Cutting the wire frees the face and never un-patches it.** Same rule as taking a connector down.
+  Wirecutters clicked on a face cut *that face's* wire and leave the other five alone — the box's
+  `getCableLimiter` answers with the wire on the clicked face, which is what
+  `clearAllConnectionsFor` filters on. A run is never cut this way: runs are made by laying conduit
+  and removed by breaking it.
+
+A refusal says which rule it hit rather than the generic "you cannot attach this wire here" — see
+`IImmersiveConnectable.getCableRefusal` and the `chat.immersiveengineering.warning.conduit.wire*`
+keys. Being told "wrong cable" while holding the right cable is how a rule becomes a bug report.
+
+**A face can serve a wire and an adjacent connector at once.** They are the same conductor arriving
+at the same face by two routes, so nothing about that is ambiguous, and it is not a second budget:
+`drainToBreakout` offers the neighbour first — touching is the stronger claim, the same order the
+Grid Service Unit settled on — and offers the wire only what is left.
+
+The three-connectors-round-a-box arrangement is untouched. That is what an underground feeder looks
+like, and it still auto-patches and still works.
+
+Under the hood: incoming energy is credited by way of
+`IImmersiveConnectable.outputEnergy(amount, simulate, type, arriving)`, a four-argument form added
+for exactly this — a connector has one terminal and does not need to be told which of its wires the
+energy came down, and a box has six and cannot work without it. Outgoing energy goes through
+`WireNetTransfer` with a filter on the route's first hop, so a conductor's energy leaves by *its*
+face's wire and no other. The box refuses to be a through-route at all
+(`allowEnergyToPass` answers only for the null query), because a route search allowed to walk in on
+one wire and out on another would quietly turn sixteen conductors into one wire with extra steps.
+
 ### Tiers
 
-There is no tier setting. The tier of a circuit is whichever connector you hang on its breakout:
-an LV connector makes it an LV circuit, an HV connector an HV one. IE's connectors already cap
-throughput by tier, and a second place to say so would only be somewhere for the two to disagree.
+There is no tier setting. **The tier of a circuit is whatever hardware is on its face** — the wire
+you string to it, or the connector you hang on it. An LV wire makes it an LV circuit, an HV wire an
+HV one, and the same for connectors. IE's wires and connectors already cap throughput by tier, and a
+second place to say so would only be somewhere for the two to disagree.
+
+So a face's phase is now *whatever is on it*. An HV wire on one face of a box and an LV wire on
+another are two circuits of two tiers coming out of the same bundle, capped by their own hardware.
+That is Decision 7 of the plan — each channel behaves as its own wire — made visible: the tubing
+does not have a tier, the circuit does.
 
 Mixed tiers in one bundle are fine — an LV channel and an HV channel share a run happily, because
 the tier belongs to the conductor rather than to the tubing.
@@ -304,6 +366,13 @@ it was spent proving something nobody was going to look at.
 
 A conductor still goes dark about a second after whatever fed it stops, so a switched circuit still
 visibly switches.
+
+A wire strung to a box crosses the two subsystems, and each keeps its own flag: whether the *push*
+onto the wire is the lossless one is `cityModeWires`, because that is a property of the wire network
+the energy is going onto and of the nodes at the other end of it; whether the box **debits itself**
+for what it delivered is `cityModeConduits`, because that is the conduit's own accounting. An
+energised conductor delivers to the block against its face and to the wire on it without being
+drained by either, which is what makes presence spread rather than divide.
 
 Turning the master `cityMode` switch off always restores stock behaviour.
 

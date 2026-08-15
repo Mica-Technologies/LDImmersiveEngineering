@@ -310,4 +310,102 @@ class JunctionBoxLogicTest
 			assertEquals(0, JunctionBoxLogic.firstFreeChannel(1 << (CHANNELS+2), CHANNELS));
 		}
 	}
+
+	@Nested
+	@DisplayName("which faces will take a wire")
+	class WireFaces
+	{
+		private static final int DOWN = 0;
+		private static final int UP = 1;
+		private static final int NORTH = 2;
+		private static final int SOUTH = 3;
+
+		/** A box bolted to its floor, which is where one with no runs on it is drawn. */
+		private JunctionBoxLogic.WireRefusal offer(int wiredMask, int face)
+		{
+			return JunctionBoxLogic.canTakeWire(wiredMask, face, DOWN, true);
+		}
+
+		@Test
+		@DisplayName("a bare face takes a wire")
+		void bareFaceTakesOne()
+		{
+			assertSame(JunctionBoxLogic.WireRefusal.NONE, offer(0, NORTH));
+		}
+
+		@Test
+		@DisplayName("only power wire; structural cable and redstone are refused")
+		void onlyPowerWire()
+		{
+			//The tier test is made outside this class, against WireType's categories, so all this
+			//has to be is the place the answer is turned into a refusal rather than a silent no.
+			assertSame(JunctionBoxLogic.WireRefusal.WRONG_KIND,
+					JunctionBoxLogic.canTakeWire(0, NORTH, DOWN, false));
+		}
+
+		@Test
+		@DisplayName("a face that already has a wire refuses a second")
+		void oneWirePerFace()
+		{
+			//One face is one breakout on one conductor. Two wires on it would be two circuits
+			//sharing a conductor, which is a short rather than a feature.
+			assertSame(JunctionBoxLogic.WireRefusal.FACE_TAKEN, offer(1 << NORTH, NORTH));
+			assertSame(JunctionBoxLogic.WireRefusal.NONE, offer(1 << NORTH, SOUTH));
+		}
+
+		@Test
+		@DisplayName("the face the box is bolted to is refused")
+		void mountFaceRefused()
+		{
+			//The housing lies flush against it, so a wire there would leave from inside the block
+			//the box is screwed to.
+			assertSame(JunctionBoxLogic.WireRefusal.MOUNT_FACE, offer(0, DOWN));
+			assertSame(JunctionBoxLogic.WireRefusal.MOUNT_FACE,
+					JunctionBoxLogic.canTakeWire(0, UP, UP, true));
+			//And it is only that box's own mount: the same face on a box in another plane is fine.
+			assertSame(JunctionBoxLogic.WireRefusal.NONE,
+					JunctionBoxLogic.canTakeWire(0, DOWN, UP, true));
+		}
+
+		@Test
+		@DisplayName("a box with a wire on every face it can use says it is full")
+		void fullBoxSaysSo()
+		{
+			//Five, not six: the sixth face is the one it is bolted to. "Full" rather than "that face
+			//is taken" because the player's next move is to use another box, not another face.
+			int everyOtherFace = 0b111111&~(1 << DOWN);
+			assertEquals(0, JunctionBoxLogic.freeFaces(everyOtherFace, DOWN));
+			assertSame(JunctionBoxLogic.WireRefusal.BOX_FULL, offer(everyOtherFace, NORTH));
+			assertSame(JunctionBoxLogic.WireRefusal.BOX_FULL, offer(everyOtherFace, DOWN));
+		}
+
+		@Test
+		@DisplayName("six faces, minus the one it stands on, is five wires")
+		void fiveWiresOnAMountedBox()
+		{
+			assertEquals(JunctionBoxLogic.FACES-1, JunctionBoxLogic.freeFaces(0, DOWN));
+		}
+
+		@Test
+		@DisplayName("cutting a wire off frees that face and no other")
+		void freeingOneFace()
+		{
+			int wired = (1 << NORTH)|(1 << SOUTH);
+			assertSame(JunctionBoxLogic.WireRefusal.FACE_TAKEN, offer(wired, NORTH));
+			//The face is freed by clearing its bit -- JunctionWires does that -- and nothing else
+			//about the box changes, which is why the breakout stays patched.
+			assertSame(JunctionBoxLogic.WireRefusal.NONE, offer(wired&~(1 << NORTH), NORTH));
+			assertSame(JunctionBoxLogic.WireRefusal.FACE_TAKEN, offer(wired&~(1 << NORTH), SOUTH));
+		}
+
+		@Test
+		@DisplayName("a face index off the end is refused rather than throwing")
+		void nonsenseFaceRefused()
+		{
+			assertSame(JunctionBoxLogic.WireRefusal.WRONG_KIND,
+					JunctionBoxLogic.canTakeWire(0, 6, DOWN, true));
+			assertSame(JunctionBoxLogic.WireRefusal.WRONG_KIND,
+					JunctionBoxLogic.canTakeWire(0, -1, DOWN, true));
+		}
+	}
 }

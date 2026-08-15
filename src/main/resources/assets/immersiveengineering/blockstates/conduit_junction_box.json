@@ -5,7 +5,7 @@
 				"facing": "down"
 			},
 			"apply": {
-				"model": "immersiveengineering:conduit/junction_box_down"
+				"model": "immersiveengineering:smartmodel/conn_conduit_junction_box_down"
 			}
 		},
 		{
@@ -112,7 +112,7 @@
 				"facing": "up"
 			},
 			"apply": {
-				"model": "immersiveengineering:conduit/junction_box_up"
+				"model": "immersiveengineering:smartmodel/conn_conduit_junction_box_up"
 			}
 		},
 		{
@@ -219,7 +219,7 @@
 				"facing": "north"
 			},
 			"apply": {
-				"model": "immersiveengineering:conduit/junction_box_north"
+				"model": "immersiveengineering:smartmodel/conn_conduit_junction_box_north"
 			}
 		},
 		{
@@ -326,7 +326,7 @@
 				"facing": "south"
 			},
 			"apply": {
-				"model": "immersiveengineering:conduit/junction_box_south"
+				"model": "immersiveengineering:smartmodel/conn_conduit_junction_box_south"
 			}
 		},
 		{
@@ -433,7 +433,7 @@
 				"facing": "west"
 			},
 			"apply": {
-				"model": "immersiveengineering:conduit/junction_box_west"
+				"model": "immersiveengineering:smartmodel/conn_conduit_junction_box_west"
 			}
 		},
 		{
@@ -540,7 +540,7 @@
 				"facing": "east"
 			},
 			"apply": {
-				"model": "immersiveengineering:conduit/junction_box_east"
+				"model": "immersiveengineering:smartmodel/conn_conduit_junction_box_east"
 			}
 		},
 		{

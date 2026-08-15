@@ -57,10 +57,15 @@ NEGATIVE = {"down", "north", "west"}
 # say `immersiveengineering:grid/utility_box` for `models/block/grid/utility_box.json`; this
 # follows them.
 MODEL_REF = "immersiveengineering:conduit/%s"
+# The junction box's housing goes through IE's connection smart model instead, which draws the
+# housing and then any catenary strung to the box on top of it.  ClientProxy registers one key
+# per mounting face against the plain housing model above; the name after `conn_` is that key.
+# See ConnLoader -- the `models/block/smartmodel/conn_` prefix is what its `accepts` matches.
+CONN_MODEL_REF = "immersiveengineering:smartmodel/conn_conduit_junction_box_%s"
 
 
 def read_bounds_constants(repo):
-    """Take DEPTH and HALF_WIDTH from the Java rather than restating them here.
+    """Take DEPTH, HALF_WIDTH and JUNCTION_HALF from the Java rather than restating them here.
 
     If ConduitBounds moves its numbers, the models move with it or this script stops --
     which is the point.  A silent divergence between the box you click and the tube you
@@ -71,12 +76,12 @@ def read_bounds_constants(repo):
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
     found = {}
-    for name in ("DEPTH", "HALF_WIDTH"):
+    for name in ("DEPTH", "HALF_WIDTH", "JUNCTION_HALF"):
         match = re.search(r"int\s+%s\s*=\s*(\d+)\s*;" % name, source)
         if not match:
             raise SystemExit("could not find %s in ConduitBounds.java" % name)
         found[name] = int(match.group(1))
-    return found["DEPTH"], found["HALF_WIDTH"]
+    return found["DEPTH"], found["HALF_WIDTH"], found["JUNCTION_HALF"]
 
 
 def in_plane(mount):
@@ -309,12 +314,13 @@ def build_blockstate(assets):
     return parts
 
 
-# Half the junction box's width across the surface it is mounted on, in pixels.  Five, because
-# six to ten would be lost against a run and four would not read as hardware from across a room.
-BOX_HALF = 5
+# Half the junction box's width across the surface it is mounted on lives in ConduitBounds now,
+# alongside the tubing's own numbers, and arrives here through read_bounds_constants.  It moved
+# because the Java needs it too: a wire strung to a box has to land on the box's actual surface,
+# and a terminal point derived from a second copy of the number is a wire starting in mid-air.
 
 
-def box_bounds(mount, depth):
+def box_bounds(mount, depth, box_half):
     """Where the junction box's housing sits when it is bolted to that face, as [from, to].
 
     **The box hugs its surface, exactly as the conduit does.**  It stands `2*depth+2` off the
@@ -333,8 +339,8 @@ def box_bounds(mount, depth):
     For `down` this is bit-for-bit the shape the box has always had, so a box with no runs on
     it -- and every box in a world saved before this -- looks exactly as it did.
     """
-    lo = [8 - BOX_HALF] * 3
-    hi = [8 + BOX_HALF] * 3
+    lo = [8 - box_half] * 3
+    hi = [8 + box_half] * 3
     axis = "xyz".index(AXIS_OF[mount])
     stand_off = 2 * depth + 2
     if mount in NEGATIVE:
@@ -344,7 +350,7 @@ def box_bounds(mount, depth):
     return lo, hi
 
 
-def build_junction_box(assets, depth, half):
+def build_junction_box(assets, depth, box_half):
     """The junction box: a squat surface box per mounting face, and the blockstate that draws it.
 
     Plainer than the conduit on purpose.  It is a thing you walk up to and right-click with
@@ -374,7 +380,7 @@ def build_junction_box(assets, depth, half):
     # runconnection_*, a second and unrelated set -- see IEProperties.RUNCONNECTION.
     parts = []
     for mount in FACINGS:
-        frm, to = box_bounds(mount, depth)
+        frm, to = box_bounds(mount, depth, box_half)
         write_json(os.path.join(out, "junction_box_%s.json" % mount), {
             "textures": {
                 "box": "immersiveengineering:blocks/conduit_junction_box",
@@ -384,7 +390,7 @@ def build_junction_box(assets, depth, half):
         })
         parts.append({
             "when": {"facing": mount},
-            "apply": {"model": MODEL_REF % ("junction_box_%s" % mount)},
+            "apply": {"model": CONN_MODEL_REF % mount},
         })
         for face in build_patch_models(assets, mount, frm, to):
             parts.append({
@@ -693,10 +699,10 @@ def main():
         repo, "src", "main", "resources", "assets", "immersiveengineering"))
     args = parser.parse_args()
 
-    depth, half = read_bounds_constants(repo)
+    depth, half, box_half = read_bounds_constants(repo)
     models = build_models(args.assets, depth, half)
     parts = build_blockstate(args.assets)
-    build_junction_box(args.assets, depth, half)
+    build_junction_box(args.assets, depth, box_half)
     build_ground_feeder(args.assets)
     build_item_blockstate(args.assets)
     texture = build_texture(args.assets, depth)
@@ -704,7 +710,8 @@ def main():
     build_patch_texture(args.assets)
     build_feeder_texture(args.assets)
 
-    print("depth=%d half_width=%d (read from ConduitBounds.java)" % (depth, half))
+    print("depth=%d half_width=%d junction_half=%d (read from ConduitBounds.java)"
+          % (depth, half, box_half))
     print("wrote %d models, %d blockstate parts" % (len(models), len(parts)))
     print("wrote %s" % os.path.relpath(texture, repo))
 

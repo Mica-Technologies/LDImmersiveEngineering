@@ -17,10 +17,12 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 
+import javax.annotation.Nullable;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 /**
  * Pushing energy out of a node and along the wire network it is attached to.
@@ -49,6 +51,37 @@ public final class WireNetTransfer
 	}
 
 	/**
+	 * The last leg of a route: the connection whose {@code end} is the node about to be handed the
+	 * energy, and therefore the one that node knows as "the wire on such-and-such a terminal".
+	 * <p>
+	 * The route is built outward from the pushing node -- see
+	 * {@code ImmersiveNetHandler.getIndirectEnergyConnections} -- so the first sub-connection
+	 * leaves the pusher and the last arrives at the receiver.
+	 */
+	@Nullable
+	private static Connection lastHop(AbstractConnection con)
+	{
+		if(con.subConnections==null||con.subConnections.length==0)
+			return null;
+		return con.subConnections[con.subConnections.length-1];
+	}
+
+	/**
+	 * The first leg of a route: the wire it leaves this node by.
+	 * <p>
+	 * Public because the filter a caller passes to {@link #transfer} is written in terms of it --
+	 * the node knows which of its own wires it means, and this is where the route says which one it
+	 * took.
+	 */
+	@Nullable
+	public static Connection firstHop(AbstractConnection con)
+	{
+		if(con.subConnections==null||con.subConnections.length==0)
+			return null;
+		return con.subConnections[0];
+	}
+
+	/**
 	 * Sends up to {@code energy} out of the node at {@code pos} along its network.
 	 *
 	 * @param maxInput  the node's input rate, used only for the loss curve's shoulder -- the same
@@ -62,6 +95,24 @@ public final class WireNetTransfer
 	public static int transfer(World world, BlockPos pos, int maxInput, int maxOutput, int energy,
 							   boolean simulate, int energyType,
 							   Map<AbstractConnection, IImmersiveConnectable> endCache)
+	{
+		return transfer(world, pos, maxInput, maxOutput, energy, simulate, energyType, endCache, null);
+	}
+
+	/**
+	 * The same push, restricted to the routes that leave by one particular wire.
+	 * <p>
+	 * A connector has one terminal and wants all of them, which is what the overload above is. A
+	 * conduit junction box has six, each carrying its own conductor, and a channel's energy must
+	 * leave by <em>its</em> face's wire and no other -- so it filters on the first hop of each
+	 * route. The alternative is six terminals sharing one budget, which is not six circuits.
+	 *
+	 * @param only keeps a route if it returns true, or null to take every route as before
+	 */
+	public static int transfer(World world, BlockPos pos, int maxInput, int maxOutput, int energy,
+							   boolean simulate, int energyType,
+							   Map<AbstractConnection, IImmersiveConnectable> endCache,
+							   @Nullable Predicate<AbstractConnection> only)
 	{
 		int received = 0;
 		if(world.isRemote)
@@ -82,13 +133,13 @@ public final class WireNetTransfer
 		//(energy will be provided to the nearby outputs rather than some random ones)
 		Map<AbstractConnection, Integer> powerSorting = new TreeMap<>();
 		for(AbstractConnection con : outputs)
-			if(con.isEnergyOutput)
+			if(con.isEnergyOutput&&(only==null||only.test(con)))
 			{
 				IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
 				if(con.cableType!=null&&end!=null)
 				{
 					int atmOut = Math.min(powerForSort, con.cableType.getTransferRate());
-					int tempR = end.outputEnergy(atmOut, true, energyType);
+					int tempR = end.outputEnergy(atmOut, true, energyType, lastHop(con));
 					if(tempR > 0)
 					{
 						powerSorting.put(con, tempR);
@@ -107,10 +158,11 @@ public final class WireNetTransfer
 					float prio = powerSorting.get(con)/(float)sum;
 					int output = Math.min(MathHelper.ceil(powerForSort*prio), powerLeft);
 
-					int tempR = end.outputEnergy(Math.min(output, con.cableType.getTransferRate()), true, energyType);
+					int tempR = end.outputEnergy(Math.min(output, con.cableType.getTransferRate()), true,
+							energyType, lastHop(con));
 					int r = tempR;
 					tempR -= (int)Math.max(0, Math.floor(tempR*con.getPreciseLossRate(tempR, maxInput)));
-					end.outputEnergy(tempR, simulate, energyType);
+					end.outputEnergy(tempR, simulate, energyType, lastHop(con));
 					HashSet<IImmersiveConnectable> passedConnectors = new HashSet<>();
 					float intermediaryLoss = 0;
 					//<editor-fold desc="Transfer rate and passed energy">
@@ -155,6 +207,16 @@ public final class WireNetTransfer
 	 */
 	public static int city(World world, BlockPos pos, int available)
 	{
+		return city(world, pos, available, null);
+	}
+
+	/**
+	 * City mode's push, restricted to one of this node's wires. See the filtered
+	 * {@link #transfer} for why a node with six terminals needs that.
+	 */
+	public static int city(World world, BlockPos pos, int available,
+						   @Nullable Predicate<AbstractConnection> only)
+	{
 		if(world.isRemote||available <= 0)
 			return 0;
 		Set<AbstractConnection> outputs = ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(pos,
@@ -168,10 +230,12 @@ public final class WireNetTransfer
 				break;
 			if(!con.isEnergyOutput||con.cableType==null||con.cableType.getTransferRate() <= 0)
 				continue;
+			if(only!=null&&!only.test(con))
+				continue;
 			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
 			if(end==null||!end.allowEnergyToPass(null))
 				continue;
-			int sent = end.outputEnergy(powerLeft, false, 0);
+			int sent = end.outputEnergy(powerLeft, false, 0, lastHop(con));
 			powerLeft -= sent;
 			//Notify in-line connectables (e.g. the Energy Meter) of throughput so they still measure
 			//power in city mode. City mode is lossless, so the full amount passes through every

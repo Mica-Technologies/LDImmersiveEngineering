@@ -44,6 +44,51 @@ public class ConduitBounds
 	/** Half the width of the tubing, in sixteenths. Six to ten, so four wide and centred. */
 	public static final int HALF_WIDTH = 2;
 
+	/**
+	 * Half the junction box's width across the surface it is bolted to, in sixteenths.
+	 * <p>
+	 * Five, because six to ten would be lost against a run and four would not read as hardware from
+	 * across a room. Stated here rather than in the asset script for the reason every other number
+	 * in this file is: something on the Java side now needs it too -- a wire strung to a box has to
+	 * land on the box's actual surface, and a terminal point derived from a different set of numbers
+	 * than the model was drawn from is a wire that starts in mid-air.
+	 */
+	public static final int JUNCTION_HALF = 5;
+
+	/**
+	 * How far the junction box's housing stands off the face it is bolted to, in sixteenths.
+	 * <p>
+	 * Deliberately derived from {@link #DEPTH} rather than chosen: the box hugs its surface exactly
+	 * as the conduit does, and a run clipped to the same face passes through the housing's own
+	 * cross-section rather than beside it.
+	 */
+	public static final int JUNCTION_DEPTH = 2*DEPTH+2;
+
+	/**
+	 * The junction box's housing, in the same sixteenths the model is drawn in.
+	 *
+	 * @param mount the face the box is bolted to
+	 *
+	 * @return minX, minY, minZ, maxX, maxY, maxZ, in sixteenths
+	 */
+	public static int[] junctionBox(EnumFacing mount)
+	{
+		int[] min = {8-JUNCTION_HALF, 8-JUNCTION_HALF, 8-JUNCTION_HALF};
+		int[] max = {8+JUNCTION_HALF, 8+JUNCTION_HALF, 8+JUNCTION_HALF};
+		int axis = axisIndex(mount.getAxis());
+		if(mount.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE)
+		{
+			min[axis] = 0;
+			max[axis] = JUNCTION_DEPTH;
+		}
+		else
+		{
+			min[axis] = 16-JUNCTION_DEPTH;
+			max[axis] = 16;
+		}
+		return new int[]{min[0], min[1], min[2], max[0], max[1], max[2]};
+	}
+
 	private static final float U = 1/16f;
 
 	/**

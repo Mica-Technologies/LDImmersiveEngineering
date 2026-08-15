@@ -12,9 +12,10 @@ package blusunrize.immersiveengineering.common.blocks.conduit;
  * The junction box's decisions that do not need a world.
  * <p>
  * The bucket brigade itself already lives in {@code ConduitTransfer} and is tested there; this is
- * what was left inline on the tile entity. Three things, each of which is a choice rather than
- * arithmetic: what a comparator reads off a bundle, how much a channel will take, and how the
- * redstone channels resolve when several boxes on one run drive the same conductor.
+ * what was left inline on the tile entity. Each is a choice rather than arithmetic: what a
+ * comparator reads off a bundle, how much a channel will take, how the redstone channels resolve
+ * when several boxes on one run drive the same conductor, which conductor an unasked-for breakout
+ * takes, and which of a box's six faces will accept a wire.
  *
  * @author LDImmersiveEngineering -- conduits
  */
@@ -119,5 +120,85 @@ public final class JunctionBoxLogic
 			if((usedMask&(1 << i))==0)
 				return i;
 		return -1;
+	}
+
+	//	=================================
+	//		WIRES STRUNG STRAIGHT TO A BOX
+	//	=================================
+
+	/** How many faces a box has, and therefore the most wires one can carry. */
+	public static final int FACES = 6;
+
+	/**
+	 * Why a face will not take the wire being offered to it, or {@link WireRefusal#NONE}.
+	 * <p>
+	 * An enum rather than a boolean because the answer is the message the player gets. Being told
+	 * "wrong cable" while holding the right cable -- which is what a bare no came out as -- is how a
+	 * rule becomes a bug report, and this box has three separate rules that can say no.
+	 */
+	public enum WireRefusal
+	{
+		/** Nothing wrong: the wire may be attached. */
+		NONE,
+		/** Not an LV, MV or HV wire. Structural cable holds things up; redstone carries no flux. */
+		WRONG_KIND,
+		/** The face is the one the housing is bolted to, so a wire there would start inside a block. */
+		MOUNT_FACE,
+		/** Something is already strung to that face. One face, one wire, one circuit. */
+		FACE_TAKEN,
+		/** Every face this box can take a wire on already has one. */
+		BOX_FULL
+	}
+
+	/**
+	 * Whether a wire may be strung to one face of a junction box, and if not, why not.
+	 * <p>
+	 * <strong>One wire per face, six faces, minus the one it is bolted to.</strong> The face is the
+	 * face the player clicked, which is the whole reason a box can hold six independent circuits
+	 * without a single extra click of configuration: the gesture already said which one was meant.
+	 * <p>
+	 * The mount face is refused because the housing lies flush against it -- a wire attached there
+	 * would leave from inside the block the box is screwed to. In practice that face is usually not
+	 * even clickable, so this mostly guards the case where it is: a box hanging in open air, whose
+	 * mount is whichever surface its runs put it on. A box with no runs at all is drawn standing on
+	 * the floor of its cell, so {@code down} is the face it refuses.
+	 * <p>
+	 * <strong>The mount is never allowed to take a wire away.</strong> A box's mount moves when the
+	 * runs reaching it move, and yanking a wire because somebody laid conduit on the far side would
+	 * be a circuit broken by an unrelated action. This is asked when a wire is attached and never
+	 * afterwards.
+	 *
+	 * @param wiredMask one bit per face already carrying a wire, as {@link JunctionWires#mask}
+	 * @param face      the face the player clicked, by {@code EnumFacing.ordinal()}
+	 * @param mount     the face the box is bolted to, by {@code EnumFacing.ordinal()}
+	 * @param tierWire  whether the offered wire is one of the three power tiers
+	 */
+	public static WireRefusal canTakeWire(int wiredMask, int face, int mount, boolean tierWire)
+	{
+		if(!tierWire)
+			return WireRefusal.WRONG_KIND;
+		if(face < 0||face >= FACES)
+			return WireRefusal.WRONG_KIND;
+		//"Full" is tested before the face's own two rules so that a box with a wire everywhere says
+		//so, rather than blaming whichever face happened to be clicked.
+		if(freeFaces(wiredMask, mount)==0)
+			return WireRefusal.BOX_FULL;
+		if(face==mount)
+			return WireRefusal.MOUNT_FACE;
+		if((wiredMask&(1 << face))!=0)
+			return WireRefusal.FACE_TAKEN;
+		return WireRefusal.NONE;
+	}
+
+	/**
+	 * @return how many faces of this box could still take a wire
+	 */
+	public static int freeFaces(int wiredMask, int mount)
+	{
+		int free = 0;
+		for(int i = 0; i < FACES; i++)
+			if(i!=mount&&(wiredMask&(1 << i))==0)
+				free++;
+		return free;
 	}
 }

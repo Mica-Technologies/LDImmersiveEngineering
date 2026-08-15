@@ -62,13 +62,41 @@ A patch panel with six faces. Each face is one of three things:
 from across the room: which faces break out, and which channel each one carries. A box with no
 plates on it is a box nobody has patched.
 
-Put an LV, MV or HV Connector --- or a Grid Feed or Service Unit --- against a \emph{bare} face and
-the box breaks a free conductor out to it by itself, wearing that conductor's plate so you can see
-which. That is all most circuits need; the dye is how you choose \emph{which} conductor rather than
-whether there is one.
+String an LV, MV or HV wire straight to a \emph{bare} face --- or put a Connector of that tier, or a
+Grid Feed or Service Unit, against one --- and the box breaks a free conductor out to it by itself,
+wearing that conductor's plate so you can see which. That is all most circuits need; the dye is how
+you choose \emph{which} conductor rather than whether there is one.
 
-A connector on a power breakout picks up that conductor and nothing else. One bundle down a corridor
+Whatever is on a power breakout picks up that conductor and nothing else. One bundle down a corridor
 can feed a lighting circuit, a workshop and a furnace, each on its own colour.
+
+\subsection{Wires straight to a face}
+
+A junction box is a wire endpoint in its own right: point a coil at the face you want and the wire
+attaches there, with no connector bolted to the wall beside it.
+
+\begin{itemize}
+\item \textbf{One wire per face.} A face is one breakout on one conductor, so six faces are six
+      wires and six separate circuits.
+\item \textbf{The face is the face you clicked.} Nothing has to be configured afterwards --- the
+      gesture already said which circuit you meant.
+\item \textbf{Not the face the box is bolted to.} The housing lies flush against that one. A box no
+      run reaches stands on the floor of its cell, so that is the face it refuses.
+\item \textbf{LV, MV and HV only.} Structural cable holds things up and redstone wire carries no
+      flux; neither has anything to do on a conductor.
+\item \textbf{Wirecutters clicked on a face cut that face's wire}, and leave the other five alone.
+      The face is then free for another wire, and the breakout stays patched where it was.
+\end{itemize}
+
+Runs are never cut this way. A run is made by laying conduit and removed by breaking it, which is
+the whole of how one is edited.
+
+\begin{ietip}
+The connectors have not gone anywhere. Three of them round a box, with the runs buried, is what an
+underground feeder looks like --- and a face happily serves a wire and an adjacent connector at
+once, since the two are the same conductor arriving by two routes. What the neighbour takes is gone
+before the wire is offered anything, so it is never a second helping.
+\end{ietip}
 
 \begin{ietip}
 Auto-patching only answers to wiring hardware --- a connector or a grid box. A junction box dropped
@@ -78,8 +106,10 @@ working circuit.
 \end{ietip}
 
 \begin{ietip}
-There is no tier setting. The tier of a circuit is whichever connector you hang on its breakout,
-because IE's connectors already cap throughput by tier. Mixed tiers in one bundle are fine.
+There is no tier setting. The tier of a circuit is whatever hardware is on its face --- the wire you
+string to it, or the connector you hang on it --- because IE's wires and connectors already cap
+throughput by tier. An HV wire on one face and an LV wire on another are two circuits of two tiers
+coming out of the same bundle.
 \end{ietip}
 
 A colour lives on one face at a time --- patching it somewhere new takes it off wherever it was,

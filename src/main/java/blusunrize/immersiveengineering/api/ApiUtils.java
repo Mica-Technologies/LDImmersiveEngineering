@@ -15,10 +15,13 @@ import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Conn
 import blusunrize.immersiveengineering.common.EventHandler;
 import blusunrize.immersiveengineering.common.IESaveData;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IGeneralMultiblock;
+import blusunrize.immersiveengineering.common.util.ChatUtils;
+import blusunrize.immersiveengineering.common.util.IELogger;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
 import blusunrize.immersiveengineering.common.util.network.MessageObstructedConnection;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.AtomicDouble;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import net.minecraft.block.Block;
@@ -35,6 +38,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagInt;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.*;
 import net.minecraft.util.math.*;
@@ -648,7 +652,16 @@ public class ApiUtils
 			if(!((IImmersiveConnectable)tileEntity).canConnectCable(wire, target, offset)||!coil.canConnectCable(stack, tileEntity))
 			{
 				if(!world.isRemote)
-					player.sendStatusMessage(new TextComponentTranslation(Lib.CHAT_WARN+"wrongCable"), true);
+				{
+					//A node with rules of its own gets to say which of them it just applied. Nothing
+					//else changes: a node that has nothing to add still gets the generic warning on
+					//the action bar, which is where every refusal has always appeared.
+					String reason = ((IImmersiveConnectable)tileEntity).getCableRefusal(wire, target);
+					if(reason!=null)
+						ChatUtils.sendServerNoSpamMessages(player, new TextComponentTranslation(reason));
+					else
+						player.sendStatusMessage(new TextComponentTranslation(Lib.CHAT_WARN+"wrongCable"), true);
+				}
 				return EnumActionResult.FAIL;
 			}
 
@@ -763,6 +776,98 @@ public class ApiUtils
 			return EnumActionResult.SUCCESS;
 		}
 		return EnumActionResult.PASS;
+	}
+
+	//	=================================
+	//		WIRE ENDPOINTS THAT ARE NOT TileEntityImmersiveConnectable
+	//	=================================
+	// The three things every wire endpoint has to do for its wires to be drawn and to survive a
+	// reload. They lived on TileEntityImmersiveConnectable, which is the right home for anything
+	// that can afford to extend it -- and the conduit junction box cannot, because it is already a
+	// patch panel, a redstone node and a flux receiver built on TileEntityIEBase. Lifted here
+	// rather than copied so there is one implementation to be right about, in the way
+	// WireNetTransfer already is for the push itself.
+
+	/**
+	 * The connection set a smart model draws this node's catenaries from.
+	 * <p>
+	 * <strong>Bundles are skipped.</strong> A conduit run's visible form is the conduit blocks it
+	 * passes through; there is no catenary to draw, and generating its sub-vertices to hand the
+	 * renderer something it throws away is work for nothing on every box in view.
+	 */
+	public static Set<Connection> genConnBlockstate(World world, BlockPos pos)
+	{
+		Set<Connection> conns = ImmersiveNetHandler.INSTANCE.getConnections(world, pos);
+		if(conns==null)
+			return ImmutableSet.of();
+		Set<Connection> ret = new HashSet<Connection>()
+		{
+			@Override
+			public boolean equals(Object o)
+			{
+				if(o==this)
+					return true;
+				if(!(o instanceof HashSet))
+					return false;
+				HashSet<Connection> other = (HashSet<Connection>)o;
+				if(other.size()!=this.size())
+					return false;
+				for(Connection c : this)
+					if(!other.contains(c))
+						return false;
+				return true;
+			}
+		};
+		for(Connection c : conns)
+		{
+			if(c.isBundle())
+				continue;
+			IImmersiveConnectable end = toIIC(c.end, world, false);
+			if(end==null)
+				continue;
+			// generate subvertices
+			c.getSubVertices(world);
+			ret.add(c);
+		}
+		return ret;
+	}
+
+	/**
+	 * Appends this node's connections to a description packet, so the client can draw them.
+	 */
+	public static void writeConnsToNBT(World world, BlockPos pos, @Nullable NBTTagCompound nbt)
+	{
+		if(world==null||world.isRemote||nbt==null)
+			return;
+		NBTTagList connectionList = new NBTTagList();
+		Set<Connection> conL = ImmersiveNetHandler.INSTANCE.getConnections(world, pos);
+		if(conL!=null)
+			for(Connection con : conL)
+				connectionList.appendTag(con.writeToNBT());
+		nbt.setTag("connectionList", connectionList);
+	}
+
+	/**
+	 * Installs the connections a description packet carried into the client's copy of the graph.
+	 * <p>
+	 * Single player is skipped deliberately: both sides share one {@code ImmersiveNetHandler}
+	 * there, so re-adding what is already in it would be at best pointless and at worst a way to
+	 * clobber the server's own set.
+	 */
+	public static void loadConnsFromNBT(World world, BlockPos pos, @Nullable NBTTagCompound nbt)
+	{
+		if(world==null||!world.isRemote||nbt==null||net.minecraft.client.Minecraft.getMinecraft().isSingleplayer())
+			return;
+		NBTTagList connectionList = nbt.getTagList("connectionList", 10);
+		ImmersiveNetHandler.INSTANCE.clearConnectionsOriginatingFrom(pos, world);
+		for(int i = 0; i < connectionList.tagCount(); i++)
+		{
+			Connection con = Connection.readFromNBT(connectionList.getCompoundTagAt(i));
+			if(con!=null)
+				ImmersiveNetHandler.INSTANCE.addConnection(world, pos, con);
+			else
+				IELogger.error("CLIENT read connection as null from {}", nbt);
+		}
 	}
 
 	public static Object convertToValidRecipeInput(Object input)

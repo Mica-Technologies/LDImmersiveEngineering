@@ -22,6 +22,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.common.property.IExtendedBlockState;
 
 import javax.annotation.Nullable;
 
@@ -55,7 +56,12 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 				IEProperties.RUNCONNECTION[4], IEProperties.RUNCONNECTION[5],
 				//Unlisted, and the only way the ground feeder's model can find out what it is
 				//supposed to look like: the disguise lives on the tile entity, not in the state.
-				IEProperties.TILEENTITY_PASSTHROUGH);
+				IEProperties.TILEENTITY_PASSTHROUGH,
+				//Also unlisted, and what makes a wire strung to a junction box visible. Without it
+				//getExtendedState has nowhere to put the connection set -- the property has to be
+				//declared before it can be filled -- and the far end draws only its own half of the
+				//catenary, which is the "wires with holes in" symptom rather than a missing wire.
+				IEProperties.CONNECTIONS);
 		this.setHardness(2.0F);
 		this.setResistance(10.0F);
 		this.lightOpacity = 0;
@@ -79,6 +85,35 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		//lightOpacity above is set for the whole block and is right for tubing. A feeder is a hole
 		//somebody filled in, so it stops light like the floor it is part of.
 		this.setMetaLightOpacity(BlockTypes_Conduit.GROUND_FEEDER.getMeta(), 255);
+		//	=================================
+		//	The junction box draws in SOLID, not CUTOUT
+		//	=================================
+		//Because a wire strung to a box has to be drawn, and the connection model only emits catenary
+		//quads during the SOLID and TRANSLUCENT passes -- a block that declared CUTOUT alone would
+		//never be asked for them and its wires would simply not be there.
+		//
+		//Moved rather than added, which is the part that matters: the box is drawn by a *multipart*
+		//blockstate, and every layer a block declares is a second pass over every part of it. Adding
+		//SOLID alongside CUTOUT -- what the Grid Feed and Service Units do, where one model can be
+		//told which layer its own quads belong in -- would draw the housing, all six patch plates and
+		//every run stub twice. Every texture the box is made of is fully opaque, so CUTOUT was buying
+		//nothing here in the first place.
+		this.setMetaBlockLayer(BlockTypes_Conduit.JUNCTION_BOX.getMeta(), BlockRenderLayer.SOLID);
+	}
+
+	@Override
+	public IBlockState getExtendedState(IBlockState state, IBlockAccess world, BlockPos pos)
+	{
+		state = super.getExtendedState(state, world, pos);
+		//BlockIETileProvider fills CONNECTIONS for a TileEntityImmersiveConnectable, which a junction
+		//box deliberately is not -- it is a patch panel, a redstone node and a flux receiver built on
+		//TileEntityIEBase, and it is a wire endpoint as well. Filled here, the way BlockConnector and
+		//BlockClothDevice fill it for their own tiles.
+		TileEntity tile = world.getTileEntity(pos);
+		if(state instanceof IExtendedBlockState&&tile instanceof TileEntityJunctionBox)
+			state = ((IExtendedBlockState)state).withProperty(IEProperties.CONNECTIONS,
+					((TileEntityJunctionBox)tile).genConnBlockstate());
+		return state;
 	}
 
 	@Override
@@ -169,18 +204,12 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 			//passing through unconfigured is exactly the common case, and its faces still need to
 			//meet the box's model rather than leave a gap where a conduit's arm reaches flush.
 			EnumFacing[] neighbourMounts = new EnumFacing[EnumFacing.VALUES.length];
+			//The scan itself lives on the tile entity, because the tile entity needs the same answer:
+			//a wire strung to a box attaches to the housing, and the housing is wherever this puts it.
+			boolean[] joins = TileEntityJunctionBox.joiningRuns(world, pos, neighbourMounts);
 			for(EnumFacing side : EnumFacing.VALUES)
-			{
-				TileEntity neighbour = world.getTileEntity(pos.offset(side));
-				EnumFacing neighbourMount = neighbour instanceof TileEntityConduit
-						?((TileEntityConduit)neighbour).facing: null;
-				EnumFacing.Axis feederAxis = neighbour instanceof TileEntityGroundFeeder
-						?((TileEntityGroundFeeder)neighbour).getAxis(): null;
-				boolean joins = ConduitGeometry.joinsJunctionBox(side, neighbourMount, feederAxis);
-				if(joins)
-					neighbourMounts[side.ordinal()] = neighbourMount;
-				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()], joins);
-			}
+				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()],
+						joins[side.ordinal()]);
 			//And which surface the box is drawn against, taken from the runs that reach it rather
 			//than from anything the box stores. A box in a different plane from its run cannot meet
 			//it at all -- the tubing hugs its face, so the gap is across the block, not along it --

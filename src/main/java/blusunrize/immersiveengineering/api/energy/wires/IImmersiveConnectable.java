@@ -52,6 +52,44 @@ public interface IImmersiveConnectable
 	int outputEnergy(int amount, boolean simulate, int energyType);
 
 	/**
+	 * The same handover, told which of this node's wires the energy came down.
+	 * <p>
+	 * A connector has one terminal, so for almost everything on the network "how much arrived" is
+	 * the whole question and the three-argument form above answers it. A conduit junction box does
+	 * not: each of its six faces is a separate circuit on a separate conductor, and energy arriving
+	 * over the wire on the north face has to land on the north face's channel rather than on
+	 * whichever one happened to be first. Without this the box could only guess.
+	 * <p>
+	 * Default-implemented so nothing else has to care. {@link blusunrize.immersiveengineering.common.util.WireNetTransfer}
+	 * is the only caller, and it passes the last hop of the route -- the connection whose
+	 * {@code end} is this node -- so a node can look up which of its own terminals that is.
+	 *
+	 * @param arriving the connection the energy travels over on its last hop into this node, or
+	 *                 null when the caller does not know
+	 */
+	default int outputEnergy(int amount, boolean simulate, int energyType, @Nullable Connection arriving)
+	{
+		return outputEnergy(amount, simulate, energyType);
+	}
+
+	/**
+	 * Why this node refused a wire, said in its own words.
+	 * <p>
+	 * {@link #canConnectCable} answers yes or no and gets no player to talk to, so a refusal has
+	 * always come out as the same generic "wrong cable" whatever the actual reason was. That is
+	 * fine for a connector, which only ever refuses a tier; it is not fine for a node with rules of
+	 * its own -- a junction box takes one wire per face and six in total, and being told "wrong
+	 * cable" while holding the right cable is how a rule becomes a bug report.
+	 *
+	 * @return a translation key to show instead of the generic warning, or null for the generic one
+	 */
+	@Nullable
+	default String getCableRefusal(WireType cableType, TargetingInfo target)
+	{
+		return null;
+	}
+
+	/**
 	 * @return a blockPos to do the connection check for.<br>For multiblocks like transformers
 	 */
 	BlockPos getConnectionMaster(@Nullable WireType cableType, TargetingInfo target);

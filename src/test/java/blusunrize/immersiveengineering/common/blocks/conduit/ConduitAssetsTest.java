@@ -543,16 +543,19 @@ class ConduitAssetsTest
 			//The housing is keyed on facing rather than drawn unconditionally, because a box that
 			//does not hug the same surface as its run cannot meet it -- see RunStubs below. The six
 			//are exhaustive, so a box always draws something whatever the state says.
+			//
+			//The housing part names a *smart* model rather than the generated one, so that a wire
+			//strung to the box is drawn too; the generated model is what that wraps, and is checked
+			//to exist in WireEndpoint below. Nothing else in this file resolves through a loader, so
+			//that check does not belong here.
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
 				String model = housingModelFor(mount);
 				assertNotNull(model, "no housing for a box mounted "+mount.getName()
 						+", so a box in that plane would draw as nothing but its plates");
-				assertTrue(new File(ASSETS+modelPath(model)).isFile(),
-						"the box blockstate names a model nobody wrote: "+model);
-				assertEquals(ConduitGeometry.junctionBoxModelName(mount),
-						model.substring(model.lastIndexOf('/')+1),
-						"the assets and ConduitGeometry disagree about what the housing is called");
+				assertTrue(model.endsWith(ConduitGeometry.junctionBoxModelName(mount)),
+						"the assets and ConduitGeometry disagree about what the housing is called: "
+								+model);
 			}
 			assertTrue(new File(ASSETS+"textures/blocks/conduit_junction_box.png").isFile());
 		}
@@ -1250,6 +1253,98 @@ class ConduitAssetsTest
 							textures.get("box").getAsString(),
 							face+" stub does not reuse the box's texture");
 				}
+		}
+	}
+
+	@Nested
+	@DisplayName("the junction box as a wire endpoint")
+	class WireEndpoint
+	{
+		@Test
+		@DisplayName("the housing is drawn through the connection smart model")
+		void housingGoesThroughTheConnModel()
+		{
+			//	=================================
+			//	The one that makes wires visible.
+			//	=================================
+			//
+			// A wire strung to a box is drawn by the box's own baked model, and only ConnModelReal
+			// draws one. Point the housing part at a plain model and the box still looks perfect,
+			// the wire still exists, energy still flows -- and the catenary's near half is simply
+			// not there, with nothing in the log. There is no way to notice that except by looking.
+			//
+			// The name after `conn_` is the key ClientProxy registers against the plain housing
+			// model, which is what ConnLoader looks up.
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				String model = junctionPart(mount, null);
+				assertNotNull(model, "no housing part for a box mounted "+mount.getName());
+				assertEquals("immersiveengineering:smartmodel/conn_conduit_junction_box_"
+								+mount.getName(), model,
+						"a box mounted "+mount.getName()+" is drawn by a model that cannot draw a wire");
+			}
+		}
+
+		@Test
+		@DisplayName("the model the smart model wraps is the one that was generated")
+		void wrappedHousingModelExists()
+		{
+			//ConnLoader resolves its key through ClientProxy rather than through the filesystem, so
+			//nothing in the resource pack points at these any more. They still have to be there.
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				String path = "models/block/conduit/"+ConduitGeometry.junctionBoxModelName(mount)
+						+".json";
+				assertTrue(new File(ASSETS+path).isFile(),
+						"the smart model's base is missing: "+path);
+			}
+		}
+
+		@Test
+		@DisplayName("the housing the models draw is the housing the Java measures")
+		void housingMatchesTheJavaConstants()
+		{
+			//ConduitBounds.junctionBox is what ConduitGeometry.junctionTerminal derives a wire's
+			//attachment point from, and the generator draws the housing from the same constants.
+			//If the two ever drift, a wire starts a pixel or two off the box it is attached to --
+			//which is exactly the kind of thing that is obvious in a screenshot and invisible here.
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				int[] drawn = junctionHousing(mount);
+				int[] measured = ConduitBounds.junctionBox(mount);
+				assertArrayEquals(measured, drawn,
+						"the model and ConduitBounds disagree about a box mounted "+mount.getName());
+			}
+		}
+
+		@Test
+		@DisplayName("a wire lands on the middle of the face's plate")
+		void terminalLandsOnThePlate()
+		{
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				int[] box = junctionHousing(mount);
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					float[] point = ConduitGeometry.junctionTerminal(mount, face);
+					int faceAxis = face.getAxis().ordinal();
+					for(int axis = 0; axis < 3; axis++)
+					{
+						float pixels = point[axis]*16;
+						if(axis==faceAxis)
+							//On the surface of the housing, not inside it: a catenary that started
+							//in the middle of the block would visibly begin inside the wall on any
+							//box that is bolted to one.
+							assertEquals(face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE
+											?box[axis]: box[axis+3], pixels, 1e-4,
+									mount+"/"+face+" terminal is not on the housing's surface");
+						else
+							//And centred across it, which is where the plate is.
+							assertEquals((box[axis]+box[axis+3])/2f, pixels, 1e-4,
+									mount+"/"+face+" terminal is not centred on the plate");
+					}
+				}
+			}
 		}
 	}
 }

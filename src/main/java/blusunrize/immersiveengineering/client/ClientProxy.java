@@ -14,8 +14,10 @@ import blusunrize.immersiveengineering.api.crafting.BlueprintCraftingRecipe;
 import blusunrize.immersiveengineering.api.crafting.FermenterRecipe;
 import blusunrize.immersiveengineering.api.crafting.SqueezerRecipe;
 import blusunrize.immersiveengineering.api.energy.ThermoelectricHandler;
+import blusunrize.immersiveengineering.api.energy.wires.WireApi;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.shader.ShaderCase;
+import blusunrize.immersiveengineering.common.blocks.conduit.ConduitGeometry;
 import blusunrize.immersiveengineering.api.shader.ShaderCase.ShaderLayer;
 import blusunrize.immersiveengineering.api.shader.ShaderRegistry;
 import blusunrize.immersiveengineering.api.tool.BulletHandler;
@@ -378,6 +380,22 @@ public class ClientProxy extends CommonProxy
 			}
 		});
 		ModelLoaderRegistry.registerLoader(new ConnLoader());
+		//	=================================
+		//	The junction box's housing, drawn through the connection model
+		//	=================================
+		//So that a wire strung straight to a box is actually drawn. Six keys because a box has six
+		//housing models, one per surface it can be bolted to, and the multipart blockstate picks
+		//between them on `facing`.
+		//
+		//This route rather than the `custom: {base, layers}` one the Grid Feed and Service Units use:
+		//that data only exists in a Forge blockstate's `variants`, and Forge's blockstate format has
+		//no multipart. The box is multipart -- it has a coloured plate per patched face and a stub
+		//per face a run touches -- so its housing is named through ConnLoader's key registry instead,
+		//which is a plain model reference and works anywhere a model reference does.
+		for(EnumFacing mount : EnumFacing.VALUES)
+			WireApi.registerConnectorForRender("conduit_junction_box_"+mount.getName(),
+					new ResourceLocation(ImmersiveEngineering.MODID,
+							"block/conduit/"+ConduitGeometry.junctionBoxModelName(mount)), null);
 		ModelLoaderRegistry.registerLoader(new FeedthroughLoader());
 		ModelLoaderRegistry.registerLoader(new ConduitDisguiseLoader());
 		ModelLoaderRegistry.registerLoader(new ModelConfigurableSides.Loader());
@@ -875,6 +893,10 @@ public class ClientProxy extends CommonProxy
 						new ItemStack(IEContent.blockConduit, 1,
 								BlockTypes_Conduit.JUNCTION_BOX.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "conduits4"),
+				//Numbered 9 rather than 5 because it was written last; the order on the page is the
+				//order of this list, and renumbering six keys to insert one would only make the diff
+				//harder to read than the change is.
+				new ManualPages.Text(ManualHelper.getManual(), "conduits9"),
 				new ManualPages.Text(ManualHelper.getManual(), "conduits5"),
 				new ManualPages.Text(ManualHelper.getManual(), "conduits6"),
 				new ManualPages.Crafting(ManualHelper.getManual(), "conduits7",

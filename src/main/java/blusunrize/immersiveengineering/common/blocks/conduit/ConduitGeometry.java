@@ -493,6 +493,49 @@ public class ConduitGeometry
 			EnumFacing.DOWN, EnumFacing.UP,
 			EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.WEST, EnumFacing.EAST};
 
+	/**
+	 * Where a wire strung to a junction box attaches: the centre of that face's patch plate.
+	 * <p>
+	 * <strong>On the surface, not in the middle of the block.</strong> A box is a ten-pixel housing
+	 * hugging whatever it is bolted to, so the centre of its cell is inside the block next door as
+	 * often as not; a catenary that started there would visibly begin inside the wall. This lands on
+	 * the plate the face already wears when it is patched, which is the thing a player is looking at
+	 * when they decide to string a wire to that face.
+	 * <p>
+	 * Derived from {@link ConduitBounds#junctionBox} rather than written out, for the same reason
+	 * the plate models are derived from the housing: two sets of numbers for one shape is how the
+	 * wire and the box it is attached to end up half a pixel apart with nothing to explain it.
+	 *
+	 * @param mount the face the box is bolted to
+	 * @param face  the face the wire is on
+	 *
+	 * @return x, y, z within the block, in block-relative units
+	 */
+	public static float[] junctionTerminal(EnumFacing mount, EnumFacing face)
+	{
+		int[] box = ConduitBounds.junctionBox(mount);
+		float[] point = new float[3];
+		for(int i = 0; i < 3; i++)
+			point[i] = (box[i]+box[i+3])/32f;
+		int axis = axisIndex(face.getAxis());
+		point[axis] = (face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE
+				?box[axis]: box[axis+3])/16f;
+		return point;
+	}
+
+	private static int axisIndex(EnumFacing.Axis axis)
+	{
+		switch(axis)
+		{
+			case X:
+				return 0;
+			case Y:
+				return 1;
+			default:
+				return 2;
+		}
+	}
+
 	/** The name a generated model file uses for the box's housing on one mounting face. */
 	public static String junctionBoxModelName(EnumFacing mount)
 	{
