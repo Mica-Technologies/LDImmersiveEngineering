@@ -1147,7 +1147,8 @@ ie.manual.entry.updateNews_40=Dear Engineer!<br><br>The past update has brought 
 
 ie.manual.title=LDIE Engineer's Manual
 ie.manual.search=Search
-ie.manual.indexHint=Pick a category on the left, or search for anything in the manual.
+ie.manual.welcome=Welcome to LDIE! Pick a category on the left, or search for what you need.
+ie.manual.disclaimer=LDIE is a specialized fork of Immersive Engineering for the Alto/UIA server. DO NOT distribute our private builds outside this server: it violates the mod's licence, which strictly forbids custom distributions.
 
 ie.manual.category.general.name=Overview and Resources
 ie.manual.category.construction.name=Construction

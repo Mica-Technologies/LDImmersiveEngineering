@@ -274,6 +274,9 @@ public abstract class ManualPages implements IManualPage
 		public void initPage(GuiManual gui, int x, int y, List<GuiButton> pageButtons)
 		{
 			super.initPage(gui, x, y, pageButtons);
+			//The flag goes back the way it was found: this runs outside drawScreen, so anything left
+			//behind here follows the shared font renderer out of the manual entirely.
+			boolean uni = manual.fontRenderer.getUnicodeFlag();
 			manual.fontRenderer.setUnicodeFlag(true);
 			int l = localizedText!=null?manual.fontRenderer.listFormattedStringToWidth(localizedText, gui.getPageWidth()).size(): 0;
 			textHeight = l*manual.fontRenderer.FONT_HEIGHT+6;
@@ -309,7 +312,7 @@ public abstract class ManualPages implements IManualPage
 			{
 				e.printStackTrace();
 			}
-			manual.fontRenderer.setUnicodeFlag(false);
+			manual.fontRenderer.setUnicodeFlag(uni);
 		}
 
 		@Override
@@ -488,9 +491,13 @@ public abstract class ManualPages implements IManualPage
 			if(localizedText!=null&&!localizedText.isEmpty())
 				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOffset, gui.getPageWidth(), manual.getTextColour());
 
+			//The ASCII font is for the tooltip alone; see GuiManual#drawTitle for what leaving it on
+			//did to the title bar.
+			boolean uni = manual.fontRenderer.getUnicodeFlag();
 			manual.fontRenderer.setUnicodeFlag(false);
 			if(!highlighted.isEmpty())
 				gui.renderToolTip(highlighted, mx, my);
+			manual.fontRenderer.setUnicodeFlag(uni);
 			RenderHelper.disableStandardItemLighting();
 		}
 
@@ -671,9 +678,13 @@ public abstract class ManualPages implements IManualPage
 			if(localizedText!=null&&!localizedText.isEmpty())
 				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+totalYOff-2, gui.getPageWidth(), manual.getTextColour());
 
+			//The ASCII font is for the tooltip alone. It used to be left switched on, and since the
+			//title bar is drawn after the page, that decided which font the title bar came out in --
+			//see GuiManual#drawTitle.
 			manual.fontRenderer.setUnicodeFlag(false);
 			if(!highlighted.isEmpty())
 				gui.renderToolTip(highlighted, mx, my);
+			manual.fontRenderer.setUnicodeFlag(uni);
 			GlStateManager.enableBlend();
 			RenderHelper.disableStandardItemLighting();
 		}
@@ -885,9 +896,13 @@ public abstract class ManualPages implements IManualPage
 				ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff+2, gui.getPageWidth(), manual.getTextColour());
 			//			manual.fontRenderer.drawSplitString(localizedText, x,y+yOff+2, 120, manual.getTextColour());
 
+			//The ASCII font is for the tooltip alone. It used to be left switched on, and since the
+			//title bar is drawn after the page, that decided which font the title bar came out in --
+			//see GuiManual#drawTitle.
 			manual.fontRenderer.setUnicodeFlag(false);
 			if(!highlighted.isEmpty())
 				gui.renderToolTip(highlighted, mx, my);
+			manual.fontRenderer.setUnicodeFlag(uni);
 			GlStateManager.enableBlend();
 			RenderHelper.disableStandardItemLighting();
 		}

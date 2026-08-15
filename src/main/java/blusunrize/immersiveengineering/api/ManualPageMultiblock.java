@@ -288,10 +288,14 @@ public class ManualPageMultiblock extends ManualPages
 				GlStateManager.enableBlend();
 				RenderHelper.disableStandardItemLighting();
 
+				boolean uni = manual.fontRenderer.getUnicodeFlag();
 				manual.fontRenderer.setUnicodeFlag(true);
 				if(localizedText!=null&&!localizedText.isEmpty())
 					ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOffTotal, gui.getPageWidth(), manual.getTextColour());
 
+				//The ASCII font is for the hint marker and its tooltip alone. It used to be left
+				//switched on, and since the title bar is drawn after the page, that decided which
+				//font the title bar came out in -- see GuiManual#drawTitle.
 				manual.fontRenderer.setUnicodeFlag(false);
 				if(componentTooltip!=null)
 				{
@@ -300,6 +304,7 @@ public class ManualPageMultiblock extends ManualPages
 					if(mx >= hintX&&mx < hintX+6&&my >= y+yOffTotal/2-4&&my < y+yOffTotal/2+4)
 						gui.drawHoveringText(componentTooltip, mx, my, manual.fontRenderer);
 				}
+				manual.fontRenderer.setUnicodeFlag(uni);
 			}
 
 		} catch(Exception e)

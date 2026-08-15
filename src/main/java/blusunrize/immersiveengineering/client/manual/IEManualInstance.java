@@ -302,10 +302,18 @@ public class IEManualInstance extends ManualInstance
 		return key.equals(title)?I18n.format("item.immersiveengineering.tool.manual.name"): title;
 	}
 
+	/**
+	 * The licence paragraph is not filler. These builds are a private fork under a licence that does
+	 * not allow redistribution, and the first page of the manual is the one place every player is
+	 * guaranteed to look, so it says so there rather than in a file nobody opens.
+	 */
 	@Override
-	public String getIndexHint()
+	public String[] getWelcomeText()
 	{
-		return I18n.format("ie.manual.indexHint");
+		return new String[]{
+				I18n.format("ie.manual.welcome"),
+				I18n.format("ie.manual.disclaimer")
+		};
 	}
 
 	@Override

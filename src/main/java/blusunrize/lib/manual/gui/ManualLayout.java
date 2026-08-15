@@ -148,4 +148,45 @@ public class ManualLayout
 	{
 		return availableHeight-lines*lineHeight;
 	}
+
+	/**
+	 * Stacks blocks of text -- the welcome page's title and its paragraphs -- inside a pane, and says
+	 * where each one starts relative to the top of it.
+	 * <p>
+	 * A welcome page reads as a welcome page when it sits in the middle of the paper, so that is what
+	 * this does when the block fits. What it must not do is centre a block that is taller than the
+	 * pane, because a negative offset puts the first line above the top edge and loses the manual's
+	 * own name; so when space runs short the paragraph spacing goes first (it is the cheapest thing
+	 * to give up) and then the block is pinned to the top, where the caller can clip the tail instead
+	 * of spilling it over the frame. The smallest screen {@link #MIN_WIDTH}x{@link #MIN_HEIGHT}
+	 * allows is genuinely too small for a long welcome text, and this is what "too small" does.
+	 *
+	 * @param blockLines number of lines in each block, in order
+	 * @return one offset per block, never negative, never decreasing
+	 */
+	public static int[] stackBlocks(int availableHeight, int[] blockLines, int lineHeight, int gap)
+	{
+		int lines = 0;
+		for(int l : blockLines)
+			lines += Math.max(0, l);
+		int gaps = Math.max(0, blockLines.length-1);
+		int text = lines*lineHeight;
+
+		//Full spacing, then half of it, then none: the block loses air before it loses words.
+		int spacing = gap;
+		if(text+gaps*spacing > availableHeight)
+			spacing = gap/2;
+		if(text+gaps*spacing > availableHeight)
+			spacing = 0;
+		int start = Math.max(0, (availableHeight-(text+gaps*spacing))/2);
+
+		int[] offsets = new int[blockLines.length];
+		int y = start;
+		for(int i = 0; i < blockLines.length; i++)
+		{
+			offsets[i] = y;
+			y += Math.max(0, blockLines[i])*lineHeight+spacing;
+		}
+		return offsets;
+	}
 }

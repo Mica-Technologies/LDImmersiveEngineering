@@ -139,9 +139,13 @@ public class ManualPageBlueprint extends ManualPages
 			ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+yOff+2, gui.getPageWidth(), manual.getTextColour());
 		//			manual.fontRenderer.drawSplitString(localizedText, x,y+yOff+2, 120, manual.getTextColour());
 
+		//The ASCII font is for the tooltip alone. It used to be left switched on, and since the title
+		//bar is drawn after the page, that decided which font the title bar came out in -- see
+		//GuiManual#drawTitle.
 		manual.fontRenderer.setUnicodeFlag(false);
 		if(!highlighted.isEmpty())
 			gui.renderToolTip(highlighted, mx, my);
+		manual.fontRenderer.setUnicodeFlag(uni);
 		GlStateManager.enableBlend();
 		RenderHelper.disableStandardItemLighting();
 	}

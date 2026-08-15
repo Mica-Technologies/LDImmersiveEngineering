@@ -62,11 +62,13 @@ public abstract class ManualInstance
 	public abstract boolean improveReadability();
 
 	/**
-	 * Shown on the empty page, before an entry has been picked. Empty means "draw nothing".
+	 * Shown under the manual's name on the page that is up before an entry has been picked, one
+	 * string per paragraph -- how to use the index, and anything the reader has to be told before
+	 * they read anything else. Empty means "draw nothing but the name".
 	 */
-	public String getIndexHint()
+	public String[] getWelcomeText()
 	{
-		return "";
+		return new String[0];
 	}
 
 	/**

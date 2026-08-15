@@ -79,6 +79,10 @@ public class GuiManual extends GuiScreen
 	private static final int PADDING = ManualLayout.PADDING;
 	private static final int TITLE_BAR = ManualLayout.TITLE_BAR;
 	private static final int PAGE_PADDING = ManualLayout.PAGE_PADDING;
+	/**
+	 * Which glyph sheet every title uses. See {@link #drawTitle}.
+	 */
+	private static final boolean TITLE_UNICODE = false;
 
 	int xSize;
 	int ySize;
@@ -431,15 +435,13 @@ public class GuiManual extends GuiScreen
 		ManualEntry entry = manual.getEntry(selectedEntry);
 		if(entry!=null)
 		{
-			manual.titleRenderPre();
 			int titleY = pageY+PAGE_PADDING;
-			this.drawCenteredStringScaled(manual.fontRenderer, TextFormatting.BOLD+manual.formatEntryName(entry.getName()),
-					pageX+pageWidth/2, titleY+manual.fontRenderer.FONT_HEIGHT/2, manual.getTitleColour(), 1, false);
+			drawTitle(manual.formatEntryName(entry.getName()), pageX+pageWidth/2,
+					titleY+manual.fontRenderer.FONT_HEIGHT/2, manual.getTitleColour(), true);
 			String subtext = manual.formatEntrySubtext(entry.getName());
 			if(!subtext.isEmpty())
-				this.drawCenteredStringScaled(manual.fontRenderer, subtext, pageX+pageWidth/2,
-						titleY+manual.fontRenderer.FONT_HEIGHT+manual.fontRenderer.FONT_HEIGHT/2, manual.getSubTitleColour(), 1, false);
-			manual.titleRenderPost();
+				drawTitle(subtext, pageX+pageWidth/2,
+						titleY+manual.fontRenderer.FONT_HEIGHT+manual.fontRenderer.FONT_HEIGHT/2, manual.getSubTitleColour(), false);
 
 			//A rule under the header, so the title reads as a heading and not as the first line.
 			drawRect(textX, textY-6, textX+textWidth, textY-5, 0x22000000);
@@ -455,21 +457,10 @@ public class GuiManual extends GuiScreen
 					manual.getPagenumberColour(), 1, false);
 		}
 		else
-		{
-			manual.titleRenderPre();
-			this.drawCenteredStringScaled(manual.fontRenderer, TextFormatting.BOLD+manual.getManualName(),
-					pageX+pageWidth/2, pageY+pageHeight/2-manual.fontRenderer.FONT_HEIGHT, manual.getTitleColour(), 1, false);
-			manual.titleRenderPost();
-			String hint = manual.getIndexHint();
-			if(!hint.isEmpty())
-				ManualUtils.drawSplitString(manual.fontRenderer, hint, textX, pageY+pageHeight/2+4, textWidth, manual.getTextColour());
-		}
+			drawWelcomePage();
 
 		//Title bar
-		manual.titleRenderPre();
-		this.drawCenteredStringScaled(manual.fontRenderer, TextFormatting.BOLD+manual.getManualName(),
-				guiLeft+xSize/2, guiTop+TITLE_BAR/2-1, COLOUR_TITLE, 1, false);
-		manual.titleRenderPost();
+		drawTitle(manual.getManualName(), guiLeft+xSize/2, guiTop+TITLE_BAR/2-1, COLOUR_TITLE, true);
 
 		this.searchField.drawTextBox();
 		if(searchField.getText().isEmpty())
@@ -484,6 +475,71 @@ public class GuiManual extends GuiScreen
 		super.drawScreen(mx, my, f);
 		GlStateManager.enableBlend();
 		manual.entryRenderPost();
+	}
+
+	/**
+	 * =================================
+	 * Every title is drawn in the same font, whatever the page did.
+	 * =================================
+	 * <p>
+	 * <strong>This is why the title bar used to change size as you turned pages.</strong> The manual's
+	 * font renderer is one shared object, and the unicode flag on it decides which glyph sheet the
+	 * text comes from -- the ASCII sheet, which is wide and letter-spaced, or the unicode sheet, which
+	 * is noticeably tighter and thinner at the same {@code FONT_HEIGHT}. {@link #drawScreen} turns the
+	 * flag on for the whole screen, but several page types turned it off to draw items and their
+	 * tooltips and never turned it back (see the balanced flags in {@code ManualPages},
+	 * {@code ManualPageBlueprint} and {@code ManualPageMultiblock}, which this pairs with), and the
+	 * title bar is drawn <em>after</em> the page. A recipe page therefore left the title in the ASCII
+	 * font and a plain text page left it in the unicode one.
+	 * <p>
+	 * Fixing the leaks alone would have settled on the tighter of the two, so the flag is pinned here
+	 * instead of inherited. It is pinned <em>off</em> because that is the rendering the title is
+	 * designed for: {@link ManualInstance#titleRenderPre()} widens the letter spacing through
+	 * {@code renderDefaultChar}, which only the ASCII path calls, while {@code getStringWidth} counts
+	 * the spacing either way -- so with the flag on, the hook does nothing to the glyphs and the
+	 * string is measured wider than it draws, leaving the title off-centre as well as tighter.
+	 */
+	private void drawTitle(String title, int x, int y, int colour, boolean bold)
+	{
+		boolean uni = manual.fontRenderer.getUnicodeFlag();
+		manual.fontRenderer.setUnicodeFlag(TITLE_UNICODE);
+		manual.titleRenderPre();
+		this.drawCenteredStringScaled(manual.fontRenderer, (bold?TextFormatting.BOLD.toString(): "")+title,
+				x, y, colour, 1, false);
+		manual.titleRenderPost();
+		manual.fontRenderer.setUnicodeFlag(uni);
+	}
+
+	/**
+	 * The page that is showing before an entry is picked: the manual's name, then the welcome text,
+	 * all of it centred.
+	 * <p>
+	 * The paragraphs are laid out as one block by {@link ManualLayout#stackBlocks}, so on a roomy
+	 * screen the whole thing sits in the middle of the page and on a cramped one it gives up its
+	 * paragraph spacing and rides the top rather than spilling past the paper. Nothing is drawn below
+	 * the bottom margin either way -- a welcome page that runs off the paper is the first thing a
+	 * player would see.
+	 */
+	private void drawWelcomePage()
+	{
+		FontRenderer fr = manual.fontRenderer;
+		int centreX = pageX+pageWidth/2;
+		int top = pageY+PAGE_PADDING;
+		int bottom = pageY+pageHeight-PAGE_PADDING;
+
+		//Measured in the font the paragraphs are actually drawn in, which is the screen's, not the
+		//title's -- the two disagree about how many lines a paragraph takes.
+		String[] paragraphs = manual.getWelcomeText();
+		int[] blockLines = new int[paragraphs.length+1];
+		blockLines[0] = 1;//the title
+		for(int i = 0; i < paragraphs.length; i++)
+			blockLines[i+1] = ManualUtils.splitToWidth(fr, paragraphs[i], textWidth).size();
+
+		int[] offsets = ManualLayout.stackBlocks(bottom-top, blockLines, fr.FONT_HEIGHT, fr.FONT_HEIGHT);
+		drawTitle(manual.getManualName(), centreX, top+offsets[0]+fr.FONT_HEIGHT/2, manual.getTitleColour(), true);
+		for(int i = 0; i < paragraphs.length; i++)
+			ManualUtils.drawCenteredSplitString(fr, paragraphs[i], centreX, top+offsets[i+1], textWidth,
+					manual.getTextColour(), bottom);
 	}
 
 	private void drawFrame()

@@ -142,13 +142,16 @@ public class ManualPageShader extends ManualPages
 		RenderHelper.disableStandardItemLighting();
 		GlStateManager.disableRescaleNormal();
 
+		//Balanced, like every other page's: the title bar is drawn after this and must not inherit
+		//whichever font the last page happened to leave behind. See GuiManual#drawTitle.
+		boolean uni = manual.fontRenderer.getUnicodeFlag();
 		manual.fontRenderer.setUnicodeFlag(true);
 		String name = "§l"+shader.getName();
 		int w = manual.fontRenderer.getStringWidth(name);
 		manual.fontRenderer.drawString(name, x+mid-w/2, y+24, manual.getTextColour(), false);
 		if(localizedText!=null&&!localizedText.isEmpty())
 			ManualUtils.drawSplitString(manual.fontRenderer, localizedText, x, y+38, gui.getPageWidth(), manual.getTextColour());
-
+		manual.fontRenderer.setUnicodeFlag(uni);
 	}
 
 	@Override

@@ -162,6 +162,40 @@ public class ManualUtils
 		}
 	}
 
+	/**
+	 * The lines a string takes once it is wrapped to a width, so a caller can budget the vertical
+	 * space for a block of text before it starts drawing any of it.
+	 */
+	public static List<String> splitToWidth(FontRenderer fontRenderer, String string, int width)
+	{
+		return fontRenderer.listFormattedStringToWidth(string, Math.max(1, width));
+	}
+
+	/**
+	 * {@link #drawSplitString}, except every line is centred on {@code centreX} rather than starting
+	 * at a left margin, and no line is drawn that would cross {@code maxY}.
+	 * <p>
+	 * The bound is not decoration: the wrapped height of a paragraph depends on the player's language
+	 * and on how narrow they have made the window, and a welcome page that runs off the bottom of the
+	 * paper and over the frame is worse than one whose last sentence is cut short.
+	 *
+	 * @return the y a following block would start at
+	 */
+	public static int drawCenteredSplitString(FontRenderer fontRenderer, String string, int centreX, int y,
+											  int width, int colour, int maxY)
+	{
+		fontRenderer.resetStyles();
+		fontRenderer.textColor = colour;
+		for(String line : splitToWidth(fontRenderer, string, width))
+		{
+			if(y+fontRenderer.FONT_HEIGHT > maxY)
+				break;
+			fontRenderer.drawString(line, centreX-fontRenderer.getStringWidth(line)/2, y, colour, false);
+			y += fontRenderer.FONT_HEIGHT;
+		}
+		return y;
+	}
+
 	public static String attemptStringTranslation(String tranlationKey, String arg)
 	{
 		String untranslated = String.format(tranlationKey, arg);
