@@ -35,8 +35,10 @@ import blusunrize.immersiveengineering.api.energy.wires.conduit.ChannelSet;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.ConduitWireType;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.ICacheData;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbourChangeTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPropertyPassthrough;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGridDevice;
@@ -108,7 +110,8 @@ import java.util.Set;
  */
 public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiveConnectable,
 		INeighbourChangeTile, IPlayerInteraction, IBlockOverlayText, IStatusLineProvider,
-		IFluxReceiver, IFluxProvider, IComparatorOverride, IRedstoneOutput, ITickable
+		IFluxReceiver, IFluxProvider, IComparatorOverride, IRedstoneOutput, ITickable,
+		IPropertyPassthrough, ICacheData
 {
 	/**
 	 * The most one channel may hold. One tick's worth of its own wire: a box is a relay, not a
@@ -233,9 +236,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * Which faces a run physically touches, and the plane each of those runs is in.
 	 * <p>
 	 * Stated once, here, because two things need the answer and they must not disagree:
-	 * {@code BlockConduit.getActualState} draws the box's stubs and picks the model's facing from
-	 * it, and the tile entity works out where a wire attaches from it. A box drawn against one
-	 * surface with its wires leaving from another would be a bug with nothing in it to find.
+	 * {@code ConduitJunctionModel} draws the box's housing and stubs and picks the plane from it,
+	 * and the tile entity works out where a wire attaches from it. A box drawn against one surface
+	 * with its wires leaving from another would be a bug with nothing in it to find.
 	 *
 	 * @param mounts filled in per side with the mount face of the conduit joining there, or null
 	 *
@@ -286,6 +289,63 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	private void forgetMount()
 	{
 		mount = null;
+	}
+
+	//	=================================
+	//		WHAT THE MODEL DRAWS
+	//	=================================
+
+	/**
+	 * Everything about a box that is visible, packed into one integer.
+	 * <p>
+	 * Bits 0-2 are the mounting face's ordinal and bits 3-8 are one flag per face a run physically
+	 * touches, which between them pick the housing model and the set of run stubs grown out to meet
+	 * those runs. {@code ConduitJunctionModel} composes its quads from exactly this and caches them
+	 * under it, and {@link #getCacheData} hands the same number to the connection model so that two
+	 * differently-shaped boxes cannot share one baked model.
+	 * <p>
+	 * <strong>Computed fresh every time rather than cached like {@link #mount}.</strong> The client
+	 * has no way to know it has gone stale: {@code BlockIETileProvider.neighborChanged} forwards a
+	 * neighbour change to the tile entity on the server only, so a box whose run was extended while
+	 * it watched would keep drawing the shape it had when the chunk was last built, with no second
+	 * chance to notice. Six tile lookups against a {@code ChunkCache} is the cheaper mistake.
+	 */
+	public int getRenderShape()
+	{
+		if(world==null)
+			return EnumFacing.DOWN.ordinal();
+		EnumFacing[] mounts = new EnumFacing[EnumFacing.VALUES.length];
+		boolean[] joins = joiningRuns(world, getPos(), mounts);
+		int shape = ConduitGeometry.junctionBoxMount(mounts).ordinal();
+		for(int i = 0; i < joins.length; i++)
+			if(joins[i])
+				shape |= 1 << (3+i);
+		return shape;
+	}
+
+	/** @return one bit per patched face, which is the set of coloured plates the box wears */
+	public int getPatchMask()
+	{
+		int mask = 0;
+		for(EnumFacing face : EnumFacing.VALUES)
+			if(patch.isPatched(face))
+				mask |= 1 << face.ordinal();
+		return mask;
+	}
+
+	/**
+	 * What tells one box's baked model from another's.
+	 * <p>
+	 * {@code ConnModelReal} caches an assembled model -- the housing plus whatever wires are strung
+	 * to it -- under the block's listed properties, and a conduit has almost none left: the twelve
+	 * per-face booleans that used to spell a box's shape now live on this tile entity instead, where
+	 * a cache key cannot see them. Without this every box in a save would hash to the same key and
+	 * the first one built would be drawn everywhere.
+	 */
+	@Override
+	public Object[] getCacheData()
+	{
+		return new Object[]{getRenderShape(), getPatchMask()};
 	}
 
 	// ------------------------------------------------------------------
@@ -805,13 +865,19 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			{
 				if(!run.isBundle())
 					continue;
+				//The far box looked up once per run, not once per live conductor: sixteen tile
+				//lookups a run a tick was most of what a fully lit bundle cost.
+				TileEntity te = world.isBlockLoaded(run.end)?world.getTileEntity(run.end): null;
+				if(!(te instanceof TileEntityJunctionBox))
+					continue;
+				TileEntityJunctionBox peer = (TileEntityJunctionBox)te;
 				for(WireChannel channel : WireChannel.VALUES)
 					if((liveMask&channel.getMask())!=0)
 					{
 						if(city)
-							energise(run, channel);
+							energise(run, peer, channel);
 						else
-							passAlong(run, channel);
+							passAlong(run, peer, channel);
 					}
 			}
 
@@ -841,14 +907,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * the source end at the same pace. No gradient to speak of, no loss, no arithmetic beyond a
 	 * comparison.
 	 */
-	private void energise(Connection run, WireChannel channel)
+	private void energise(Connection run, TileEntityJunctionBox peer, WireChannel channel)
 	{
 		if(run.channels==null||run.channels.getSpec(channel)==null)
 			return;
-		TileEntity te = world.isBlockLoaded(run.end)?world.getTileEntity(run.end): null;
-		if(!(te instanceof TileEntityJunctionBox))
-			return;
-		TileEntityJunctionBox peer = (TileEntityJunctionBox)te;
 		int index = channel.ordinal();
 		int give = held[index]-CITY_HOP;
 		if(give <= 0||peer.held[index] >= give)
@@ -961,15 +1023,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		return sent;
 	}
 
-	private void passAlong(Connection run, WireChannel channel)
+	private void passAlong(Connection run, TileEntityJunctionBox peer, WireChannel channel)
 	{
 		ChannelSpec spec = run.channels==null?null: run.channels.getSpec(channel);
 		if(spec==null)
 			return;
-		TileEntity te = world.isBlockLoaded(run.end)?world.getTileEntity(run.end): null;
-		if(!(te instanceof TileEntityJunctionBox))
-			return;
-		TileEntityJunctionBox peer = (TileEntityJunctionBox)te;
 		int index = channel.ordinal();
 		ConduitTransfer.Moved moved = ConduitTransfer.hop(held[index], peer.held[index],
 				CHANNEL_CAPACITY, spec.getTransferRate(), spec.getLossRatio());

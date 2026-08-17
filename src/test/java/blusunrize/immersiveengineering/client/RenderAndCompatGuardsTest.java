@@ -125,6 +125,13 @@ class RenderAndCompatGuardsTest
 					"TileRenderBucketWheel"})
 				assertTrue(proxy.contains(owner+"::reset"),
 						owner+" caches a baked model but nothing clears it on a resource reload");
+			//The two conduit smart models glue baked part models into one quad list per shape and
+			//keep it. Those quads hold TextureAtlasSprites, so an uncleared cache draws with UVs
+			//into an atlas that has been re-stitched underneath it -- garbled conduit after a
+			//resource pack swap, and the old sprites kept alive besides.
+			for(String owner : new String[]{"ConduitRunModel", "ConduitJunctionModel"})
+				assertTrue(proxy.contains(owner+".modelCache::clear"),
+						owner+" caches assembled quads but nothing clears it on a resource reload");
 		}
 
 		/**
@@ -139,7 +146,9 @@ class RenderAndCompatGuardsTest
 			for(String file : new String[]{
 					"client/models/ModelConveyor.java",
 					"client/models/IESmartObjModel.java",
-					"client/models/ModelConfigurableSides.java"})
+					"client/models/ModelConfigurableSides.java",
+					"client/models/smart/ConduitRunModel.java",
+					"client/models/smart/ConduitJunctionModel.java"})
 			{
 				String text = source(file);
 				int decl = text.indexOf("modelCache =");

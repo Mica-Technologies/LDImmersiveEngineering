@@ -4,10 +4,15 @@ Regenerates the conduit block's texture, models and blockstate.
 
 Conduit is surface-mounted tubing: it lies flat against a face, turns in right angles,
 and wraps around the corners of what it is clipped to, which is the shape IE's catenary
-wires cannot make and the reason the block exists.  It is drawn by an ordinary multipart
-blockstate -- a hub pad against the mounting face plus one arm per joined direction, in
-whichever of its three forms that arm has -- rather than by a renderer.  Seventy-eight
-small models, every one an axis-aligned box, and nothing drawn per frame.
+wires cannot make and the reason the block exists.  It is drawn out of static geometry --
+a hub pad against the mounting face plus one arm per joined direction, in whichever of its
+three forms that arm has -- rather than by a renderer.  Seventy-eight small models, every
+one an axis-aligned box, and nothing drawn per frame.
+
+Which of them to draw is picked by a smart model reading the tile entity, so the two
+blockstates written here are one unconditional part each.  They used to be seventy-eight
+and seventy-two selectors, keyed on twelve boolean block properties, and those twelve cost
+BlockConduit 73,728 block states and a model reference for every one of them.
 
 Everything here is generated because the alternative is seventy-eight hand-written JSON
 files whose only difference is six numbers, and a typo in one of them shows up as a
@@ -57,11 +62,19 @@ NEGATIVE = {"down", "north", "west"}
 # say `immersiveengineering:grid/utility_box` for `models/block/grid/utility_box.json`; this
 # follows them.
 MODEL_REF = "immersiveengineering:conduit/%s"
-# The junction box's housing goes through IE's connection smart model instead, which draws the
-# housing and then any catenary strung to the box on top of it.  ClientProxy registers one key
-# per mounting face against the plain housing model above; the name after `conn_` is that key.
-# See ConnLoader -- the `models/block/smartmodel/conn_` prefix is what its `accepts` matches.
-CONN_MODEL_REF = "immersiveengineering:smartmodel/conn_conduit_junction_box_%s"
+# The models above are no longer named by any blockstate.  Both blockstates name a single smart
+# model instead, and the Java picks the pieces off the tile entity -- see ConduitRunModel and
+# ConduitJunctionModel.  That is what took the block from 73,728 states to 18: a multipart
+# blockstate can only select on *listed* block properties, and there were twelve booleans' worth
+# of them describing a shape the tile entity already knew.
+#
+# The generated files themselves are unchanged, and are still the only geometry there is.
+RUN_MODEL_REF = "immersiveengineering:smartmodel/conduit_run"
+# The junction box's goes through IE's connection smart model on top of that, which draws the box
+# and then any catenary strung to it.  ClientProxy registers one key against the assembling model;
+# the name after `conn_` is that key.  See ConnLoader -- the `models/block/smartmodel/conn_`
+# prefix is what its `accepts` matches.
+CONN_MODEL_REF = "immersiveengineering:smartmodel/conn_conduit_junction_box"
 
 
 def read_bounds_constants(repo):
@@ -265,51 +278,37 @@ def build_models(assets, depth, half):
 
 
 def build_blockstate(assets):
-    """The block's multipart blockstate: the hub always, and each arm in whichever form it has.
+    """The block's blockstate: one unconditional part naming the smart model, and nothing else.
 
-    Multipart rather than variants because the alternative is enumerating 6 facings x 16
-    connection combinations by hand.  The `when` clauses use the same absolute
-    sideconnection_* and runconnection_* properties BlockConduit fills in from the tile
-    entity, so reading one against the other needs no translation.
+    **This file used to be a seventy-eight selector multipart** -- a hub per facing plus each
+    arm in each of its three forms, chosen by twelve boolean block properties.  It worked, and
+    it cost 73,728 block states: Forge builds the cartesian product of every listed property at
+    startup and hands each resulting state a ModelResourceLocation of its own, so twelve
+    booleans on top of type and facing meant seventy-three thousand model references for a
+    block made of seventy-eight little boxes.
 
-    **Two properties per arm, spelling four states.**  Since runs learned to turn corners
-    an arm is one of four things, and the pair reads:
+    Those seventy-eight models are unchanged and are still all the geometry there is.  What
+    moved is only the *selection*: ConduitRunModel reads the mount and the three arm masks
+    straight off the tile entity through IEProperties.TILEENTITY_PASSTHROUGH and glues the
+    same pieces together, caching the result per distinct shape.  A blockstate can only select
+    on listed properties, which is why the selection had to be listed properties before.
 
-        sideconnection = the tubing crosses this cell boundary in the plane of the surface
-        runconnection  = the arm toward this face turns a corner
-
-    so false/false is no arm, true/false a straight one, false/true a riser -- which stops
-    at the edge and climbs -- and true/true a straight arm that carries on past the edge to
-    cap an outer corner.  Nothing was added to the block state to pay for corners: Forge
-    builds the cartesian product of every listed property at startup, and this block already
-    declares fourteen.
+    Still multipart rather than variants, and still a single unconditional part: a `variants`
+    file would have to resolve the whole property string the state mapper hands it, which in
+    the Forge format means a submap per property or the variant silently does not resolve.
+    The ground feeder's file has had exactly this shape since it was written.
 
     It lives in conduit_run.json rather than conduit.json, and BlockConduit's custom state
     mapper is what points at it -- the same split IE's fences use.  A multipart file cannot
     also carry the `inventory,...` variant the item model is looked up through, so the two
     have to be separate files.  Getting either half wrong gives a purple block and no error,
     which is why build_item_blockstate below is not optional.
+
+    The model reference is NOT one of the generated ones.  `smartmodel/conduit_run` is claimed
+    by ConduitRunLoader, which builds the model in code -- there is no file behind it and there
+    must not be one.
     """
-    parts = []
-    for mount in FACINGS:
-        parts.append({
-            "when": {"facing": mount},
-            "apply": {"model": MODEL_REF % ("conduit_%s_hub" % mount)},
-        })
-        for arm in in_plane(mount):
-            for suffix, side, run in (("", "true", "false"),
-                                      ("_riser", "false", "true"),
-                                      ("_wrap", "true", "true")):
-                parts.append({
-                    "when": {
-                        "facing": mount,
-                        "sideconnection_%s" % arm: side,
-                        "runconnection_%s" % arm: run,
-                    },
-                    "apply": {
-                        "model": MODEL_REF % ("conduit_%s_%s%s" % (mount, arm, suffix)),
-                    },
-                })
+    parts = [{"apply": {"model": RUN_MODEL_REF}}]
     write_json(os.path.join(assets, "blockstates", "conduit_run.json"), {"multipart": parts})
     return parts
 
@@ -358,27 +357,30 @@ def build_junction_box(assets, depth, box_half):
     to be visible from across a room.  A cube inset on every side, drawn with its own
     texture, does both and costs one model per face it can be bolted to.
 
-    Six of everything, keyed on `facing`, which costs no block state at all: BlockConduit
-    already declares `facing` for every meta and nothing else fills it in for a box.  The box
-    has no facing of its own -- no tile entity field, no placement rule, no packet -- it is
-    derived from the runs that reach it, in `ConduitGeometry.junctionBoxMount`.
+    Six of everything, and it costs no block state at all: the box has no facing of its own --
+    no tile entity field, no placement rule, no packet -- it is derived from the runs that reach
+    it, in `ConduitGeometry.junctionBoxMount`, and read at render time by ConduitJunctionModel.
     """
     out = os.path.join(assets, "models", "block", "conduit")
     faces = {face: {"texture": "#box"} for face in FACINGS}
-    # Multipart: one housing per mounting face, plus a coloured plate on each patched face, plus a
-    # stub toward each face a run is physically touching -- all three keyed on the mount as well,
-    # since where the housing is decides where a plate sits and what a stub has to bridge.
+    # **None of these models is named by the blockstate any more.**  The file used to be a
+    # seventy-two selector multipart -- a housing per mounting face, a coloured plate on each
+    # patched face, a stub toward each face a run touches -- selected by `facing` and twelve
+    # boolean block properties.  Those twelve cost BlockConduit 73,728 states, because Forge
+    # builds the cartesian product of every listed property at startup and gives each state a
+    # model reference of its own.
     #
-    # A `variants` file would have to resolve the *whole* property string the state mapper hands
-    # it -- type, facing and all twelve connection flags, because BlockConduit declares them for
-    # every meta -- which in the Forge format means a submap per property or the variant simply
-    # does not resolve.  Multipart ignores the variant string entirely and reads the state.
+    # ConduitJunctionLoader bakes all of them once and ConduitJunctionModel picks between them
+    # from the tile entity instead, which is where the mount, the patch table and the joined
+    # faces have always actually lived.  The models below are byte-for-byte what they were.
     #
-    # The plates reuse the same absolute sideconnection_* properties the run does; BlockConduit
-    # fills them from the patch table rather than from a connection mask when the tile is a box.
-    # Same properties, same file format, one meaning per block type.  The stubs key off
-    # runconnection_*, a second and unrelated set -- see IEProperties.RUNCONNECTION.
-    parts = []
+    # Still multipart rather than variants, with one unconditional part: a `variants` file would
+    # have to resolve the whole property string the state mapper hands it, which in the Forge
+    # format means a submap per property or the variant silently does not resolve.
+    #
+    # The part names `smartmodel/conn_conduit_junction_box`, not the assembling model directly,
+    # so that a wire strung to the box is drawn along with it -- only ConnModelReal draws a
+    # catenary.  ClientProxy registers the assembling model as the base behind that key.
     for mount in FACINGS:
         frm, to = box_bounds(mount, depth, box_half)
         write_json(os.path.join(out, "junction_box_%s.json" % mount), {
@@ -388,25 +390,12 @@ def build_junction_box(assets, depth, box_half):
             },
             "elements": [{"from": frm, "to": to, "faces": faces}],
         })
-        parts.append({
-            "when": {"facing": mount},
-            "apply": {"model": CONN_MODEL_REF % mount},
-        })
-        for face in build_patch_models(assets, mount, frm, to):
-            parts.append({
-                "when": {"facing": mount, "sideconnection_%s" % face: "true"},
-                "apply": {"model": MODEL_REF % ("junction_patch_%s_%s" % (mount, face))},
-            })
-        # Only the faces build_run_stub_models actually wrote get a part: the box already reaches
-        # the block edge on the face it is bolted to, so there is no gap to close there and no
-        # model to name.
-        for face in build_run_stub_models(assets, mount, frm, to):
-            parts.append({
-                "when": {"facing": mount, "runconnection_%s" % face: "true"},
-                "apply": {"model": MODEL_REF % ("junction_run_%s_%s" % (mount, face))},
-            })
+        build_patch_models(assets, mount, frm, to)
+        # build_run_stub_models writes nothing for the face the box already reaches on its own:
+        # there is no gap to close there, and ConduitJunctionLoader skips the same face.
+        build_run_stub_models(assets, mount, frm, to)
     write_json(os.path.join(assets, "blockstates", "conduit_junction_box.json"), {
-        "multipart": parts,
+        "multipart": [{"apply": {"model": CONN_MODEL_REF}}],
     })
 
 

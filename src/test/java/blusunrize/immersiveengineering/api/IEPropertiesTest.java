@@ -125,16 +125,6 @@ class IEPropertiesTest
 	}
 
 	@Test
-	@DisplayName("SIDECONNECTION has one property per side, indexed by EnumFacing.ordinal()")
-	void sideConnectionIsIndexedByFacing()
-	{
-		assertEquals(EnumFacing.VALUES.length, IEProperties.SIDECONNECTION.length);
-		for(EnumFacing facing : EnumFacing.VALUES)
-			assertEquals("sideconnection_"+facing.getName(), IEProperties.SIDECONNECTION[facing.ordinal()].getName(),
-					"SIDECONNECTION is not indexed by EnumFacing.ordinal() at "+facing);
-	}
-
-	@Test
 	@DisplayName("the ProperySideConfig wrapper accepts any SideConfig and stringifies it")
 	void sideConfigPropertyBehaviour()
 	{
@@ -194,8 +184,6 @@ class IEPropertiesTest
 		names.add(IEProperties.OBJ_TEXTURE_REMAP.getName());
 		names.add(IEProperties.TILEENTITY_PASSTHROUGH.getName());
 		for(IEProperties.ProperySideConfig p : IEProperties.SIDECONFIG)
-			names.add(p.getName());
-		for(PropertyBoolInverted p : IEProperties.SIDECONNECTION)
 			names.add(p.getName());
 		for(PropertyBoolInverted p : IEProperties.BOOLEANS)
 			names.add(p.getName());

@@ -48,9 +48,14 @@ public class ConnModelReal implements IBakedModel
 
 	TextureAtlasSprite textureAtlasSprite = Minecraft.getMinecraft().getTextureMapBlocks()
 			.getAtlasSprite(ImmersiveEngineering.MODID.toLowerCase(Locale.ENGLISH)+":blocks/wire");
+	//256, up from IE's 100: every wire endpoint in view competes for this, and this fork added
+	//junction boxes, grid units and fluid-network blocks to the connectors IE had. With a room of
+	//boxes plus the connectors feeding them the old cap was small enough to thrash on every chunk
+	//rebuild, and each miss re-bakes catenary geometry. Not larger: an entry holds a connector's
+	//assembled quads, and the two-minute expiry already bounds what a player who walked away costs.
 	public static final Cache<Pair<Byte, ExtBlockstateAdapter>, IBakedModel> cache = CacheBuilder.newBuilder()
 			.expireAfterAccess(2, TimeUnit.MINUTES)
-			.maximumSize(100)
+			.maximumSize(256)
 			.build();
 	private final IBakedModel base;
 	private final ImmutableSet<BlockRenderLayer> layers;

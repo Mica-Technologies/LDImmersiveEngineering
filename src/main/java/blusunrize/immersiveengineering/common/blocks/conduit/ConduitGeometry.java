@@ -69,11 +69,11 @@ public class ConduitGeometry
 	/**
 	 * What one arm of a conduit does, which is the whole of the difference wrapping made.
 	 * <p>
-	 * Four values in two bits, and the two bits are the two boolean block properties the run
-	 * already had a use for -- see {@code BlockConduit}. Nothing was added to the block state to
-	 * pay for corners, which matters more than it looks: Forge builds the cartesian product of
-	 * every listed property at startup, so a third value on a per-face property would have
-	 * multiplied this block's state count by eleven.
+	 * Four values in two bits, held on the tile entity as two of {@code ConduitArms}' three masks
+	 * and read from there by {@code ConduitRunModel}. Nothing about an arm is in the block state at
+	 * all, which matters more than it looks: Forge builds the cartesian product of every listed
+	 * property at startup and gives each resulting state a model reference of its own, and this was
+	 * once twelve booleans' worth -- 73,728 states for a block made of seventy-eight little boxes.
 	 */
 	public enum ArmMode
 	{
@@ -419,10 +419,10 @@ public class ConduitGeometry
 	/**
 	 * The name a generated model file uses for one arm.
 	 * <p>
-	 * Lower case and mount-first, matching the blockstate this fork's asset script writes. It lives
-	 * here rather than in the script so that a test can check the block and the assets agree
-	 * without either of them guessing at the other's spelling -- the two silent causes of a purple
-	 * block in 1.12 are a blockstate naming a model nobody wrote and a model nobody references.
+	 * Lower case and mount-first, matching the files this fork's asset script writes. It lives here
+	 * rather than in the script because both the script and {@code ConduitRunModel} spell these
+	 * names, and a part the model asks for and nobody wrote is a hole in a run with nothing in the
+	 * log -- one of the two silent causes of a purple block in 1.12.
 	 */
 	public static String armModelName(EnumFacing mount, EnumFacing dir)
 	{
@@ -461,8 +461,8 @@ public class ConduitGeometry
 	 * arrived at a boundary with nothing on the other side of it, and the piece grown out to close
 	 * that gap grew along the floor, three pixels clear of the wall the run was on.
 	 * <p>
-	 * Read off the neighbours rather than stored: it costs no block state -- {@code facing} is already
-	 * declared for every meta of this block and nothing else fills it in for a box -- and it needs no
+	 * Read off the neighbours rather than stored: it costs no block state at all -- the box's model
+	 * asks {@code TileEntityJunctionBox.getRenderShape} for it at render time -- and it needs no
 	 * placement rule, no tile entity field and no packet. It also cannot go stale, which a stored
 	 * mount would: a box is placed before the run reaches it as often as after.
 	 * <p>

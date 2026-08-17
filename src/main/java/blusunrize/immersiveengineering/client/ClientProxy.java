@@ -17,7 +17,6 @@ import blusunrize.immersiveengineering.api.energy.ThermoelectricHandler;
 import blusunrize.immersiveengineering.api.energy.wires.WireApi;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.shader.ShaderCase;
-import blusunrize.immersiveengineering.common.blocks.conduit.ConduitGeometry;
 import blusunrize.immersiveengineering.api.shader.ShaderCase.ShaderLayer;
 import blusunrize.immersiveengineering.api.shader.ShaderRegistry;
 import blusunrize.immersiveengineering.api.tool.BulletHandler;
@@ -39,6 +38,10 @@ import blusunrize.immersiveengineering.client.models.smart.ConnLoader;
 import blusunrize.immersiveengineering.client.models.smart.ConnModelReal;
 import blusunrize.immersiveengineering.client.models.smart.ConnModelReal.ExtBlockstateAdapter;
 import blusunrize.immersiveengineering.client.models.smart.ConduitDisguiseLoader;
+import blusunrize.immersiveengineering.client.models.smart.ConduitJunctionLoader;
+import blusunrize.immersiveengineering.client.models.smart.ConduitJunctionModel;
+import blusunrize.immersiveengineering.client.models.smart.ConduitRunLoader;
+import blusunrize.immersiveengineering.client.models.smart.ConduitRunModel;
 import blusunrize.immersiveengineering.client.models.smart.FeedthroughLoader;
 import blusunrize.immersiveengineering.client.models.smart.FeedthroughModel;
 import blusunrize.immersiveengineering.client.render.*;
@@ -381,23 +384,24 @@ public class ClientProxy extends CommonProxy
 		});
 		ModelLoaderRegistry.registerLoader(new ConnLoader());
 		//	=================================
-		//	The junction box's housing, drawn through the connection model
+		//	The junction box, drawn through the connection model
 		//	=================================
-		//So that a wire strung straight to a box is actually drawn. Six keys because a box has six
-		//housing models, one per surface it can be bolted to, and the multipart blockstate picks
-		//between them on `facing`.
+		//So that a wire strung straight to a box is actually drawn. One key, whose base model is the
+		//whole box -- housing, patch plates and run stubs -- assembled by ConduitJunctionLoader from
+		//the tile entity. It used to be six keys and six housings, picked between by `facing` in a
+		//seventy-two selector multipart blockstate; the plates and stubs were selected there too, off
+		//twelve boolean block properties that cost the block 73,728 states.
 		//
 		//This route rather than the `custom: {base, layers}` one the Grid Feed and Service Units use:
 		//that data only exists in a Forge blockstate's `variants`, and Forge's blockstate format has
-		//no multipart. The box is multipart -- it has a coloured plate per patched face and a stub
-		//per face a run touches -- so its housing is named through ConnLoader's key registry instead,
-		//which is a plain model reference and works anywhere a model reference does.
-		for(EnumFacing mount : EnumFacing.VALUES)
-			WireApi.registerConnectorForRender("conduit_junction_box_"+mount.getName(),
-					new ResourceLocation(ImmersiveEngineering.MODID,
-							"block/conduit/"+ConduitGeometry.junctionBoxModelName(mount)), null);
+		//no multipart. ConnLoader's key registry is a plain model reference and works anywhere a
+		//model reference does -- including in front of another custom loader, which is what this is.
+		WireApi.registerConnectorForRender(ConduitJunctionLoader.CONNECTOR_KEY,
+				ConduitJunctionLoader.LOCATION, null);
 		ModelLoaderRegistry.registerLoader(new FeedthroughLoader());
 		ModelLoaderRegistry.registerLoader(new ConduitDisguiseLoader());
+		ModelLoaderRegistry.registerLoader(new ConduitRunLoader());
+		ModelLoaderRegistry.registerLoader(new ConduitJunctionLoader());
 		ModelLoaderRegistry.registerLoader(new ModelConfigurableSides.Loader());
 		ModelLoaderRegistry.registerLoader(new MultiLayerLoader());
 		ConveyorChute.clientInit();
@@ -2077,6 +2081,12 @@ public class ClientProxy extends CommonProxy
 		IEApi.renderCacheClearers.add(ModelPowerpack.catenaryCacheLeft::invalidateAll);
 		IEApi.renderCacheClearers.add(ModelPowerpack.catenaryCacheRight::invalidateAll);
 		IEApi.renderCacheClearers.add(FeedthroughModel.CACHE::invalidateAll);
+		//Both conduit smart models glue a set of baked part models into one quad list per shape and
+		//keep it. Those quads hold TextureAtlasSprites, so a resource reload that re-stitches the
+		//atlas leaves every conduit and every junction box drawing with UVs into a texture that has
+		//been rebuilt underneath them -- and keeps the old sprites alive besides.
+		IEApi.renderCacheClearers.add(ConduitRunModel.modelCache::clear);
+		IEApi.renderCacheClearers.add(ConduitJunctionModel.modelCache::clear);
 		//The Auto Workbench traces the blueprint outline out of the output item's *texture*, so the
 		//lines it caches are only correct for the atlas they were read from. Left uncleared, a
 		//resource pack swap leaves every workbench drawing the previous pack's blueprint. It also

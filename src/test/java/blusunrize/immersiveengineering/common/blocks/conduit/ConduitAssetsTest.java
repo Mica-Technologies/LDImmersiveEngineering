@@ -90,35 +90,39 @@ class ConduitAssetsTest
 	}
 
 	/**
-	 * One part of the junction box's blockstate, picked out by the plane the box is in and the flag
-	 * that turns the part on.
+	 * How a generated conduit part is named, in the spelling a blockstate would have used.
 	 * <p>
-	 * Every part of that file is keyed on {@code facing} as well as on its own flag, because where
-	 * the housing is decides where a plate sits and what a stub has to bridge. See
-	 * {@code ConduitGeometry.junctionBoxMount} for where the facing comes from -- the box has none
-	 * of its own.
-	 *
-	 * @param mount    the surface the box is bolted to
-	 * @param property the connection flag the part waits on, or null for the housing itself
-	 *
-	 * @return the model that part draws, or null if the blockstate has no such part
+	 * <strong>Nothing names these files any more.</strong> Both blockstates are a single
+	 * unconditional part pointing at a smart model, and the Java picks the pieces off the tile
+	 * entity -- so the old check, "every model the blockstate names exists", has nothing left to
+	 * walk. What replaces it is this: enumerate every name the Java composer can produce, through
+	 * the same {@link ConduitGeometry} methods it uses, and insist the file is there.
+	 * <p>
+	 * That is the same guard, aimed at the same failure. A part the composer names and nobody wrote
+	 * is a hole in a conduit or a box drawn with a piece missing, with nothing in the log.
 	 */
-	private static String junctionPart(EnumFacing mount, String property)
+	private static String partReference(String name)
 	{
-		for(JsonElement element : read("blockstates/conduit_junction_box.json")
-				.getAsJsonArray("multipart"))
-		{
-			JsonObject part = element.getAsJsonObject();
-			if(!part.has("when"))
-				continue;
-			JsonObject when = part.getAsJsonObject("when");
-			if(!when.has("facing")||!mount.getName().equals(when.get("facing").getAsString()))
-				continue;
-			if(property==null?keys(when).size()==1
-					:when.has(property)&&"true".equals(when.get(property).getAsString()))
-				return part.getAsJsonObject("apply").get("model").getAsString();
-		}
-		return null;
+		return "immersiveengineering:conduit/"+name;
+	}
+
+	/**
+	 * The one part of a blockstate that is now all there is to it.
+	 *
+	 * @return the smart model it names
+	 */
+	private static String onlyPart(String blockstate)
+	{
+		JsonObject state = read("blockstates/"+blockstate);
+		assertTrue(state.has("multipart"), blockstate+" stopped being multipart");
+		assertFalse(state.has("variants"),
+				"a file cannot carry both; the inventory variant belongs in conduit.json");
+		JsonArray parts = state.getAsJsonArray("multipart");
+		assertEquals(1, parts.size(), blockstate+" should be one unconditional part and no more");
+		JsonObject part = parts.get(0).getAsJsonObject();
+		assertFalse(part.has("when"),
+				blockstate+"'s only part is conditional, so the block would draw as nothing at all");
+		return part.getAsJsonObject("apply").get("model").getAsString();
 	}
 
 	/**
@@ -151,108 +155,127 @@ class ConduitAssetsTest
 		}
 
 		@Test
-		@DisplayName("it is multipart, not variants")
-		void isMultipart()
+		@DisplayName("it is one unconditional part naming the smart model, and nothing else")
+		void isOneSmartModelPart()
 		{
-			JsonObject state = read("blockstates/conduit_run.json");
-			assertTrue(state.has("multipart"), "the block blockstate stopped being multipart");
-			assertFalse(state.has("variants"),
-					"a file cannot carry both; the inventory variant belongs in conduit.json");
+			//	=================================
+			//	This file used to be seventy-eight selectors.
+			//	=================================
+			//A hub per facing plus each arm in each of its three forms, chosen by twelve boolean
+			//block properties -- and Forge builds the cartesian product of every listed property at
+			//startup and hands each resulting state a ModelResourceLocation of its own, so those
+			//twelve cost BlockConduit 73,728 states and 73,728 model references for seventy-eight
+			//little boxes. The same boxes are assembled by ConduitRunModel from the tile entity now.
+			//
+			//Still multipart with one unconditional part rather than `variants`, for the reason the
+			//ground feeder's file has always been: a `variants` file has to resolve the whole
+			//property string the state mapper hands it, and that means a submap per property or the
+			//variant silently fails to resolve -- as a purple block.
+			assertEquals("immersiveengineering:smartmodel/conduit_run", onlyPart("conduit_run.json"));
 		}
 
 		@Test
-		@DisplayName("there is a hub for every mount and all three arm forms for every direction")
-		void everyMountAndArmIsCovered()
+		@DisplayName("the model it names is the one the loader claims")
+		void blockstateAndLoaderAgree()
+		{
+			//The same trap ConduitDisguiseLoader's own check is about, and it is the one that matters
+			//here: there is deliberately no file behind this reference, so if the loader's path
+			//string and the blockstate's reference ever drift apart the loader is simply never
+			//asked, Minecraft looks for a file nobody wrote, and every length of conduit in the save
+			//is purple with nothing in the log.
+			String claimed = grepConstant(
+					"src/main/java/blusunrize/immersiveengineering/client/models/smart/"
+							+"ConduitRunLoader.java", "RESOURCE_LOCATION");
+			assertEquals(claimed+".json", modelPath(onlyPart("conduit_run.json")),
+					"the blockstate and ConduitRunLoader disagree about where the smart model lives");
+		}
+
+		@Test
+		@DisplayName("nobody has written a file over the smart model's location")
+		void smartModelHasNoFile()
+		{
+			//The other half of the same trap. A real file at that path would be loaded in preference
+			//to the loader, and every conduit in the world would draw as whatever the file said.
+			assertFalse(new File(ASSETS+modelPath(onlyPart("conduit_run.json"))).isFile(),
+					"a file now exists where ConduitRunLoader builds the model in code");
+		}
+
+		@Test
+		@DisplayName("every part the composer can name exists: six hubs and all seventy-two arms")
+		void everyPartTheComposerNamesExists()
 		{
 			//	=================================
-			//	Two properties, four arm states
+			//	What the blockstate check turned into.
 			//	=================================
-			//An arm is one of four things since runs learned to turn corners, and the pair of
-			//booleans BlockConduit fills in spells all four: sideconnection is "the tubing crosses
-			//this cell boundary in the plane of the surface", runconnection is "the arm toward this
-			//face turns a corner". So a part has to test both, and a part testing only one would
-			//draw a straight arm over a riser.
-			JsonArray parts = read("blockstates/conduit_run.json").getAsJsonArray("multipart");
-			Set<String> hubs = new HashSet<>();
-			Set<String> arms = new HashSet<>();
-			for(JsonElement element : parts)
-			{
-				JsonObject part = element.getAsJsonObject();
-				JsonObject when = part.getAsJsonObject("when");
-				assertNotNull(when, "a conduit part applies unconditionally and would always draw");
-				String facing = when.get("facing").getAsString();
-				Set<String> conditions = keys(when);
-				conditions.remove("facing");
-				if(conditions.isEmpty())
-				{
-					hubs.add(facing);
-					continue;
-				}
-				assertEquals(2, conditions.size(),
-						"an arm has to pin down both of its flags, not "+conditions);
-				String side = null;
-				String run = null;
-				for(String key : conditions)
-					if(key.startsWith("sideconnection_"))
-						side = key.substring("sideconnection_".length());
-					else if(key.startsWith("runconnection_"))
-						run = key.substring("runconnection_".length());
-				assertNotNull(side, "an arm part has no sideconnection flag: "+conditions);
-				assertNotNull(run, "an arm part has no runconnection flag: "+conditions);
-				assertEquals(side, run, "an arm tests two different faces at once");
-				String sideValue = when.get("sideconnection_"+side).getAsString();
-				String runValue = when.get("runconnection_"+run).getAsString();
-				assertFalse("false".equals(sideValue)&&"false".equals(runValue),
-						"a part draws an arm for a direction with no arm in it");
-				arms.add(facing+"/"+side+"/"+sideValue+runValue);
-			}
+			//Nothing references these files any more, so "every model the blockstate names exists"
+			//has nothing to walk. The failure it guarded against is unchanged: ConduitRunModel asks
+			//for a part by name, and a name nobody wrote is a hole in a run with nothing in the log.
+			//So the names are enumerated here through the very methods the composer uses.
+			int found = 0;
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
-				assertTrue(hubs.contains(mount.getName()), "no hub for a conduit mounted "+mount);
+				assertTrue(new File(ASSETS+modelPath(partReference(
+								ConduitGeometry.hubModelName(mount)))).isFile(),
+						"no hub for a conduit mounted "+mount);
+				found++;
 				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
-					for(String form : new String[]{"truefalse", "falsetrue", "truetrue"})
-						assertTrue(arms.contains(mount.getName()+"/"+dir.getName()+"/"+form),
-								"no "+form+" arm for "+mount+" running "+dir);
+					for(String name : new String[]{ConduitGeometry.armModelName(mount, dir),
+							ConduitGeometry.riserModelName(mount, dir),
+							ConduitGeometry.wrapModelName(mount, dir)})
+					{
+						assertTrue(new File(ASSETS+modelPath(partReference(name))).isFile(),
+								"the run's composer names a model nobody wrote: "+name);
+						found++;
+					}
 			}
-			assertEquals(6, hubs.size());
-			assertEquals(3*6*ConduitGeometry.ARMS, arms.size());
+			//Six hubs and three forms of each of four arms on each of six mounts. The count is
+			//asserted as well as the files, so an arm quietly dropped from ConduitGeometry.inPlane
+			//would fail here rather than pass by checking less.
+			assertEquals(6+3*6*ConduitGeometry.ARMS, found);
 		}
 
 		@Test
 		@DisplayName("no arm is offered outside its own plane")
 		void noArmLeavesThePlane()
 		{
-			//An arm along the mounting axis would be a conduit growing out of its own wall.
-			JsonArray parts = read("blockstates/conduit_run.json").getAsJsonArray("multipart");
-			for(JsonElement element : parts)
+			//An arm along the mounting axis would be a conduit growing out of its own wall. The
+			//composer walks inPlane, so this is a check on inPlane itself.
+			for(EnumFacing mount : EnumFacing.VALUES)
 			{
-				JsonObject when = element.getAsJsonObject().getAsJsonObject("when");
-				EnumFacing mount = EnumFacing.byName(when.get("facing").getAsString());
-				for(String key : keys(when))
-				{
-					String prefix = key.startsWith("sideconnection_")?"sideconnection_"
-							:key.startsWith("runconnection_")?"runconnection_": null;
-					if(prefix==null)
-						continue;
-					EnumFacing dir = EnumFacing.byName(key.substring(prefix.length()));
+				assertEquals(ConduitGeometry.ARMS, ConduitGeometry.inPlane(mount).length);
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
 					assertTrue(ConduitGeometry.isInPlane(mount, dir),
 							mount+" offers an arm toward "+dir+", which is off its surface");
-				}
 			}
 		}
 
 		@Test
-		@DisplayName("every model it names exists")
-		void everyModelExists()
+		@DisplayName("the block no longer declares the twelve per-face properties")
+		void blockDeclaresOnlyTypeAndFacing()
 		{
-			JsonArray parts = read("blockstates/conduit_run.json").getAsJsonArray("multipart");
-			for(JsonElement element : parts)
-			{
-				String model = element.getAsJsonObject().getAsJsonObject("apply")
-						.get("model").getAsString();
-				assertTrue(new File(ASSETS+modelPath(model)).isFile(),
-						"the blockstate names a model nobody wrote: "+model);
-			}
+			//	=================================
+			//	The state count, guarded as text.
+			//	=================================
+			//There is no way to count the real thing from here -- constructing a Block needs
+			//Minecraft bootstrapped, and these tests run world-free -- so the guard is on the source.
+			//BlockConduit's listed properties are type (3) and facing (6): eighteen states. It used
+			//to declare twelve booleans besides, which multiplied that by 4096.
+			//
+			//Re-adding one would not fail anything else in this suite: the block would still work,
+			//every model would still be found, and the only symptom would be startup cost and
+			//memory nobody attributes to it.
+			String block = source("src/main/java/blusunrize/immersiveengineering/common/blocks/"
+					+"conduit/BlockConduit.java");
+			assertFalse(block.contains("IEProperties.SIDECONNECTION["),
+					"BlockConduit declares SIDECONNECTION again: six booleans is a 64x block state "
+							+"count, and the smart model already reads the same thing off the tile");
+			assertFalse(block.contains("IEProperties.RUNCONNECTION["),
+					"BlockConduit declares RUNCONNECTION again: see above");
+			//The two that are left, and the two unlisted ones the smart models arrive through.
+			for(String declared : new String[]{"IEProperties.FACING_ALL",
+					"IEProperties.TILEENTITY_PASSTHROUGH", "IEProperties.CONNECTIONS"})
+				assertTrue(block.contains(declared),
+						"BlockConduit no longer declares "+declared);
 		}
 	}
 
@@ -526,55 +549,28 @@ class ConduitAssetsTest
 		@DisplayName("it is multipart, so it does not have to resolve the property string")
 		void isMultipart()
 		{
-			//BlockConduit declares facing and six sideconnection flags for *every* meta, so the
-			//state mapper hands the box the whole string. A `variants` file would need a submap per
-			//property or the variant silently fails to resolve; multipart reads the state instead
-			//and ignores the string.
+			//BlockConduit still declares type and facing for every meta, so the state mapper hands
+			//the box a property string. A `variants` file would need a submap per property or the
+			//variant silently fails to resolve; multipart ignores the string and reads the state.
 			JsonObject state = read("blockstates/conduit_junction_box.json");
 			assertTrue(state.has("multipart"),
-					"the box uses a variants blockstate but BlockConduit gives it seven properties "
-							+"to resolve, and it declares a submap for none of them");
+					"the box uses a variants blockstate but BlockConduit gives it properties to "
+							+"resolve, and it declares a submap for none of them");
 		}
 
 		@Test
-		@DisplayName("its model and texture exist, one housing per surface it can be bolted to")
+		@DisplayName("its housing models and texture exist, one per surface it can be bolted to")
 		void modelAndTextureExist()
 		{
-			//The housing is keyed on facing rather than drawn unconditionally, because a box that
-			//does not hug the same surface as its run cannot meet it -- see RunStubs below. The six
-			//are exhaustive, so a box always draws something whatever the state says.
-			//
-			//The housing part names a *smart* model rather than the generated one, so that a wire
-			//strung to the box is drawn too; the generated model is what that wraps, and is checked
-			//to exist in WireEndpoint below. Nothing else in this file resolves through a loader, so
-			//that check does not belong here.
+			//A box that does not hug the same surface as its run cannot meet it -- see RunStubs
+			//below -- so there is a housing per plane and ConduitJunctionModel picks between them
+			//from the tile entity. The six are exhaustive, so a box always draws something.
 			for(EnumFacing mount : EnumFacing.VALUES)
-			{
-				String model = housingModelFor(mount);
-				assertNotNull(model, "no housing for a box mounted "+mount.getName()
-						+", so a box in that plane would draw as nothing but its plates");
-				assertTrue(model.endsWith(ConduitGeometry.junctionBoxModelName(mount)),
-						"the assets and ConduitGeometry disagree about what the housing is called: "
-								+model);
-			}
+				assertTrue(new File(ASSETS+modelPath(partReference(
+								ConduitGeometry.junctionBoxModelName(mount)))).isFile(),
+						"no housing for a box mounted "+mount.getName()
+								+", so a box in that plane would draw as nothing but its plates");
 			assertTrue(new File(ASSETS+"textures/blocks/conduit_junction_box.png").isFile());
-		}
-
-		/** @return the model the box's own housing is drawn with on that mount, or null if none */
-		private String housingModelFor(EnumFacing mount)
-		{
-			for(JsonElement element : read("blockstates/conduit_junction_box.json")
-					.getAsJsonArray("multipart"))
-			{
-				JsonObject part = element.getAsJsonObject();
-				if(!part.has("when"))
-					continue;
-				JsonObject when = part.getAsJsonObject("when");
-				if(keys(when).size()==1&&when.has("facing")
-						&&mount.getName().equals(when.get("facing").getAsString()))
-					return part.getAsJsonObject("apply").get("model").getAsString();
-			}
-			return null;
 		}
 
 		@Test
@@ -770,6 +766,19 @@ class ConduitAssetsTest
 		}
 	}
 
+	/** A source file, read as text. These tests run without Minecraft started. */
+	private static String source(String path)
+	{
+		try
+		{
+			return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
+					java.nio.charset.StandardCharsets.UTF_8);
+		} catch(IOException e)
+		{
+			throw new AssertionError("could not read "+path, e);
+		}
+	}
+
 	/**
 	 * Read a {@code public static final String} out of a source file.
 	 * <p>
@@ -779,15 +788,7 @@ class ConduitAssetsTest
 	 */
 	private static String grepConstant(String path, String name)
 	{
-		String source;
-		try
-		{
-			source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
-					java.nio.charset.StandardCharsets.UTF_8);
-		} catch(IOException e)
-		{
-			throw new AssertionError("could not read "+path, e);
-		}
+		String source = source(path);
 		java.util.regex.Matcher matcher = java.util.regex.Pattern
 				.compile(name+"\\s*=\\s*\"([^\"]*)\"").matcher(source);
 		assertTrue(matcher.find(), "no constant called "+name+" in "+path);
@@ -900,49 +901,28 @@ class ConduitAssetsTest
 	class PatchPlates
 	{
 		/**
-		 * @return the model a face's plate is drawn with on a box bolted to that mount, or null if
-		 * the blockstate has no part for it
+		 * @return the model a face's plate is drawn with on a box bolted to that mount, named the
+		 * way {@code ConduitJunctionModel} names it
 		 */
 		private String plateModelFor(EnumFacing mount, EnumFacing face)
 		{
-			return junctionPart(mount, "sideconnection_"+face.getName());
-		}
-
-		@Test
-		@DisplayName("the box itself is still drawn whatever plane it is in")
-		void boxIsAlwaysDrawn()
-		{
-			//The six housing parts are exhaustive over facing, which is what makes them as
-			//unconditional as the single part they replaced: a box always draws one of them.
-			for(EnumFacing mount : EnumFacing.VALUES)
-				assertNotNull(junctionPart(mount, null),
-						"a box mounted "+mount.getName()+" draws no housing at all, only plates");
+			return partReference(ConduitGeometry.junctionPatchModelName(mount, face));
 		}
 
 		@Test
 		@DisplayName("every face has a plate, in every plane the box can sit in")
 		void everyFaceIsCovered()
 		{
-			for(EnumFacing mount : EnumFacing.VALUES)
-				for(EnumFacing face : EnumFacing.VALUES)
-					assertNotNull(plateModelFor(mount, face),
-							"no plate for "+face.getName()+" on a box mounted "+mount.getName()
-									+": patching that face would change nothing you can see, which is "
-									+"the bug this whole thing exists to fix");
-		}
-
-		@Test
-		@DisplayName("every plate model exists")
-		void everyPlateModelExists()
-		{
+			//Thirty-six plates, all of them nameable by the composer and none of them referenced by
+			//anything else. A face with no plate would mean patching it changed nothing you can see,
+			//which is the bug this whole thing exists to fix.
 			for(EnumFacing mount : EnumFacing.VALUES)
 				for(EnumFacing face : EnumFacing.VALUES)
 				{
 					String path = modelPath(plateModelFor(mount, face));
-					assertTrue(new File(ASSETS+path).isFile(), "missing plate model: "+path);
-					assertEquals(ConduitGeometry.junctionPatchModelName(mount, face),
-							path.substring(path.lastIndexOf('/')+1).replace(".json", ""),
-							"the assets and ConduitGeometry disagree about what a plate is called");
+					assertTrue(new File(ASSETS+path).isFile(),
+							"no plate for "+face.getName()+" on a box mounted "+mount.getName()
+									+": "+path+" is missing");
 				}
 		}
 
@@ -1052,12 +1032,14 @@ class ConduitAssetsTest
 	class RunStubs
 	{
 		/**
-		 * @return the model a face's stub is drawn with on a box in that plane, or null if the
-		 * blockstate has no part for it
+		 * @return the model a face's stub is drawn with on a box in that plane, or null on the face
+		 * the housing already reaches by itself -- which is the rule
+		 * {@code ConduitJunctionLoader.stubName} applies and the one the generator writes files by
 		 */
 		private String stubModelFor(EnumFacing mount, EnumFacing face)
 		{
-			return junctionPart(mount, "runconnection_"+face.getName());
+			return face==mount?null
+					:partReference(ConduitGeometry.junctionRunModelName(mount, face));
 		}
 
 		/**
@@ -1087,6 +1069,11 @@ class ConduitAssetsTest
 		@DisplayName("a stub is offered on every face the box does not already touch, and none it does")
 		void stubsCoverExactlyTheGap()
 		{
+			//Three things have to agree about which faces get a stub, and this is where they are
+			//held together: the generator writes a file for a face only if there is a gap there, the
+			//loader bakes one only if there is a file, and the composer draws one only if it baked
+			//one. A face the composer names with no file behind it is a box drawn with a piece
+			//missing; a file nobody names is a stub that never appears.
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
 				int[] box = junctionHousing(mount);
@@ -1098,8 +1085,18 @@ class ConduitAssetsTest
 						assertNull(model, "a box mounted "+mount.getName()+" already reaches the block "
 								+"edge on "+face+"; a stub there is a seam nobody would see the point of");
 					else
+					{
 						assertNotNull(model, "no stub for "+face+" on a box mounted "+mount.getName()
 								+": a run terminating there leaves the gap the playtest was about");
+						assertTrue(new File(ASSETS+modelPath(model)).isFile(),
+								"the box's composer names a stub nobody wrote: "+model);
+					}
+					//One-directional on purpose. Five stub files for a box's own mounting face are
+					//still on disk from before the housing learned to hug its surface, when only
+					//`down` was flush and the generator wrote the other five; it does not write them
+					//any more and it does not delete anything, so they are dead files rather than a
+					//disagreement. Nothing names them: the composer skips the mount face, which is
+					//the assertion above.
 				}
 			}
 		}
@@ -1260,8 +1257,12 @@ class ConduitAssetsTest
 	@DisplayName("the junction box as a wire endpoint")
 	class WireEndpoint
 	{
+		private static final String LOADER =
+				"src/main/java/blusunrize/immersiveengineering/client/models/smart/"
+						+"ConduitJunctionLoader.java";
+
 		@Test
-		@DisplayName("the housing is drawn through the connection smart model")
+		@DisplayName("the box is drawn through the connection smart model")
 		void housingGoesThroughTheConnModel()
 		{
 			//	=================================
@@ -1269,28 +1270,51 @@ class ConduitAssetsTest
 			//	=================================
 			//
 			// A wire strung to a box is drawn by the box's own baked model, and only ConnModelReal
-			// draws one. Point the housing part at a plain model and the box still looks perfect,
-			// the wire still exists, energy still flows -- and the catenary's near half is simply
-			// not there, with nothing in the log. There is no way to notice that except by looking.
+			// draws one. Point the part at a plain model and the box still looks perfect, the wire
+			// still exists, energy still flows -- and the catenary's near half is simply not there,
+			// with nothing in the log. There is no way to notice that except by looking.
 			//
-			// The name after `conn_` is the key ClientProxy registers against the plain housing
-			// model, which is what ConnLoader looks up.
-			for(EnumFacing mount : EnumFacing.VALUES)
-			{
-				String model = junctionPart(mount, null);
-				assertNotNull(model, "no housing part for a box mounted "+mount.getName());
-				assertEquals("immersiveengineering:smartmodel/conn_conduit_junction_box_"
-								+mount.getName(), model,
-						"a box mounted "+mount.getName()+" is drawn by a model that cannot draw a wire");
-			}
+			// One part now rather than six: the plane the box is in is picked by
+			// ConduitJunctionModel from the tile entity rather than by a `facing` selector, which is
+			// most of what took this block from 73,728 states to eighteen.
+			String model = onlyPart("conduit_junction_box.json");
+			assertTrue(model.startsWith("immersiveengineering:smartmodel/conn_"),
+					"the box is drawn by a model that cannot draw a wire: "+model);
+			//The name after `conn_` is the key ClientProxy registers the assembling model against,
+			//which is what ConnLoader looks up. A key with nothing registered under it resolves to
+			//the missing model -- a purple box, and every wire on it gone.
+			assertEquals(grepConstant(LOADER, "CONNECTOR_KEY"),
+					model.substring(model.indexOf("conn_")+"conn_".length()),
+					"the blockstate and ConduitJunctionLoader disagree about the connector key");
+			assertTrue(source("src/main/java/blusunrize/immersiveengineering/client/ClientProxy.java")
+							.contains("registerConnectorForRender(ConduitJunctionLoader.CONNECTOR_KEY"),
+					"nothing registers a base model for the box's connector key");
 		}
 
 		@Test
-		@DisplayName("the model the smart model wraps is the one that was generated")
+		@DisplayName("the location ConnLoader is pointed at is the one the loader claims")
+		void connectorBaseAndLoaderAgree()
+		{
+			//WireApi is handed a plain ResourceLocation, which ModelLoaderRegistry prefixes with
+			//`models/` and offers to every loader in turn. If ConduitJunctionLoader's accepts() and
+			//that location ever drift apart, the box resolves to a file nobody wrote -- purple, and
+			//silent.
+			String claimed = grepConstant(LOADER, "RESOURCE_LOCATION");
+			assertTrue(claimed.startsWith("models/"),
+					"a loader's accepted path always carries the models/ prefix: "+claimed);
+			assertTrue(source(LOADER).contains("\""+claimed.substring("models/".length())+"\""),
+					"ConduitJunctionLoader.LOCATION is not the path its accepts() matches");
+			assertFalse(new File(ASSETS+claimed+".json").isFile(),
+					"a file now exists where ConduitJunctionLoader builds the model in code");
+		}
+
+		@Test
+		@DisplayName("the models the smart model assembles are the ones that were generated")
 		void wrappedHousingModelExists()
 		{
-			//ConnLoader resolves its key through ClientProxy rather than through the filesystem, so
-			//nothing in the resource pack points at these any more. They still have to be there.
+			//ConnLoader resolves its key through ClientProxy rather than through the filesystem, and
+			//ConduitJunctionModel names its parts in Java, so nothing in the resource pack points at
+			//these any more. They still have to be there.
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
 				String path = "models/block/conduit/"+ConduitGeometry.junctionBoxModelName(mount)

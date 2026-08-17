@@ -110,6 +110,21 @@ public class ConduitBounds
 	 */
 	public static float[] of(EnumFacing mount, int connections, int risers)
 	{
+		//Memoised: this is behind getBlockBounds, which vanilla asks on every collision and ray
+		//trace against the block, and it used to allocate three arrays and do the arithmetic each
+		//time. There are only 6 x 16 x 16 answers. The array handed back is shared -- read it, do
+		//not write to it -- which is how every caller already treated it.
+		int key = (mount.ordinal()<<8)|((connections&0xF)<<4)|(risers&0xF);
+		float[] cached = CACHE[key];
+		if(cached==null)
+			CACHE[key] = cached = compute(mount, connections, risers);
+		return cached;
+	}
+
+	private static final float[][] CACHE = new float[6<<8][];
+
+	private static float[] compute(EnumFacing mount, int connections, int risers)
+	{
 		//Start with the hub: a centred pad against the mounting face, then grow it toward each arm.
 		int[] min = {8-HALF_WIDTH, 8-HALF_WIDTH, 8-HALF_WIDTH};
 		int[] max = {8+HALF_WIDTH, 8+HALF_WIDTH, 8+HALF_WIDTH};

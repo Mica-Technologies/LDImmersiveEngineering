@@ -33,10 +33,14 @@ import javax.annotation.Nullable;
  * lies flat against a face, turns in right angles and wraps around the corners of whatever it is
  * clipped to, and that is the entire reason it exists.
  * <p>
- * The block is drawn by an ordinary multipart blockstate -- a hub against the mounting face plus
- * one arm per joined direction, in whichever of its three forms that arm has -- rather than by a
- * renderer. Seventy-eight small models, all axis-aligned boxes generated alongside the texture, and
- * nothing drawn per frame. A catenary renderer would be both the wrong shape and far more expensive.
+ * The block is drawn out of static geometry -- a hub against the mounting face plus one arm per
+ * joined direction, in whichever of its three forms that arm has -- rather than by a renderer.
+ * Seventy-eight small models, all axis-aligned boxes generated alongside the texture, and nothing
+ * drawn per frame. A catenary renderer would be both the wrong shape and far more expensive.
+ * <p>
+ * Which of those pieces to assemble is read off the tile entity by a smart model rather than spelled
+ * out in listed block properties -- see the constructor. That is why this block has eighteen states
+ * and not seventy-three thousand.
  *
  * @author LDImmersiveEngineering -- conduits
  */
@@ -44,18 +48,24 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 {
 	public BlockConduit()
 	{
+		//	=================================
+		//	Two listed properties, and that is deliberate
+		//	=================================
+		//Type times facing: eighteen states, and Forge builds every one of them at startup. It used
+		//to build 73,728, because twelve per-face booleans were declared here as well -- six saying
+		//which of a run's arms crossed a cell boundary and six saying which turned a corner, doubling
+		//as "this face is patched" and "a run touches this face" on a junction box. Every one of
+		//those states also earns a ModelResourceLocation of its own through IECustomStateMapper, so
+		//the cost was 73,728 model references for a block with seventy-eight pieces of geometry in it.
+		//
+		//All twelve now reach the renderer through TILEENTITY_PASSTHROUGH and a smart model instead
+		//-- see ConduitRunModel and ConduitJunctionModel. Nothing about how any of it draws changed;
+		//the same part models are assembled from the same three arm masks, one step later.
 		super("conduit", Material.IRON, PropertyEnum.create("type", BlockTypes_Conduit.class),
 				ItemBlockIEBase.class, IEProperties.FACING_ALL,
-				IEProperties.SIDECONNECTION[0], IEProperties.SIDECONNECTION[1],
-				IEProperties.SIDECONNECTION[2], IEProperties.SIDECONNECTION[3],
-				IEProperties.SIDECONNECTION[4], IEProperties.SIDECONNECTION[5],
-				//The junction box's own view of the same six faces -- which ones a run physically
-				//touches, rather than which ones are patched. See RUNCONNECTION's own comment.
-				IEProperties.RUNCONNECTION[0], IEProperties.RUNCONNECTION[1],
-				IEProperties.RUNCONNECTION[2], IEProperties.RUNCONNECTION[3],
-				IEProperties.RUNCONNECTION[4], IEProperties.RUNCONNECTION[5],
-				//Unlisted, and the only way the ground feeder's model can find out what it is
-				//supposed to look like: the disguise lives on the tile entity, not in the state.
+				//Unlisted, and how all three metas find out what they are supposed to look like: the
+				//shape lives on the tile entity, not in the state. The feeder's disguise, the run's
+				//arm masks and the box's mount, patches and stubs all arrive this way.
 				IEProperties.TILEENTITY_PASSTHROUGH,
 				//Also unlisted, and what makes a wire strung to a junction box visible. Without it
 				//getExtendedState has nowhere to put the connection set -- the property has to be
@@ -142,85 +152,21 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		return "run";
 	}
 
-	@Override
-	public IBlockState getActualState(IBlockState state, IBlockAccess world, BlockPos pos)
-	{
-		state = super.getActualState(state, world, pos);
-		TileEntity tile = world.getTileEntity(pos);
-		if(tile instanceof TileEntityConduit)
-		{
-			TileEntityConduit conduit = (TileEntityConduit)tile;
-			//	=================================
-			//	Four arm modes in two boolean properties
-			//	=================================
-			//Written out in absolute facings rather than as arm indices: the blockstate file reads far
-			//better as "sideconnection_north" than as "arm2", and the mapping between the two is
-			//exactly what ConduitGeometry.armIndex is for.
-			//
-			//An arm is one of four things since runs learned to turn corners, and the pair of
-			//booleans below spells all four:
-			//
-			//    sideconnection = the tubing crosses this cell boundary in the plane of the surface
-			//    runconnection  = the arm toward this face turns a corner
-			//
-			//    false/false  nothing            true/false  a straight arm
-			//    false/true   a riser, which     true/true   a straight arm that carries on past
-			//                 stops at the edge              the edge to cap an outer corner
-			//                 and climbs
-			//
-			//**No property was added to pay for corners, and that is not tidiness.** Forge builds
-			//the cartesian product of every listed property at startup, and this block already
-			//declares fourteen; a third value on a per-face property would have multiplied its
-			//state count by eleven, and a seventh boolean array by sixty-four.
-			//
-			//RUNCONNECTION means something else entirely on a junction box -- "a run touches this
-			//face" -- and that is safe for the reason SIDECONNECTION's two meanings are safe: the
-			//two block types are drawn by different blockstate files and neither can see the other's.
-			for(EnumFacing side : EnumFacing.VALUES)
-			{
-				ConduitGeometry.ArmMode mode = conduit.armMode(side);
-				state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
-						mode==ConduitGeometry.ArmMode.STRAIGHT||mode==ConduitGeometry.ArmMode.WRAP);
-				//Filled in for a run as well as for a box, and it has to be: an unset property keeps
-				//whatever the default state carries, and a stale true here would draw a riser into
-				//the ceiling.
-				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()],
-						mode==ConduitGeometry.ArmMode.RISER||mode==ConduitGeometry.ArmMode.WRAP);
-			}
-			return state;
-		}
-		if(tile instanceof TileEntityJunctionBox)
-		{
-			//The same six SIDECONNECTION properties the run uses, carrying "this face is patched"
-			//here rather than "this face is joined". Two meanings for one property is worth a second
-			//look, but the two block types are drawn by different blockstate files and neither can
-			//see the other's, so there is nowhere for them to be confused.
-			ConduitPatch patch = ((TileEntityJunctionBox)tile).getPatch();
-			for(EnumFacing side : EnumFacing.VALUES)
-				state = applyProperty(state, IEProperties.SIDECONNECTION[side.ordinal()],
-						patch.isPatched(side));
-			//The box's own idea of which faces a run actually touches -- see
-			//ConduitGeometry.joinsJunctionBox for why this cannot be read off the patch table: a run
-			//passing through unconfigured is exactly the common case, and its faces still need to
-			//meet the box's model rather than leave a gap where a conduit's arm reaches flush.
-			EnumFacing[] neighbourMounts = new EnumFacing[EnumFacing.VALUES.length];
-			//The scan itself lives on the tile entity, because the tile entity needs the same answer:
-			//a wire strung to a box attaches to the housing, and the housing is wherever this puts it.
-			boolean[] joins = TileEntityJunctionBox.joiningRuns(world, pos, neighbourMounts);
-			for(EnumFacing side : EnumFacing.VALUES)
-				state = applyProperty(state, IEProperties.RUNCONNECTION[side.ordinal()],
-						joins[side.ordinal()]);
-			//And which surface the box is drawn against, taken from the runs that reach it rather
-			//than from anything the box stores. A box in a different plane from its run cannot meet
-			//it at all -- the tubing hugs its face, so the gap is across the block, not along it --
-			//and this is the property that puts the two in the same plane. See
-			//ConduitGeometry.junctionBoxMount. Nothing else fills FACING_ALL for a box: the tile
-			//entity is deliberately not an IDirectionalTile, so this is the only writer.
-			state = applyProperty(state, IEProperties.FACING_ALL,
-					ConduitGeometry.junctionBoxMount(neighbourMounts));
-		}
-		return state;
-	}
+	//	=================================
+	//	There is no getActualState override any more
+	//	=================================
+	//BlockIETileProvider still fills FACING_ALL for a run, because TileEntityConduit is an
+	//IDirectionalTile and that is the one listed property left with anything to say. Everything else
+	//that used to be derived here -- twelve booleans per block, and for a junction box six tile
+	//lookups to work out which faces a run touched -- is read straight off the tile entity by the
+	//smart models now. getActualState is asked once per block per chunk rebuild and once per
+	//getStateForPlacement and once per anything that wants a block's real shape, so the six lookups
+	//were being paid for by every one of those callers rather than by the one that needed them.
+	//
+	//A box no longer fills FACING_ALL at all. It never had a facing of its own -- the mount is
+	//derived from the runs that reach it, in ConduitGeometry.junctionBoxMount -- and the only reader
+	//was the multipart blockstate that used to pick between six housing models. ConduitJunctionModel
+	//asks TileEntityJunctionBox.getRenderShape for the same answer instead.
 
 	//	=================================
 	//		PATCH COLOURS

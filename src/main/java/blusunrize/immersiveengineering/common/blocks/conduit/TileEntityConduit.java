@@ -8,10 +8,12 @@
 
 package blusunrize.immersiveengineering.common.blocks.conduit;
 
+import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockBounds;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IDirectionalTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbourChangeTile;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPropertyPassthrough;
 import blusunrize.immersiveengineering.common.blocks.IStatusLineProvider;
 import blusunrize.immersiveengineering.common.blocks.TileEntityIEBase;
 import blusunrize.immersiveengineering.common.util.Utils;
@@ -44,11 +46,17 @@ import java.util.List;
  * The connection mask is recomputed when a neighbour changes rather than every tick. There is no
  * {@code update} here at all, and that is the point: a conduit is scenery with a graph edge
  * attached, and the profiled history of this mod is largely a story about blocks that polled.
+ * <p>
+ * <strong>{@link IPropertyPassthrough} is what draws it.</strong> The three arm masks reach the
+ * renderer through {@code IEProperties.TILEENTITY_PASSTHROUGH} and a smart model rather than
+ * through twelve boolean block properties. Forge builds the cartesian product of every listed
+ * property at startup and bakes a model reference for each; those twelve cost this block 4096
+ * states per facing per meta, all to say what four bits already say here.
  *
  * @author LDImmersiveEngineering -- conduits
  */
 public class TileEntityConduit extends TileEntityIEBase implements IDirectionalTile, IBlockBounds,
-		INeighbourChangeTile, IBlockOverlayText, IStatusLineProvider
+		INeighbourChangeTile, IBlockOverlayText, IStatusLineProvider, IPropertyPassthrough
 {
 	/**
 	 * The face this conduit is clipped to -- the direction from the conduit toward its surface. A
@@ -66,6 +74,21 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	public int getConnections()
 	{
 		return arms.getConnections();
+	}
+
+	/**
+	 * The three arm masks, for the model's cache key. Together with {@link #facing} they are the
+	 * whole of what a length of conduit looks like, so they are what {@code ConduitRunModel} caches
+	 * an assembled quad list under.
+	 */
+	public int getRisers()
+	{
+		return arms.getRisers();
+	}
+
+	public int getWraps()
+	{
+		return arms.getWraps();
 	}
 
 	public boolean isConnected(EnumFacing dir)
@@ -97,6 +120,17 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		for(int i = 0; i < plane.length; i++)
 		{
 			EnumFacing dir = plane[i];
+			//An arm whose neighbourhood is not loaded keeps whatever it was. Unloaded reads as
+			//"nothing there" everywhere else in the feature, and that is the right answer for a
+			//walk -- but here it would turn a run's saved arms into stubs at every chunk border on
+			//load and never put them back, since the neighbour that would tell us it is there sees
+			//nothing changed when its own chunk arrives. The saved mask is the better guess.
+			if(!world.isBlockLoaded(getPos().offset(dir))
+					||!world.isBlockLoaded(ConduitGeometry.outerCornerCell(getPos(), facing, dir)))
+			{
+				found.set(i, arms.mode(i));
+				continue;
+			}
 			//Three ways to be joined in one direction, and the three are decided independently: a
 			//run may reach a wall and climb it where a flat neighbour would have been, and may
 			//round an outer corner in a direction that also holds a junction box. What differs is
@@ -220,8 +254,18 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		//No wakeBoxes here: on a chunk load every box on the run runs rebuildRuns from its own
 		//onLoad already, and a hundred conduits each walking the same run to reach the same two
 		//boxes would be a hundred walks to learn what two walks already knew.
-		if(world!=null&&!world.isRemote&&refreshConnections())
-			markContainingBlockForUpdate(null);
+		//
+		//And not now, but next tick: a chunk's tile entities are added one after another, and a
+		//conduit refreshed as it lands sees only the neighbours that landed before it. A run of ten
+		//loaded that way came back with a stub in the middle -- the fifth piece never learned about
+		//the sixth, and nothing afterwards told it, because the sixth found its own saved arms
+		//already right and had no reason to say anything. By the next tick the whole chunk is in.
+		if(world!=null&&!world.isRemote)
+			ApiUtils.addFutureServerTask(world, () -> {
+				if(!isInvalid()&&world.isBlockLoaded(getPos())&&world.getTileEntity(getPos())==this
+						&&refreshConnections())
+					markContainingBlockForUpdate(null);
+			});
 	}
 
 	/**

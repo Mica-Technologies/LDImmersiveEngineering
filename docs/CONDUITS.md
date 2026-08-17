@@ -344,6 +344,14 @@ replaces.** Two structural properties hold it up.
   at all per tick. The conduit blocks between two boxes are never nodes.
 - **Idle is free.** A junction box carrying nothing does one integer comparison per tick. A base
   with two hundred boxes and three live circuits costs two hundred comparisons.
+- **Eighteen block states, not 73,728.** What a conduit or a box looks like — which arms it has and
+  in which of their three forms, which faces are patched, which surface a box hugs — is read off the
+  tile entity at render time by a smart model, not spelled out in block properties. It used to be
+  twelve boolean properties, and Forge builds the cartesian product of every listed property at
+  startup and gives each resulting state a model reference of its own, so a block made of
+  seventy-eight little boxes was costing seventy-three thousand of them. Nothing about how any of it
+  draws changed: the same generated models are assembled from the same masks, one step later, and
+  the assembly is cached per distinct shape.
 
 Energy moves as a bucket brigade: each box hands half the difference to whichever neighbour is
 holding less, and drains in full into any connector on the matching breakout. Nobody walks the run

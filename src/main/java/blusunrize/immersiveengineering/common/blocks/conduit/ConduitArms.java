@@ -52,10 +52,23 @@ public class ConduitArms
 		return connections;
 	}
 
-	/** Which arms climb, for the one caller that wants the whole mask: the hitbox. */
+	/** Which arms climb, for the callers that want the whole mask: the hitbox and the model. */
 	public int getRisers()
 	{
 		return risers;
+	}
+
+	/**
+	 * Which arms cap an outer corner, for the model's cache key.
+	 * <p>
+	 * The three masks together are exactly what decides which of the seventy-eight part models a
+	 * length of conduit is assembled from, so they are also what that assembly is cached under --
+	 * see {@code ConduitRunModel}. Two conduits with the same three masks on the same mount draw the
+	 * same thing, and nothing else about a conduit is visible.
+	 */
+	public int getWraps()
+	{
+		return wraps;
 	}
 
 	public boolean isConnected(int arm)

@@ -47,38 +47,19 @@ public class IEProperties
 			new ProperySideConfig("sideconfig_west"),
 			new ProperySideConfig("sideconfig_east")
 	};
-	public static final PropertyBoolInverted[] SIDECONNECTION = {
-			PropertyBoolInverted.create("sideconnection_down"),
-			PropertyBoolInverted.create("sideconnection_up"),
-			PropertyBoolInverted.create("sideconnection_north"),
-			PropertyBoolInverted.create("sideconnection_south"),
-			PropertyBoolInverted.create("sideconnection_west"),
-			PropertyBoolInverted.create("sideconnection_east")
-	};
-
-	//The conduit junction box's own idea of which faces a run is physically touching, as opposed to
-	//SIDECONNECTION above, which the box already uses to mean "this face is patched". The two cannot
-	//share one property: a box can have a run arriving on a face that is not patched at all.
+	//	=================================
+	//	SIDECONNECTION and RUNCONNECTION are gone
+	//	=================================
+	//Twelve per-face booleans, and the conduit was the only block in the mod that ever declared any
+	//of them: six spelling which of a run's arms crossed a cell boundary and six which of them turned
+	//a corner, doubling as "this face is patched" and "a run touches this face" on a junction box.
 	//
-	//On a length of conduit -- a different meta of the same block, drawn by a different blockstate
-	//file -- this pair says something else again, and deliberately: together the two spell the four
-	//things an arm can be, since runs learned to turn corners. sideconnection is "the tubing crosses
-	//this cell boundary in the plane of the surface" and runconnection is "the arm toward this face
-	//turns a corner", so false/false is no arm, true/false a straight one, false/true a riser and
-	//true/true a straight arm capping an outer corner. See BlockConduit.getActualState.
+	//Forge builds the cartesian product of every listed property at block registration and hands each
+	//resulting state a ModelResourceLocation of its own, so twelve booleans cost that block 4096
+	//states per facing per meta -- 73,728 in all, for seventy-eight pieces of geometry. They now
+	//reach the renderer through TILEENTITY_PASSTHROUGH and a smart model instead; see
+	//ConduitRunModel and ConduitJunctionModel. Nothing about a conduit's appearance changed.
 	//
-	//Reused rather than given a property of its own because Forge builds the cartesian product of
-	//every listed property at block registration: BlockConduit already declares fourteen, and a
-	//seventh boolean array would have multiplied its state count by sixty-four.
-	public static final PropertyBoolInverted[] RUNCONNECTION = {
-			PropertyBoolInverted.create("runconnection_down"),
-			PropertyBoolInverted.create("runconnection_up"),
-			PropertyBoolInverted.create("runconnection_north"),
-			PropertyBoolInverted.create("runconnection_south"),
-			PropertyBoolInverted.create("runconnection_west"),
-			PropertyBoolInverted.create("runconnection_east")
-	};
-
 	//An array of non-descript booleans for mirroring, active textures, etc.
 	public static final PropertyBoolInverted[] BOOLEANS = {
 			PropertyBoolInverted.create("boolean0"),
