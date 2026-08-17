@@ -56,11 +56,34 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 
 	boolean firstTick = true;
 
+	/**
+	 * Whether this connector was feeding something the last time it looked, or null before it has
+	 * looked. Server side, not saved.
+	 * <p>
+	 * The wire network's route cache bakes "is the far end a consumer" into each cached route, and
+	 * nothing invalidated that when the answer changed. A connector wired up before the machine
+	 * behind it was formed -- the ordinary building order -- was cached as a dead end, and stayed one
+	 * for as long as the world was loaded: the machine ran on whatever its buffer held and then sat
+	 * dark on a live wire, which is precisely "it works for a few seconds and then breaks down". The
+	 * cheap watch below catches that transition (and the reverse, and a capacitor's side being
+	 * switched, and a machine loading a tick after its wire) and re-floods the network once, which is
+	 * what stringing the wire again did by accident.
+	 */
+	private Boolean lastKnownOutput;
+
+	/**
+	 * How often a connector re-asks whether the block it is bolted to takes power. Rare enough to
+	 * cost nothing -- one tile lookup a second and a half per connector -- and the answer only ever
+	 * changes when a player builds something, so a second's delay is invisible.
+	 */
+	private static final int OUTPUT_WATCH_INTERVAL = 32;
+
 	@Override
 	public void update()
 	{
 		if(!world.isRemote)
 		{
+			watchOutputState();
 			//				if(Lib.IC2 && !this.inICNet)
 			//				{
 			//					IC2Helper.loadIC2Tile(this);
@@ -96,6 +119,21 @@ public class TileEntityConnectorLV extends TileEntityImmersiveConnectable implem
 			firstTick = false;
 		}
 	}
+	/**
+	 * See {@link #lastKnownOutput}. Staggered by position so a wall of connectors does not all look
+	 * on the same tick, and silent on the first look: the flood that runs when a connector loads has
+	 * already covered whatever the answer is then.
+	 */
+	private void watchOutputState()
+	{
+		if(isRelay()||((world.getTotalWorldTime()+(pos.getX()^pos.getZ()))&(OUTPUT_WATCH_INTERVAL-1))!=0)
+			return;
+		boolean output = isEnergyOutput();
+		if(lastKnownOutput!=null&&lastKnownOutput!=output)
+			ImmersiveNetHandler.INSTANCE.queueConnectivityFlood(world, pos);
+		lastKnownOutput = output;
+	}
+
 	//	@Override
 	//	public void invalidate()
 	//	{
