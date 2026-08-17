@@ -237,7 +237,8 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	 * <p>
 	 * Hung off the connection mask actually changing rather than off every neighbour update, so it
 	 * costs a walk when somebody builds something and nothing at all the rest of the time -- the
-	 * same bargain {@link TileEntityJunctionBox#rebuildRuns} makes.
+	 * same bargain {@link TileEntityJunctionBox#rebuildRuns} makes. Queued rather than walked on
+	 * the spot, so a box reached by several conduits changing in one tick walks its run once.
 	 */
 	private void wakeBoxes()
 	{
@@ -245,7 +246,7 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		{
 			TileEntity te = Utils.getExistingTileEntity(world, box);
 			if(te instanceof TileEntityJunctionBox)
-				((TileEntityJunctionBox)te).rebuildRuns();
+				((TileEntityJunctionBox)te).queueRebuild();
 		}
 	}
 

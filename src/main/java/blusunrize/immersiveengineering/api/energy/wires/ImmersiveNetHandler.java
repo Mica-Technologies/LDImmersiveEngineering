@@ -169,9 +169,15 @@ public class ImmersiveNetHandler
 		Map<BlockPos, Set<Connection>> connsInDim = getMultimap(world.provider.getDimension());
 		Set<Connection> reverseConns = connsInDim.get(con.end);
 		Set<Connection> forwardConns = connsInDim.get(con.start);
-		Optional<Connection> back = reverseConns.stream().filter(con::hasSameConnectors).findAny();
-		reverseConns.removeIf(con::hasSameConnectors);
-		forwardConns.removeIf(con::hasSameConnectors);
+		//Either end may have no entry at all -- a node whose set was never created, or one torn
+		//down from the other side first -- and this runs inside the server tick, where a null here
+		//is a crash with nothing useful in the report.
+		Optional<Connection> back = reverseConns==null?Optional.empty()
+				: reverseConns.stream().filter(con::hasSameConnectors).findAny();
+		if(reverseConns!=null)
+			reverseConns.removeIf(con::hasSameConnectors);
+		if(forwardConns!=null)
+			forwardConns.removeIf(con::hasSameConnectors);
 		Map<BlockPos, BlockWireInfo> mapForDim = blockWireMap.lookup(world.provider.getDimension());
 		BiConsumer<BlockPos, Map<BlockPos, BlockWireInfo>> handle = (p, map) -> {
 			if(mapForDim!=null)
@@ -403,8 +409,11 @@ public class ImmersiveNetHandler
 			double dx = dropPos.getX()+.5;
 			double dy = dropPos.getY()+.5;
 			double dz = dropPos.getZ()+.5;
-			if(world.getGameRules().getBoolean("doTileDrops"))
-				world.spawnEntity(new EntityItem(world, dx, dy, dz, conn.cableType.getWireCoil(conn)));
+			ItemStack coil = conn.cableType.getWireCoil(conn);
+			//An empty coil is a real answer -- a conduit bundle has none -- and an item entity holding
+			//nothing lives for a tick before killing itself. See clearAllConnectionsFor.
+			if(!coil.isEmpty()&&world.getGameRules().getBoolean("doTileDrops"))
+				world.spawnEntity(new EntityItem(world, dx, dy, dz, coil));
 		}
 	}
 
@@ -598,6 +607,12 @@ public class ImmersiveNetHandler
 		if(conL!=null)
 			for(Connection con : conL)
 			{
+				//A conduit bundle is never a wire route: the boxes at its ends move energy along it
+				//themselves, hop by hop, and a route search that walked out along one only found
+				//peers it then had to be told to ignore. Skipped here and below, so the search does
+				//not spend its budget on them.
+				if(con.isBundle())
+					continue;
 				IImmersiveConnectable end = toIIC(con.end, world);
 				if(end!=null)
 				{
@@ -654,7 +669,7 @@ public class ImmersiveNetHandler
 			Set<Connection> conLN = getConnections(world, nextPos);
 			if(conLN!=null)
 				for(Connection con : conLN)
-					if(next.allowEnergyToPass(con))
+					if(!con.isBundle()&&next.allowEnergyToPass(con))
 					{
 						IImmersiveConnectable end = toIIC(con.end, world);
 						float newLoss = con.getBaseLoss()+loss;

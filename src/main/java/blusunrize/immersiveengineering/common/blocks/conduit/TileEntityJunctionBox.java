@@ -25,6 +25,7 @@ import blusunrize.immersiveengineering.common.util.WireNetTransfer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.math.Vec3i;
 import net.minecraft.world.IBlockAccess;
+import net.minecraft.world.World;
 import net.minecraftforge.common.property.IExtendedBlockState;
 
 import java.util.Arrays;
@@ -196,6 +197,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
 
+	/** Client only: the tick the readout last asked the server for fresh figures. */
+	private long lastReadoutRequest = Long.MIN_VALUE;
+
 	/**
 	 * What each conductor is carrying as a redstone signal, 0-15.
 	 * <p>
@@ -242,7 +246,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		boolean[] joins = new boolean[EnumFacing.VALUES.length];
 		for(EnumFacing side : EnumFacing.VALUES)
 		{
-			TileEntity neighbour = world.getTileEntity(pos.offset(side));
+			BlockPos at = pos.offset(side);
+			//Unloaded is "nothing there", as everywhere else in the feature: this is asked from the
+			//server when a wire's attachment point is wanted and from the client's chunk-render
+			//threads, and neither may pull the chunk next door in to answer. A ChunkCache reports
+			//everything it holds as loaded, so the client path is unchanged by the guard.
+			TileEntity neighbour = world instanceof World&&!((World)world).isBlockLoaded(at)
+					?null: world.getTileEntity(at);
 			EnumFacing neighbourMount = neighbour instanceof TileEntityConduit
 					?((TileEntityConduit)neighbour).facing: null;
 			EnumFacing.Axis feederAxis = neighbour instanceof TileEntityGroundFeeder
@@ -283,18 +293,116 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	// ------------------------------------------------------------------
 
 	/**
+	 * Set when something next door changed; cleared by the next server tick, which does the walk.
+	 * <p>
+	 * A neighbour change asks for a rebuild rather than performing one, and the tick performs at
+	 * most one however many asked. Placing a single length of conduit against a box reaches it
+	 * three ways -- the neighbour update, the conduit's own block update, and {@code wakeBoxes} --
+	 * and each used to be a full walk of the run.
+	 */
+	private boolean rebuildQueued;
+
+	/**
+	 * Which faces had conduit hardware against them when the runs were last walked, one bit per
+	 * {@link EnumFacing} ordinal. What lets a neighbour update be ignored: a comparator flickering
+	 * against a live box, a hopper, a piston somewhere on the far side -- none of them can have
+	 * changed a run, and none of them is worth a walk. Only a change on a face that has, or had,
+	 * conduit hardware on it can. Zero until the first walk, and a zero mask defers to the queue,
+	 * so a box that has never walked still walks on its first neighbour update.
+	 */
+	private int hardwareMask;
+
+	/**
+	 * Set when a neighbour change may have moved a redstone input; cleared by the next server tick,
+	 * which re-derives the run's signals once. The same bargain as {@link #rebuildQueued}: a lever
+	 * being spammed against a box with a redstone breakout costs one walk over the run's boxes a
+	 * tick, not one per update, and nothing that bounces an update back can turn that into a loop.
+	 */
+	private boolean signalsQueued;
+
+	/**
+	 * @return one bit per face with a conduit, box or feeder against it right now
+	 */
+	private int hardwareAround()
+	{
+		int mask = 0;
+		for(EnumFacing side : EnumFacing.VALUES)
+		{
+			BlockPos at = getPos().offset(side);
+			TileEntity te = world.isBlockLoaded(at)?world.getTileEntity(at): null;
+			if(te instanceof TileEntityConduit||te instanceof TileEntityJunctionBox
+					||te instanceof TileEntityGroundFeeder)
+				mask |= 1<<side.ordinal();
+		}
+		return mask;
+	}
+
+	/**
+	 * Whether a change at {@code other} could have altered the runs reaching this box.
+	 * <p>
+	 * True when there is conduit hardware there now, when there was some there at the last walk,
+	 * or when the question cannot be answered cheaply -- a change that is not next door, or a box
+	 * that has never walked. False for the common case this exists for: a neighbour that is not
+	 * conduit and never was, changing state next to a box, which used to cost a full walk of the
+	 * run and could do so every tick.
+	 */
+	private boolean concernsRuns(BlockPos other)
+	{
+		if(hardwareMask==0||other==null)
+			return true;
+		int dx = other.getX()-getPos().getX();
+		int dy = other.getY()-getPos().getY();
+		int dz = other.getZ()-getPos().getZ();
+		if(Math.abs(dx)+Math.abs(dy)+Math.abs(dz)!=1)
+			return true;
+		EnumFacing side = EnumFacing.getFacingFromVector(dx, dy, dz);
+		if((hardwareMask&(1<<side.ordinal()))!=0)
+			return true;
+		TileEntity te = world.isBlockLoaded(other)?world.getTileEntity(other): null;
+		return te instanceof TileEntityConduit||te instanceof TileEntityJunctionBox
+				||te instanceof TileEntityGroundFeeder;
+	}
+
+	/**
+	 * Ask for the runs to be re-walked on the next server tick. Safe to call any number of times a
+	 * tick, from anything, at any depth: it sets a flag.
+	 */
+	public void queueRebuild()
+	{
+		if(world!=null&&!world.isRemote)
+			rebuildQueued = true;
+	}
+
+	/**
 	 * Rebuild this box's connections from the conduit actually on the walls.
 	 * <p>
 	 * Both sides of a run are torn down and rebuilt rather than patched, because working out which
 	 * single conduit block changed and what that implies is far more code than re-walking a run,
 	 * and this happens when somebody places a block rather than every tick.
+	 * <p>
+	 * <strong>Notifies only when the graph actually changed.</strong> This used to send a block
+	 * update unconditionally, and a block update notifies the neighbours, and a neighbouring box
+	 * answers a neighbour update by rebuilding -- so two boxes side by side rebuilt each other
+	 * forever. Not once a tick, either: {@code BlockIETileProvider.neighborChanged} defers the
+	 * call onto the server's future-task queue, and the server drains that queue to empty inside a
+	 * single tick, so each rebuild queued the next and the tick never ended. The client kept
+	 * drawing at full frame rate while the integrated server sat in that loop, which is exactly
+	 * the "locks up but only while conduit is placed" a playtester reported, and a dedicated
+	 * server's watchdog kills it, which is the crash he saw. Callers that want the walk go through
+	 * {@link #queueRebuild()} now, which also bounds a box to one walk a tick against anything
+	 * else that might bounce an update back.
+	 *
+	 * @return true if a run was made or dropped
 	 */
-	public void rebuildRuns()
+	public boolean rebuildRuns()
 	{
 		if(world==null||world.isRemote)
-			return;
+			return false;
+		rebuildQueued = false;
+		hardwareMask = hardwareAround();
 		Map<BlockPos, Integer> peers = ConduitRoute.junctionsFrom(getPos(), new ConduitWorldProbe(world));
 		Set<BlockPos> wanted = new HashSet<>(peers.keySet());
+		boolean changed = false;
 
 		//Drop what is no longer reachable first, so a run rerouted onto a different wall does not
 		//briefly exist twice.
@@ -302,7 +410,12 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		{
 			BlockPos other = existing.end;
 			if(!wanted.remove(other))
-				ImmersiveNetHandler.INSTANCE.removeConnectionAndDrop(existing, world, getPos());
+			{
+				//removeConnection, not removeConnectionAndDrop: a bundle has no coil, and the drop
+				//variant spawned an item entity holding nothing for every run torn down.
+				ImmersiveNetHandler.INSTANCE.removeConnection(world, existing);
+				changed = true;
+			}
 		}
 		for(BlockPos peer : wanted)
 		{
@@ -319,8 +432,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(back!=null)
 				back.channels = fullBundle();
 			((TileEntityJunctionBox)te).markContainingBlockForUpdate(null);
+			changed = true;
 		}
-		markContainingBlockForUpdate(null);
+		if(changed)
+			markContainingBlockForUpdate(null);
+		return changed;
 	}
 
 	private static ChannelSet fullBundle()
@@ -650,6 +766,18 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			rebuildRuns();
 			if(reconcileWires())
 				markDirty();
+		}
+		//One walk a tick, however many neighbour changes asked for it -- see queueRebuild. Cheap
+		//when nothing asked: a boolean, before the live-mask check below.
+		if(rebuildQueued&&world!=null&&!world.isRemote&&rebuildRuns())
+			//The run's shape changed: if this box carries signals, the walk over its boxes has to
+			//be redone on the new graph.
+			signalsQueued = true;
+		if(signalsQueued&&world!=null&&!world.isRemote)
+		{
+			signalsQueued = false;
+			if(patch.hasRedstone())
+				propagateSignals();
 		}
 		//The cheap exit, and the reason a base full of idle conduit costs nothing: one comparison.
 		if(world==null||world.isRemote||liveMask==0)
@@ -1132,16 +1260,20 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		forgetMount();
 		if(world==null||world.isRemote)
 			return;
-		rebuildRuns();
+		//Queued, not done -- see rebuildRuns for the loop this used to be -- and only when the change
+		//is on a face that has, or had, conduit against it. Anything else next to a box is somebody
+		//else's hardware and cannot have moved a run.
+		if(concernsRuns(other))
+			queueRebuild();
 		if(autoPatch())
 		{
 			markDirty();
 			markContainingBlockForUpdate(null);
 		}
 		//A neighbour changing is the only thing that can move a redstone input, so it is the only
-		//thing that has to re-derive the run's signals.
+		//thing that has to re-derive the run's signals. Queued for the same reason the walk is.
 		if(patch.hasRedstone())
-			propagateSignals();
+			signalsQueued = true;
 	}
 
 	// ------------------------------------------------------------------
@@ -1211,7 +1343,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//twenty boxes with one output on it should cause one neighbour notification, not twenty.
 		for(EnumFacing face : EnumFacing.VALUES)
 			if(patch.isPatched(face)&&patch.modeOf(face)==ConduitPatch.Mode.REDSTONE_OUT)
-				world.notifyNeighborsOfStateChange(getPos().offset(face), getBlockType(), false);
+				//Except this box: it is the emitting face's neighbour too, and telling it would only
+				//queue another walk to find the signals it just set.
+				world.notifyNeighborsOfStateExcept(getPos().offset(face), getBlockType(),
+						face.getOpposite());
 	}
 
 	/**
@@ -1501,8 +1636,14 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//The figures come from the server, and only while somebody is reading them: once a second
 		//ask for a fresh description packet, the same way the voltmeter does. A box nobody is
 		//looking at sends nothing.
-		if(world!=null&&world.isRemote&&world.getTotalWorldTime()%20==0)
+		//Gated on the tick the last request went out on, not on the world time alone: this is
+		//called once per frame, and "world time is a multiple of twenty" is true for every frame of
+		//that tick, which at a hundred frames a second was five or six requests where one was meant.
+		if(world!=null&&world.isRemote&&world.getTotalWorldTime()-lastReadoutRequest >= 20)
+		{
+			lastReadoutRequest = world.getTotalWorldTime();
 			ImmersiveEngineering.packetHandler.sendToServer(new MessageRequestBlockUpdate(getPos()));
+		}
 		EnumFacing side = mop==null?null: mop.sideHit;
 		WireChannel here = patch.get(side);
 		return new String[]{

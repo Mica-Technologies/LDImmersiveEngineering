@@ -843,7 +843,17 @@ public class ApiUtils
 		Set<Connection> conL = ImmersiveNetHandler.INSTANCE.getConnections(world, pos);
 		if(conL!=null)
 			for(Connection con : conL)
-				connectionList.appendTag(con.writeToNBT());
+			{
+				NBTTagCompound tag = con.writeToNBT();
+				//A bundle goes over as a bundle with nothing in it. The client needs to know the
+				//edge exists and that it is conduit -- the box's readout counts its runs and the
+				//wire renderer skips them -- and needs none of the sixteen conductor specs, which
+				//are a kilobyte a run that only the server's transfer ever reads. Empty rather than
+				//absent: absent reads back as an ordinary wire, and would be drawn as one.
+				if(con.isBundle())
+					tag.setTag("channels", new NBTTagCompound());
+				connectionList.appendTag(tag);
+			}
 		nbt.setTag("connectionList", connectionList);
 	}
 
@@ -859,15 +869,23 @@ public class ApiUtils
 		if(world==null||!world.isRemote||nbt==null||net.minecraft.client.Minecraft.getMinecraft().isSingleplayer())
 			return;
 		NBTTagList connectionList = nbt.getTagList("connectionList", 10);
-		ImmersiveNetHandler.INSTANCE.clearConnectionsOriginatingFrom(pos, world);
+		//The dimension-keyed overloads, and one cache reset at the end, rather than the World ones:
+		//each of those resets the cached routes as it goes, which on the client means throwing
+		//away every baked wire model in the game. One description packet for one connector used to
+		//do that once for the clear and once more per connection it carried.
+		int dimension = world.provider.getDimension();
+		Set<Connection> existing = ImmersiveNetHandler.INSTANCE.getConnections(dimension, pos);
+		if(existing!=null)
+			existing.clear();
 		for(int i = 0; i < connectionList.tagCount(); i++)
 		{
 			Connection con = Connection.readFromNBT(connectionList.getCompoundTagAt(i));
 			if(con!=null)
-				ImmersiveNetHandler.INSTANCE.addConnection(world, pos, con);
+				ImmersiveNetHandler.INSTANCE.addConnection(dimension, pos, con);
 			else
 				IELogger.error("CLIENT read connection as null from {}", nbt);
 		}
+		ImmersiveNetHandler.INSTANCE.resetCachedIndirectConnections(world, pos);
 	}
 
 	public static Object convertToValidRecipeInput(Object input)

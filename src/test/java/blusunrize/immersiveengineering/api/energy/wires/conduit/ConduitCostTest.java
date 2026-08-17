@@ -241,6 +241,70 @@ class ConduitCostTest
 		}
 	}
 
+	/**
+	 * A neighbour update must not be able to feed itself. This is the shape of the one bug that
+	 * actually shipped: a box that rebuilt its runs on every neighbour update and sent a block
+	 * update after every rebuild -- and a block update is a neighbour update to the box next door.
+	 * Two boxes side by side then rebuilt each other inside the server's future-task drain, which
+	 * runs to empty within a single tick, and the tick never ended. See
+	 * {@code TileEntityJunctionBox.rebuildRuns} for the full account.
+	 */
+	@Nested
+	@DisplayName("a neighbour update cannot feed itself")
+	class NoFeedback
+	{
+		private final String box = source("common/blocks/conduit/TileEntityJunctionBox.java");
+
+		private String body(String signature, String until)
+		{
+			int start = box.indexOf(signature);
+			assertTrue(start > 0, signature+" is gone -- rewrite this test");
+			int end = box.indexOf(until, start);
+			assertTrue(end > start, until+" is gone -- rewrite this test");
+			return box.substring(start, end);
+		}
+
+		@Test
+		@DisplayName("a neighbour change queues the walk rather than doing it")
+		void neighbourChangeQueues()
+		{
+			String body = body("public void onNeighborBlockChange(BlockPos other)", "\n\t}\n");
+			assertFalse(body.contains("rebuildRuns()"),
+					"onNeighborBlockChange walks the run on the spot again -- that is the loop");
+			assertTrue(body.contains("queueRebuild()"), "onNeighborBlockChange no longer queues a rebuild");
+			assertFalse(body.contains("propagateSignals()"),
+					"onNeighborBlockChange re-derives signals on the spot; queue them like the walk");
+		}
+
+		@Test
+		@DisplayName("a rebuild that changed nothing tells nobody")
+		void rebuildNotifiesOnlyOnChange()
+		{
+			String body = body("public boolean rebuildRuns()", "\n\t}\n");
+			//Every self-notification in the method has to sit under the changed flag. Cheap way to
+			//assert that: the method's own mark is guarded, and it is the only one at method depth.
+			assertTrue(body.contains("if(changed)\n\t\t\tmarkContainingBlockForUpdate(null);"),
+					"rebuildRuns marks the block for update unconditionally -- that is the loop");
+			assertEquals(1, countOf(body, "\n\t\tmarkContainingBlockForUpdate(null);")
+					+countOf(body, "\n\t\t\tmarkContainingBlockForUpdate(null);"),
+					"rebuildRuns notifies itself somewhere other than under the changed flag");
+		}
+
+		@Test
+		@DisplayName("the walk happens at most once a tick, from the tick")
+		void walkIsCoalescedIntoTheTick()
+		{
+			String update = body("public void update()", "private void drainToBreakout");
+			assertTrue(update.contains("rebuildQueued"), "update() no longer drains the rebuild queue");
+			//And the queue flag is what everything else sets: nothing outside update() and the
+			//first-tick reconcile may walk directly.
+			int walks = countOf(box, "rebuildRuns();")+countOf(box, "rebuildRuns())");
+			assertEquals(2, walks, "something calls rebuildRuns() directly instead of queueRebuild()");
+			String conduit = source("common/blocks/conduit/TileEntityConduit.java");
+			assertFalse(conduit.contains("rebuildRuns()"), "a conduit walks a box's runs on the spot");
+		}
+	}
+
 	private static int countOf(String text, String needle)
 	{
 		int n = 0;

@@ -126,6 +126,8 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 {
 	private boolean shieldToggleButton = false;
 	private int shieldToggleTimer = 0;
+	/** The tick the energy overlay last asked the server for fresh figures -- see its use. */
+	private long lastEnergyReadoutRequest = Long.MIN_VALUE;
 	private static final String[] BULLET_TOOLTIP = {"\u00A0\u00A0IE\u00A0", "\u00A0\u00A0AMMO\u00A0", "\u00A0\u00A0HERE\u00A0", "\u00A0\u00A0--\u00A0"};
 
 	@Override
@@ -942,8 +944,11 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 							}
 							if(text!=null)
 							{
-								if(player.world.getTotalWorldTime()%20==0)
+								//Once a tick, not once a frame: the tick test alone held for every frame
+								//drawn during that tick.
+								if(player.world.getTotalWorldTime()-lastEnergyReadoutRequest >= 20)
 								{
+									lastEnergyReadoutRequest = player.world.getTotalWorldTime();
 									ImmersiveEngineering.packetHandler.sendToServer(new MessageRequestBlockUpdate(mop.getBlockPos()));
 								}
 								int i = 0;
