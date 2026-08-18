@@ -197,8 +197,39 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 	@Override
 	public void postEnergyTransferUpdate(int energy, boolean simulate)
 	{
-		if(!simulate)
-			this.updateMasterBlock(null, energy!=0);
+		if(simulate)
+			return;
+		if(energy > 0)
+			cityModePresence();
+		this.updateMasterBlock(null, energy!=0);
+	}
+
+	/**
+	 * City mode: being fed at all is being fed enough.
+	 * <p>
+	 * The rest of city mode already says so -- a conductor lit by any credit is lit, a generator
+	 * holding any fuel runs, a switched-on machine's buffer reads full -- and machines were the
+	 * one place accounting still applied between the switch edges: a machine drawing more than
+	 * its wire brought drained its buffer to zero and then ran in fits, exactly as it would in
+	 * stock. In a decorative city that is a machine that ``worked for ten seconds and then died'',
+	 * which is precisely what a playtester reported once his wire actually delivered.
+	 * <p>
+	 * So while the machine subsystem is simplified, every delivery tops the buffer up to
+	 * capacity: a machine that receives anything runs at full speed and its gauge reads full, and
+	 * only when the supply stops does the gauge draw down at the machine's own rate and the machine
+	 * finally stop. Not while switched off, or the redstone edge that empties the buffer would be
+	 * refilled a tick later by whatever is still feeding it.
+	 */
+	private void cityModePresence()
+	{
+		if(!CityMode.machines()||world==null||world.isRemote)
+			return;
+		T master = master();
+		if(master==null||!master.formed||master.isRSDisabled())
+			return;
+		FluxStorage storage = master.energyStorage;
+		if(storage.getEnergyStored() < storage.getMaxEnergyStored())
+			storage.setEnergy(storage.getMaxEnergyStored());
 	}
 
 	@SideOnly(Side.CLIENT)

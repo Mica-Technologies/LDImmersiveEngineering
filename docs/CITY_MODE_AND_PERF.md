@@ -121,7 +121,7 @@ It covers seven subsystems:
 | **Wires** | One lossless push per connector instead of loss, distance weighting, proportional split, a double simulate/real pass and a network-wide broadcast. |
 | **Floodlights** | Beams are re-traced only when the light switches or a neighbour changes, never on a timer, and the number of light blocks one lamp may place is capped. |
 | **Generators** | Fuel becomes presence rather than accounting — a generator holding fuel runs on it forever and never draws the tank down; an empty one is still empty. |
-| **Machines** | Multiblocks with nothing to do stop re-scanning the recipe list every tick, and the scan interval widens. A switched-on machine also animates steadily rather than per-batch, and its energy buffer follows its redstone switch. |
+| **Machines** | Multiblocks with nothing to do stop re-scanning the recipe list every tick, and the scan interval widens. A switched-on machine also animates steadily rather than per-batch, its energy buffer follows its redstone switch, and any delivery at all keeps it full — a fed machine runs at full speed. |
 | **Virtual grid** | Segments stop accounting for flux and switch to presence: a segment is energized or it is not, and its Service Units deliver freely. See [Virtual Power Grid](#virtual-power-grid). |
 | **Fluid pipes** | A pipe hands its fluid to the endpoints on its network in order until it runs out, instead of simulating a fill against every one of them and then splitting the result in proportion. See [Fluid Pipes](#fluid-pipes). |
 | **Conduits** | Bundles stop moving units of flux and switch to presence, exactly as the grid does: a conductor is energised or it is not. See [Conduits](#conduits). |
@@ -627,13 +627,29 @@ same trade the [virtual grid](#virtual-power-grid) and [conduits](#conduits) mak
 the machine and its gauge are one thing a player switches, and stopping the process while leaving
 the buffer sitting where it was reads as the switch only half working.
 
-It is an **edge**, not a level: the buffer is set once per transition and left alone in between, so
-a machine doing real work still draws its buffer down and still refills from whatever feeds it. A
+It is an **edge**, not a level: the buffer is set once per transition and left alone in between. A
 machine seen for the first time — freshly placed, or freshly loaded from disk — counts as a
 transition, so a machine that comes back with its lever already thrown is brought into line
 immediately rather than waiting for someone to flip it twice.
 
-This does create energy, and it is the one place city mode does. It is gated behind
+### Being fed at all is being fed enough
+
+Between those edges the buffer used to do stock accounting, and that left one hole: a machine
+drawing more than its wire delivered — a Squeezer running eight batches off an LV line, an Arc
+Furnace off anything smaller than HV — drained to zero and then ran in fits, animation and sound
+cutting in and out with the buffer. Everything else in city mode already treats supply as
+presence (a conductor lit by any credit is lit, a generator holding any fuel runs), and machines
+were the last place the accounting still bit. A playtester's summary of it was that machines
+"work for ten seconds and then die out": ten seconds is the full buffer being spent.
+
+So in city mode **every delivery tops the buffer up to capacity**. A machine that receives
+anything at all runs at full speed and its gauge reads full; only when the supply stops does the
+gauge draw down at the machine's own rate and the machine finally stop. Not while it is switched
+off — the redstone edge that empties the buffer would otherwise be refilled a tick later by
+whatever is still feeding it. This is the machine half of the same trade the wires make: an LV
+wire lights an HV conductor, and an LV wire runs an Arc Furnace.
+
+Both of these create energy, and they are the places city mode does. They are gated behind
 `cityModeMachines` with everything else in this section, so `cityModeMachines = false` (or the
 master switch) restores strict conservation.
 
