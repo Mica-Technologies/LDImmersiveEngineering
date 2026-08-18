@@ -24,6 +24,8 @@ import net.minecraft.util.Mirror;
 import net.minecraft.util.Rotation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
+import net.minecraft.server.management.PlayerChunkMapEntry;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.property.IExtendedBlockState;
 import net.minecraftforge.energy.CapabilityEnergy;
@@ -157,6 +159,27 @@ public abstract class TileEntityIEBase extends TileEntity
 	public void markContainingBlockForUpdate(@Nullable IBlockState newState)
 	{
 		markBlockForUpdate(getPos(), newState);
+	}
+
+	/**
+	 * Send this tile's description packet to every player watching its chunk, and nothing else.
+	 * <p>
+	 * {@link #markContainingBlockForUpdate} is the heavy way to get data to the client: it sends a
+	 * block change as well, which makes every client rebuild the chunk section the block is in, and
+	 * it notifies all six neighbours. That is right when the block itself changed. It is the wrong
+	 * tool for "the numbers inside this tile moved", which is what a machine says every tick it is
+	 * processing -- and a client rebuilding a chunk mesh twenty times a second for every running
+	 * machine in view is a large part of what a busy IE base costs to look at. This sends only the
+	 * tile data; a renderer that reads the tile sees it on the next frame.
+	 */
+	public void sendUpdatePacketToWatchers()
+	{
+		if(!(world instanceof WorldServer))
+			return;
+		PlayerChunkMapEntry entry = ((WorldServer)world).getPlayerChunkMap()
+				.getEntry(pos.getX()>>4, pos.getZ()>>4);
+		if(entry!=null)
+			entry.sendPacket(getUpdatePacket());
 	}
 
 	public void markBlockForUpdate(BlockPos pos, @Nullable IBlockState newState)

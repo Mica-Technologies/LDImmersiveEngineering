@@ -27,6 +27,7 @@ import blusunrize.immersiveengineering.common.util.EnergyHelper.IEForgeEnergyWra
 import blusunrize.immersiveengineering.common.util.EnergyHelper.IIEInternalFluxHandler;
 import blusunrize.immersiveengineering.common.util.Utils;
 import blusunrize.immersiveengineering.common.util.inventory.IIEInventory;
+import net.minecraft.block.state.IBlockState;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -402,6 +403,34 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 	 */
 	private long lastProcessStart = CityModeMachines.NEVER;
 
+	/**
+	 * Set by {@link #requestClientSync} while the machine is running; flushed once at the top of the
+	 * next tick, so however many things moved inside the machine in a tick -- energy arriving, a
+	 * process advancing, an item going in -- the clients hear about it once, a tick later.
+	 */
+	private boolean clientSyncQueued;
+
+	/**
+	 * A machine that is merely running sends its tile data and nothing else.
+	 * <p>
+	 * It used to send a full block update on every process tick and again on every energy
+	 * delivery: a block-change packet, which makes every client in range rebuild the chunk section
+	 * the machine sits in, plus a notification to all six neighbours -- forty times a second, per
+	 * running machine, for numbers that only the machine's own renderer reads. Nothing about the
+	 * block itself changes while a machine runs; the multiblock models are drawn by tile renderers
+	 * that read the tile every frame. So a null state -- "the data moved" -- now queues one
+	 * description packet a tick and tells the comparators, which are the one neighbour that
+	 * genuinely wants to know. A real state change still takes the full path.
+	 */
+	@Override
+	protected void requestClientSync(@Nullable IBlockState state)
+	{
+		if(state!=null||world==null||world.isRemote)
+			super.requestClientSync(state);
+		else
+			clientSyncQueued = true;
+	}
+
 	@Override
 	public void update()
 	{
@@ -409,6 +438,12 @@ public abstract class TileEntityMultiblockMetal<T extends TileEntityMultiblockMe
 		tickedProcesses = 0;
 		if(world.isRemote||isDummy())
 			return;
+		if(clientSyncQueued)
+		{
+			clientSyncQueued = false;
+			sendUpdatePacketToWatchers();
+			world.updateComparatorOutputLevel(getPos(), getBlockType());
+		}
 		//Before the enable check, not after: switching a machine *off* is a transition too, and a
 		//machine that has already returned cannot notice it.
 		updateCityModeRedstoneBuffer();

@@ -275,8 +275,20 @@ public abstract class TileEntityMultiblockPart<T extends TileEntityMultiblockPar
 		{
 			master.markDirty();
 			if(blockUpdate)
-				master.markContainingBlockForUpdate(state);
+				master.requestClientSync(state);
 		}
+	}
+
+	/**
+	 * Get this master's state to the clients. The default is the full block update, which is what
+	 * every caller got before; a master that updates its data every tick may do something lighter
+	 * -- see {@code TileEntityMultiblockMetal}.
+	 *
+	 * @param state a new block state to notify with, or null when only the tile's data changed
+	 */
+	protected void requestClientSync(@Nullable IBlockState state)
+	{
+		markContainingBlockForUpdate(state);
 	}
 
 	public boolean isDummy()
