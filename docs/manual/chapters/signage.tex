@@ -1,0 +1,93 @@
+\chapter{Pole Signage}
+\label{ch:signage}
+
+A hundred poles across a map are a hundred identical poles. The \textbf{Utility Pole Sign} is the
+tag that tells them apart: which station feeds this one, which feeder it is on, who last climbed it.
+
+\begin{iefork}
+Not in stock Immersive Engineering, and not invented either. All thirteen kinds are signs that hang
+on real poles --- the shapes, the colours and what each one means are the \emph{Los Angeles
+Department of Water and Power}'s and \emph{Southern California Edison}'s. They are told apart the
+way the real ones are: by shape and colour, long before you are close enough to read the number.
+\end{iefork}
+
+One item, one recipe, thirteen plates. Which plate a sign is lives on the sign, not on the item, so
+there is nothing to hunt for in a creative tab and nothing to craft twice.
+
+\section{Hanging one}
+
+Place it against the \textbf{side} of whatever holds the wires up --- a pole, a crossarm, a wall.
+The plate bolts flat to that face and reads from the outside. There is no top or bottom placement: a
+tag lying on a floor is not a thing that exists, and a sign whose support is broken comes down with
+it, the way a torch does.
+
+Signs have no collision box. Walking into a pole covered in them is walking into the pole.
+
+\section{Choosing the plate}
+
+\textbf{Hit a sign with an Engineer's Hammer} and it steps to the next of the thirteen. Keep hitting
+and it walks the whole set and comes back round --- one gesture, no menu, and it works from a ladder.
+
+\textbf{Sneak and hit it with the hammer} and the plate opens for writing:
+
+\begin{itemize}
+\item The \textbf{arrows} pick the kind, the same set the hammer walks.
+\item One \textbf{text box} per line that kind carries --- one, two or three, or none at all for the
+      line crossing diamond, which is a symbol rather than a label.
+\item The \textbf{preview} shows the real plate with the real lettering on it, laid out by exactly
+      the arithmetic the world uses. What is in that window is what ends up on the pole.
+\end{itemize}
+
+Enter and Tab step between the lines. Done and Escape both keep what was typed.
+
+\begin{ietip}
+Text is \textbf{printed to fill the plate} rather than typeset at a fixed size. A short number comes
+out big and a long one comes out small, which is what the real ones do and why a pole number and a
+station name can share a plate the size of a hand. The vertical strips read downwards, because a
+strip six pixels wide holds a pole number no other way.
+\end{ietip}
+
+A sign taken down keeps its plate and its text, so hammering thirteen times to find the one you
+meant and then mining it by accident costs nothing.
+
+\section{What the kinds mean}
+
+\begin{description}
+\item[Parallel Generation] The horizontal red strip. Several sources are feeding the distribution
+      station this pole hangs off, or power is running in a loop across the area. Mainly a LADWP
+      sign, and the only one in the set that carries white text. Two lines.
+\item[Pole Number] The yellow vertical strip: general pole identification, and the one every
+      utility uses. One line, read downwards.
+\item[Street Light] The white vertical strip. SCE hangs these for street lighting, and so do
+      privately owned poles. One line, read downwards.
+\item[Old Pattern] The bare metal vertical strip --- mostly replaced by something more legible, and
+      still on plenty of poles. One line, read downwards, in grey.
+\item[Series Light Oval] The painted white oval a series-wired street light wears: the series number
+      on top and the pole number underneath.
+\item[Feeder Tag] The horizontal yellow strip. For the LADWP this is the distribution station, the
+      feeder off it, and how many conduit or transformer bank connections are on that connection;
+      on a light pole it is the capacitor bank or the phase cutoff. Everybody else uses it for pole
+      numbers.
+\item[Fibre Run] The orange strip, horizontal or vertical, marking fibre and cable runs. Almost
+      every utility uses these.
+\item[Pole Inspection Tag] The round bolt-on tag: who inspected the pole on top, the year
+      underneath. It also does duty as the tag saying where a wooden pole was logged.
+\item[Tower Number] The plain yellow diamond the LADWP numbers transmission towers with, roughly
+      every fourth tower. No border --- the number is painted straight onto it.
+\item[Line Crossing] The same diamond with a black outline and a black cross, marking where a line
+      crosses another, or a span nobody wants to walk: a valley, a ravine. It carries no text.
+\item[Tower Identifier] The tower run, in two forms. The vertical one reads downwards in three
+      parts --- the initials of the plant the run starts at, the tower's number, then, under a rule
+      printed on the plate, the initials of the station it ends at. The horizontal one is one line,
+      and is what the DC towers of the Pacific Intertie carry.
+\end{description}
+
+\section{What a sign costs to look at}
+
+Nothing you will notice. The plate is an ordinary block model baked into the chunk mesh like any
+other --- one of fifty-two, thirteen plates times four facings --- so a pole line of them costs what
+a pole line of blocks costs.
+
+Only the \emph{lettering} is drawn per frame, and only within forty-eight blocks. Past that the
+plate is a pixel or two across and the number was never legible anyway, so nothing is drawn at all.
+A blank sign draws nothing at any distance.

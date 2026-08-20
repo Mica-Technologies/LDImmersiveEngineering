@@ -49,23 +49,36 @@ the plane of the surface it is clipped to, and wraps onto the next surface where
 
 \section{The Junction Box}
 
-A patch panel with six faces. Each face is one of three things:
+A patch panel with six faces. Four things can be done to a face:
 
 \begin{itemize}
-\item Right-click with a \textbf{dye}: that face breaks out the conductor of that colour.
+\item \textbf{Sneak and hit a face with an Engineer's Hammer}: steps that face to the next
+      conductor, and after the last one takes the breakout away entirely. Colours already spent on
+      another face of the same box are stepped over --- the same conductor arriving at two
+      connectors is a short, not a circuit.
+\item Right-click with a \textbf{dye}: that face breaks out the conductor of that colour, in one hit
+      rather than by cycling to it.
 \item Right-click a patched face with \textbf{redstone dust}: cycles it between power, reading
       redstone, and emitting redstone.
 \item Sneak and right-click empty-handed: unpatches the face.
 \end{itemize}
 
-\textbf{A patched face wears a plate in its conductor's colour}, so a box tells you how it is wired
-from across the room: which faces break out, and which channel each one carries. A box with no
-plates on it is a box nobody has patched.
+\textbf{A breakout reaches the block edge}, wearing its conductor's colour at the mouth --- so a box
+tells you how it is wired from across the room, and whatever is bolted against that face meets it
+flush rather than standing three pixels clear of it. A box grows the same stub, uncoloured, toward
+anything else set down against it, so one sunk into a wall reads as part of the wall.
 
 String an LV, MV or HV wire straight to a \emph{bare} face --- or put a Connector of that tier, or a
-Grid Feed or Service Unit, against one --- and the box breaks a free conductor out to it by itself,
-wearing that conductor's plate so you can see which. That is all most circuits need; the dye is how
-you choose \emph{which} conductor rather than whether there is one.
+Grid Feed or Service Unit, against one --- and the box breaks a conductor out to it by itself. That
+is all most circuits need; the dye and the hammer are how you choose \emph{which} conductor rather
+than whether there is one.
+
+\textbf{Which colour it picks is fixed, not arbitrary.} Looking at a box: \textcolor{red}{\textbf{red}}
+on the left, \textcolor{blue}{\textbf{blue}} in the middle --- on top, for a box on a pole ---
+and \textcolor{green!50!black}{\textbf{green}} on the right. West and north take red, east and south
+take green, up and down take blue. Two boxes wired the same way therefore come out the same, which
+is what makes a row of poles readable from the ground. A fourth breakout, or one whose colour is
+already spent elsewhere on that box, falls back to the lowest free conductor.
 
 Whatever is on a power breakout picks up that conductor and nothing else. One bundle down a corridor
 can feed a lighting circuit, a workshop and a furnace, each on its own colour.

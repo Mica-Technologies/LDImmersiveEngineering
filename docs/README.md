@@ -30,6 +30,13 @@ implements which system and how those systems behave. All entries cite real sour
 - **[FLUID_NETWORK.md](FLUID_NETWORK.md)** — this fork's virtual fluid network: named mains of
   Inlets and Outlets that move fluid with no pipe between them, the one-fluid-per-main rule, Main
   Valves, and the Fluid Control Console. A deliberate mirror of the virtual grid.
+- **[CONDUITS.md](CONDUITS.md)** — this fork's multi-wire conduits: surface-mounted tubing that
+  wraps around corners, sixteen dye-named conductors in one bundle, junction boxes and their
+  breakouts, wires strung straight to a box face, the Ground Feeder, and the one-edge-per-run
+  performance argument the whole design rests on.
+- **[SIGNAGE.md](SIGNAGE.md)** — this fork's utility pole signage: thirteen kinds of real LADWP and
+  SCE pole tag, chosen and written with an Engineer's Hammer, with the lettering printed to fill
+  the plate.
 - **[PETROLEUM.md](PETROLEUM.md)** — this fork's petroleum system: deterministic, retrogen-free
   oil reservoirs, the Wellhead/Drilling Derrick/Pumpjack progression, core-sample prospecting,
   distillation and cracking, the large-scale power plants and their combined cycle, buried tanks,

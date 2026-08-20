@@ -94,13 +94,25 @@ derived from the neighbours every time the box is drawn rather than stored anywh
 before its run and one placed after it end up looking the same; a box where two planes meet can only
 sit in one of them and picks floors over ceilings over walls. See `ConduitGeometry.junctionBoxMount`.
 
-Each face is one of three things:
+Each face is one of four things:
 
-| Right-click with | Effect |
+| Do this to a face | Effect |
 |---|---|
-| A **dye** | That face breaks out the conductor of that colour |
-| **Redstone dust** (on a patched face) | Cycles that face: power → reads redstone → emits redstone |
-| **Nothing**, while sneaking | Unpatches the face |
+| **Sneak + Engineer's Hammer** | Steps that face to the next conductor, and after the last one to no breakout at all |
+| Right-click with a **dye** | That face breaks out the conductor of that colour, in one hit |
+| Right-click with **redstone dust** (on a patched face) | Cycles that face: power → reads redstone → emits redstone |
+| Sneak + right-click with **nothing** | Unpatches the face |
+
+The hammer cycle skips every conductor already spent on another face of the same box (the same
+conductor at two connectors is a short) and skips the bare stop when a wire is strung to the face
+(live hardware on no conductor is the worst of the ways to be wrong). `JunctionBoxLogic.nextBreakout`
+owns the walk and is tested; the tile only supplies the mask and the wire check.
+
+**The unpatch gesture requires *both* hands empty.** A right click is offered to the main hand and
+then, if that reports it did nothing, to the off hand — and the client cannot know a server-only
+`IHammerInteraction` consumed the click, so a sneaking player with a hammer in one hand and nothing
+in the other sent two. The first recoloured the face and the second, arriving empty-handed,
+unpatched it again; the breakout appeared to vanish on the first hit and never come back.
 
 ### Auto-patching
 
@@ -120,20 +132,54 @@ Three rules keep it from being a nuisance:
   that happens to accept flux — a box dropped beside a capacitor bank to turn a corner must not
   quietly start draining the run into it, and "connectors and grid boxes claim a face" is a rule a
   player can state.
-- **Lowest free conductor, never one already broken out on that box.** The same conductor arriving
+- **The face's own colour, never one already broken out on that box.** The same conductor arriving
   at two connectors is a short. A box with all sixteen spoken for hands out nothing rather than
-  stealing one from a working circuit. `JunctionBoxLogic.firstFreeChannel` owns that and is tested.
+  stealing one from a working circuit. `JunctionBoxLogic.preferredChannel` owns that and is tested.
 - **It never un-patches.** Taking a connector down leaves the breakout where it was; the alternative
   is a box that forgets a deliberate configuration the moment something is mined next to it.
 
 It runs on neighbour change and on load. On load as well, because a box placed against hardware that
 was already there hears nothing afterwards — settled blocks never fire another update.
 
-**A patched face wears a plate in its conductor's colour.** A box says how it is wired from across
-the room rather than only under the crosshair. The plate is painted near-white and tinted per face
-through `BlockConduit.getRenderColour`, so the sixteen colours cost six models rather than
-ninety-six; the tint index *is* the face's `EnumFacing` ordinal, and `ConduitAssetsTest` guards that
-because drift there would put the right colours on the wrong faces with nothing logged.
+### Which colour a face reaches for
+
+**Red on the left, blue in the middle, green on the right.** A box on a pole wears three breakouts
+far more often than it wears sixteen, and lowest-free meant which colour landed where depended on
+the order somebody happened to bolt the hardware on — so two boxes built the same way came out
+different, and a lineman reading a pole from the ground could not tell one circuit from another.
+
+By `EnumFacing` ordinal: down and up take **blue**, north and west take **red**, south and east take
+**green**. Read looking north, west is on the left and east is on the right, and up is between them —
+which is "on top" for a box on a pole and "in the centre" for one on the ground. North and south
+take the same pair, so a line running the other way is laid out the same way round.
+
+It is a *preference*, not a rule. The colour is only taken if it is free; a fourth breakout, or one
+whose colour has already gone somewhere on that box, falls through to the lowest free conductor
+exactly as every breakout used to.
+
+### A breakout reaches the block edge
+
+**The housing used to stop three pixels short of every face a run did not arrive on** — so an LV
+connector bolted to a box, or a machine set down beside one, stood clear of it with a gap you could
+see the ground through. It was reported twice in one testing round, once for blocks and once for
+connectors, and it is the same three pixels both times: the box is ten pixels across in a
+sixteen-pixel cell, and nothing but a conduit's own arm ever closed the rest.
+
+A face now grows its stub when a run joins it, when a conductor is broken out on it, or when
+anything is set down against it — solid-sided, or wiring hardware, and nothing else, so a box does
+not grow an arm to meet a dandelion. See `TileEntityJunctionBox.meetsNeighbour`.
+
+**The colour moved to the mouth**, which is where decision 9 always said it belonged: a stub grown
+out to the block edge swallows a plate lying flat against the housing. A patched face wears the
+stub cut two pixels short plus a tinted cap on the end (`junction_run_*_short` and
+`junction_mouth_*`); an unpatched one wears the whole stub in the box's own steel. The two abut
+rather than overlap, because two coplanar faces in one place is z-fighting at every breakout on a
+pole, and `ConduitAssetsTest` measures that they tile the plain stub exactly.
+
+The cap is painted near-white and tinted per face through `BlockConduit.getRenderColour`, so the
+sixteen colours cost six models rather than ninety-six; the tint index *is* the face's `EnumFacing`
+ordinal, and `ConduitAssetsTest` guards that because drift there would put the right colours on the
+wrong faces with nothing logged.
 
 **A colour lives on one face at a time.** Patching it somewhere new takes it off wherever it was —
 the same conductor arriving at two connectors would be a short, not a feature.
@@ -352,6 +398,34 @@ replaces.** Two structural properties hold it up.
   seventy-eight little boxes was costing seventy-three thousand of them. Nothing about how any of it
   draws changed: the same generated models are assembled from the same masks, one step later, and
   the assembly is cached per distinct shape.
+
+### Redrawing when a shape changes
+
+**An arm lives on the tile entity, not in the block state** — which is what made eighteen states
+possible, and which also means `markContainingBlockForUpdate` sends a block change whose state is
+*identical* to the one the client already has. `Chunk.setBlockState` answers an unchanged state with
+null, `World.markAndNotifyBlock` does nothing with that, and the render section is never marked
+dirty. The tile data arrives and is read; the mesh it belongs to was built a moment ago and is not
+built again.
+
+That is the "conduit that draws disconnected until you walk away and come back". It was intermittent
+because it usually got away with it: placing a conduit dirties the sections within one block of it,
+so a neighbour that refreshes in the *same* server tick is redrawn by that. A neighbour that
+refreshes a tick later — which is where `ApiUtils.addFutureServerTask` puts every neighbour update —
+misses that rebuild and has nothing of its own to ask for another. Leaving the chunk and coming back
+rebuilt the mesh from scratch, which is exactly why that looked like a cure.
+
+Two nets under it:
+
+- `TileEntityConduit.onDataPacket` and `TileEntityJunctionBox.onDataPacket` mark the block for a
+  render update when the packet actually changed the shape — gated on the shape, not done on every
+  packet, because a box sends one a second to anybody reading its overlay and a chunk section
+  rebuild is not free.
+- `BlockConduit.neighborChanged` lets the **client** rebuild its own arms. Every rule in
+  `refreshConnections` is arithmetic on what is next door, with no server-only state anywhere in it,
+  so there is no reason for a client to sit waiting to be told. The server stays authoritative — it
+  saves the arms and its packets overwrite whatever the client worked out — this only means the
+  client is never *stuck* on a shape the blocks around it plainly contradict.
 
 Energy moves as a bucket brigade: each box hands half the difference to whichever neighbour is
 holding less, and drains in full into any connector on the matching breakout. Nobody walks the run
