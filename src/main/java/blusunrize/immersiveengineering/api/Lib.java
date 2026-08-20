@@ -68,6 +68,7 @@ public class Lib
 	public static final int GUIID_GridDevice = GUIID_Base_Tile+18;
 	public static final int GUIID_FluidConsole = GUIID_Base_Tile+19;
 	public static final int GUIID_GasPump = GUIID_Base_Tile+20;
+	public static final int GUIID_UtilitySign = GUIID_Base_Tile+21;
 	//Items
 	public static final int GUIID_Base_Item = 64;
 	public static final int GUIID_Manual = GUIID_Base_Item+0;

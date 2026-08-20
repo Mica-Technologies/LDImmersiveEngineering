@@ -1,0 +1,64 @@
+{
+	"forge_marker": 1,
+	"defaults": {
+		"model": "immersiveengineering:signage/sign_parallel_generation"
+	},
+	"variants": {
+		"facing": {
+			"north": {},
+			"east": {
+				"y": 90
+			},
+			"south": {
+				"y": 180
+			},
+			"west": {
+				"y": 270
+			}
+		},
+		"kind": {
+			"0": {
+				"model": "immersiveengineering:signage/sign_parallel_generation"
+			},
+			"1": {
+				"model": "immersiveengineering:signage/sign_yellow_vertical"
+			},
+			"2": {
+				"model": "immersiveengineering:signage/sign_white_vertical"
+			},
+			"3": {
+				"model": "immersiveengineering:signage/sign_silver_vertical"
+			},
+			"4": {
+				"model": "immersiveengineering:signage/sign_oval_fraction"
+			},
+			"5": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal"
+			},
+			"6": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal"
+			},
+			"7": {
+				"model": "immersiveengineering:signage/sign_orange_vertical"
+			},
+			"8": {
+				"model": "immersiveengineering:signage/sign_inspection_round"
+			},
+			"9": {
+				"model": "immersiveengineering:signage/sign_tower_diamond"
+			},
+			"10": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond"
+			},
+			"11": {
+				"model": "immersiveengineering:signage/sign_tower_vertical"
+			},
+			"12": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal"
+			}
+		},
+		"type": {
+			"utility_sign": {}
+		}
+	}
+}

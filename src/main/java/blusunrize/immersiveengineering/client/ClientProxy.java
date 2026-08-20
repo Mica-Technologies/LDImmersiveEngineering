@@ -58,6 +58,7 @@ import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IIEMetaBl
 import blusunrize.immersiveengineering.common.blocks.cloth.BlockTypes_ClothDevice;
 import blusunrize.immersiveengineering.common.blocks.cloth.TileEntityShaderBanner;
 import blusunrize.immersiveengineering.common.blocks.conduit.BlockTypes_Conduit;
+import blusunrize.immersiveengineering.common.blocks.signage.BlockTypes_Signage;
 import blusunrize.immersiveengineering.common.blocks.fluidnet.TileEntityFluidConsole;
 import blusunrize.immersiveengineering.common.items.ItemNetworkTerminal;
 import blusunrize.immersiveengineering.common.blocks.grid.BlockTypes_GridDevice;
@@ -74,6 +75,7 @@ import blusunrize.immersiveengineering.common.blocks.multiblocks.*;
 import blusunrize.immersiveengineering.common.items.ItemPetroleum;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDecoration;
 import blusunrize.immersiveengineering.common.blocks.petroleum.TileEntityGasPump;
+import blusunrize.immersiveengineering.common.blocks.signage.TileEntityUtilitySign;
 import blusunrize.immersiveengineering.common.blocks.petroleum.BlockTypes_PetroleumDevice;
 import blusunrize.immersiveengineering.common.blocks.stone.*;
 import blusunrize.immersiveengineering.common.blocks.wooden.*;
@@ -612,6 +614,8 @@ public class ClientProxy extends CommonProxy
 		//PETROLEUM
 		//Only the price on the pump's panel: the pump itself is a baked OBJ like any other block.
 		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityGasPump.class, new TileRenderGasPump());
+		//Only the lettering, and only within forty-eight blocks: the plate itself is a baked model.
+		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityUtilitySign.class, new TileRenderUtilitySign());
 
 		//		ClientRegistry.bindTileEntitySpecialRenderer(TileEntityWallmount.class, new TileRenderWallmount());
 		//
@@ -907,6 +911,15 @@ public class ClientProxy extends CommonProxy
 						new ItemStack(IEContent.blockConduit, 1,
 								BlockTypes_Conduit.GROUND_FEEDER.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "conduits8"));
+		//Signage. In the same chapter as the wires and the conduit, because a pole line you cannot
+		//read is the problem it solves, and the poles are what the chapter is already about.
+		ManualHelper.getManual().addEntry("signage", ManualHelper.CAT_ENERGY,
+				new ManualPages.Crafting(ManualHelper.getManual(), "signage0",
+						new ItemStack(IEContent.blockSignage, 1,
+								BlockTypes_Signage.UTILITY_SIGN.getMeta())),
+				new ManualPages.Text(ManualHelper.getManual(), "signage1"),
+				new ManualPages.Text(ManualHelper.getManual(), "signage2"),
+				new ManualPages.Text(ManualHelper.getManual(), "signage3"));
 		//Petroleum. In CAT_ENERGY because the whole chain ends in fuel: everything a player builds
 		//out here is on the way to a diesel generator, a turbine or a firebox, and the chapter only
 		//makes sense read next to those.
@@ -1676,6 +1689,8 @@ public class ClientProxy extends CommonProxy
 					gui = new GuiFluidConsole(player.inventory, (TileEntityFluidConsole)te);
 				if(ID==Lib.GUIID_GasPump&&te instanceof TileEntityGasPump)
 					gui = new GuiGasPump(player.inventory, (TileEntityGasPump)te);
+				if(ID==Lib.GUIID_UtilitySign&&te instanceof TileEntityUtilitySign)
+					gui = new GuiUtilitySign(player.inventory, (TileEntityUtilitySign)te);
 				if(gui!=null)
 					((IGuiTile)te).onGuiOpened(player, true);
 				return gui;

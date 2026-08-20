@@ -1978,6 +1978,33 @@ tile.immersiveengineering.conduit.junction_box.info=Where a conduit run ends and
 tile.immersiveengineering.conduit.ground_feeder.name=Conduit Ground Feeder
 tile.immersiveengineering.conduit.ground_feeder.info=A hole through a floor or a wall that a conduit run passes straight through, wearing whatever is around it. It surveys its surroundings when placed and puts on the block it finds most of, counting what is visible over what is buried -- one set into a lawn wears grass rather than the dirt underneath. Right-click it with any full block to pin that instead; sneak and right-click it empty-handed to hand it back to the survey. It carries the whole bundle along one axis and splits nothing: an Engineer's Hammer turns that axis. Crossing one is what lets a run change to a surface with no corner between the two; runs turn ordinary corners on their own.
 chat.immersiveengineering.info.groundFeeder.auto=Surveying its surroundings again
+#Utility pole signage
+tile.immersiveengineering.signage.utility_sign.name=Utility Pole Sign
+tile.immersiveengineering.signage.utility_sign.info=A tag bolted flat to a pole, in thirteen kinds -- the ones the LADWP, SCE and their neighbours really hang. Place it against the side of whatever holds the wires up. Hit it with an Engineer's Hammer to step to the next kind; sneak and hit it to open the plate and write on it. Text is printed to fill the plate, so a short number comes out big and a long one comes out small, exactly as they do on a pole.
+gui.immersiveengineering.utility_sign.title=UTILITY POLE SIGN
+gui.immersiveengineering.utility_sign.noText=This plate is a symbol. There is nothing to write on it.
+desc.immersiveengineering.info.sign.parallel_generation=Parallel Generation (red strip)
+desc.immersiveengineering.info.sign.yellow_vertical=Pole Number (yellow, vertical)
+desc.immersiveengineering.info.sign.white_vertical=Street Light (white, vertical)
+desc.immersiveengineering.info.sign.silver_vertical=Old Pattern (silver, vertical)
+desc.immersiveengineering.info.sign.oval_fraction=Series Light Oval
+desc.immersiveengineering.info.sign.yellow_horizontal=Feeder Tag (yellow, horizontal)
+desc.immersiveengineering.info.sign.orange_horizontal=Fibre Run (orange, horizontal)
+desc.immersiveengineering.info.sign.orange_vertical=Fibre Run (orange, vertical)
+desc.immersiveengineering.info.sign.inspection_round=Pole Inspection Tag
+desc.immersiveengineering.info.sign.tower_diamond=Tower Number (diamond)
+desc.immersiveengineering.info.sign.line_crossing_diamond=Line Crossing (diamond)
+desc.immersiveengineering.info.sign.tower_vertical=Tower Identifier (vertical)
+desc.immersiveengineering.info.sign.tower_horizontal=Tower Identifier (horizontal)
+#Engineer's Manual: signage
+ie.manual.entry.signage.name=Pole Signage
+ie.manual.entry.signage.subtext=Somebody has to read it
+ie.manual.entry.signage0=A hundred poles across a map are a hundred identical poles.<br>The Â§6Utility Pole SignÂ§r is the tag that tells them apart: which station feeds this one, which feeder it is on, who last climbed it. Thirteen kinds, and every one of them is a sign that hangs on a real pole -- the shapes and colours are the Â§oLos Angeles Department of Water and PowerÂ§r's and Â§oSouthern California EdisonÂ§r's, and they are told apart the way the real ones are, by shape and colour long before you are close enough to read the number.
+ie.manual.entry.signage1=Â§lHanging one.Â§r Place it against the Â§osideÂ§r of whatever holds the wires up -- a pole, a crossarm, a wall. It bolts flat to that face and reads from the outside; a tag has no top or bottom face to sit on, and if the pole comes down the tag comes down with it.<br>Â§lChoosing the kind.Â§r Hit it with an Â§6Engineer's HammerÂ§r and it steps to the next of the thirteen. Keep hitting to walk the whole set; it comes back round.
+ie.manual.entry.signage2=Â§lWriting on it.Â§r Â§6Sneak and hit it with the hammerÂ§r and the plate opens: pick the kind with the arrows, type the lines, and watch the preview -- what is in that window is what ends up on the pole.<br>Text is Â§oprinted to fill the plateÂ§r rather than typeset at a fixed size, which is what the real ones do: a short number comes out big and a long one comes out small. The vertical strips read downwards, because a strip six pixels wide holds a pole number no other way.
+ie.manual.entry.signage3=Â§lWhat the kinds mean.Â§r A Â§credoÂ§r horizontal strip says parallel generation feeds the station this pole hangs off. Â§eYellowÂ§r is general identification -- the vertical strip is the pole number, the horizontal one the station, feeder and connection count. Â§fWhiteÂ§r is street lighting and Â§7silverÂ§r is the older pattern of the same. Â§6OrangeÂ§r marks fibre and cable runs. The white oval is a series-wired light: series number over pole number. The round tag is who inspected the pole and when.<br>The diamonds belong to transmission towers: a plain one carries the tower number, and one with a cross on it marks a line crossing -- another line, a valley, a ravine.
+
+
 
 #Engineer's Manual: conduits
 ie.manual.entry.conduits.name=Conduit

@@ -1,0 +1,16 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:signage",
+		"data": 0,
+		"count": 4
+	},
+	"pattern": [
+		"PP"
+	],
+	"key": {
+		"P": {
+			"item": "#plateAluminum"
+		}
+	}
+}

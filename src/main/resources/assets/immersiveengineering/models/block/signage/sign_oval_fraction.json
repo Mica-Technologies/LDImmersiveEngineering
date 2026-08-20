@@ -1,0 +1,76 @@
+{
+	"textures": {
+		"sign": "immersiveengineering:blocks/sign_oval_fraction",
+		"particle": "immersiveengineering:blocks/sign_oval_fraction"
+	},
+	"elements": [
+		{
+			"from": [
+				2,
+				4,
+				0
+			],
+			"to": [
+				14,
+				12,
+				1
+			],
+			"faces": {
+				"south": {
+					"texture": "#sign",
+					"uv": [
+						2,
+						4,
+						14,
+						12
+					]
+				},
+				"north": {
+					"texture": "#sign",
+					"uv": [
+						14,
+						4,
+						2,
+						12
+					]
+				},
+				"up": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"down": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"west": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"east": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				}
+			}
+		}
+	]
+}

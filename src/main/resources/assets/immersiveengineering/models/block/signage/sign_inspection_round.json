@@ -1,0 +1,76 @@
+{
+	"textures": {
+		"sign": "immersiveengineering:blocks/sign_inspection_round",
+		"particle": "immersiveengineering:blocks/sign_inspection_round"
+	},
+	"elements": [
+		{
+			"from": [
+				3,
+				3,
+				0
+			],
+			"to": [
+				13,
+				13,
+				1
+			],
+			"faces": {
+				"south": {
+					"texture": "#sign",
+					"uv": [
+						3,
+						3,
+						13,
+						13
+					]
+				},
+				"north": {
+					"texture": "#sign",
+					"uv": [
+						13,
+						3,
+						3,
+						13
+					]
+				},
+				"up": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"down": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"west": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"east": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				}
+			}
+		}
+	]
+}

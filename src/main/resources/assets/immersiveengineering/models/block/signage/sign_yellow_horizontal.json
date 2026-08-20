@@ -1,0 +1,76 @@
+{
+	"textures": {
+		"sign": "immersiveengineering:blocks/sign_yellow_horizontal",
+		"particle": "immersiveengineering:blocks/sign_yellow_horizontal"
+	},
+	"elements": [
+		{
+			"from": [
+				1,
+				6,
+				0
+			],
+			"to": [
+				15,
+				10,
+				1
+			],
+			"faces": {
+				"south": {
+					"texture": "#sign",
+					"uv": [
+						1,
+						6,
+						15,
+						10
+					]
+				},
+				"north": {
+					"texture": "#sign",
+					"uv": [
+						15,
+						6,
+						1,
+						10
+					]
+				},
+				"up": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"down": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"west": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"east": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				}
+			}
+		}
+	]
+}

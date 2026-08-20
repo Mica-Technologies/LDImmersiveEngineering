@@ -1,0 +1,76 @@
+{
+	"textures": {
+		"sign": "immersiveengineering:blocks/sign_parallel_generation",
+		"particle": "immersiveengineering:blocks/sign_parallel_generation"
+	},
+	"elements": [
+		{
+			"from": [
+				1,
+				5,
+				0
+			],
+			"to": [
+				15,
+				11,
+				1
+			],
+			"faces": {
+				"south": {
+					"texture": "#sign",
+					"uv": [
+						1,
+						5,
+						15,
+						11
+					]
+				},
+				"north": {
+					"texture": "#sign",
+					"uv": [
+						15,
+						5,
+						1,
+						11
+					]
+				},
+				"up": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"down": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"west": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"east": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				}
+			}
+		}
+	]
+}
