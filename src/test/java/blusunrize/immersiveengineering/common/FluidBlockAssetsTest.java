@@ -43,7 +43,9 @@ class FluidBlockAssetsTest
 	@DisplayName("every fluid with a block has a fluid_block variant")
 	void everyFluidBlockHasAVariant() throws IOException
 	{
-		String source = new String(Files.readAllBytes(IE_CONTENT), "UTF-8");
+		//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+		//and every pattern below is written with the bare newline the repository stores.
+		String source = new String(Files.readAllBytes(IE_CONTENT), "UTF-8").replace("\r\n", "\n");
 
 		//fluidX = setupFluid(new Fluid("name", ...   -- the variable each fluid lives in.
 		Map<String, String> fluidNamesByVariable = new HashMap<>();
@@ -64,7 +66,9 @@ class FluidBlockAssetsTest
 		assertTrue(fluidsWithBlocks.size() >= 15,
 				"only "+fluidsWithBlocks.size()+" fluid blocks parsed out of IEContent -- the registration pattern moved and this test is reading nothing");
 
-		String json = new String(Files.readAllBytes(FLUID_BLOCK_JSON), "UTF-8");
+		//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+		//and every pattern below is written with the bare newline the repository stores.
+		String json = new String(Files.readAllBytes(FLUID_BLOCK_JSON), "UTF-8").replace("\r\n", "\n");
 		for(String fluidName : fluidsWithBlocks)
 			assertTrue(json.contains("\""+fluidName+"\""),
 					"fluid '"+fluidName+"' has a world block but no variant in fluid_block.json -- "

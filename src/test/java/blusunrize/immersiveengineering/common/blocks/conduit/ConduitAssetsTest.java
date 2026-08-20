@@ -771,8 +771,10 @@ class ConduitAssetsTest
 	{
 		try
 		{
+			//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+			//and every pattern below is written with the bare newline the repository stores.
 			return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
-					java.nio.charset.StandardCharsets.UTF_8);
+					java.nio.charset.StandardCharsets.UTF_8).replace("\r\n", "\n");
 		} catch(IOException e)
 		{
 			throw new AssertionError("could not read "+path, e);
@@ -825,9 +827,11 @@ class ConduitAssetsTest
 			String proxy;
 			try
 			{
+				//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+				//and every pattern below is written with the bare newline the repository stores.
 				proxy = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(
 						"src/main/java/blusunrize/immersiveengineering/client/ClientProxy.java")),
-						java.nio.charset.StandardCharsets.UTF_8);
+						java.nio.charset.StandardCharsets.UTF_8).replace("\r\n", "\n");
 			} catch(IOException e)
 			{
 				throw new AssertionError("could not read ClientProxy", e);
@@ -847,9 +851,11 @@ class ConduitAssetsTest
 	{
 		try
 		{
+			//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+			//and every pattern below is written with the bare newline the repository stores.
 			return new String(java.nio.file.Files.readAllBytes(
 					java.nio.file.Paths.get(ASSETS+"lang/en_us.lang")),
-					java.nio.charset.StandardCharsets.UTF_8);
+					java.nio.charset.StandardCharsets.UTF_8).replace("\r\n", "\n");
 		} catch(IOException e)
 		{
 			throw new AssertionError("could not read en_us.lang", e);

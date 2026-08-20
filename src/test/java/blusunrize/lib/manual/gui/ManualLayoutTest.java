@@ -472,8 +472,10 @@ class ManualLayoutTest
 		{
 			try
 			{
+				//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+				//and every pattern below is written with the bare newline the repository stores.
 				return new String(Files.readAllBytes(Paths.get(
-						"src/main/resources/assets/immersiveengineering/lang/en_us.lang")), StandardCharsets.UTF_8);
+						"src/main/resources/assets/immersiveengineering/lang/en_us.lang")), StandardCharsets.UTF_8).replace("\r\n", "\n");
 			} catch(IOException e)
 			{
 				throw new UncheckedIOException("could not read en_us.lang", e);

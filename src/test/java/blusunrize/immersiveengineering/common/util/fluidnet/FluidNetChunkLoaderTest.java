@@ -216,7 +216,9 @@ class FluidNetChunkLoaderTest
 		{
 			try
 			{
-				return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8);
+				//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+				//and every pattern below is written with the bare newline the repository stores.
+				return new String(Files.readAllBytes(Paths.get(path)), StandardCharsets.UTF_8).replace("\r\n", "\n");
 			} catch(IOException e)
 			{
 				throw new UncheckedIOException("could not read "+path, e);

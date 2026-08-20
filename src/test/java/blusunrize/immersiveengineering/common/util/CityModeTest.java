@@ -447,8 +447,10 @@ class CityModeTest
 			String source;
 			try
 			{
+				//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+				//and every pattern below is written with the bare newline the repository stores.
 				source = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(path)),
-						java.nio.charset.StandardCharsets.UTF_8);
+						java.nio.charset.StandardCharsets.UTF_8).replace("\r\n", "\n");
 			} catch(java.io.IOException e)
 			{
 				throw new AssertionError("could not read "+path, e);

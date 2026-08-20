@@ -77,7 +77,9 @@ class PetroleumManualTest
 		assertTrue(file.isFile(), "missing source file: "+file.getPath());
 		try
 		{
-			return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+			//Line endings normalised: core.autocrlf is on, so a fresh checkout hands these files CRLF,
+			//and every pattern below is written with the bare newline the repository stores.
+			return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8).replace("\r\n", "\n");
 		} catch(IOException e)
 		{
 			throw new AssertionError("could not read "+file.getPath(), e);
