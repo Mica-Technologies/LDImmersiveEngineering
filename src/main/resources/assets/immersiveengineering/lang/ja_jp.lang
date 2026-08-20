@@ -1612,7 +1612,7 @@ ie.manual.entry.computer.energymeter.subtext=Just an ADC
 ie.manual.entry.computer.energymeter0=The bottom block of a current transformer can be connected to a computer. It will provide a single method, §lgetAvgEnergy()§r , that returns the average amount of energy per tick that was transferred through the transformer during the last 20 ticks.
 
 ie.manual.entry.computer.excavator.name=Excavator ☎
-ie.manual.entry.computer.excavator.subtext=Better than Dwarves
+ie.manual.entry.computer.excavator.subtext=Does it have school bus mode!?
 ie.manual.entry.computer.excavator0=§lisActive()§r: returns whether the excavator is running. This does not say anything about the existence of a mineral vein<br>§lgetEnergyStored()§r: returns the amount of energy currently stored in this excavator<br>§lgetMaxEnergyStored()§r: returns the maximum amount of energy that can be stored in this excavator
 
 ie.manual.entry.computer.squeezerAndFermenter.name=Fermenter & Squeezer ☎

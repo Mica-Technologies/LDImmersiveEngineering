@@ -1529,7 +1529,7 @@ ie.manual.entry.arcfurnace4=The four slots on the right are for "additives", dif
 ie.manual.entry.arcfurnace5=The seven slots at the bottom are six output slots and a slot for slag. Outputs are retrieved from the 'bucket' at the front of the structure, slag through the port at the back of the machine. The Arc Furnace will automatically push output and slag to connected inventories (this includes Conveyor Belts).
 
 ie.manual.entry.excavator.name=Excavator
-ie.manual.entry.excavator.subtext=Better than Dwarves
+ie.manual.entry.excavator.subtext=Does it have school bus mode!?
 ie.manual.entry.excavator0=The Excavator is one of the pinnacles of modern engineering. It is able to dig up <link;minerals;§o§nminerals§r;0> from veins inaccessible by normal mining. In return however, the excavator is a complex structure which requires <config;i;excavator_consumption> Flux/t in order to operate.
 ie.manual.entry.excavator1=The structure is comprised of two pieces: The engine shown on the first page and the bucket wheel displayed on the second, which fits into the 'braces' of the engine as displayed on the previous page. The energy input for the engine is on its side, the back features a redstone control panel and the item output.<br>As the excavator digs up ores, the yield of the vein slowly decreases, but a vein of minerals can last for <config;i;excavator_depletion_days> days of consecutive digging.
 
@@ -1576,7 +1576,7 @@ ie.manual.entry.computer.energymeter.subtext=Just an ADC
 ie.manual.entry.computer.energymeter0=The bottom block of a current transformer can be connected to a computer. It will provide a single method, §lgetAvgEnergy()§r , that returns the average amount of energy per tick that was transferred through the transformer during the last 20 ticks.
 
 ie.manual.entry.computer.excavator.name=Excavator ☎
-ie.manual.entry.computer.excavator.subtext=Better than Dwarves
+ie.manual.entry.computer.excavator.subtext=Does it have school bus mode!?
 ie.manual.entry.computer.excavator0=§lisActive()§r: returns whether the excavator is running. This does not say anything about the existence of a mineral vein<br>§lgetEnergyStored()§r: returns the amount of energy currently stored in this excavator<br>§lgetMaxEnergyStored()§r: returns the maximum amount of energy that can be stored in this excavator
 
 ie.manual.entry.computer.squeezerAndFermenter.name=Fermenter & Squeezer ☎
