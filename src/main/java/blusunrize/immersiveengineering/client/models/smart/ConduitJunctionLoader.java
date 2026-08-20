@@ -86,15 +86,28 @@ public class ConduitJunctionLoader implements ICustomModelLoader
 		return face==mount?null: ConduitGeometry.junctionRunModelName(mount, face);
 	}
 
+	/** @return the same stub cut short to leave room for a coloured mouth, or null on the mount */
+	private static String shortStubName(EnumFacing mount, EnumFacing face)
+	{
+		return face==mount?null: ConduitGeometry.junctionShortRunModelName(mount, face);
+	}
+
+	/** @return the coloured mouth that finishes a short stub, or null on the mount */
+	private static String mouthName(EnumFacing mount, EnumFacing face)
+	{
+		return face==mount?null: ConduitGeometry.junctionMouthModelName(mount, face);
+	}
+
 	private static class RawJunctionModel implements IModel
 	{
 		@Nonnull
 		@Override
 		public Collection<ResourceLocation> getDependencies()
 		{
-			//Six housings, thirty-six plates and thirty stubs, declared. Nothing else references
-			//these files any more -- the blockstate names one smart model and no more -- so without
-			//this they would never be loaded and their textures would never reach the block atlas.
+			//Six housings, thirty-six plates and thirty stubs in three forms, declared. Nothing
+			//else references these files any more -- the blockstate names one smart model and no
+			//more -- so without this they would never be loaded and their textures would never
+			//reach the block atlas.
 			List<ResourceLocation> out = new ArrayList<>();
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
@@ -104,7 +117,11 @@ public class ConduitJunctionLoader implements ICustomModelLoader
 					out.add(ConduitParts.location(ConduitGeometry.junctionPatchModelName(mount, face)));
 					String stub = stubName(mount, face);
 					if(stub!=null)
+					{
 						out.add(ConduitParts.location(stub));
+						out.add(ConduitParts.location(shortStubName(mount, face)));
+						out.add(ConduitParts.location(mouthName(mount, face)));
+					}
 				}
 			}
 			return out;
@@ -127,6 +144,8 @@ public class ConduitJunctionLoader implements ICustomModelLoader
 			IBakedModel[] housings = new IBakedModel[faces];
 			IBakedModel[][] plates = new IBakedModel[faces][faces];
 			IBakedModel[][] stubs = new IBakedModel[faces][faces];
+			IBakedModel[][] shortStubs = new IBakedModel[faces][faces];
+			IBakedModel[][] mouths = new IBakedModel[faces][faces];
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
 				housings[mount.ordinal()] = ConduitParts.bake(
@@ -137,13 +156,19 @@ public class ConduitJunctionLoader implements ICustomModelLoader
 							ConduitGeometry.junctionPatchModelName(mount, face), state, format,
 							bakedTextureGetter);
 					String stub = stubName(mount, face);
-					stubs[mount.ordinal()][face.ordinal()] = stub==null?null
-							:ConduitParts.bake(stub, state, format, bakedTextureGetter);
+					if(stub==null)
+						continue;
+					stubs[mount.ordinal()][face.ordinal()] =
+							ConduitParts.bake(stub, state, format, bakedTextureGetter);
+					shortStubs[mount.ordinal()][face.ordinal()] = ConduitParts.bake(
+							shortStubName(mount, face), state, format, bakedTextureGetter);
+					mouths[mount.ordinal()][face.ordinal()] = ConduitParts.bake(
+							mouthName(mount, face), state, format, bakedTextureGetter);
 				}
 			}
 			//A rebake means new sprites behind every one of those parts.
 			ConduitJunctionModel.modelCache.clear();
-			return new ConduitJunctionModel(housings, plates, stubs);
+			return new ConduitJunctionModel(housings, plates, stubs, shortStubs, mouths);
 		}
 	}
 }

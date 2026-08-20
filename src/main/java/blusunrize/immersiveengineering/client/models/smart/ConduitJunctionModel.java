@@ -28,8 +28,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Drawing a junction box: the housing against whichever surface its runs are on, a coloured plate on
- * every patched face, and a stub out to the block edge on every face a run physically touches.
+ * Drawing a junction box: the housing against whichever surface its runs are on, and a stub out to the
+ * block edge on every face that has anything to meet -- a run, a conductor broken out, or simply a
+ * block bolted against it. A breakout's stub ends in a coloured mouth; a plain one does not.
  * <p>
  * <strong>Exactly what the multipart blockstate did, one step later.</strong> The same seventy-eight
  * generated models -- six housings, thirty-six plates, thirty-six stubs -- are picked in the same
@@ -66,12 +67,19 @@ public class ConduitJunctionModel implements IBakedModel
 	private final IBakedModel[][] plates;
 	/** A stub per face, per mount, and null on the face the housing already reaches by itself. */
 	private final IBakedModel[][] stubs;
+	/** The same stubs cut short, worn under a coloured mouth. */
+	private final IBakedModel[][] shortStubs;
+	/** The coloured mouth that finishes a breakout, tinted per face exactly as a plate is. */
+	private final IBakedModel[][] mouths;
 
-	ConduitJunctionModel(IBakedModel[] housings, IBakedModel[][] plates, IBakedModel[][] stubs)
+	ConduitJunctionModel(IBakedModel[] housings, IBakedModel[][] plates, IBakedModel[][] stubs,
+						 IBakedModel[][] shortStubs, IBakedModel[][] mouths)
 	{
 		System.arraycopy(housings, 0, this.housings, 0, housings.length);
 		this.plates = plates;
 		this.stubs = stubs;
+		this.shortStubs = shortStubs;
+		this.mouths = mouths;
 	}
 
 	@Nonnull
@@ -115,16 +123,31 @@ public class ConduitJunctionModel implements IBakedModel
 		List<IBakedModel> parts = new ArrayList<>();
 		parts.add(housings[mount.ordinal()]);
 		for(EnumFacing face : EnumFacing.VALUES)
-			if((patched&(1 << face.ordinal()))!=0)
-				parts.add(plates[mount.ordinal()][face.ordinal()]);
-		for(EnumFacing face : EnumFacing.VALUES)
 		{
+			int m = mount.ordinal(), f = face.ordinal();
+			boolean isPatched = (patched&(1 << f))!=0;
 			//No stub on the face the housing is bolted to: it already reaches the block edge there,
 			//and a zero-thickness box is a model that parses and draws nothing. There is deliberately
-			//no file for it either -- see build_run_stub_models in the asset script.
-			IBakedModel stub = stubs[mount.ordinal()][face.ordinal()];
-			if(stub!=null&&(shape&(1 << (3+face.ordinal())))!=0)
-				parts.add(stub);
+			//no file for it either -- see build_run_stub_models in the asset script. A conductor
+			//broken out on that face -- which takes a dye on a face nobody can click, so in practice
+			//only a save that predates this -- keeps the flat plate it always had.
+			if(stubs[m][f]==null)
+			{
+				if(isPatched)
+					parts.add(plates[m][f]);
+				continue;
+			}
+			//**A breakout is a breakout: it reaches the block edge.** A patched face grows its stub
+			//whether or not a run joins there, and wears the conductor's colour on the last two
+			//pixels of it -- which is what a connector or a block bolted against that face meets,
+			//instead of the three-pixel gap a playtester found beside every one of them.
+			if(isPatched)
+			{
+				parts.add(shortStubs[m][f]);
+				parts.add(mouths[m][f]);
+			}
+			else if((shape&(1 << (3+f)))!=0)
+				parts.add(stubs[m][f]);
 		}
 		return parts;
 	}

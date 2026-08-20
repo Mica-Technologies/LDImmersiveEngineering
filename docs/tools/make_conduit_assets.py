@@ -449,6 +449,16 @@ def build_patch_models(assets, mount, frm, to):
     return written
 
 
+# How much of a breakout stub is the coloured mouth: the last two pixels before the block edge.
+#
+# The colour is at the *mouth* rather than on a plate against the housing because a breakout that
+# reaches the block edge buries a plate that does not.  Growing the stub is what closes the gap a
+# playtester reported between a box and everything bolted next to it, and the plate was the one
+# thing the stub would have swallowed -- so the plate moved to the end of the stub, which is also
+# where decision 9 always said the colour belonged: "a colour strip at the mouth".
+MOUTH_DEPTH = 2
+
+
 def run_stub_bounds(frm, to, face):
     """Where a stub toward one face sits: the box's own cross-section, extended from the box's
     edge out to the block boundary that face's arm reaches.
@@ -470,6 +480,24 @@ def run_stub_bounds(frm, to, face):
     if lo[i] == hi[i]:
         return None
     return lo, hi
+
+
+def split_stub(lo, hi, face):
+    """A stub cut into the length that stays steel and the mouth that takes the dye.
+
+    Returned as two boxes that abut rather than overlap.  Two coplanar faces in the same place
+    z-fight; two boxes sharing a plane between them do not, because whichever of the pair faces
+    the camera is the one inside the solid.
+    """
+    i = "xyz".index(AXIS_OF[face])
+    shaft, mouth = (list(lo), list(hi)), (list(lo), list(hi))
+    if face in NEGATIVE:
+        cut = lo[i]+MOUTH_DEPTH
+        shaft[0][i], mouth[1][i] = cut, cut
+    else:
+        cut = hi[i]-MOUTH_DEPTH
+        shaft[1][i], mouth[0][i] = cut, cut
+    return shaft, mouth
 
 
 def build_run_stub_models(assets, mount, frm, to):
@@ -496,12 +524,31 @@ def build_run_stub_models(assets, mount, frm, to):
             continue
         lo, hi = bounds
         faces = {f: {"texture": "#box"} for f in FACINGS}
+        box_textures = {
+            "box": "immersiveengineering:blocks/conduit_junction_box",
+            "particle": "immersiveengineering:blocks/conduit_junction_box",
+        }
         write_json(os.path.join(out, "junction_run_%s_%s.json" % (mount, face)), {
-            "textures": {
-                "box": "immersiveengineering:blocks/conduit_junction_box",
-                "particle": "immersiveengineering:blocks/conduit_junction_box",
-            },
+            "textures": box_textures,
             "elements": [{"from": lo, "to": hi, "faces": faces}],
+        })
+        # The same stub cut short, and the coloured mouth that finishes it.  A face with a
+        # conductor broken out on it wears these two instead of the whole stub above, so the
+        # colour sits at the block edge where the hardware bolted to it can be seen against it.
+        (shaft_lo, shaft_hi), (mouth_lo, mouth_hi) = split_stub(lo, hi, face)
+        write_json(os.path.join(out, "junction_run_%s_%s_short.json" % (mount, face)), {
+            "textures": box_textures,
+            "elements": [{"from": shaft_lo, "to": shaft_hi, "faces": faces}],
+        })
+        # Tinted through the face's own ordinal, exactly as the flat plate is, so
+        # BlockConduit.getRenderColour needs no second mapping table.
+        tinted = {f: {"texture": "#patch", "tintindex": FACINGS.index(face)} for f in FACINGS}
+        write_json(os.path.join(out, "junction_mouth_%s_%s.json" % (mount, face)), {
+            "textures": {
+                "patch": "immersiveengineering:blocks/conduit_patch",
+                "particle": "immersiveengineering:blocks/conduit_patch",
+            },
+            "elements": [{"from": mouth_lo, "to": mouth_hi, "faces": tinted}],
         })
         written.append(face)
     return written

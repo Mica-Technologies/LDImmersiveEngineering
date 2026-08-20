@@ -1,0 +1,40 @@
+{
+	"textures": {
+		"box": "immersiveengineering:blocks/conduit_junction_box",
+		"particle": "immersiveengineering:blocks/conduit_junction_box"
+	},
+	"elements": [
+		{
+			"from": [
+				3,
+				0,
+				2
+			],
+			"to": [
+				13,
+				8,
+				3
+			],
+			"faces": {
+				"down": {
+					"texture": "#box"
+				},
+				"up": {
+					"texture": "#box"
+				},
+				"north": {
+					"texture": "#box"
+				},
+				"south": {
+					"texture": "#box"
+				},
+				"west": {
+					"texture": "#box"
+				},
+				"east": {
+					"texture": "#box"
+				}
+			}
+		}
+	]
+}

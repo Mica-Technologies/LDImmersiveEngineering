@@ -298,9 +298,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	/**
 	 * Everything about a box that is visible, packed into one integer.
 	 * <p>
-	 * Bits 0-2 are the mounting face's ordinal and bits 3-8 are one flag per face a run physically
-	 * touches, which between them pick the housing model and the set of run stubs grown out to meet
-	 * those runs. {@code ConduitJunctionModel} composes its quads from exactly this and caches them
+	 * Bits 0-2 are the mounting face's ordinal and bits 3-8 are one flag per face that has something
+	 * to meet -- a run arriving, or simply a block or a connector set down against it -- which
+	 * between them pick the housing model and the set of stubs grown out to reach them. {@code ConduitJunctionModel} composes its quads from exactly this and caches them
 	 * under it, and {@link #getCacheData} hands the same number to the connection model so that two
 	 * differently-shaped boxes cannot share one baked model.
 	 * <p>
@@ -318,9 +318,39 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		boolean[] joins = joiningRuns(world, getPos(), mounts);
 		int shape = ConduitGeometry.junctionBoxMount(mounts).ordinal();
 		for(int i = 0; i < joins.length; i++)
-			if(joins[i])
+			if(joins[i]||meetsNeighbour(EnumFacing.byIndex(i)))
 				shape |= 1 << (3+i);
 		return shape;
+	}
+
+	/**
+	 * Whether there is anything against that face for the housing to reach out and meet.
+	 * <p>
+	 * <strong>The housing used to stop three pixels short of every face a run did not arrive on</strong>
+	 * -- so an LV connector bolted to a box, or a machine set down beside one, stood clear of it with
+	 * a gap you could see the ground through. It was reported twice in one testing round, once for
+	 * blocks and once for connectors, and it is the same three pixels both times: the box is ten
+	 * pixels across in a sixteen-pixel cell, and nothing but a conduit's own arm ever closed the
+	 * rest.
+	 * <p>
+	 * Solid-sided or wiring hardware, and nothing else. A solid side is the block somebody has just
+	 * set down next to the box; wiring hardware is the connector or grid unit that is the whole
+	 * reason a box has faces. Grass, a torch or a snow layer is neither, and a box growing a stub
+	 * out to meet a dandelion would be a worse bug than the one this fixes.
+	 */
+	private boolean meetsNeighbour(EnumFacing face)
+	{
+		BlockPos other = getPos().offset(face);
+		if(!world.isBlockLoaded(other))
+			return false;
+		IBlockState state = world.getBlockState(other);
+		if(state.getBlock().isAir(state, world, other))
+			return false;
+		if(state.isSideSolid(world, other, face.getOpposite()))
+			return true;
+		//A connector's model is a small thing hugging the face it is bolted to, which is not a solid
+		//side by any test -- and is exactly what the gap was most visible against.
+		return Utils.getExistingTileEntity(world, other) instanceof IImmersiveConnectable;
 	}
 
 	/** @return one bit per patched face, which is the set of coloured plates the box wears */

@@ -560,4 +560,32 @@ public class ConduitGeometry
 	{
 		return "junction_run_"+mount.getName()+"_"+dir.getName();
 	}
+
+	/**
+	 * The same stub cut two pixels short, worn by a face that has a conductor broken out on it so
+	 * that {@link #junctionMouthModelName} can finish it in that conductor's colour.
+	 * <p>
+	 * Two models rather than one stub with a coloured cap laid over its end: the cap would share
+	 * the stub's outer face exactly, and two coplanar faces in one place is z-fighting. Cutting the
+	 * stub instead leaves the two abutting, and whichever of the pair faces the camera is the one
+	 * buried inside the solid.
+	 */
+	public static String junctionShortRunModelName(EnumFacing mount, EnumFacing dir)
+	{
+		return junctionRunModelName(mount, dir)+"_short";
+	}
+
+	/**
+	 * The coloured mouth of a breakout: the last two pixels of the stub, in the conductor's dye.
+	 * <p>
+	 * <strong>This is where a breakout's colour lives now.</strong> It used to be a plate painted
+	 * flat against the housing, which was right while the housing stopped short of the block edge
+	 * and wrong the moment it stopped doing that -- a stub grown out to meet the hardware bolted
+	 * beside it swallows a plate lying underneath it. The mouth is also where decision 9 always
+	 * said the colour belonged, and where somebody standing in front of a pole can read it.
+	 */
+	public static String junctionMouthModelName(EnumFacing mount, EnumFacing dir)
+	{
+		return "junction_mouth_"+mount.getName()+"_"+dir.getName();
+	}
 }

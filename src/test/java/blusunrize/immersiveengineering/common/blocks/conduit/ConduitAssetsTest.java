@@ -1031,6 +1031,9 @@ class ConduitAssetsTest
 	@DisplayName("the junction box's run stubs")
 	class RunStubs
 	{
+		/** What the generator's MOUTH_DEPTH says, restated so a change to either fails here. */
+		private static final int MOUTH_DEPTH = 2;
+
 		/**
 		 * @return the model a face's stub is drawn with on a box in that plane, or null on the face
 		 * the housing already reaches by itself -- which is the rule
@@ -1132,6 +1135,73 @@ class ConduitAssetsTest
 					assertEquals(ConduitGeometry.junctionRunModelName(mount, face),
 							model.substring(model.lastIndexOf('/')+1),
 							"the assets and ConduitGeometry disagree about what a stub is called");
+				}
+		}
+
+		@Test
+		@DisplayName("a breakout's short stub and coloured mouth tile the plain stub exactly")
+		void theBreakoutTilesTheStub()
+		{
+			//A patched face wears these two instead of the whole stub, so together they have to be
+			//the whole stub: same cross-section, same reach, and meeting on one plane between them.
+			//An overlap here is two coplanar faces in one place, which is z-fighting at every
+			//breakout on a pole; a gap is a slot of daylight through the middle of one.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					String plain = stubModelFor(mount, face);
+					if(plain==null)
+						continue;
+					String shortStub = partReference(ConduitGeometry.junctionShortRunModelName(mount, face));
+					String mouth = partReference(ConduitGeometry.junctionMouthModelName(mount, face));
+					assertTrue(new File(ASSETS+modelPath(shortStub)).isFile(),
+							"missing short stub: "+shortStub);
+					assertTrue(new File(ASSETS+modelPath(mouth)).isFile(), "missing mouth: "+mouth);
+					int[] whole = stubBounds(plain);
+					int[] shaft = stubBounds(shortStub);
+					int[] cap = stubBounds(mouth);
+					int axis = face.getAxis().ordinal();
+					for(int i = 0; i < 6; i++)
+						if(i%3!=axis)
+						{
+							assertEquals(whole[i], shaft[i], "the short stub for "+face+" on a box "
+									+"mounted "+mount.getName()+" is not the stub's cross-section");
+							assertEquals(whole[i], cap[i], "the mouth for "+face+" on a box mounted "
+									+mount.getName()+" is not the stub's cross-section");
+						}
+					boolean negative = face.getAxisDirection()==EnumFacing.AxisDirection.NEGATIVE;
+					//The mouth is the end at the block boundary, whichever end that is.
+					int[] outer = negative?shaft: cap;
+					int[] inner = negative?cap: shaft;
+					assertEquals(whole[axis], inner[axis], "the pair does not start where the stub does");
+					assertEquals(whole[axis+3], outer[axis+3], "the pair does not reach the block edge");
+					assertEquals(inner[axis+3], outer[axis],
+							"the short stub and the mouth for "+face+" overlap or leave a gap");
+					assertEquals(MOUTH_DEPTH, cap[axis+3]-cap[axis],
+							"the coloured mouth is not "+MOUTH_DEPTH+" pixels deep");
+				}
+		}
+
+		@Test
+		@DisplayName("a mouth is tinted by its own face's ordinal, exactly as a patch plate is")
+		void theMouthCarriesTheFaceTint()
+		{
+			//BlockConduit.getRenderColour reads EnumFacing.byIndex straight off the tint index. A
+			//mouth whose index did not match its face would paint the right box the wrong colour,
+			//which is worse than painting nothing.
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing face : EnumFacing.VALUES)
+				{
+					if(face==mount)
+						continue;
+					String mouth = partReference(ConduitGeometry.junctionMouthModelName(mount, face));
+					JsonObject faces = read(modelPath(mouth)).getAsJsonArray("elements").get(0)
+							.getAsJsonObject().getAsJsonObject("faces");
+					for(EnumFacing drawn : EnumFacing.VALUES)
+						assertEquals(face.ordinal(),
+								faces.getAsJsonObject(drawn.getName()).get("tintindex").getAsInt(),
+								"the mouth for "+face+" on a box mounted "+mount.getName()
+										+" is tinted as some other face");
 				}
 		}
 
