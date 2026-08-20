@@ -35,6 +35,7 @@ import blusunrize.immersiveengineering.api.energy.wires.conduit.ChannelSet;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.ConduitWireType;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IHammerInteraction;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.ICacheData;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbourChangeTile;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IPlayerInteraction;
@@ -109,7 +110,7 @@ import java.util.Set;
  * @author LDImmersiveEngineering -- conduits
  */
 public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiveConnectable,
-		INeighbourChangeTile, IPlayerInteraction, IBlockOverlayText, IStatusLineProvider,
+		INeighbourChangeTile, IPlayerInteraction, IHammerInteraction, IBlockOverlayText, IStatusLineProvider,
 		IFluxReceiver, IFluxProvider, IComparatorOverride, IRedstoneOutput, ITickable,
 		IPropertyPassthrough, ICacheData
 {
@@ -590,7 +591,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			}
 			return true;
 		}
-		if(heldItem.isEmpty()&&player.isSneaking())
+		//**Both hands, not just this one.** A right click is offered to the main hand and then, if
+		//that says it did nothing, to the off hand -- and the client cannot know that the hammer's
+		//cycle did anything, because IHammerInteraction is dispatched on the server only. So a
+		//sneaking player with a hammer in one hand and nothing in the other sent two clicks: the
+		//first recoloured the face and the second, arriving empty-handed, unpatched it again. The
+		//breakout appeared to vanish on the first hit and never come back.
+		if(heldItem.isEmpty()&&player.getHeldItemMainhand().isEmpty()&&player.isSneaking())
 		{
 			if(!patch.isPatched(side))
 				return false;
@@ -614,6 +621,60 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * Sneak and hit a face with an Engineer's Hammer to cycle what is broken out on it.
+	 * <p>
+	 * <strong>Because a dye was the only way, and a dye is not a thing anybody guesses.</strong>
+	 * Changing a breakout's colour meant working out that dyes do it at all, then carrying sixteen
+	 * of them up a pole to try one. The hammer is already in the hand of anybody building wiring --
+	 * it is what rotates every other piece of IE hardware -- so it is the tool the gesture belongs
+	 * on. Dyes still work, and are still the way to ask for one particular colour in one hit.
+	 * <p>
+	 * The cycle is every colour this box has not already spent somewhere else, and then bare. Taken
+	 * colours are stepped over rather than refused: the same conductor on two faces is a short, and
+	 * a click that visibly does nothing reads as a broken block. Bare is skipped too when a wire is
+	 * strung to the face, for the reason {@link #interact} gives -- live hardware on no conductor is
+	 * the worst of the ways for this to be wrong.
+	 */
+	@Override
+	public boolean hammerUseSide(EnumFacing side, EntityPlayer player, float hitX, float hitY, float hitZ)
+	{
+		//Not the plain hit: that is how a hammer rotates hardware, and a box has nothing to rotate,
+		//so a player swinging at one is far more likely to be hitting the wall behind it.
+		if(!player.isSneaking()||side==getMount())
+			return false;
+		if(!cycleBreakout(side))
+			return false;
+		markDirty();
+		markContainingBlockForUpdate(null);
+		//A conductor that was carrying redstone has just moved or gone. The run re-derives rather
+		//than being pushed at, exactly as it does when the mode itself is cycled.
+		if(patch.hasRedstone())
+			propagateSignals();
+		world.notifyNeighborsOfStateChange(getPos().offset(side), getBlockType(), false);
+		return true;
+	}
+
+	/**
+	 * One step of the hammer's cycle on one face.
+	 *
+	 * @return true if anything changed
+	 */
+	private boolean cycleBreakout(EnumFacing side)
+	{
+		WireChannel current = patch.get(side);
+		int taken = 0;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			WireChannel channel = patch.get(face);
+			if(channel!=null&&face!=side)
+				taken |= channel.getMask();
+		}
+		int next = JunctionBoxLogic.nextBreakout(current==null?-1: current.ordinal(), taken,
+				!wires.has(side), WireChannel.VALUES.length);
+		return patch.set(side, next < 0?null: WireChannel.byIndex(next));
 	}
 
 	public static boolean isRedstoneDust(ItemStack stack)
@@ -683,7 +744,8 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		{
 			if(patch.isPatched(face)||!wantsBreakout(face))
 				continue;
-			int free = JunctionBoxLogic.firstFreeChannel(patchedMask(), WireChannel.VALUES.length);
+			int free = JunctionBoxLogic.preferredChannel(face.ordinal(), patchedMask(),
+					WireChannel.VALUES.length);
 			if(free < 0)
 				//Sixteen conductors, all spoken for. Nothing sensible left to do, and stealing one
 				//from another face would break a working circuit to make a new one.
@@ -1199,13 +1261,15 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(target==null||target.side==null||other==null||!isTierWire(cableType))
 			return;
 		wires.set(target.side, ApiUtils.toBlockPos(other), cableType.getUniqueName());
-		//A bare face takes the lowest free conductor, exactly as one does when a connector is bolted
-		//against it -- the gesture says "power, here", and answering it with silence until somebody
-		//finds out about dyes is the awkwardness auto-patching exists to end. A face that is already
-		//patched keeps its colour, so a hand-dyed circuit survives having a wire strung to it.
+		//A bare face takes the colour that face reaches for -- red on the left, blue in the middle,
+		//green on the right -- exactly as one does when a connector is bolted against it. The
+		//gesture says "power, here", and answering it with silence until somebody finds out about
+		//dyes is the awkwardness auto-patching exists to end. A face that is already patched keeps
+		//its colour, so a hand-dyed circuit survives having a wire strung to it.
 		if(!patch.isPatched(target.side))
 		{
-			int free = JunctionBoxLogic.firstFreeChannel(patchedMask(), WireChannel.VALUES.length);
+			int free = JunctionBoxLogic.preferredChannel(target.side.ordinal(), patchedMask(),
+					WireChannel.VALUES.length);
 			if(free >= 0)
 				patch.set(target.side, WireChannel.byIndex(free));
 		}
@@ -1638,12 +1702,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 				EnumFacing face = EnumFacing.byIndex(free);
 				changed |= wires.set(face, con.end, type);
 				//An adopted wire is a wire strung to a bare face, and gets what connectCable gives one:
-				//the lowest free conductor. Without this the table knows the wire and the patch does
+				//that face's own colour. Without this the table knows the wire and the patch does
 				//not, and the circuit is silently dead -- the graph accepts energy for a face that
 				//has no conductor to put it on.
 				if(!patch.isPatched(face))
 				{
-					int channel = JunctionBoxLogic.firstFreeChannel(patchedMask(), WireChannel.VALUES.length);
+					int channel = JunctionBoxLogic.preferredChannel(face.ordinal(), patchedMask(),
+							WireChannel.VALUES.length);
 					if(channel >= 0)
 					{
 						patch.set(face, WireChannel.byIndex(channel));

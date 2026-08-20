@@ -408,4 +408,125 @@ class JunctionBoxLogicTest
 					JunctionBoxLogic.canTakeWire(0, -1, DOWN, true));
 		}
 	}
+
+	/**
+	 * Which colour a breakout comes out, and what a hammer does to it.
+	 * <p>
+	 * Both were reported in one round of playtesting: the colours were "random" -- lowest free,
+	 * which depends on the order somebody bolted hardware on -- and changing one meant carrying dyes
+	 * up a pole. Positional defaults and a cycle on the tool already in hand are the two answers.
+	 */
+	@Nested
+	@DisplayName("breakout colours")
+	class BreakoutColours
+	{
+		private static final int DOWN = 0, UP = 1, NORTH = 2, SOUTH = 3, WEST = 4, EAST = 5;
+		private static final int BLUE = 11, GREEN = 13, RED = 14;
+
+		@Test
+		@DisplayName("red on the left, blue in the middle, green on the right")
+		void theThreeDefaults()
+		{
+			//The layout on the reference photograph, read looking north: west is on the left, east
+			//is on the right, and up is between them -- which is "on top" for a box on a pole and
+			//"in the centre" for one on the ground, the two cases the report names.
+			assertEquals(RED, JunctionBoxLogic.preferredChannel(WEST, 0, CHANNELS));
+			assertEquals(GREEN, JunctionBoxLogic.preferredChannel(EAST, 0, CHANNELS));
+			assertEquals(BLUE, JunctionBoxLogic.preferredChannel(UP, 0, CHANNELS));
+			assertEquals(BLUE, JunctionBoxLogic.preferredChannel(DOWN, 0, CHANNELS));
+			//A line running the other way is laid out the same way round.
+			assertEquals(RED, JunctionBoxLogic.preferredChannel(NORTH, 0, CHANNELS));
+			assertEquals(GREEN, JunctionBoxLogic.preferredChannel(SOUTH, 0, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("three breakouts on one box come out red, blue and green whatever order they are asked for")
+		void theOrderDoesNotMatter()
+		{
+			//The whole complaint: two boxes built the same way came out different because the
+			//colours depended on which piece of hardware was bolted on first.
+			int[] faces = {UP, WEST, EAST};
+			for(int first = 0; first < 3; first++)
+			{
+				int used = 0;
+				int[] got = new int[6];
+				for(int step = 0; step < 3; step++)
+				{
+					int face = faces[(first+step)%3];
+					got[face] = JunctionBoxLogic.preferredChannel(face, used, CHANNELS);
+					used |= 1 << got[face];
+				}
+				assertEquals(RED, got[WEST]);
+				assertEquals(BLUE, got[UP]);
+				assertEquals(GREEN, got[EAST]);
+			}
+		}
+
+		@Test
+		@DisplayName("a colour already spent falls back to the lowest free one")
+		void takenFallsBack()
+		{
+			//A preference, not a rule: the same conductor on two faces is a short.
+			assertEquals(0, JunctionBoxLogic.preferredChannel(WEST, 1 << RED, CHANNELS));
+			assertEquals(1, JunctionBoxLogic.preferredChannel(WEST, (1 << RED)|1, CHANNELS));
+			assertEquals(-1, JunctionBoxLogic.preferredChannel(WEST, (1 << CHANNELS)-1, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a face index off the end still gets a conductor rather than throwing")
+		void nonsenseFaceStillWorks()
+		{
+			assertEquals(0, JunctionBoxLogic.preferredChannel(-1, 0, CHANNELS));
+			assertEquals(0, JunctionBoxLogic.preferredChannel(99, 0, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("the hammer walks every colour and then takes the breakout away")
+		void theWholeCycle()
+		{
+			int at = -1;
+			for(int i = 0; i < CHANNELS; i++)
+			{
+				at = JunctionBoxLogic.nextBreakout(at, 0, true, CHANNELS);
+				assertEquals(i, at, "the cycle skipped a colour");
+			}
+			assertEquals(-1, JunctionBoxLogic.nextBreakout(at, 0, true, CHANNELS),
+					"the last colour should step to a bare face");
+			assertEquals(0, JunctionBoxLogic.nextBreakout(-1, 0, true, CHANNELS),
+					"and bare should step back to the first colour");
+		}
+
+		@Test
+		@DisplayName("colours spent on other faces are stepped over, not refused")
+		void takenColoursAreSkipped()
+		{
+			//A click that visibly does nothing reads as a broken block, so the cycle never lands on
+			//a conductor another face is already using.
+			int taken = 0b0110;
+			assertEquals(0, JunctionBoxLogic.nextBreakout(-1, taken, true, CHANNELS));
+			assertEquals(3, JunctionBoxLogic.nextBreakout(0, taken, true, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a wire on the face takes bare out of the cycle")
+		void aWireHoldsTheFace()
+		{
+			assertEquals(0, JunctionBoxLogic.nextBreakout(CHANNELS-1, 0, false, CHANNELS),
+					"with a wire on it the last colour should wrap to the first, not go bare");
+			for(int i = 0; i < CHANNELS; i++)
+				assertNotEquals(-1, JunctionBoxLogic.nextBreakout(i, 0, false, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("nowhere to go answers where it already is")
+		void nowhereToGo()
+		{
+			//Sixteen conductors, fifteen spent elsewhere, a wire holding this face: the one stop in
+			//the cycle is the one it is on. A caller reads that as "nothing happened".
+			int taken = ((1 << CHANNELS)-1)&~(1 << 7);
+			assertEquals(7, JunctionBoxLogic.nextBreakout(7, taken, false, CHANNELS));
+			//And with every one of them spent elsewhere there is no stop at all.
+			assertEquals(-1, JunctionBoxLogic.nextBreakout(-1, (1 << CHANNELS)-1, false, CHANNELS));
+		}
+	}
 }

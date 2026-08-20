@@ -122,6 +122,98 @@ public final class JunctionBoxLogic
 		return -1;
 	}
 
+	/**
+	 * Which conductor a breakout on that face should take, before falling back to the lowest free
+	 * one.
+	 * <p>
+	 * <strong>Red on the left, blue in the middle, green on the right.</strong> A box on a pole
+	 * wears three breakouts far more often than it wears sixteen, and until now which colour landed
+	 * where depended on the order somebody happened to bolt the hardware on -- so two boxes built
+	 * the same way came out different, and a lineman reading a pole from the ground could not tell
+	 * one circuit from another at a glance. Handing each face a fixed colour is what makes a row of
+	 * poles read as a row of poles.
+	 * <p>
+	 * The three are the phase colours anybody would reach for, laid out the way they are on the
+	 * reference photograph: looking north at a box, west is on the left and east is on the right,
+	 * and up is between them -- which is also "on top" for a box on a pole and "in the centre" for
+	 * one on the ground, the two cases the report names. North and south take the same pair, so a
+	 * line running the other way is laid out the same way round.
+	 * <p>
+	 * A preference, not a rule: the colour is only taken if it is free, because the same conductor
+	 * arriving at two connectors is a short. A fourth breakout, or a second one on a face whose
+	 * colour has already gone somewhere, falls through to {@link #firstFreeChannel} exactly as
+	 * every breakout used to.
+	 *
+	 * @param face         the face wanting a breakout, as an {@code EnumFacing} ordinal
+	 * @param usedMask     one bit per conductor already patched on this box
+	 * @param channelCount how many conductors a bundle carries
+	 *
+	 * @return the index of the conductor to patch, or -1 if the box has none left
+	 */
+	public static int preferredChannel(int face, int usedMask, int channelCount)
+	{
+		int wanted = face >= 0&&face < DEFAULT_CHANNEL.length?DEFAULT_CHANNEL[face]: -1;
+		if(wanted >= 0&&wanted < channelCount&&(usedMask&(1 << wanted))==0)
+			return wanted;
+		return firstFreeChannel(usedMask, channelCount);
+	}
+
+	/**
+	 * The colour each face reaches for first, indexed by {@code EnumFacing.ordinal()} -- down, up,
+	 * north, south, west, east.
+	 * <p>
+	 * Written as indices into {@code WireChannel} rather than as the enum, so this class stays what
+	 * the rest of it is: arithmetic with no game behind it. The three used are BLUE, GREEN and RED,
+	 * which are 11, 13 and 14 in {@code EnumDyeColor} order -- the order {@code WireChannel}
+	 * deliberately matches, and the order a dye's ore dictionary name resolves through.
+	 */
+	private static final int[] DEFAULT_CHANNEL = {11, 11, 14, 13, 14, 13};
+
+	/**
+	 * One step of the Engineer's Hammer's cycle on a face: which conductor it lands on next.
+	 * <p>
+	 * The cycle is every conductor this box has not already spent on some <em>other</em> face, in
+	 * order, and then bare. Conductors spoken for elsewhere are stepped over rather than refused:
+	 * the same conductor arriving at two connectors is a short, and a click that visibly does
+	 * nothing reads as a broken block rather than as a rule.
+	 * <p>
+	 * Bare is a stop in the cycle rather than a separate gesture, so one tool both recolours a
+	 * breakout and takes it away -- which is what the report asked for, and what makes the hammer a
+	 * complete answer rather than a shortcut with a hole in it. It is skipped when a wire is strung
+	 * to the face, for the reason the box refuses to unpatch under one: hardware left live on no
+	 * conductor is the worst of the ways for this to be wrong.
+	 *
+	 * @param current      the conductor on that face now, or -1 for a bare face
+	 * @param takenMask    one bit per conductor patched on <em>another</em> face of this box
+	 * @param mayGoBare    whether "no breakout" is one of the stops
+	 * @param channelCount how many conductors a bundle carries
+	 *
+	 * @return the conductor to patch, or -1 to leave the face bare. Answers {@code current} when
+	 * there is nowhere else to go, so a caller can treat "no change" as "nothing happened".
+	 */
+	public static int nextBreakout(int current, int takenMask, boolean mayGoBare, int channelCount)
+	{
+		int[] stops = new int[channelCount];
+		int count = 0;
+		for(int i = 0; i < channelCount; i++)
+			if((takenMask&(1 << i))==0)
+				stops[count++] = i;
+		int size = count+(mayGoBare?1: 0);
+		if(size==0)
+			return current;
+		int index = -1;
+		if(current < 0)
+			//A bare face steps to the first colour when bare is not a stop at all, which is a face a
+			//wire was adopted onto before anything patched it.
+			index = mayGoBare?count: -1;
+		else
+			for(int i = 0; i < count; i++)
+				if(stops[i]==current)
+					index = i;
+		int next = (index+1)%size;
+		return next < count?stops[next]: -1;
+	}
+
 	//	=================================
 	//		WIRES STRUNG STRAIGHT TO A BOX
 	//	=================================
