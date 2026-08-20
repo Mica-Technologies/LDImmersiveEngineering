@@ -59,6 +59,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.EnumDyeColor;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
@@ -362,6 +364,27 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(patch.isPatched(face))
 				mask |= 1 << face.ordinal();
 		return mask;
+	}
+
+	/**
+	 * Redraw when a description packet changes which conductors are broken out.
+	 * <p>
+	 * The same hole {@code TileEntityConduit.onDataPacket} closes, and for the same reason: a
+	 * breakout lives on the tile entity, so the block change that carries it is a change to a state
+	 * the client already has, and an unchanged state marks no render section dirty. Without this a
+	 * face dyed or hammered to a new colour keeps the old one until something else rebuilds the mesh.
+	 * <p>
+	 * Gated on the patch mask, not on the packet: a box sends one of these every second to anybody
+	 * reading its overlay, and rebuilding a chunk section once a second for a box somebody is
+	 * looking at is the cost {@code sendUpdatePacketToWatchers} was written to avoid.
+	 */
+	@Override
+	public void onDataPacket(NetworkManager net, SPacketUpdateTileEntity pkt)
+	{
+		int before = getPatchMask();
+		super.onDataPacket(net, pkt);
+		if(world!=null&&world.isRemote&&getPatchMask()!=before)
+			world.markBlockRangeForRenderUpdate(getPos(), getPos());
 	}
 
 	/**

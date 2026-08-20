@@ -20,6 +20,8 @@ import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
@@ -292,6 +294,46 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 			if(te instanceof TileEntityJunctionBox)
 				((TileEntityJunctionBox)te).queueRebuild();
 		}
+	}
+
+	/**
+	 * What this conduit looks like, as one number, for telling a description packet that changed the
+	 * shape from one that did not.
+	 */
+	private int drawnShape()
+	{
+		return facing.ordinal()|arms.getConnections() << 3|arms.getRisers() << 7|arms.getWraps() << 11;
+	}
+
+	/**
+	 * Redraw when a description packet changes the shape -- because nothing else will.
+	 * <p>
+	 * <strong>This is the "conduit that draws disconnected until you walk away and come back".</strong>
+	 * An arm lives on the tile entity, not in the block state, so when a conduit learns that
+	 * something joined it, {@code markContainingBlockForUpdate} sends a block change whose state is
+	 * <em>identical</em> to the one the client already has. {@code Chunk.setBlockState} answers an
+	 * unchanged state with null, {@code World.markAndNotifyBlock} does nothing at all with that, and
+	 * the render section is never marked dirty. The tile data arrives and is read; the mesh it
+	 * belongs to was built a moment ago and is not built again.
+	 * <p>
+	 * It was intermittent because it usually got away with it: placing a conduit dirties the
+	 * sections within one block of it, so a neighbour that refreshes in the <em>same</em> server tick
+	 * is redrawn by that. A neighbour that refreshes a tick later -- which is where
+	 * {@code addFutureServerTask} puts every neighbour update -- misses that rebuild and has nothing
+	 * of its own to ask for another. Leaving the chunk and coming back rebuilt the mesh from
+	 * scratch, which is exactly why that looked like a cure.
+	 * <p>
+	 * Gated on the shape actually changing rather than done on every packet: a rebuild of a chunk
+	 * section is not free, and this is the class of thing {@code sendUpdatePacketToWatchers} exists
+	 * to keep out of the render loop.
+	 */
+	@Override
+	public void onDataPacket(NetworkManager net, SPacketUpdateTileEntity pkt)
+	{
+		int before = drawnShape();
+		super.onDataPacket(net, pkt);
+		if(world!=null&&world.isRemote&&drawnShape()!=before)
+			world.markBlockRangeForRenderUpdate(getPos(), getPos());
 	}
 
 	@Override

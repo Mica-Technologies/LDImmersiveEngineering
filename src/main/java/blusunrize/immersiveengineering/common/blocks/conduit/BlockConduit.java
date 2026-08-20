@@ -13,6 +13,7 @@ import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.BlockIETileProvider;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IColouredBlock;
 import blusunrize.immersiveengineering.common.blocks.ItemBlockIEBase;
+import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyEnum;
 import net.minecraft.block.state.IBlockState;
@@ -167,6 +168,35 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 	//derived from the runs that reach it, in ConduitGeometry.junctionBoxMount -- and the only reader
 	//was the multipart blockstate that used to pick between six housing models. ConduitJunctionModel
 	//asks TileEntityJunctionBox.getRenderShape for the same answer instead.
+
+	/**
+	 * Let a conduit work out its own shape on the client as well as on the server.
+	 * <p>
+	 * <strong>A second net under the "draws disconnected until you come back" bug.</strong> The
+	 * primary fix is in {@code TileEntityConduit.onDataPacket}, which redraws when the arms a
+	 * description packet carries differ from the ones already there. This covers the case where no
+	 * such packet arrives at all: the client's copy of a conduit can see its neighbours perfectly
+	 * well -- every rule in {@code refreshConnections} is arithmetic on what is next door, with no
+	 * server-only state anywhere in it -- so there is no reason for it to sit waiting to be told.
+	 * <p>
+	 * The server stays authoritative: it saves the arms, and its packets overwrite whatever the
+	 * client worked out. This only means the client is never <em>stuck</em> on a shape that the
+	 * blocks around it plainly contradict, which is the whole of what a player was walking away and
+	 * back to cure.
+	 * <p>
+	 * Server side this does nothing but defer to IE, which routes the change through
+	 * {@code INeighbourChangeTile} on a future task -- see {@code BlockIETileProvider}.
+	 */
+	@Override
+	public void neighborChanged(IBlockState state, World world, BlockPos pos, Block block, BlockPos fromPos)
+	{
+		super.neighborChanged(state, world, pos, block, fromPos);
+		if(!world.isRemote)
+			return;
+		TileEntity tile = world.getTileEntity(pos);
+		if(tile instanceof TileEntityConduit&&((TileEntityConduit)tile).refreshConnections())
+			world.markBlockRangeForRenderUpdate(pos, pos);
+	}
 
 	//	=================================
 	//		PATCH COLOURS
