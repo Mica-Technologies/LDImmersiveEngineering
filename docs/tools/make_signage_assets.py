@@ -63,8 +63,8 @@ def read_kinds(repo):
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
     body = source[source.index("public enum UtilitySignKind"):source.index("public static final UtilitySignKind[]")]
-    pattern = re.compile(r"^\t([A-Z_]+)\((\d+), (\d+), (\d+), 0x([0-9A-Fa-f]+), (true|false)\)",
-                         re.MULTILINE)
+    pattern = re.compile(r"^\t([A-Z_]+)\((\d+), (\d+), (\d+), 0x([0-9A-Fa-f]+), (true|false), "
+                         r"SignShape\.([A-Z]+)\)", re.MULTILINE)
     kinds = []
     for match in pattern.finditer(body):
         kinds.append({
@@ -73,6 +73,7 @@ def read_kinds(repo):
             "height": int(match.group(3)),
             "lines": int(match.group(4)),
             "rotated": match.group(6) == "true",
+            "shape": match.group(7),
         })
     if not kinds:
         raise SystemExit("could not read any kinds out of UtilitySignKind.java")
@@ -135,6 +136,13 @@ def diamond(draw, rect, fill, outline=None):
     draw.polygon(points, fill=fill, outline=outline)
 
 
+# What each routine above cuts a plate to.  UtilitySignKind declares the same thing, and
+# SignLayout fits the lettering to what it declares -- so a plate drawn as an oval but
+# declared a rectangle gets its text laid out to a rectangle it has not got, which is
+# exactly how the numbers came to be hanging off the paint the first time round.
+SHAPE_OF = {"strip": "RECT", "oval": "ELLIPSE", "disc": "ELLIPSE", "diamond": "DIAMOND"}
+
+
 def build_texture(assets, kind):
     """One sprite per kind: the plate on a transparent field.
 
@@ -146,6 +154,7 @@ def build_texture(assets, kind):
     draw = ImageDraw.Draw(image)
     rect = plate_rect(kind)
     name = kind["name"]
+    routine = "strip"
     if name == "parallel_generation":
         strip(draw, rect, RED, RED_LIT)
     elif name in ("yellow_vertical", "yellow_horizontal", "tower_horizontal"):
@@ -158,12 +167,16 @@ def build_texture(assets, kind):
         strip(draw, rect, ORANGE, ORANGE_LIT)
     elif name == "oval_fraction":
         oval(draw, rect, WHITE, WHITE_LIT)
+        routine = "oval"
     elif name == "inspection_round":
         disc(draw, rect, SILVER, SILVER_LIT)
+        routine = "disc"
     elif name == "tower_diamond":
         diamond(draw, rect, YELLOW)
+        routine = "diamond"
     elif name == "line_crossing_diamond":
         diamond(draw, rect, YELLOW, outline=EDGE)
+        routine = "diamond"
         # The cross this sign is named for.  Drawn short of the points so it reads as a
         # marking on the plate rather than as the plate being cut in four.
         x0, y0, x1, y1 = rect
@@ -179,6 +192,10 @@ def build_texture(assets, kind):
         draw.line([x0+1, rule, x1-2, rule], fill=EDGE)
     else:
         raise SystemExit("no artwork for sign kind %s" % name)
+    if SHAPE_OF[routine] != kind["shape"]:
+        raise SystemExit("%s is drawn as a %s but declares SignShape.%s -- one of the two is "
+                         "wrong, and what comes out is a sign whose text is fitted to a plate "
+                         "it has not got" % (name, SHAPE_OF[routine], kind["shape"]))
     out = os.path.join(assets, "textures", "blocks", "sign_%s.png" % name)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     image.save(out, "PNG", optimize=True)

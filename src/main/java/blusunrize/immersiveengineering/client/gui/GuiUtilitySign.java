@@ -178,7 +178,7 @@ public class GuiUtilitySign extends GuiIEContainerBase
 			if(text.isEmpty())
 				continue;
 			int width = fontRenderer.getStringWidth(text);
-			float scale = SignLayout.scaleFor(kind, width)*ZOOM;
+			float scale = SignLayout.scaleFor(kind, i, width)*ZOOM;
 			GlStateManager.pushMatrix();
 			GlStateManager.translate(centreX, centreY, 0);
 			if(kind.isRotated())
@@ -187,7 +187,8 @@ public class GuiUtilitySign extends GuiIEContainerBase
 				GlStateManager.rotate(-90, 0, 0, 1);
 			GlStateManager.translate(0, SignLayout.lineCentre(kind, i)*ZOOM, 0);
 			GlStateManager.scale(scale, scale, 1);
-			fontRenderer.drawString(text, -width/2f, -SignLayout.FONT_HEIGHT/2f,
+			//Centred on the paint, exactly as the world renderer does it -- see the note there.
+			fontRenderer.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
 					0xFF000000|kind.getTextColour(), false);
 			GlStateManager.popMatrix();
 		}

@@ -24,7 +24,7 @@ colour, long before anybody is close enough to read the number.
 | Placing | Against a **horizontal** face with something solid behind it |
 | Choosing a plate | **Engineer's Hammer**: steps to the next kind |
 | Writing on it | **Sneak + Engineer's Hammer**: opens the editor |
-| Lines | 0–3 depending on the kind, auto-scaled to fill the plate |
+| Lines | 0–3 depending on the kind, auto-scaled to fill the plate's *paint* — see below |
 | Per-frame cost | The lettering only, and only within 48 blocks |
 
 ---
@@ -33,21 +33,21 @@ colour, long before anybody is close enough to read the number.
 
 Ordinals are what a sign saves, so `UtilitySignKind` may only be appended to.
 
-| # | Kind | Plate | Lines | Text |
-|---|---|---|---|---|
-| 0 | `PARALLEL_GENERATION` | 14×6 red strip | 2 | white |
-| 1 | `YELLOW_VERTICAL` | 6×14 yellow strip | 1 | black, turned |
-| 2 | `WHITE_VERTICAL` | 6×14 white strip | 1 | black, turned |
-| 3 | `SILVER_VERTICAL` | 6×14 bare metal strip | 1 | grey, turned |
-| 4 | `OVAL_FRACTION` | 12×8 white oval | 2 | black |
-| 5 | `YELLOW_HORIZONTAL` | 14×4 yellow strip | 1 | black |
-| 6 | `ORANGE_HORIZONTAL` | 14×4 orange strip | 1 | black |
-| 7 | `ORANGE_VERTICAL` | 6×14 orange strip | 1 | black, turned |
-| 8 | `INSPECTION_ROUND` | 10×10 silver disc | 2 | grey |
-| 9 | `TOWER_DIAMOND` | 12×12 yellow diamond, no border | 1 | black |
-| 10 | `LINE_CROSSING_DIAMOND` | 12×12 yellow diamond, outline and cross | 0 | — |
-| 11 | `TOWER_VERTICAL` | 8×14 yellow, rule printed at ⅔ height | 3 | black |
-| 12 | `TOWER_HORIZONTAL` | 14×4 yellow strip | 1 | black |
+| # | Kind | Plate | Shape | Lines | Text |
+|---|---|---|---|---|---|
+| 0 | `PARALLEL_GENERATION` | 14×6 red strip | `RECT` | 2 | white |
+| 1 | `YELLOW_VERTICAL` | 6×14 yellow strip | `RECT` | 1 | black, turned |
+| 2 | `WHITE_VERTICAL` | 6×14 white strip | `RECT` | 1 | black, turned |
+| 3 | `SILVER_VERTICAL` | 6×14 bare metal strip | `RECT` | 1 | grey, turned |
+| 4 | `OVAL_FRACTION` | 12×8 white oval | `ELLIPSE` | 2 | black |
+| 5 | `YELLOW_HORIZONTAL` | 14×4 yellow strip | `RECT` | 1 | black |
+| 6 | `ORANGE_HORIZONTAL` | 14×4 orange strip | `RECT` | 1 | black |
+| 7 | `ORANGE_VERTICAL` | 6×14 orange strip | `RECT` | 1 | black, turned |
+| 8 | `INSPECTION_ROUND` | 10×10 silver disc | `ELLIPSE` | 2 | grey |
+| 9 | `TOWER_DIAMOND` | 12×12 yellow diamond, no border | `DIAMOND` | 1 | black |
+| 10 | `LINE_CROSSING_DIAMOND` | 12×12 yellow diamond, outline and cross | `DIAMOND` | 0 | — |
+| 11 | `TOWER_VERTICAL` | 8×14 yellow, rule printed at ⅔ height | `RECT` | 3 | black |
+| 12 | `TOWER_HORIZONTAL` | 14×4 yellow strip | `RECT` | 1 | black |
 
 What each means in the field is in the manual chapter (`docs/manual/chapters/signage.tex`) and in
 the `UtilitySignKind` javadoc; it is deliberately not repeated in the code as data, because nothing
@@ -56,6 +56,40 @@ in the game branches on it.
 **Every plate is an even number of pixels across and down.** Odd would put the plate's edge on a
 half-pixel, which samples between two texels and comes out of the atlas as a blurred fringe — on a
 six-pixel strip, most of the sign. `SignageTest` asserts it.
+
+---
+
+## Where the lettering goes
+
+`SignLayout`, shared by `TileRenderUtilitySign` and `GuiUtilitySign` — a preview that lays text out
+by its own arithmetic is a preview that lies as soon as either side is touched.
+
+**A line is printed to fill the plate rather than typeset at a fixed size**, which is what somebody
+who reads real ones means by "resizable": a short number comes out big and a long one comes out
+small, exactly as they do on a pole. It is scaled to whichever limit it hits first — the plate it
+has to fit along, or its share of the plate's depth.
+
+**Filling the plate means filling the paint, not the sprite.** The first version fitted every line
+to the sprite's bounding box, and every one of the thirteen had text sitting on its border or, on
+the round and pointed kinds, hanging off the plate entirely. Four things fix that, and all four are
+in `SignLayout`:
+
+| | |
+|---|---|
+| `SignShape.getInset()` | The painted outline is not printable plate. One pixel on everything with a border; half on the plain tower diamond, which has none. |
+| `SignShape.spanAt()` | A plate is not the rectangle it is drawn inside. An oval or a diamond narrows away from its middle, so a line is fitted to how much plate is left **where its tallest letter reaches**, not at its centre. `getStackFactor()` is the matching rule for the stack's depth: the largest box inscribed *in* the shape rather than around it. |
+| `PADDING` | A tenth of the way in on every side, so the lettering is held off the border rather than stopping against it. A fraction rather than a number of pixels, because a 14×4 strip has two pixels of plate inside its border and no more. |
+| `INK_HEIGHT` | A glyph cell is eight pixels tall and a capital paints seven of them. Scaling and centring by the cell puts every line half a pixel high and half a pixel taller than the plate was measured for. Both draw sites offset by the ink instead — and by `inkWidth`, since `getStringWidth` counts the gap after the last character too. |
+
+`LEADING` keeps a stack of lines from meeting, and `TOWER_VERTICAL` declares
+`getRuleAfterLine()`: its three lines are **not** three even shares of the plate, because the rule
+printed at ⅔ height has the receiving station's initials under it. Divided evenly, the third line's
+letters sat on the rule.
+
+`SignageTest` walks every kind, every line and a spread of string widths and asserts the painted box
+lands inside the shape; it also reads the sprites back off disk to check that each plate is really
+cut to the shape its kind declares, and that the tower plate's rule is drawn in the gap the layout
+leaves for it.
 
 ---
 

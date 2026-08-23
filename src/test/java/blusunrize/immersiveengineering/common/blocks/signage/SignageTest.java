@@ -16,6 +16,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -52,6 +54,24 @@ class SignageTest
 	private static String modelName(UtilitySignKind kind)
 	{
 		return "signage/sign_"+kind.getName();
+	}
+
+	private static BufferedImage sprite(UtilitySignKind kind)
+	{
+		File file = new File(ASSETS+"textures/blocks/sign_"+kind.getName()+".png");
+		assertTrue(file.isFile(), "missing sprite: "+file.getPath());
+		try
+		{
+			return ImageIO.read(file);
+		} catch(IOException e)
+		{
+			throw new AssertionError("could not read "+file.getPath(), e);
+		}
+	}
+
+	private static int brightness(int argb)
+	{
+		return ((argb>>16)&0xFF)+((argb>>8)&0xFF)+(argb&0xFF);
 	}
 
 	private static JsonObject element(UtilitySignKind kind)
@@ -150,7 +170,7 @@ class SignageTest
 				for(int i = 0; i < kind.getLines(); i++)
 				{
 					float centre = SignLayout.lineCentre(kind, i);
-					float half = kind.getTextDepth()/2f;
+					float half = SignLayout.halfDepth(kind);
 					assertTrue(Math.abs(centre) < half,
 							kind+" line "+i+" is centred off the plate at "+centre);
 				}
@@ -171,20 +191,72 @@ class SignageTest
 		void textIsFittedBothWays()
 		{
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
-			{
-				if(kind.getLines()==0)
-					continue;
-				//A wide string: what matters is that it comes out no wider than the plate.
-				int wide = 200;
-				float scale = SignLayout.scaleFor(kind, wide);
-				assertTrue(scale*wide <= kind.getTextSpan(),
-						kind+" prints a long line "+(scale*wide)+" pixels wide on a "
-								+kind.getTextSpan()+" pixel plate");
-				//A single character: capped rather than grown until it fills the plate.
-				float big = SignLayout.scaleFor(kind, 5);
-				assertTrue(big*SignLayout.FONT_HEIGHT <= SignLayout.MAX_TEXT_HEIGHT+0.001f,
-						kind+" blows a short line up past the cap");
-			}
+				for(int i = 0; i < kind.getLines(); i++)
+				{
+					//A wide string: what matters is that it comes out no wider than the paint
+					//there is to print it on, which on a shape that narrows is not the plate's
+					//full width.
+					int wide = 200;
+					float scale = SignLayout.scaleFor(kind, i, wide);
+					assertTrue(scale*SignLayout.inkWidth(wide) <= SignLayout.lineSpan(kind, i)+1e-3,
+							kind+" line "+i+" prints "+(scale*SignLayout.inkWidth(wide))
+									+" pixels wide where the plate is only "
+									+SignLayout.lineSpan(kind, i));
+					//A single character: capped rather than grown until it fills the plate.
+					float big = SignLayout.scaleFor(kind, i, 5);
+					assertTrue(big*SignLayout.INK_HEIGHT <= SignLayout.MAX_TEXT_HEIGHT+0.001f,
+							kind+" blows a short line up past the cap");
+				}
+		}
+
+		@Test
+		@DisplayName("every line of lettering lands on the paint, not on the border or off the plate")
+		void textStaysInsideTheShape()
+		{
+			//This is the whole of what went wrong the first time round: a line was fitted to the
+			//rectangle the sprite is drawn inside rather than to the plate cut out of it, so a
+			//number sat on top of the border, and on an oval or a diamond hung off the paint
+			//altogether. The box a line paints is checked against the shape at both of the two
+			//limits it can hit -- width, and its share of the depth.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				for(int i = 0; i < kind.getLines(); i++)
+					for(int stringWidth : new int[]{2, 6, 13, 25, 60, 200})
+					{
+						float scale = SignLayout.scaleFor(kind, i, stringWidth);
+						float halfWide = scale*SignLayout.inkWidth(stringWidth)/2f;
+						float halfTall = scale*SignLayout.INK_HEIGHT/2f;
+						//The two corners furthest from the middle, which is where a line leaves
+						//the paint first.
+						float across = Math.abs(SignLayout.lineCentre(kind, i))+halfTall;
+						float room = kind.getShape().spanAt(SignLayout.halfSpan(kind),
+								SignLayout.halfDepth(kind), across)/2f;
+						assertTrue(halfWide <= room+1e-3, kind+" line "+i+" of a "+stringWidth
+								+"-pixel string reaches "+halfWide+" pixels out where the plate "
+								+"has "+room);
+						assertTrue(across <= SignLayout.halfDepth(kind)+1e-3, kind+" line "+i
+								+" reaches "+across+" pixels across a plate with "
+								+SignLayout.halfDepth(kind));
+					}
+		}
+
+		@Test
+		@DisplayName("lettering is sized by the ink, not by the empty row under it")
+		void textIsSizedByItsInk()
+		{
+			//A glyph cell is eight pixels tall and a capital paints seven of them; a line scaled
+			//and centred by the cell comes out half a pixel high and half a pixel taller than the
+			//plate was measured for, which on a four-pixel strip is the border.
+			assertEquals(7, SignLayout.INK_HEIGHT);
+			assertEquals(8, SignLayout.FONT_HEIGHT);
+			//getStringWidth counts the gap after the last character too.
+			assertEquals(0f, SignLayout.inkWidth(0));
+			assertEquals(0f, SignLayout.inkWidth(1));
+			assertEquals(11f, SignLayout.inkWidth(12));
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				for(int i = 0; i < kind.getLines(); i++)
+					assertEquals(SignLayout.lineHeight(kind, i),
+							SignLayout.scaleFor(kind, i, 0)*SignLayout.INK_HEIGHT, 1e-3,
+							kind+" does not fill the depth it gives line "+i);
 		}
 
 		@Test
@@ -192,13 +264,64 @@ class SignageTest
 		void linesDoNotCollide()
 		{
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				for(int i = 1; i < kind.getLines(); i++)
+				{
+					float above = SignLayout.lineCentre(kind, i-1)
+							+SignLayout.lineHeight(kind, i-1)/2f;
+					float below = SignLayout.lineCentre(kind, i)-SignLayout.lineHeight(kind, i)/2f;
+					assertTrue(below > above, kind+" draws line "+(i-1)+" down to "+above
+							+" and line "+i+" from "+below+", so they meet");
+				}
+		}
+
+		@Test
+		@DisplayName("nothing is printed on the tower plate's rule")
+		void theRuleIsLeftClear()
+		{
+			//The sprite has a rule two thirds of the way down and the receiving station's initials
+			//go under it, so the three lines are not three even shares of the plate. Laid out
+			//evenly the third line's letters sit on top of the rule, which is what they did.
+			UtilitySignKind kind = UtilitySignKind.TOWER_VERTICAL;
+			assertEquals(1, kind.getRuleAfterLine());
+			float near = SignLayout.ruleEdge(kind);
+			float far = near+SignLayout.RULE_THICKNESS;
+			for(int i = 0; i < kind.getLines(); i++)
 			{
-				if(kind.getLines() < 2)
+				float top = SignLayout.lineCentre(kind, i)-SignLayout.lineHeight(kind, i)/2f;
+				float bottom = SignLayout.lineCentre(kind, i)+SignLayout.lineHeight(kind, i)/2f;
+				if(i <= kind.getRuleAfterLine())
+					assertTrue(bottom <= near+1e-3,
+							"line "+i+" reaches "+bottom+", onto a rule that starts at "+near);
+				else
+					assertTrue(top >= far-1e-3,
+							"line "+i+" starts at "+top+", onto a rule that ends at "+far);
+			}
+			for(UtilitySignKind other : UtilitySignKind.VALUES)
+				if(other!=kind)
+					assertEquals(-1, other.getRuleAfterLine(), other+" claims a printed rule");
+		}
+
+		@Test
+		@DisplayName("the lettering is held off the border rather than stopping against it")
+		void textIsHeldOffTheBorder()
+		{
+			//Text that stops exactly on the inside of the outline is on the plate and still reads
+			//as a line that was cropped rather than as one somebody painted.
+			assertTrue(SignLayout.PADDING > 0&&SignLayout.PADDING < 0.5f);
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(kind.getLines()==0)
 					continue;
-				float height = SignLayout.scaleFor(kind, 200)*SignLayout.FONT_HEIGHT;
-				float gap = SignLayout.lineCentre(kind, 1)-SignLayout.lineCentre(kind, 0);
-				assertTrue(gap >= height, kind+" stacks its lines "+gap
-						+" pixels apart and draws them "+height+" pixels tall");
+				float border = kind.getShape().getInset();
+				assertTrue(SignLayout.halfSpan(kind) < kind.getTextSpan()/2f-border,
+						kind+" prints right up to the inside of its border");
+				assertTrue(SignLayout.halfDepth(kind) < kind.getTextDepth()/2f-border,
+						kind+" prints right up to the inside of its border");
+				//And there is still a plate left to print on afterwards.
+				assertTrue(SignLayout.lineHeight(kind, 0) > 0.5f,
+						kind+" has nothing left to print on: "+SignLayout.lineHeight(kind, 0));
+				assertTrue(SignLayout.lineSpan(kind, 0) > 1f,
+						kind+" has nothing left to print on: "+SignLayout.lineSpan(kind, 0));
 			}
 		}
 
@@ -209,8 +332,8 @@ class SignageTest
 			UtilitySignKind blank = UtilitySignKind.LINE_CROSSING_DIAMOND;
 			assertEquals(0, blank.getLines());
 			assertEquals(0f, SignLayout.lineCentre(blank, 0));
-			assertTrue(SignLayout.scaleFor(blank, 40) > 0);
-			assertTrue(SignLayout.scaleFor(blank, 0) > 0);
+			assertTrue(SignLayout.scaleFor(blank, 0, 40) > 0);
+			assertTrue(SignLayout.scaleFor(blank, 0, 0) > 0);
 		}
 	}
 
@@ -228,6 +351,59 @@ class SignageTest
 						"no sprite for "+kind);
 				assertTrue(new File(ASSETS+"models/block/"+modelName(kind)+".json").isFile(),
 						"no model for "+kind);
+			}
+		}
+
+		@Test
+		@DisplayName("a plate is cut to the shape its kind declares")
+		void spriteMatchesTheShape()
+		{
+			//SignLayout fits lettering to the shape the kind declares, so a plate drawn as an
+			//oval and declared a rectangle would have its text laid out to a rectangle it has
+			//not got -- which is how the numbers came to be hanging off the paint. The corners
+			//of the plate's own pixel rect tell the two apart: a rectangle paints them and
+			//anything rounded or pointed leaves them clear.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				BufferedImage sprite = sprite(kind);
+				int x0 = 8-kind.getWidth()/2, y0 = 8-kind.getHeight()/2;
+				int x1 = x0+kind.getWidth()-1, y1 = y0+kind.getHeight()-1;
+				boolean square = kind.getShape()==SignShape.RECT;
+				for(int[] corner : new int[][]{{x0, y0}, {x1, y0}, {x0, y1}, {x1, y1}})
+				{
+					boolean painted = (sprite.getRGB(corner[0], corner[1])>>>24) > 0;
+					assertEquals(square, painted, kind+" declares "+kind.getShape()
+							+" but its sprite "+(painted?"paints": "leaves clear")+" the corner at "
+							+corner[0]+","+corner[1]);
+				}
+				//And the middle of every plate is painted, whatever it is cut to.
+				assertTrue((sprite.getRGB(8, 8)>>>24) > 0, kind+" has a hole in the middle");
+			}
+		}
+
+		@Test
+		@DisplayName("the tower plate's rule is drawn where the layout leaves room for it")
+		void spriteRuleMatchesTheLayout()
+		{
+			//SignLayout divides that plate's lines either side of the rule, off arithmetic the
+			//generator repeats in Python. Read it back off the sprite rather than trusting the
+			//two to stay in step: a rule that moved a pixel would put letters on top of it, and
+			//nothing anywhere would say so.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(kind.getRuleAfterLine() < 0)
+					continue;
+				assertFalse(kind.isRotated(), kind+" turns its text but claims a rule across it");
+				BufferedImage sprite = sprite(kind);
+				int row = Math.round(SignLayout.ruleEdge(kind)+kind.getTextDepth()/2f)
+						+(8-kind.getHeight()/2);
+				int centre = 8;
+				int rgb = sprite.getRGB(centre, row);
+				//The rule is the plate's own dark outline colour, drawn across a yellow plate.
+				assertTrue(brightness(rgb) < brightness(sprite.getRGB(centre, row-1)),
+						kind+" has no rule at row "+row+", where the layout leaves a gap for one");
+				assertTrue(brightness(rgb) < brightness(sprite.getRGB(centre, row+1)),
+						kind+" has no rule at row "+row+", where the layout leaves a gap for one");
 			}
 		}
 

@@ -104,13 +104,17 @@ public class TileRenderUtilitySign extends TileEntitySpecialRenderer<TileEntityU
 		int width = font.getStringWidth(text);
 		if(width <= 0)
 			return;
-		float scale = SignLayout.scaleFor(kind, width)/16f;
+		float scale = SignLayout.scaleFor(kind, index, width)/16f;
 		GlStateManager.pushMatrix();
 		//Down the plate, in the frame the rotation above has already turned.
 		GlStateManager.translate(0, -SignLayout.lineCentre(kind, index)/16d, 0);
 		//Negative Y because a font renderer draws downwards and the world does not.
 		GlStateManager.scale(scale, -scale, scale);
-		font.drawString(text, -width/2f, -SignLayout.FONT_HEIGHT/2f, kind.getTextColour(), false);
+		//Centred on the paint rather than on the glyph cell: the cell's last row is the descender,
+		//which a pole number never uses, and the trailing pixel of a string width is the gap after
+		//the last letter. Centring on those puts the line half a pixel high and half a pixel left.
+		font.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
+				kind.getTextColour(), false);
 		GlStateManager.popMatrix();
 	}
 }

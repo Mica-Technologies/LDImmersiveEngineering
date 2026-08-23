@@ -40,62 +40,62 @@ public enum UtilitySignKind implements IStringSerializable
 	 * hangs off -- several sources into one station, or a loop across the area. Mainly a LADWP
 	 * sign, and the only one in the set that carries white text.
 	 */
-	PARALLEL_GENERATION(14, 6, 2, 0xFFFFFF, false),
+	PARALLEL_GENERATION(14, 6, 2, 0xFFFFFF, false, SignShape.RECT),
 	/**
 	 * The yellow vertical strip: general pole identification, and the one every utility uses.
 	 */
-	YELLOW_VERTICAL(6, 14, 1, 0x1A1A1A, true),
+	YELLOW_VERTICAL(6, 14, 1, 0x1A1A1A, true, SignShape.RECT),
 	/**
 	 * The white vertical strip. SCE hangs these for street lighting; so do privately owned poles,
 	 * the City of Long Beach's among them.
 	 */
-	WHITE_VERTICAL(6, 14, 1, 0x1A1A1A, true),
+	WHITE_VERTICAL(6, 14, 1, 0x1A1A1A, true, SignShape.RECT),
 	/**
 	 * The bare metal vertical strip. Mostly replaced by something more legible, and still on
 	 * plenty of poles.
 	 */
-	SILVER_VERTICAL(6, 14, 1, 0x4A4A4A, true),
+	SILVER_VERTICAL(6, 14, 1, 0x4A4A4A, true, SignShape.RECT),
 	/**
 	 * The painted white oval, as the City of Lakewood and its neighbours hang on series-wired
 	 * street lights: the series number on top and the pole number underneath.
 	 */
-	OVAL_FRACTION(12, 8, 2, 0x1A1A1A, false),
+	OVAL_FRACTION(12, 8, 2, 0x1A1A1A, false, SignShape.ELLIPSE),
 	/**
 	 * The horizontal yellow strip. For the LADWP this is the distribution station, the feeder off
 	 * it and how many conduit or transformer bank connections are on that connection; for a light
 	 * pole it is the capacitor bank or the phase cutoff. Everybody else uses it for pole numbers.
 	 */
-	YELLOW_HORIZONTAL(14, 4, 1, 0x1A1A1A, false),
+	YELLOW_HORIZONTAL(14, 4, 1, 0x1A1A1A, false, SignShape.RECT),
 	/** The horizontal orange strip: fibre and cable runs, at almost every utility. */
-	ORANGE_HORIZONTAL(14, 4, 1, 0x1A1A1A, false),
+	ORANGE_HORIZONTAL(14, 4, 1, 0x1A1A1A, false, SignShape.RECT),
 	/** The same, hung the other way up. */
-	ORANGE_VERTICAL(6, 14, 1, 0x1A1A1A, true),
+	ORANGE_VERTICAL(6, 14, 1, 0x1A1A1A, true, SignShape.RECT),
 	/**
 	 * The round bolt-on inspection tag: who inspected the pole on top, the year underneath. It also
 	 * does duty as the tag saying where a wooden pole was logged.
 	 */
-	INSPECTION_ROUND(10, 10, 2, 0x4A4A4A, false),
+	INSPECTION_ROUND(10, 10, 2, 0x4A4A4A, false, SignShape.ELLIPSE),
 	/**
 	 * The plain yellow diamond the LADWP numbers transmission towers with, roughly every fourth
 	 * tower. No border -- the number is painted straight onto it.
 	 */
-	TOWER_DIAMOND(12, 12, 1, 0x1A1A1A, false),
+	TOWER_DIAMOND(12, 12, 1, 0x1A1A1A, false, SignShape.DIAMOND),
 	/**
 	 * The line crossing diamond: a black outline and a black cross, marking where a line crosses
 	 * another, or a span nobody wants to walk -- a valley or a ravine. It carries no text at all,
 	 * which is why it is the one kind the editing window opens empty.
 	 */
-	LINE_CROSSING_DIAMOND(12, 12, 0, 0x1A1A1A, false),
+	LINE_CROSSING_DIAMOND(12, 12, 0, 0x1A1A1A, false, SignShape.DIAMOND),
 	/**
 	 * The vertical tower identifier, in three parts reading downwards: the initials of the plant
 	 * the run starts at, the tower's number, then -- under a rule printed on the plate -- the
 	 * initials of the station it ends at.
 	 */
-	TOWER_VERTICAL(8, 14, 3, 0x1A1A1A, false),
+	TOWER_VERTICAL(8, 14, 3, 0x1A1A1A, false, SignShape.RECT),
 	/**
 	 * The horizontal tower identifier, hung on the DC towers of the Pacific Intertie among others.
 	 */
-	TOWER_HORIZONTAL(14, 4, 1, 0x1A1A1A, false);
+	TOWER_HORIZONTAL(14, 4, 1, 0x1A1A1A, false, SignShape.RECT);
 
 	/**
 	 * Cached because {@code values()} allocates, and this is read once per sign per frame by the
@@ -117,14 +117,17 @@ public enum UtilitySignKind implements IStringSerializable
 	private final int lines;
 	private final int textColour;
 	private final boolean rotated;
+	private final SignShape shape;
 
-	UtilitySignKind(int width, int height, int lines, int textColour, boolean rotated)
+	UtilitySignKind(int width, int height, int lines, int textColour, boolean rotated,
+					SignShape shape)
 	{
 		this.width = width;
 		this.height = height;
 		this.lines = lines;
 		this.textColour = textColour;
 		this.rotated = rotated;
+		this.shape = shape;
 	}
 
 	@Override
@@ -165,6 +168,30 @@ public enum UtilitySignKind implements IStringSerializable
 	public boolean isRotated()
 	{
 		return rotated;
+	}
+
+	/**
+	 * @return what outline the plate is cut to, which is what says where its lettering may go --
+	 * a plate is not the rectangle it is drawn inside. See {@link SignShape}.
+	 */
+	public SignShape getShape()
+	{
+		return shape;
+	}
+
+	/**
+	 * Which line a rule is printed after, for the one kind that has one.
+	 * <p>
+	 * The vertical tower tag has a rule two thirds of the way down and the receiving station's
+	 * initials go <em>under</em> it, so the three lines are not three even shares of the plate: two
+	 * share the space above the rule and one has the space below. Laying them out evenly and hoping
+	 * put the third line's letters on top of the rule.
+	 *
+	 * @return the index of the last line above the rule, or -1 for a plain plate
+	 */
+	public int getRuleAfterLine()
+	{
+		return this==TOWER_VERTICAL?1: -1;
 	}
 
 	/**
