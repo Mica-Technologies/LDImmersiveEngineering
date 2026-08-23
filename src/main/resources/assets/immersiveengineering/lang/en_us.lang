@@ -1658,7 +1658,7 @@ ie.manual.entry.arcfurnace4=The four slots on the right are for "additives", dif
 ie.manual.entry.arcfurnace5=The seven slots at the bottom are six output slots and a slot for slag. Outputs are retrieved from the 'bucket' at the front of the structure, slag through the port at the back of the machine. The Arc Furnace will automatically push output and slag to connected inventories (this includes Conveyor Belts).
 
 ie.manual.entry.excavator.name=Excavator
-ie.manual.entry.excavator.subtext=Does it have school bus mode!?
+ie.manual.entry.excavator.subtext=Better than Dwarves
 ie.manual.entry.excavator0=The Excavator is one of the pinnacles of modern engineering. It is able to dig up <link;minerals;§o§nminerals§r;0> from veins inaccessible by normal mining. In return however, the excavator is a complex structure which requires <config;i;excavator_consumption> Flux/t in order to operate.
 ie.manual.entry.excavator1=The structure is comprised of two pieces: The engine shown on the first page and the bucket wheel displayed on the second, which fits into the 'braces' of the engine as displayed on the previous page. The energy input for the engine is on its side, the back features a redstone control panel and the item output.<br>As the excavator digs up ores, the yield of the vein slowly decreases, but a vein of minerals can last for <config;i;excavator_depletion_days> days of consecutive digging.
 
@@ -1705,7 +1705,7 @@ ie.manual.entry.computer.energymeter.subtext=Just an ADC
 ie.manual.entry.computer.energymeter0=The bottom block of a current transformer can be connected to a computer. It will provide a single method, §lgetAvgEnergy()§r , that returns the average amount of energy per tick that was transferred through the transformer during the last 20 ticks.
 
 ie.manual.entry.computer.excavator.name=Excavator ☎
-ie.manual.entry.computer.excavator.subtext=Does it have school bus mode!?
+ie.manual.entry.computer.excavator.subtext=Better than Dwarves
 ie.manual.entry.computer.excavator0=§lisActive()§r: returns whether the excavator is running. This does not say anything about the existence of a mineral vein<br>§lgetEnergyStored()§r: returns the amount of energy currently stored in this excavator<br>§lgetMaxEnergyStored()§r: returns the maximum amount of energy that can be stored in this excavator
 
 ie.manual.entry.computer.squeezerAndFermenter.name=Fermenter & Squeezer ☎
@@ -2059,7 +2059,7 @@ chat.immersiveengineering.info.crawlerBucketDumped=Bucket emptied.
 chat.immersiveengineering.info.crawlerReserve=Running on reserve -- refuel before working.
 chat.immersiveengineering.info.crawlerNoFuel=No diesel. Right-click the Crawler with a container of diesel to refuel it.
 ie.manual.entry.crawler.name=Hydraulic Crawler
-ie.manual.entry.crawler.subtext=A machine you climb into
+ie.manual.entry.crawler.subtext=Is it in school bus mode!?
 ie.manual.entry.crawler0=The §6Excavator§r on the facing page is a building. This is not.<br>The §6Hydraulic Crawler§r is a tracked machine that arrives as an item, unfolds where you put it, and is §odriven§r. It needs five clear blocks across to unfold into. Right-click it to climb in; there is no GUI, and everything it does is done from the seat.
 ie.manual.entry.crawler1=§lDriving.§r §6W and S§r drive the tracks, §6A and D§r steer them. It is heavy: about a second to reach full speed, rather less to stop, and it brakes harder than it accelerates so it does not coast. Reverse is slower, as it is on anything tracked, and it turns tightest standing still. A one-block ledge is climbed rather than bumped into.<br>§lLooking.§r The cab turns to wherever you look, at the speed a slew ring turns. The house follows your head, so turning to face what you are working on is the same gesture as slewing towards it. You cannot look around independently of the machine; that is the trade.
 ie.manual.entry.crawler2=§lThe arm.§r It holds its own aim rather than following your view, so you can watch what you are digging while you dig it.<br>§6R and C§r raise and lower it. §6X and Z§r reach out and draw back in. Those are two separate axes, and you need both: elevation alone would put the tool on a single arc, so anything nearer or further would be out of reach wherever you parked.<br>The panel in the corner shows both, and turns §cred§r at the stops.
