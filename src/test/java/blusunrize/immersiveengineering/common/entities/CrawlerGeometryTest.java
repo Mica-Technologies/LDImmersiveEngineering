@@ -156,6 +156,83 @@ class CrawlerGeometryTest
 	}
 
 	@Nested
+	@DisplayName("the exhaust stack")
+	class Exhaust
+	{
+		@Test
+		@DisplayName("it is on the engine's side of the machine, not the cab's")
+		void oppositeTheCab()
+		{
+			//The stack stands out of the engine cowl, and the cowl is the side the cab is not on.
+			//Smoke coming out of the roof of the cab would be the sign that one of the two offsets
+			//was read off the model and the other guessed.
+			assertTrue(CrawlerGeometry.EXHAUST_SIDE*CrawlerGeometry.CAB_SIDE < 0,
+					"the exhaust is at x="+CrawlerGeometry.EXHAUST_SIDE+" and the seat at x="
+							+CrawlerGeometry.CAB_SIDE+"; they are on the same side of the machine");
+		}
+
+		@Test
+		@DisplayName("it is above the cab and below the top of the machine")
+		void standsProudOfTheHouse()
+		{
+			//A stack sunk into the bodywork puts the plume inside the engine, and one above the
+			//machine's own declared height puts it in mid-air over it. Both look like a typo and
+			//neither is reported by anything at runtime.
+			assertTrue(CrawlerGeometry.EXHAUST_HEIGHT > CrawlerGeometry.CAB_HEIGHT,
+					"the exhaust is lower than the cab floor, so the smoke leaves from inside the "
+							+"machine");
+			assertTrue(CrawlerGeometry.EXHAUST_HEIGHT < CrawlerGeometry.HEIGHT,
+					"the exhaust is above the machine's own height, so the smoke leaves from a "
+							+"point no part of the model reaches");
+		}
+
+		@Test
+		@DisplayName("it travels round with the slew, as everything on the house does")
+		void followsTheSlew()
+		{
+			double[] parked = CrawlerGeometry.exhaustOffset(0);
+			double[] slewed = CrawlerGeometry.exhaustOffset(180);
+			assertEquals(-parked[0], slewed[0], 1e-9,
+					"the stack did not come round with the house it stands on");
+			assertEquals(-parked[1], slewed[1], 1e-9);
+		}
+
+		@Test
+		@DisplayName("its distance from the mast never changes, whatever the slew")
+		void radiusIsConstant()
+		{
+			double expected = Math.hypot(CrawlerGeometry.EXHAUST_SIDE, CrawlerGeometry.EXHAUST_FORWARD);
+			for(int slew = -360; slew <= 360; slew += 11)
+			{
+				double[] stack = CrawlerGeometry.exhaustOffset(slew);
+				assertEquals(expected, Math.hypot(stack[0], stack[1]), 1e-9, "slew "+slew);
+			}
+		}
+
+		@Test
+		@DisplayName("it is where the model's stack is")
+		void agreesWithTheModel()
+		{
+			//	=================================
+			//	The check the seat needed and did not have.
+			//	=================================
+			//
+			// These three numbers are read off the generator's exhaust, and there is nothing at
+			// runtime that would notice them drifting: the smoke would simply come out of a point
+			// beside the machine, which looks like a machine that smokes oddly rather than like a
+			// constant that is wrong. The generator states them in the model's own frame, where up
+			// is negative and Z is negated by the renderer's scale.
+			double unit = CrawlerGeometry.UNIT;
+			assertEquals(-10.5*unit, CrawlerGeometry.EXHAUST_SIDE, 1e-9,
+					"the stack has moved across the machine in the generator");
+			assertEquals(-6.5*unit, CrawlerGeometry.EXHAUST_FORWARD, 1e-9,
+					"the stack has moved along the machine in the generator");
+			assertEquals(39.4*unit, CrawlerGeometry.EXHAUST_HEIGHT, 1e-9,
+					"the stack's rain cap is no longer where the generator caps it");
+		}
+	}
+
+	@Nested
 	@DisplayName("shortestTurn")
 	class ShortestTurn
 	{

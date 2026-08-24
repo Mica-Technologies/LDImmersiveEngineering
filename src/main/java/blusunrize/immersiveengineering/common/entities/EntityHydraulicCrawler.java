@@ -46,6 +46,7 @@ import net.minecraft.util.DamageSource;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -231,6 +232,19 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	 * three quarters of a second rather than a second and a half.
 	 */
 	private static final float SLEW_RATE = 6F;
+
+	/**
+	 * The exhaust plume: how often it puffs at idle, how many puffs a tick at full load, how wide
+	 * the mouth of the stack is scattered over, and how fast the smoke leaves it.
+	 * <p>
+	 * These are the shape of the plume and nothing else -- see {@link #smoke()}. The rise is per
+	 * tick and the particle keeps it for its whole life, which is why it is a tenth of what "out of
+	 * an exhaust" suggests: anything faster is a flare rather than smoke.
+	 */
+	private static final int IDLE_SMOKE_PERIOD = 6;
+	private static final int WORKING_SMOKE_PUFFS = 3;
+	private static final double SMOKE_SPREAD = 0.18;
+	private static final double SMOKE_RISE = 0.04;
 
 	private static final DataParameter<Float> SLEW = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
@@ -933,6 +947,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			//
 			// Now there is one authority, and the client's only job is to catch up to it smoothly.
 			tickLerp();
+			smoke();
 		}
 		else
 		{
@@ -954,6 +969,66 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			carryAlong();
 			bumpEntities();
 			lastToolTip = getToolTip();
+		}
+	}
+
+	/**
+	 * Diesel smoke out of the stack, while the engine is turning.
+	 * <p>
+	 * <strong>Client-side and nowhere near the simulation.</strong> Nothing here is sent, saved or
+	 * asked about by the server: the two things it reads -- whether anybody is aboard and how much
+	 * diesel is left -- are already synced for the panel in the corner of the screen, and the third,
+	 * how hard the machine is working, is measured from the movement the client is interpolating
+	 * anyway. A machine that told the server about its own smoke would be a machine sending a packet
+	 * a tick to say something every client can already see.
+	 * <p>
+	 * <strong>The plume is the load.</strong> A diesel at idle smokes a little and a diesel under
+	 * load smokes a great deal, which is the one thing about an exhaust that reads as an engine
+	 * rather than as decoration: standing still it is an occasional puff, and pulling away it is a
+	 * column. Load is taken from ground speed against {@link CrawlerDrive#TOP_SPEED} rather than
+	 * from the throttle, because the client has the former and the server has the latter -- and
+	 * because a machine straining against a hill is working hard at a low speed, which is exactly
+	 * when a real one blows the most smoke.
+	 * <p>
+	 * The stack is on the house, so the smoke leaves from {@link CrawlerGeometry#exhaustOffset}
+	 * rather than from a fixed corner of the tracks; slew the machine and the plume goes round with
+	 * the cowl it comes out of.
+	 * <p>
+	 * Not marked client-only, deliberately. The annotation strips the method from a dedicated
+	 * server and leaves the call to it behind, which turns a guard that is already never true there
+	 * into a linkage error waiting for one bad refactor. Everything it touches exists on both
+	 * sides, and {@code World.spawnParticle} does nothing on a server.
+	 */
+	private void smoke()
+	{
+		//No operator, no combustion. Dry is dry: the reserve stops the tool, not the engine, so a
+		//machine limping home on its last bucket of diesel is still smoking.
+		if(getControllingPassenger()==null||CrawlerConfig.isDry(getFuel()))
+			return;
+		double load = CrawlerGeometry.clamp(
+				Math.hypot(posX-prevPosX, posZ-prevPosZ)/CrawlerDrive.TOP_SPEED, 0, 1);
+		//Idling, a puff every IDLE_SMOKE_PERIOD ticks; working, up to WORKING_SMOKE_PUFFS a tick.
+		int puffs = (int)Math.round(load*WORKING_SMOKE_PUFFS);
+		if(puffs < 1)
+		{
+			if(ticksExisted%IDLE_SMOKE_PERIOD!=0)
+				return;
+			puffs = 1;
+		}
+		double[] stack = CrawlerGeometry.exhaustOffset(getSlew());
+		for(int i = 0; i < puffs; i++)
+		{
+			//Scattered across the mouth of the pipe rather than all from its centre, or the column
+			//is a string of beads on one line.
+			double spread = SMOKE_SPREAD*(rand.nextDouble()-0.5);
+			double drift = SMOKE_SPREAD*(rand.nextDouble()-0.5);
+			world.spawnParticle(EnumParticleTypes.SMOKE_LARGE,
+					posX+stack[0]+spread, posY+CrawlerGeometry.EXHAUST_HEIGHT, posZ+stack[1]+drift,
+					//Straight up and slower than it looks: the particle carries this for its whole
+					//life, so a value that reads as "out of a pipe" over one tick reads as a rocket
+					//over forty. The load is in it, so a machine pulling away throws its smoke
+					//higher as well as more often.
+					0, SMOKE_RISE*(1+load), 0);
 		}
 	}
 

@@ -142,11 +142,46 @@ public final class CrawlerGeometry
 	 */
 	public static double[] cabOffset(double slewDegrees)
 	{
+		return onHouse(CAB_SIDE, CAB_FORWARD, slewDegrees);
+	}
+
+	/**
+	 * Where the exhaust stack's rain cap is, relative to the centre of the machine.
+	 * <p>
+	 * <strong>Read off the model, as the seat is.</strong> The stack stands out of the engine cowl
+	 * at model (x -10.5, z 6.5) and its cap tops out 39.4 units above the tracks. The model is
+	 * drawn through a scale that negates Z, so the forward offset here is the negated model z --
+	 * the same conversion {@link #CAB_FORWARD} is, and the reason both are stated in one place.
+	 * <p>
+	 * The stack is on the house, so it travels round with the slew exactly as the seat does. Smoke
+	 * left at a fixed corner of the tracks would pour out of the bodywork whenever the machine was
+	 * turned.
+	 */
+	public static final double EXHAUST_SIDE = -10.5*UNIT;
+	public static final double EXHAUST_FORWARD = -6.5*UNIT;
+	public static final double EXHAUST_HEIGHT = 39.4*UNIT;
+
+	/** @see #EXHAUST_SIDE */
+	public static double[] exhaustOffset(double slewDegrees)
+	{
+		return onHouse(EXHAUST_SIDE, EXHAUST_FORWARD, slewDegrees);
+	}
+
+	/**
+	 * Turn an offset authored on the house into a world offset from the machine's centre.
+	 *
+	 * @param side    the offset across the machine, positive towards the cab
+	 * @param forward the offset along it, positive towards the arm
+	 *
+	 * @return {@code {x, z}}
+	 */
+	private static double[] onHouse(double side, double forward, double slewDegrees)
+	{
 		double radians = Math.toRadians(slewDegrees);
 		double sin = Math.sin(radians), cos = Math.cos(radians);
 		//Written out rather than going through Vec3d.rotateYaw, which takes radians in the opposite
 		//sense: the sign error that produces is invisible in the code and obvious in the world.
-		return new double[]{CAB_SIDE*cos-CAB_FORWARD*sin, CAB_SIDE*sin+CAB_FORWARD*cos};
+		return new double[]{side*cos-forward*sin, side*sin+forward*cos};
 	}
 
 	/**
