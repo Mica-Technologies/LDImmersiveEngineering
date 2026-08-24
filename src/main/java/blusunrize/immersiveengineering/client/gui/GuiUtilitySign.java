@@ -172,23 +172,53 @@ public class GuiUtilitySign extends GuiIEContainerBase
 
 		int centreX = left+PREVIEW/2;
 		int centreY = top+PREVIEW/2;
-		for(int i = 0; i < kind.getLines(); i++)
+		if(kind.isStacked())
+			drawStackedPreview(centreX, centreY, fields[0].getText());
+		else
+			for(int i = 0; i < kind.getLines(); i++)
+			{
+				String text = fields[i].getText();
+				if(text.isEmpty())
+					continue;
+				int width = fontRenderer.getStringWidth(text);
+				float scale = SignLayout.scaleFor(kind, i, width)*ZOOM;
+				GlStateManager.pushMatrix();
+				GlStateManager.translate(centreX, centreY, 0);
+				GlStateManager.translate(0, SignLayout.lineCentre(kind, i)*ZOOM, 0);
+				GlStateManager.scale(scale, scale, 1);
+				//Centred on the paint, exactly as the world renderer does it -- see the note there.
+				fontRenderer.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
+						0xFF000000|kind.getTextColour(), false);
+				GlStateManager.popMatrix();
+			}
+	}
+
+	/**
+	 * The preview's side of {@link blusunrize.immersiveengineering.client.render.TileRenderUtilitySign#drawStacked} -- the same column of
+	 * upright characters, mirrored for the screen the way the rest of this preview is: the
+	 * world renderer negates {@code stackedCentre} because the world's Y axis points up, and the
+	 * screen's already points down, so this does not have to. That is the whole of the mirroring
+	 * -- there is no rotation to undo any more, because the world side no longer applies one.
+	 */
+	private void drawStackedPreview(int centreX, int centreY, String text)
+	{
+		String trimmed = text.trim();
+		int count = trimmed.length();
+		if(count==0)
+			return;
+		int widest = 0;
+		for(int i = 0; i < count; i++)
+			widest = Math.max(widest, fontRenderer.getStringWidth(String.valueOf(trimmed.charAt(i))));
+		float scale = SignLayout.stackedScale(kind, count, widest)*ZOOM;
+		for(int i = 0; i < count; i++)
 		{
-			String text = fields[i].getText();
-			if(text.isEmpty())
-				continue;
-			int width = fontRenderer.getStringWidth(text);
-			float scale = SignLayout.scaleFor(kind, i, width)*ZOOM;
+			String ch = String.valueOf(trimmed.charAt(i));
+			int width = fontRenderer.getStringWidth(ch);
 			GlStateManager.pushMatrix();
 			GlStateManager.translate(centreX, centreY, 0);
-			if(kind.isRotated())
-				//The world renderer's rotation, mirrored: the screen's Y axis already points down
-				//where the world's points up, so the two turn opposite ways to look the same.
-				GlStateManager.rotate(-90, 0, 0, 1);
-			GlStateManager.translate(0, SignLayout.lineCentre(kind, i)*ZOOM, 0);
+			GlStateManager.translate(0, SignLayout.stackedCentre(kind, i, count)*ZOOM, 0);
 			GlStateManager.scale(scale, scale, 1);
-			//Centred on the paint, exactly as the world renderer does it -- see the note there.
-			fontRenderer.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
+			fontRenderer.drawString(ch, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
 					0xFF000000|kind.getTextColour(), false);
 			GlStateManager.popMatrix();
 		}

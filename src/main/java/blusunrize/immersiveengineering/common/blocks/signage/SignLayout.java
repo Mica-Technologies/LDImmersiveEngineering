@@ -71,18 +71,6 @@ public final class SignLayout
 	public static final float PADDING = 0.1f;
 
 	/**
-	 * Where a plate that carries a printed rule carries it, as a fraction of its depth, and how
-	 * thick the rule is in block pixels.
-	 * <p>
-	 * The vertical tower plate has one, and the initials of the receiving station go under it. The
-	 * sprite is drawn with the rule at the same fraction and rounded down to the pixel the same way
-	 * -- {@code SignageTest} reads it back off the sprite rather than trusting the two to stay in
-	 * step -- and the stack of lines is divided either side of it rather than laid across it.
-	 */
-	public static final float RULE_FRACTION = 2f/3f;
-	public static final float RULE_THICKNESS = 1f;
-
-	/**
 	 * How much of its share of the plate a line of a stack actually paints.
 	 * <p>
 	 * Without it a stack fills its plate exactly and the lines meet: the bottom row of one
@@ -135,18 +123,61 @@ public final class SignLayout
 	}
 
 	/**
-	 * Where the printed rule falls, measured from the plate's centre and positive in the direction
-	 * the lines stack -- the same arithmetic the sprite is drawn with, rounded down to the pixel
-	 * the same way.
+	 * The middle of a plate's divider, measured from the plate's centre and positive in the
+	 * direction the lines stack.
+	 * <p>
+	 * Exact rather than rounded to the pixel, and that is the point of it. The lines are divided
+	 * around the <em>middle</em> of whatever is printed there and not around its top edge: dividing
+	 * around the top gave the line below the divider the divider's whole thickness less room than
+	 * the line above it, which on a fraction bar meant a series number printed half again the size
+	 * of the pole number under it. A fraction is two numbers the same size, and a plate whose
+	 * divider is in the middle should have two even halves.
 	 *
-	 * @return the near edge of the rule, or {@link Float#NaN} for a plate that has none
+	 * @return the offset in block pixels, or {@link Float#NaN} for a plate that has none
+	 */
+	public static float dividerCentre(UtilitySignKind kind)
+	{
+		SignDivider divider = kind.getDivider();
+		if(divider.getAfterLine() < 0)
+			return Float.NaN;
+		int depth = kind.getTextDepth();
+		return depth*divider.getFraction()-depth/2f;
+	}
+
+	/**
+	 * Which row of the sprite the divider's first pixel is painted on, counted from the top of the
+	 * plate.
+	 * <p>
+	 * <strong>Stated here because the generator has to agree with it, and because everything else
+	 * about a divider is measured from it.</strong> The plate artwork is drawn in Python and the
+	 * lettering is laid out here; both round {@code floor(depth*fraction - thickness/2 + 0.5)} to
+	 * the same pixel, and a test reads the row back off the finished sprite rather than trusting
+	 * either of them. Rounding the divider's <em>middle</em> to a whole row and then measuring the
+	 * band off that row -- rather than reserving a band about the exact fraction and painting near
+	 * it -- is what keeps the paint and the gap in the paint the same thing to within nothing at
+	 * all. Half a pixel of disagreement is a bar with a letter resting on its lower edge.
+	 *
+	 * @return the row, or -1 for a plate with no divider
+	 */
+	public static int dividerRow(UtilitySignKind kind)
+	{
+		SignDivider divider = kind.getDivider();
+		if(divider.getAfterLine() < 0)
+			return -1;
+		int depth = kind.getTextDepth();
+		return (int)Math.floor(depth*divider.getFraction()-divider.getThickness()/2f+0.5f);
+	}
+
+	/**
+	 * Where a plate's divider begins, measured from the plate's centre and positive in the
+	 * direction the lines stack: the top edge of the row it is actually painted on.
+	 *
+	 * @return the near edge of the divider, or {@link Float#NaN} for a plate that has none
 	 */
 	public static float ruleEdge(UtilitySignKind kind)
 	{
-		if(kind.getRuleAfterLine() < 0)
-			return Float.NaN;
-		int depth = kind.getTextDepth();
-		return (int)(depth*RULE_FRACTION)-depth/2f;
+		int row = dividerRow(kind);
+		return row < 0?Float.NaN: row-kind.getTextDepth()/2f;
 	}
 
 	/**
@@ -160,11 +191,12 @@ public final class SignLayout
 	private static float[] band(UtilitySignKind kind, int index)
 	{
 		float half = halfDepth(kind)*kind.getShape().getStackFactor();
-		int rule = kind.getRuleAfterLine();
+		SignDivider divider = kind.getDivider();
+		int rule = divider.getAfterLine();
 		if(rule < 0)
 			return new float[]{-half, half};
 		float edge = ruleEdge(kind);
-		return index <= rule?new float[]{-half, edge}: new float[]{edge+RULE_THICKNESS, half};
+		return index <= rule?new float[]{-half, edge}: new float[]{edge+divider.getThickness(), half};
 	}
 
 	/** Which line of its own band {@code index} is, and how many lines that band holds. */
@@ -241,5 +273,63 @@ public final class SignLayout
 		if(ink <= 0)
 			return byHeight;
 		return Math.min(byHeight, lineSpan(kind, index)/ink);
+	}
+
+	/**
+	 * How much depth one row of a stacked column gets, in block pixels.
+	 * <p>
+	 * The same idea as a line's share of a stack, and for the same reason: the printable depth,
+	 * narrowed by the shape's stack factor so a column pushed to the top of an oval or a diamond
+	 * still has plate beside it, divided evenly between however many characters somebody typed.
+	 * A stacked kind carries no divider, so there is no rule to split the band around -- one row
+	 * gets a plain, even share.
+	 *
+	 * @return the slot's depth, never zero -- an empty column divides by one row rather than by
+	 * zero characters
+	 */
+	public static float stackedSlot(UtilitySignKind kind, int count)
+	{
+		return 2*halfDepth(kind)*kind.getShape().getStackFactor()/Math.max(1, count);
+	}
+
+	/**
+	 * Where row {@code index} of a stacked column of {@code count} characters sits, measured from
+	 * the plate's centre and positive in the direction the rows stack -- downwards, on every kind
+	 * that flows this way. The same arithmetic as {@link #lineCentre}, without a divider to split
+	 * around.
+	 */
+	public static float stackedCentre(UtilitySignKind kind, int index, int count)
+	{
+		float half = halfDepth(kind)*kind.getShape().getStackFactor();
+		return -half+stackedSlot(kind, count)*(index+0.5f);
+	}
+
+	/**
+	 * The one scale every character of a stacked column is drawn at.
+	 * <p>
+	 * A printed column is uniform -- every digit of a pole number the same size as its neighbours
+	 * -- so unlike a line, which is scaled to its own string, a stacked column is scaled once and
+	 * every character drawn at that. It is the smaller of what a row's depth allows and what the
+	 * plate's width allows at the row that reaches furthest from the middle, which by symmetry is
+	 * row 0 (and equally row {@code count-1}): the same two limits {@link #scaleFor} weighs, read
+	 * off the row rather than off the whole line.
+	 *
+	 * @param kind             the plate the column is on
+	 * @param count            how many characters are in it
+	 * @param widestCharWidth  the widest any one of them is, in font pixels -- not the width of the
+	 *                         whole string, because each character is centred and scaled on its own
+	 *
+	 * @return the scale, never zero
+	 */
+	public static float stackedScale(UtilitySignKind kind, int count, int widestCharWidth)
+	{
+		float rowHeight = Math.min(stackedSlot(kind, count)*LEADING, MAX_TEXT_HEIGHT);
+		float byHeight = rowHeight/INK_HEIGHT;
+		float ink = inkWidth(widestCharWidth);
+		if(ink <= 0)
+			return byHeight;
+		float reach = Math.abs(stackedCentre(kind, 0, count))+rowHeight/2f;
+		float span = kind.getShape().spanAt(halfSpan(kind), halfDepth(kind), reach);
+		return Math.min(byHeight, span/ink);
 	}
 }

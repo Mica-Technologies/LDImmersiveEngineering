@@ -79,14 +79,14 @@ public class TileRenderUtilitySign extends TileEntitySpecialRenderer<TileEntityU
 		//Lettering is paint, not a lit surface: a pole number that went black at dusk would be
 		//useless at exactly the hour somebody is out with a torch reading it.
 		GlStateManager.disableLighting();
-		if(kind.isRotated())
+		if(kind.isStacked())
 			//A strip six pixels wide and fourteen tall holds "M31390V" only one way round, and it
-			//is the way the real ones are printed: reading downwards, with the letters turned
-			//clockwise so the top of each faces the pole's left.
-			GlStateManager.rotate(90, 0, 0, 1);
-
-		for(int i = 0; i < kind.getLines(); i++)
-			drawLine(font, kind, tile.getLine(i), i);
+			//is the way the real ones are printed: a column of upright characters reading
+			//downwards, not a line of them turned on their side.
+			drawStacked(font, kind, tile.getLine(0));
+		else
+			for(int i = 0; i < kind.getLines(); i++)
+				drawLine(font, kind, tile.getLine(i), i);
 
 		GlStateManager.enableLighting();
 		GlStateManager.color(1, 1, 1, 1);
@@ -116,5 +116,40 @@ public class TileRenderUtilitySign extends TileEntitySpecialRenderer<TileEntityU
 		font.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
 				kind.getTextColour(), false);
 		GlStateManager.popMatrix();
+	}
+
+	/**
+	 * A column of upright characters, one to a row, reading downwards -- what a vertical strip is
+	 * actually printed as. {@code text} is the kind's one line; leading and trailing space is
+	 * trimmed before it is split into rows, the same way a line's own trailing gap is trimmed by
+	 * {@link SignLayout#inkWidth}, so a plate with only leading spaces typed into it is not a
+	 * column that starts several blank rows down.
+	 * <p>
+	 * Every character shares one scale -- see {@link SignLayout#stackedScale} -- so the column
+	 * reads as one uniform run the way a printed one does, rather than as digits of different
+	 * sizes stacked on each other. Each is then centred on its own ink horizontally, exactly as
+	 * {@link #drawLine} centres a whole line.
+	 */
+	private void drawStacked(FontRenderer font, UtilitySignKind kind, String text)
+	{
+		String trimmed = text.trim();
+		int count = trimmed.length();
+		if(count==0)
+			return;
+		int widest = 0;
+		for(int i = 0; i < count; i++)
+			widest = Math.max(widest, font.getStringWidth(String.valueOf(trimmed.charAt(i))));
+		float scale = SignLayout.stackedScale(kind, count, widest)/16f;
+		for(int i = 0; i < count; i++)
+		{
+			String ch = String.valueOf(trimmed.charAt(i));
+			int width = font.getStringWidth(ch);
+			GlStateManager.pushMatrix();
+			GlStateManager.translate(0, -SignLayout.stackedCentre(kind, i, count)/16d, 0);
+			GlStateManager.scale(scale, -scale, scale);
+			font.drawString(ch, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
+					kind.getTextColour(), false);
+			GlStateManager.popMatrix();
+		}
 	}
 }

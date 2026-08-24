@@ -116,19 +116,53 @@ class SignageTest
 		}
 
 		@Test
-		@DisplayName("text runs along the longer side of a plate that rotates it")
-		void rotationFollowsTheShape()
+		@DisplayName("a plate's text span is its width and its text depth is its height")
+		void spanAndDepthAreWidthAndHeight()
 		{
-			//A strip is tagged rotated because it is taller than it is wide; the span the renderer
-			//fits a line to has to be that longer side or the text is fitted to the wrong number.
+			//Unlike the strips' old rotation, which swapped the two, a stacked column does not turn
+			//the plate on its side: each of its characters is limited by the width in turn, and the
+			//column itself runs down the height, so both getters answer the same way for every kind.
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
 			{
-				assertEquals(kind.isRotated()?kind.getHeight(): kind.getWidth(), kind.getTextSpan());
-				assertEquals(kind.isRotated()?kind.getWidth(): kind.getHeight(), kind.getTextDepth());
-				if(kind.isRotated())
-					assertTrue(kind.getHeight() > kind.getWidth(),
-							kind+" turns its text along its shorter side");
+				assertEquals(kind.getWidth(), kind.getTextSpan());
+				assertEquals(kind.getHeight(), kind.getTextDepth());
 			}
+		}
+
+		@Test
+		@DisplayName("a stacked kind is a rectangle taller than it is wide, carrying one line")
+		void stackedKindsAreTallRectangles()
+		{
+			//A strip six pixels wide and fourteen tall holds "M31390V" only one way round: a column
+			//of upright characters running down the long side. Nothing about SignTextFlow.DOWN
+			//requires a rectangle or a single line, so this pins down that every kind that actually
+			//uses it is one.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				if(kind.isStacked())
+				{
+					assertEquals(SignShape.RECT, kind.getShape(),
+							kind+" flows in a column but is not cut to a rectangle");
+					assertTrue(kind.getHeight() > kind.getWidth(),
+							kind+" flows in a column but is not taller than it is wide");
+					assertEquals(1, kind.getLines(),
+							kind+" flows in a column but carries more than the one line it is split from");
+				}
+		}
+
+		@Test
+		@DisplayName("only the three kinds with something printed across their middle claim a divider")
+		void dividerTableMatchesTheKinds()
+		{
+			//One table now, on SignDivider -- this is what pins the table to the kinds it actually
+			//belongs to, rather than trusting the constructor calls not to drift.
+			assertEquals(SignDivider.TOWER_RULE, UtilitySignKind.TOWER_VERTICAL.getDivider());
+			assertEquals(SignDivider.FRACTION_BAR, UtilitySignKind.OVAL_FRACTION.getDivider());
+			assertEquals(SignDivider.NAIL, UtilitySignKind.INSPECTION_ROUND.getDivider());
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				if(kind!=UtilitySignKind.TOWER_VERTICAL&&kind!=UtilitySignKind.OVAL_FRACTION
+						&&kind!=UtilitySignKind.INSPECTION_ROUND)
+					assertEquals(SignDivider.NONE, kind.getDivider(),
+							kind+" claims a divider nobody asked it for");
 		}
 
 		@Test
@@ -275,30 +309,94 @@ class SignageTest
 		}
 
 		@Test
-		@DisplayName("nothing is printed on the tower plate's rule")
-		void theRuleIsLeftClear()
+		@DisplayName("nothing is printed on a plate's divider, whichever one it has")
+		void dividersAreLeftClear()
 		{
-			//The sprite has a rule two thirds of the way down and the receiving station's initials
-			//go under it, so the three lines are not three even shares of the plate. Laid out
-			//evenly the third line's letters sit on top of the rule, which is what they did.
-			UtilitySignKind kind = UtilitySignKind.TOWER_VERTICAL;
-			assertEquals(1, kind.getRuleAfterLine());
-			float near = SignLayout.ruleEdge(kind);
-			float far = near+SignLayout.RULE_THICKNESS;
-			for(int i = 0; i < kind.getLines(); i++)
+			//The vertical tower tag has a rule two thirds of the way down and the receiving
+			//station's initials go under it; the oval and the round tag split two lines the same
+			//way, either side of a fraction bar or a nail. None of the three are even shares of the
+			//plate -- laid out evenly a line's letters sit on top of whatever is actually there,
+			//which is what they did before this had a name.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
 			{
-				float top = SignLayout.lineCentre(kind, i)-SignLayout.lineHeight(kind, i)/2f;
-				float bottom = SignLayout.lineCentre(kind, i)+SignLayout.lineHeight(kind, i)/2f;
-				if(i <= kind.getRuleAfterLine())
-					assertTrue(bottom <= near+1e-3,
-							"line "+i+" reaches "+bottom+", onto a rule that starts at "+near);
-				else
-					assertTrue(top >= far-1e-3,
-							"line "+i+" starts at "+top+", onto a rule that ends at "+far);
+				SignDivider divider = kind.getDivider();
+				if(divider.getAfterLine() < 0)
+					continue;
+				float near = SignLayout.ruleEdge(kind);
+				float far = near+divider.getThickness();
+				for(int i = 0; i < kind.getLines(); i++)
+				{
+					float top = SignLayout.lineCentre(kind, i)-SignLayout.lineHeight(kind, i)/2f;
+					float bottom = SignLayout.lineCentre(kind, i)+SignLayout.lineHeight(kind, i)/2f;
+					if(i <= divider.getAfterLine())
+						assertTrue(bottom <= near+1e-3, kind+" line "+i+" reaches "+bottom
+								+", onto a divider that starts at "+near);
+					else
+						assertTrue(top >= far-1e-3, kind+" line "+i+" starts at "+top
+								+", onto a divider that ends at "+far);
+				}
 			}
-			for(UtilitySignKind other : UtilitySignKind.VALUES)
-				if(other!=kind)
-					assertEquals(-1, other.getRuleAfterLine(), other+" claims a printed rule");
+		}
+
+		@Test
+		@DisplayName("a stacked column runs top to bottom, in order and without its rows overlapping")
+		void stackedColumnsAreOrderedAndClear()
+		{
+			//The same shape as linesDoNotCollide, for a column of characters instead of a stack of
+			//lines: however many characters somebody typed, the rows have to stay in reading order
+			//and stay off each other, on every plate that flows this way and at more than one length.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(!kind.isStacked())
+					continue;
+				for(int count : new int[]{1, 2, 3, 7})
+				{
+					//The row height every character is actually capped to, read off stackedScale the
+					//same way textIsSizedByItsInk reads lineHeight off scaleFor -- an ink width of
+					//zero returns the height-only limit, which is the widest any row is ever drawn.
+					float rowHeight = SignLayout.stackedScale(kind, count, 0)*SignLayout.INK_HEIGHT;
+					float half = SignLayout.halfDepth(kind)*kind.getShape().getStackFactor();
+					for(int i = 0; i < count; i++)
+					{
+						float centre = SignLayout.stackedCentre(kind, i, count);
+						assertTrue(Math.abs(centre) <= half+1e-3, kind+" row "+i+" of "+count
+								+" characters is centred off the plate at "+centre);
+						if(i > 0)
+							assertTrue(centre > SignLayout.stackedCentre(kind, i-1, count),
+									kind+" prints its rows out of order with "+count+" characters");
+					}
+					for(int i = 1; i < count; i++)
+					{
+						float above = SignLayout.stackedCentre(kind, i-1, count)+rowHeight/2f;
+						float below = SignLayout.stackedCentre(kind, i, count)-rowHeight/2f;
+						assertTrue(below >= above-1e-3, kind+" draws row "+(i-1)+" down to "+above
+								+" and row "+i+" from "+below+" with "+count+" characters, so they meet");
+					}
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("a stacked column with one character or none answers rather than divides by zero")
+		void stackedColumnsHandleTheEdges()
+		{
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(!kind.isStacked())
+					continue;
+				//An empty line, once trimmed, is nothing to draw at all -- but the arithmetic behind
+				//it still has to answer, the same way SignLayout.scaleFor does for a blank plate.
+				assertTrue(SignLayout.stackedSlot(kind, 0) > 0,
+						kind+" divides by zero on an empty column");
+				assertTrue(SignLayout.stackedScale(kind, 0, 0) > 0,
+						kind+" divides by zero on an empty column");
+				//A single character sits dead centre of the plate rather than off to one side of an
+				//empty row.
+				assertEquals(0f, SignLayout.stackedCentre(kind, 0, 1), 1e-3,
+						kind+" does not centre a one-character column");
+				assertTrue(SignLayout.stackedScale(kind, 1, 40) > 0,
+						kind+" blows up scaling a single wide character");
+			}
 		}
 
 		@Test
@@ -382,28 +480,31 @@ class SignageTest
 		}
 
 		@Test
-		@DisplayName("the tower plate's rule is drawn where the layout leaves room for it")
-		void spriteRuleMatchesTheLayout()
+		@DisplayName("every declared divider is actually painted on its sprite, where the layout leaves room for it")
+		void dividerIsPaintedOnTheSprite()
 		{
-			//SignLayout divides that plate's lines either side of the rule, off arithmetic the
-			//generator repeats in Python. Read it back off the sprite rather than trusting the
-			//two to stay in step: a rule that moved a pixel would put letters on top of it, and
-			//nothing anywhere would say so.
+			//SignLayout divides a plate's lines either side of whatever this is, off arithmetic
+			//the generator repeats in Python. Read it back off the sprite rather than trusting the
+			//two to stay in step: a divider that moved a pixel would put letters on top of it, and
+			//nothing anywhere would say so. The near and far samples are taken the divider's own
+			//thickness apart, rather than one pixel either side, because the nail is two pixels
+			//deep and a one-pixel neighbour would still be reading the nail rather than the plate.
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
 			{
-				if(kind.getRuleAfterLine() < 0)
+				SignDivider divider = kind.getDivider();
+				if(divider==SignDivider.NONE)
 					continue;
-				assertFalse(kind.isRotated(), kind+" turns its text but claims a rule across it");
+				assertFalse(kind.isStacked(), kind+" flows in a column but claims a divider across it");
 				BufferedImage sprite = sprite(kind);
 				int row = Math.round(SignLayout.ruleEdge(kind)+kind.getTextDepth()/2f)
 						+(8-kind.getHeight()/2);
+				int thickness = Math.round(divider.getThickness());
 				int centre = 8;
-				int rgb = sprite.getRGB(centre, row);
-				//The rule is the plate's own dark outline colour, drawn across a yellow plate.
-				assertTrue(brightness(rgb) < brightness(sprite.getRGB(centre, row-1)),
-						kind+" has no rule at row "+row+", where the layout leaves a gap for one");
-				assertTrue(brightness(rgb) < brightness(sprite.getRGB(centre, row+1)),
-						kind+" has no rule at row "+row+", where the layout leaves a gap for one");
+				int here = brightness(sprite.getRGB(centre, row));
+				assertTrue(here < brightness(sprite.getRGB(centre, row-1)),
+						kind+" has no visible "+divider+" at row "+row);
+				assertTrue(here < brightness(sprite.getRGB(centre, row+thickness)),
+						kind+" has no visible "+divider+" at row "+row);
 			}
 		}
 

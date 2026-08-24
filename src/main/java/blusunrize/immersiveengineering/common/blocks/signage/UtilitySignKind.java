@@ -40,62 +40,65 @@ public enum UtilitySignKind implements IStringSerializable
 	 * hangs off -- several sources into one station, or a loop across the area. Mainly a LADWP
 	 * sign, and the only one in the set that carries white text.
 	 */
-	PARALLEL_GENERATION(14, 6, 2, 0xFFFFFF, false, SignShape.RECT),
+	PARALLEL_GENERATION(14, 6, 2, 0xFFFFFF, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE),
 	/**
 	 * The yellow vertical strip: general pole identification, and the one every utility uses.
 	 */
-	YELLOW_VERTICAL(6, 14, 1, 0x1A1A1A, true, SignShape.RECT),
+	YELLOW_VERTICAL(6, 14, 1, 0x1A1A1A, SignTextFlow.DOWN, SignShape.RECT, SignDivider.NONE),
 	/**
 	 * The white vertical strip. SCE hangs these for street lighting; so do privately owned poles,
 	 * the City of Long Beach's among them.
 	 */
-	WHITE_VERTICAL(6, 14, 1, 0x1A1A1A, true, SignShape.RECT),
+	WHITE_VERTICAL(6, 14, 1, 0x1A1A1A, SignTextFlow.DOWN, SignShape.RECT, SignDivider.NONE),
 	/**
 	 * The bare metal vertical strip. Mostly replaced by something more legible, and still on
 	 * plenty of poles.
 	 */
-	SILVER_VERTICAL(6, 14, 1, 0x4A4A4A, true, SignShape.RECT),
+	SILVER_VERTICAL(6, 14, 1, 0x4A4A4A, SignTextFlow.DOWN, SignShape.RECT, SignDivider.NONE),
 	/**
 	 * The painted white oval, as the City of Lakewood and its neighbours hang on series-wired
-	 * street lights: the series number on top and the pole number underneath.
+	 * street lights: the series number on top and the pole number underneath, over a fraction bar
+	 * -- the plate grew two pixels taller than the first cut so the bar has room to sit between
+	 * the two without either line losing the height it needs to stay legible.
 	 */
-	OVAL_FRACTION(12, 8, 2, 0x1A1A1A, false, SignShape.ELLIPSE),
+	OVAL_FRACTION(12, 10, 2, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.ELLIPSE, SignDivider.FRACTION_BAR),
 	/**
 	 * The horizontal yellow strip. For the LADWP this is the distribution station, the feeder off
 	 * it and how many conduit or transformer bank connections are on that connection; for a light
 	 * pole it is the capacitor bank or the phase cutoff. Everybody else uses it for pole numbers.
 	 */
-	YELLOW_HORIZONTAL(14, 4, 1, 0x1A1A1A, false, SignShape.RECT),
+	YELLOW_HORIZONTAL(14, 4, 1, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE),
 	/** The horizontal orange strip: fibre and cable runs, at almost every utility. */
-	ORANGE_HORIZONTAL(14, 4, 1, 0x1A1A1A, false, SignShape.RECT),
+	ORANGE_HORIZONTAL(14, 4, 1, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE),
 	/** The same, hung the other way up. */
-	ORANGE_VERTICAL(6, 14, 1, 0x1A1A1A, true, SignShape.RECT),
+	ORANGE_VERTICAL(6, 14, 1, 0x1A1A1A, SignTextFlow.DOWN, SignShape.RECT, SignDivider.NONE),
 	/**
-	 * The round bolt-on inspection tag: who inspected the pole on top, the year underneath. It also
-	 * does duty as the tag saying where a wooden pole was logged.
+	 * The round bolt-on inspection tag: who inspected the pole on top, the year underneath, either
+	 * side of the nail it is actually hung by -- which sits exactly where the text would otherwise
+	 * go, so the plate grew from ten pixels square to twelve to give the two lines room beside it.
 	 */
-	INSPECTION_ROUND(10, 10, 2, 0x4A4A4A, false, SignShape.ELLIPSE),
+	INSPECTION_ROUND(12, 12, 2, 0x4A4A4A, SignTextFlow.ACROSS, SignShape.ELLIPSE, SignDivider.NAIL),
 	/**
 	 * The plain yellow diamond the LADWP numbers transmission towers with, roughly every fourth
 	 * tower. No border -- the number is painted straight onto it.
 	 */
-	TOWER_DIAMOND(12, 12, 1, 0x1A1A1A, false, SignShape.DIAMOND),
+	TOWER_DIAMOND(12, 12, 1, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.DIAMOND, SignDivider.NONE),
 	/**
 	 * The line crossing diamond: a black outline and a black cross, marking where a line crosses
 	 * another, or a span nobody wants to walk -- a valley or a ravine. It carries no text at all,
 	 * which is why it is the one kind the editing window opens empty.
 	 */
-	LINE_CROSSING_DIAMOND(12, 12, 0, 0x1A1A1A, false, SignShape.DIAMOND),
+	LINE_CROSSING_DIAMOND(12, 12, 0, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.DIAMOND, SignDivider.NONE),
 	/**
 	 * The vertical tower identifier, in three parts reading downwards: the initials of the plant
 	 * the run starts at, the tower's number, then -- under a rule printed on the plate -- the
 	 * initials of the station it ends at.
 	 */
-	TOWER_VERTICAL(8, 14, 3, 0x1A1A1A, false, SignShape.RECT),
+	TOWER_VERTICAL(8, 14, 3, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.TOWER_RULE),
 	/**
 	 * The horizontal tower identifier, hung on the DC towers of the Pacific Intertie among others.
 	 */
-	TOWER_HORIZONTAL(14, 4, 1, 0x1A1A1A, false, SignShape.RECT);
+	TOWER_HORIZONTAL(14, 4, 1, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE);
 
 	/**
 	 * Cached because {@code values()} allocates, and this is read once per sign per frame by the
@@ -116,18 +119,20 @@ public enum UtilitySignKind implements IStringSerializable
 	private final int height;
 	private final int lines;
 	private final int textColour;
-	private final boolean rotated;
+	private final SignTextFlow flow;
 	private final SignShape shape;
+	private final SignDivider divider;
 
-	UtilitySignKind(int width, int height, int lines, int textColour, boolean rotated,
-					SignShape shape)
+	UtilitySignKind(int width, int height, int lines, int textColour, SignTextFlow flow,
+					SignShape shape, SignDivider divider)
 	{
 		this.width = width;
 		this.height = height;
 		this.lines = lines;
 		this.textColour = textColour;
-		this.rotated = rotated;
+		this.flow = flow;
 		this.shape = shape;
+		this.divider = divider;
 	}
 
 	@Override
@@ -161,13 +166,22 @@ public enum UtilitySignKind implements IStringSerializable
 	}
 
 	/**
-	 * @return true if the text runs along the plate rather than across it -- which is what a strip
-	 * six pixels wide and fourteen tall has to do to hold "M31390V" at all, and is how the real
-	 * ones are printed
+	 * @return which way this plate's lettering runs -- across it, one row per line, or down it, one
+	 * upright character per row. See {@link SignTextFlow}.
 	 */
-	public boolean isRotated()
+	public SignTextFlow getFlow()
 	{
-		return rotated;
+		return flow;
+	}
+
+	/**
+	 * @return true if the text is a column of upright characters read downwards rather than a stack
+	 * of lines read across -- worth a name of its own because it is what every draw checks first.
+	 * See {@link SignTextFlow#DOWN}.
+	 */
+	public boolean isStacked()
+	{
+		return flow.isStacked();
 	}
 
 	/**
@@ -180,33 +194,50 @@ public enum UtilitySignKind implements IStringSerializable
 	}
 
 	/**
-	 * Which line a rule is printed after, for the one kind that has one.
-	 * <p>
-	 * The vertical tower tag has a rule two thirds of the way down and the receiving station's
-	 * initials go <em>under</em> it, so the three lines are not three even shares of the plate: two
-	 * share the space above the rule and one has the space below. Laying them out evenly and hoping
-	 * put the third line's letters on top of the rule.
-	 *
-	 * @return the index of the last line above the rule, or -1 for a plain plate
+	 * @return what is printed across this plate's middle, if anything at all -- a rule, a fraction
+	 * bar, or the nail the round tag is actually hung by. See {@link SignDivider}.
 	 */
-	public int getRuleAfterLine()
+	public SignDivider getDivider()
 	{
-		return this==TOWER_VERTICAL?1: -1;
+		return divider;
 	}
 
 	/**
-	 * @return the length of the plate along the text's own direction, in block pixels. The renderer
-	 * fits a line to this, and the editor uses it for the same reason.
+	 * Which line the divider is printed after, for the three kinds that have one.
+	 * <p>
+	 * The vertical tower tag has a rule two thirds of the way down and the receiving station's
+	 * initials go <em>under</em> it; the oval and the round tag split two lines the same way,
+	 * either side of a fraction bar or the nail. None of the three are two even shares of the
+	 * plate -- laying them out evenly puts a line's letters on top of whatever is actually there.
+	 *
+	 * @return the index of the last line above the divider, or -1 for a plain plate. There is only
+	 * the one table now, on {@link #divider} -- see {@link SignDivider#getAfterLine()}.
+	 */
+	public int getRuleAfterLine()
+	{
+		return divider.getAfterLine();
+	}
+
+	/**
+	 * @return the plate's width, in block pixels. A line that reads across is fitted to this
+	 * directly; a stacked column is not -- each of its characters is fitted to this in turn, one
+	 * row at a time, rather than the whole run of them being fitted to it at once.
 	 */
 	public int getTextSpan()
 	{
-		return rotated?height: width;
+		return width;
 	}
 
-	/** @return the plate's extent across the text's direction -- what the stack of lines fits into */
+	/**
+	 * @return the plate's height, in block pixels -- what a stack of lines, or a column of
+	 * characters, fits into. Unlike the strips' old rotation, this no longer swaps with
+	 * {@link #getTextSpan()}: turning a whole line ninety degrees put its length along the height
+	 * and its depth along the width, but a column of upright characters does not turn at all -- it
+	 * is still limited by the width and still runs down the height.
+	 */
 	public int getTextDepth()
 	{
-		return rotated?width: height;
+		return height;
 	}
 
 	/**
