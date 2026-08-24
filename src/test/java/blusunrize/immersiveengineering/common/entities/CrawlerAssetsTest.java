@@ -57,6 +57,8 @@ class CrawlerAssetsTest
 			"src/main/java/blusunrize/immersiveengineering/client/models/ModelHydraulicCrawler.java";
 	private static final String RENDER_SRC =
 			"src/main/java/blusunrize/immersiveengineering/client/render/EntityRenderHydraulicCrawler.java";
+	private static final String ENTITY_SRC =
+			"src/main/java/blusunrize/immersiveengineering/common/entities/EntityHydraulicCrawler.java";
 	private static final String GENERATOR = "docs/tools/make_crawler_obj.py";
 	private static final String OBJ = ASSETS+"models/entity/hydraulic_crawler.obj";
 
@@ -464,6 +466,49 @@ class CrawlerAssetsTest
 			assertTrue(glassPass > lastOpaque&&lastOpaque > 0,
 					"the glass is drawn before the arm, so whatever the blend should have shown "
 							+"through it had not been drawn yet");
+		}
+
+		@Test
+		@DisplayName("the glazing is drawn in a render pass of its own, after every solid entity")
+		void glassIsDrawnInItsOwnPass()
+		{
+			//	=================================
+			//	Why "after the machine's own steel" was not far enough.
+			//	=================================
+			//
+			// Glass writes to the depth buffer -- it has to, or the far side of the cab tints
+			// through the near side -- so anything drawn after a pane and behind it is not shown
+			// through the glass, it is deleted by it. Drawn in the middle of the entity pass, the
+			// panes therefore erased whichever entities the chunk happened to hold after the
+			// machine. One of those entities is the operator sitting in the cab, which is the
+			// report this pass split answers: a driver who vanished from some angles.
+			//
+			// Forge's second render pass runs after the translucent block layer, and so after
+			// every entity that asked only for the first. Three things have to hold together for
+			// that to work, and each of them is silently undone by an ordinary-looking edit.
+			String entity = read(ENTITY_SRC);
+			assertTrue(entity.contains("public boolean shouldRenderInPass(int pass)"),
+					"the machine never opts into a second render pass, so the glazing pass below "
+							+"is never called and the cab has no windows at all");
+			assertTrue(code(entity).contains("return pass==0||pass==1;"),
+					"the machine does not ask for both render passes; asking for only the first "
+							+"puts the glass back among the entities it deletes, and asking for "
+							+"only the second draws windows with no machine behind them");
+
+			String render = code(read(RENDER_SRC));
+			assertTrue(render.contains("MinecraftForgeClient.getRenderPass()"),
+					"the renderer never asks which pass it is in, so it draws the whole machine "
+							+"twice -- once solid and once again over its own glass");
+			assertTrue(render.contains("model.renderGlass("),
+					"the renderer never draws the glazing group in the second pass");
+			int solid = render.indexOf("model.render(");
+			int shadow = render.indexOf("super.doRender(");
+			assertTrue(solid > 0&&shadow > solid,
+					"the shadow is drawn before the machine, so this test cannot say whether it "
+							+"is guarded");
+			assertTrue(render.lastIndexOf("if(!glassPass)", shadow) > solid,
+					"the shadow and the name plate are drawn in the glazing pass as well as the "
+							+"solid one, which lays both down twice a frame");
 		}
 	}
 

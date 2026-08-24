@@ -39,9 +39,18 @@ import org.lwjgl.opengl.GL11;
  * constant, and {@code CrawlerAssetsTest} asserts the two copies agree.
  * <p>
  * <strong>It is drawn in two passes: everything, and then the glass.</strong> The cab's glazing
- * is its own group so that it can be drawn last with blending on -- see {@link #renderGlass()}.
- * That is the only reason it is separate; it is authored in the house's frame and drawn under
- * the house's transform, so it slews with the cab it is glazed into.
+ * is its own group so that it can be drawn last with blending on -- see
+ * {@link #renderGlass(float)}. That is the only reason it is separate; it is authored in the
+ * house's frame and drawn under the house's transform, so it slews with the cab it is glazed
+ * into, which is why the glass pass reapplies that transform rather than sharing one.
+ * <p>
+ * <strong>The two passes are two calls, and the caller puts the rest of the world between
+ * them.</strong> They were one call with the glass at the end of it, which is late enough for
+ * the machine's own steel and nowhere near late enough for anything else: an entity drawn after
+ * the crawler is drawn after its windows, and a window that has written to the depth buffer
+ * deletes whatever is behind it. The operator is an entity, and they sit behind three panes.
+ * See {@code EntityRenderHydraulicCrawler}, which draws the steel in Forge's render pass 0 and
+ * the glass in pass 1, after every solid entity in the world has been drawn.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
@@ -144,7 +153,8 @@ public class ModelHydraulicCrawler
 	}
 
 	/**
-	 * Draw the machine, posed.
+	 * Draw the machine's steel, posed. The glazing is not in this pass -- see
+	 * {@link #renderGlass(float)}.
 	 *
 	 * @param slew       degrees the house is turned <em>relative to the tracks</em>
 	 * @param boomAngle  degrees the boom is raised
@@ -187,8 +197,24 @@ public class ModelHydraulicCrawler
 
 		GlStateManager.popMatrix();
 		GlStateManager.popMatrix();
+		GlStateManager.popMatrix();
+	}
 
-		//Back in the house's frame, with every opaque group of the machine already drawn.
+	/**
+	 * Draw the cab glazing, blended, in the house's frame.
+	 * <p>
+	 * Separate from {@link #render} so that the caller can put every other entity in the world
+	 * between the two -- see that method's note, and {@code EntityRenderHydraulicCrawler}.
+	 *
+	 * @param slew degrees the house is turned <em>relative to the tracks</em>, exactly as the
+	 * solid pass was given it: the windows are part of the cab and may not lag it by so much as
+	 * a frame
+	 */
+	public void renderGlass(float slew)
+	{
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(0, SLEW_HEIGHT, 0);
+		GlStateManager.rotate(slew, 0, 1, 0);
 		renderGlass();
 		GlStateManager.popMatrix();
 	}
@@ -205,9 +231,10 @@ public class ModelHydraulicCrawler
 	 * <p>
 	 * <strong>Last, and inside the house's transform.</strong> Blending shows what is already in
 	 * the framebuffer, so anything drawn after the glass is not behind it -- it is missing from
-	 * behind it. That puts this after the arm as well as after the house, which is why it is here
-	 * and not next to {@code model.render(HOUSE)}. The transform is still the house's, so the
-	 * windows slew with the cab they are glazed into and cannot drift from it.
+	 * behind it. That puts this after the arm as well as after the house, and after every other
+	 * entity in the world besides, which is what the second render pass buys. The transform is
+	 * still the house's, so the windows slew with the cab they are glazed into and cannot drift
+	 * from it.
 	 * <p>
 	 * <strong>Culling stays on.</strong> Each pane is a closed thin box, so there is an
 	 * outward-facing quad on each side of it: the operator sees the inner one and the world sees
@@ -215,9 +242,14 @@ public class ModelHydraulicCrawler
 	 * far side of every pane to the pass, blending the same tint over the same pixels twice and
 	 * darkening the glass for no gain.
 	 * <p>
-	 * Depth writes stay on too. Within one entity the glass is drawn last, so it blends over the
-	 * machine's own steel correctly; and with depth on, the far face of a pane is rejected against
-	 * the near one rather than tinting through it.
+	 * <strong>Depth writes are turned on here rather than assumed.</strong> They are what stops
+	 * the far side of the cab tinting through the near side: each pane is drawn front face only,
+	 * so looking in through the windscreen would otherwise blend the rear window over the same
+	 * pixels a second time and the cab would go dark. This pass runs after the translucent block
+	 * layer, which leaves the mask off, so it is set and put back rather than left to luck.
+	 * <p>
+	 * Writing depth is also exactly what made the operator vanish while this ran in the middle of
+	 * the entity pass. It is safe now only because nothing solid is drawn after it.
 	 * <p>
 	 * Everything this touches is put back: the world's render is one long stream of state, and a
 	 * blend or an alpha threshold left on leaks into every entity drawn after this one and into
@@ -225,6 +257,8 @@ public class ModelHydraulicCrawler
 	 */
 	private void renderGlass()
 	{
+		boolean wroteDepth = GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK);
+		GlStateManager.depthMask(true);
 		GlStateManager.enableBlend();
 		GlStateManager.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA,
 				GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA);
@@ -237,6 +271,7 @@ public class ModelHydraulicCrawler
 
 		GlStateManager.alphaFunc(GL11.GL_GREATER, WORLD_ALPHA_CUTOFF);
 		GlStateManager.disableBlend();
+		GlStateManager.depthMask(wroteDepth);
 	}
 
 	/**

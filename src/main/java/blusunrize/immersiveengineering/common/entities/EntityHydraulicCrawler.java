@@ -829,6 +829,25 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		return false;
 	}
 
+	/**
+	 * Drawn in both of Forge's render passes: the steel in the first, the cab glazing in the second.
+	 * <p>
+	 * <strong>Because the operator is an entity, and glass writes depth.</strong> The second pass
+	 * runs after the translucent block layer, which is after every entity that only asked for the
+	 * first one -- so by the time the windows are drawn, whoever is sitting behind them is already
+	 * on screen and the glass blends over them instead of deleting them. Drawn in one pass the
+	 * machine hid its own driver from whichever angles happened to have a pane in the way, and
+	 * which angles those were depended on nothing more principled than the order the chunk held
+	 * the two entities in.
+	 *
+	 * @see blusunrize.immersiveengineering.client.render.EntityRenderHydraulicCrawler
+	 */
+	@Override
+	public boolean shouldRenderInPass(int pass)
+	{
+		return pass==0||pass==1;
+	}
+
 	@Nullable
 	@Override
 	public Entity getControllingPassenger()

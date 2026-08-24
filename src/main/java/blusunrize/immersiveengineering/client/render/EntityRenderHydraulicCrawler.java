@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.entity.Render;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.MathHelper;
+import net.minecraftforge.client.MinecraftForgeClient;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 
@@ -40,10 +41,20 @@ import javax.annotation.Nullable;
  * {@link blusunrize.immersiveengineering.client.models.EntityOBJModel} -- so what used to be a pose
  * set on a box hierarchy is now a single call with everything that moves in its arguments.
  * <p>
- * That one call draws two passes: the machine, and then the cab glazing, blended, last. The GL
- * state that needs -- blending, and a lowered alpha threshold -- is turned on and put back inside
- * {@code ModelHydraulicCrawler}, next to the draw it belongs to and inside the house's transform,
- * so nothing leaks out of this method into the entities and the HUD drawn after it.
+ * <strong>The machine is drawn twice, in two of Forge's render passes.</strong> Pass 0 is the
+ * steel; pass 1, which runs after the translucent block layer and therefore after every solid
+ * entity in the world, is the cab glazing. That split is what keeps the operator on screen.
+ * <p>
+ * Glass writes to the depth buffer -- it has to, or the far side of the cab tints through the
+ * near side -- so while both passes were one call in the middle of the entity pass, every pane
+ * between the camera and the seat deleted whatever had not been drawn yet. Whether the player was
+ * one of those things came down to which order the chunk happened to hold the two entities in,
+ * which changes whenever the machine is driven into a different chunk: the reported symptom was
+ * an operator who vanished from some angles, and came back if you drove somewhere else.
+ * <p>
+ * The GL state each pass needs -- blending, a lowered alpha threshold, the depth mask -- is turned
+ * on and put back inside {@code ModelHydraulicCrawler}, next to the draw it belongs to and inside
+ * the house's transform, so nothing leaks out of this method into what is drawn after it.
  *
  * @author LDImmersiveEngineering -- vehicles
  */
@@ -52,6 +63,12 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 {
 	private static final ResourceLocation TEXTURE =
 			new ResourceLocation("immersiveengineering:textures/entity/hydraulic_crawler.png");
+
+	/**
+	 * Forge's second render pass: after the translucent block layer, and after every entity that
+	 * asked for the first one. {@link EntityHydraulicCrawler#shouldRenderInPass} opts in to it.
+	 */
+	private static final int GLASS_PASS = 1;
 
 	private final ModelHydraulicCrawler model = new ModelHydraulicCrawler();
 
@@ -66,6 +83,13 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 	public void doRender(EntityHydraulicCrawler crawler, double x, double y, double z,
 						 float entityYaw, float partialTicks)
 	{
+		//The glazing pass is the same machine at the same instant, so it needs the same
+		//interpolated slew the steel was drawn at -- computed once, here, and used by whichever
+		//pass is running.
+		float slew = MathHelper.wrapDegrees(
+				interpolate(crawler.prevSlew, crawler.getSlew(), partialTicks)-entityYaw);
+		boolean glassPass = MinecraftForgeClient.getRenderPass()==GLASS_PASS;
+
 		GlStateManager.pushMatrix();
 		GlStateManager.translate(x, y, z);
 
@@ -110,7 +134,12 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 		GlStateManager.rotate(entityYaw, 0, 1, 0);
 
 		bindEntityTexture(crawler);
-		model.render(
+		//Nothing but the windows in the second pass: no steel, no shadow, no name plate. Drawing
+		//any of it again would double every blended edge and lay the shadow down twice.
+		if(glassPass)
+			model.renderGlass(slew);
+		else
+			model.render(
 				//	=================================
 				//	Relative to the tracks, and to the tracks as they are being drawn.
 				//	=================================
@@ -125,8 +154,7 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 				// was turning the house was drawn swinging back and forth across the tracks by up to
 				// the turn rate, every frame. Standing still it was exact, which is why it read as the
 				// cab shaking only while driving.
-				MathHelper.wrapDegrees(interpolate(crawler.prevSlew, crawler.getSlew(), partialTicks)
-						-entityYaw),
+				slew,
 				//The joints step once a tick, by up to four degrees. Drawn straight from the synced
 				//values the arm judders at twenty frames a second; interpolated, it moves.
 				interpolate(crawler.prevBoom, crawler.getBoomAngle(), partialTicks),
@@ -146,7 +174,8 @@ public class EntityRenderHydraulicCrawler extends Render<EntityHydraulicCrawler>
 				crawler.prevTrackRight+(crawler.trackRight-crawler.prevTrackRight)*partialTicks);
 
 		GlStateManager.popMatrix();
-		super.doRender(crawler, x, y, z, entityYaw, partialTicks);
+		if(!glassPass)
+			super.doRender(crawler, x, y, z, entityYaw, partialTicks);
 	}
 
 	/**

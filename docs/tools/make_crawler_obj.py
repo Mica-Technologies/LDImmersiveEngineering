@@ -53,9 +53,10 @@ Self-checks, all of them the sort of failure nothing at runtime reports:
 
 **The glazing is its own group.**  `house_glass` is authored in the house's frame, exactly
 as the rest of the cab is, so it slews with it; it is separate only so the renderer can
-draw it last, blended, after every opaque group of the machine.  Blending an opaque group
-is a no-op and blending in the middle of the machine would leave whatever had not been
-drawn yet missing from behind the glass.
+draw it in a render pass of its own, blended, after the machine's steel and after every
+other solid entity in the world.  Blending an opaque group is a no-op, and glass drawn
+earlier than that does not show what is behind it -- it deletes it, the operator in the
+cab included.  Which is also why the back wall of the cab is glazed and not plated.
 
 No real-world manufacturer's marks: the livery is generic construction yellow and the
 only lettering is "LD".
@@ -978,17 +979,29 @@ def build_cab(mesh, faces, glass):
         for z0, z1 in ((CAB_Z0, CAB_Z0+2), (CAB_Z1-2, CAB_Z1)):
             volume += add_box(mesh, faces, "cab post",
                               (x0, CAB_TOP+2, z0, x1, CAB_FLOOR, z1), "yellow")
-    # The back wall is solid: it is the side the engine is on and nobody looks that way.
+    # The back wall: a panel to the operator's shoulder and a window above it.
     #
-    # It spans *between* the two rear posts rather than across them.  Across them it
-    # enclosed them: both rear posts were inside this box with all six of their faces in
-    # its faces' planes, so every one of them was a coincident pair and the whole back
-    # corner of the cab flickered.  Between them, the wall meets each post edge to edge --
+    # **It used to be solid, on the reasoning that the engine is behind it and nobody
+    # looks that way.**  Somebody does: the default third-person camera sits behind the
+    # machine, and a plate of steel exactly there is why a playtester reported an operator
+    # who disappeared.  A real excavator is glazed at the back for the same reason -- you
+    # cannot slew a house safely without seeing what the counterweight is about to sweep
+    # through -- so this is the realistic shape as well as the visible one.
+    #
+    # Both pieces span *between* the two rear posts rather than across them.  Across them
+    # the wall enclosed them: both rear posts were inside its box with all six of their
+    # faces in its faces' planes, so every one of them was a coincident pair and the whole
+    # back corner of the cab flickered.  Between them, it meets each post edge to edge --
     # face against opposing face, which is what a box against a box is and is fine -- and
     # the posts read as the corner pillars they are meant to be.
-    volume += add_box(mesh, faces, "cab back",
-                      (CAB_X0+2, CAB_TOP+2, CAB_Z1-2, CAB_X1-2, CAB_FLOOR, CAB_Z1),
+    volume += add_box(mesh, faces, "cab back panel",
+                      (CAB_X0+2, -22, CAB_Z1-2, CAB_X1-2, CAB_FLOOR, CAB_Z1),
                       sides("yellow", ends="cab_side"))
+    # Set into the wall's outer face by the same 0.4 the windscreen and the door glass are,
+    # so the three read as glazing in one frame rather than as three separately fitted panes.
+    volume += add_box(mesh, glass, "rear window",
+                      (CAB_X0+2, CAB_TOP+2, CAB_Z1-1.1, CAB_X1-2, -22, CAB_Z1-0.4),
+                      "glass")
     # The inner wall, half height: a rail to lean on, and clear glass above it so the
     # operator can see the arm they are working with.
     volume += add_box(mesh, faces, "cab inner wall",
@@ -1544,7 +1557,7 @@ ATTACHMENTS = {
     ("house", "cab floor"): Mount("cab base"),
     ("house", "cab post"): Mount("cab floor"),
     ("house", "cab roof"): Mount("cab post"),
-    ("house", "cab back"): Mount("cab post"),
+    ("house", "cab back panel"): Mount("cab post"),
     ("house", "cab inner wall"): Mount("cab floor"),
     ("house", "door panel"): Mount("cab post"),
     ("house", "door handle"): Mount("door panel", "+x", 0.6),
@@ -1562,6 +1575,7 @@ ATTACHMENTS = {
     ("house_glass", "windscreen"): Mount("cab post"),
     ("house_glass", "door glass"): Mount("cab post"),
     ("house_glass", "cab inner glass"): Mount("cab inner wall"),
+    ("house_glass", "rear window"): Mount("cab post"),
 
     ("boom", "boom foot pin"): Mount("boom beam", ("+x", "-x"), BOSS_PROUD),
     ("boom", "boom head pin"): Mount("boom beam", ("+x", "-x"), BOSS_PROUD),
