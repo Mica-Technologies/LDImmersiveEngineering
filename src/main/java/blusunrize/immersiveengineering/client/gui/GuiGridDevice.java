@@ -413,7 +413,17 @@ public class GuiGridDevice extends GuiIEContainerBase
 		//These boxes trade flux with the blocks they touch; they do not take wires directly,
 		//any more than a machine does. Say so while nothing is moving, since a box that is
 		//correctly assigned but wired up wrong looks identical to one that is working.
-		if(device.isLinked()&&device.isEnabled()&&device.getLastThroughput()==0)
+		//Throughput is only evidence of health where throughput is what the box does. In city mode a
+		//Feed Unit does not move a metered stream at all -- it proves its source is live with a
+		//token sip every few seconds and the engine reads presence, not flux -- so its meter sits at
+		//zero on a segment that is running perfectly. Warning on that told every player with a
+		//working grid that their power had failed. There, the honest question is whether the segment
+		//came up energised, which is the same thing the state line above already reports.
+		boolean meterMeansNothing = feed&&CityMode.grid();
+		boolean idle = meterMeansNothing
+				?segment!=null&&!segment.isEnergized()
+				:device.getLastThroughput()==0;
+		if(device.isLinked()&&device.isEnabled()&&idle)
 			fontRenderer.drawString(feed?"no power arriving": "nothing is taking power",
 					guiLeft+100, y+10, COL_WARN);
 	}

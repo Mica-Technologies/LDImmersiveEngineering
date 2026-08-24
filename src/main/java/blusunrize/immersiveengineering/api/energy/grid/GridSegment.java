@@ -492,6 +492,17 @@ public class GridSegment
 	{
 		tickIn = 0;
 		tickOut = 0;
+		//Per-device meters are zeroed here rather than inside the engine's normal-mode pass, which
+		//is where the reset used to live. City mode never ran that pass, so a Service Unit's
+		//"last tick" figure accumulated for the lifetime of the segment and reported a running
+		//total in a per-tick field -- 200000 IF/t against a 4096 IF/t cap, and a comparator
+		//permanently pegged at 15. Both modes open the tick through here, so both are covered.
+		List<GridDevice> feeds = getActiveFeeds();
+		for(int i = 0; i < feeds.size(); i++)
+			feeds.get(i).setLastThroughput(0);
+		List<GridDevice> services = getActiveServices();
+		for(int i = 0; i < services.size(); i++)
+			services.get(i).setLastThroughput(0);
 		stats.beginTick();
 	}
 

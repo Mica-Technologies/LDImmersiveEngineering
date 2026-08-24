@@ -204,6 +204,26 @@ class GridEngineCityModeTest
 		}
 
 		@Test
+		@DisplayName("the per-tick meter is a per-tick figure, not a running total")
+		void perTickMeterIsResetEachTick()
+		{
+			feed(grid, segment, 1000, 1000);
+			GridDevice service = service(grid, segment, 100000, 250);
+			//Deliver over many ticks. The reset used to live only in the normal-mode pass, so in
+			//city mode this accumulated into the lifetime total and reported it as IF/t -- a
+			//Service Unit read 200000 IF/t against a 4096 IF/t cap, and its comparator pegged at 15.
+			tickThroughOneInterval();
+			for(long t = GridConfig.sipIntervalTicks; t < GridConfig.sipIntervalTicks+20; t++)
+				tick(t);
+
+			assertTrue(service.getLifetimeThroughput() > 250,
+					"the run should have moved more than one tick's worth in total");
+			assertTrue(service.getLastThroughput() <= 250,
+					"last tick must never exceed the device's per-tick cap, but was "
+							+service.getLastThroughput());
+		}
+
+		@Test
 		@DisplayName("delivery per tick is bounded by the device's transfer cap")
 		void deliveryBoundedByDeviceCap()
 		{

@@ -8,9 +8,11 @@
 
 package blusunrize.immersiveengineering.common.util.grid;
 
+import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.GridDevice;
 import blusunrize.immersiveengineering.api.energy.grid.GridEngine;
+import blusunrize.immersiveengineering.api.energy.grid.IGridEndpoint;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
 import blusunrize.immersiveengineering.common.util.CityMode;
 import net.minecraft.server.MinecraftServer;
@@ -66,6 +68,35 @@ public class GridTickHandler
 
 		GridEngine.applySchedules(VirtualGrid.INSTANCE, getScheduleDayTime());
 		GridEngine.tick(VirtualGrid.INSTANCE, tickCounter++, cityMode);
+		refreshReadouts();
+	}
+
+	/**
+	 * How often a device recomputes the figures it shows in the world, in ticks.
+	 * <p>
+	 * The readout is change-gated, so a grid delivering a steady rate sends no packets at all and
+	 * this costs a comparison per device. Only a device whose throughput is actually moving pays,
+	 * and then at most once a second rather than twenty times -- which is the whole reason this is
+	 * not simply called every tick.
+	 */
+	private static final int READOUT_INTERVAL = 20;
+
+	/**
+	 * Lets each device refresh its in-world readout, staggered by position so a city's worth of
+	 * boxes never recompute on the same tick.
+	 */
+	private static void refreshReadouts()
+	{
+		for(GridDevice device : VirtualGrid.INSTANCE.getDevices())
+		{
+			IGridEndpoint endpoint = device.getEndpoint();
+			if(endpoint==null)
+				continue;
+			int stagger = ApiUtils.positionStagger(device.getPos().getX(),
+					device.getPos().getZ()^(device.getDimension()*31), READOUT_INTERVAL);
+			if((tickCounter+stagger)%READOUT_INTERVAL==0)
+				endpoint.refreshReadout();
+		}
 	}
 
 	/**

@@ -134,6 +134,27 @@ public abstract class TileEntityGridDevice extends TileEntityImmersiveConnectabl
 	public void onLoad()
 	{
 		super.onLoad();
+		attachToGrid();
+	}
+
+	/**
+	 * Registers this box with {@link VirtualGrid} and takes hold of its live record.
+	 * <p>
+	 * Split out of {@link #onLoad} because a chunk loading is not the only moment this has to
+	 * happen. On a dedicated server the spawn region is loaded <em>before</em>
+	 * {@code FMLServerStartedEvent}, which is where {@code GridSaveData.load} reads the save file
+	 * -- and that read clears the registry and rebuilds every record from NBT with no endpoint.
+	 * Every box already loaded therefore lost its attachment and, because {@code onLoad} does not
+	 * come round again for a chunk that is already loaded, stayed offline for the life of the
+	 * server: no power in, no power out, and a console that lists the device but never lights it.
+	 * {@code GridSaveData} calls this on every loaded box once the file is in, which puts the
+	 * attachment back.
+	 * <p>
+	 * Safe to call more than once: {@code attach} looks the record up by position rather than
+	 * creating a second one.
+	 */
+	public void attachToGrid()
+	{
 		if(world==null||world.isRemote)
 			return;
 		DimensionBlockPos dPos = new DimensionBlockPos(pos, world);
@@ -217,6 +238,13 @@ public abstract class TileEntityGridDevice extends TileEntityImmersiveConnectabl
 		captureBackup();
 		applyLimits();
 		markDirty();
+		if(world!=null&&!world.isRemote)
+			pushClientState();
+	}
+
+	@Override
+	public void refreshReadout()
+	{
 		if(world!=null&&!world.isRemote)
 			pushClientState();
 	}
@@ -343,6 +371,28 @@ public abstract class TileEntityGridDevice extends TileEntityImmersiveConnectabl
 	public void onDataPacket(@Nonnull NetworkManager net, @Nonnull SPacketUpdateTileEntity pkt)
 	{
 		readCustomNBT(pkt.getNbtCompound(), true);
+	}
+
+	/**
+	 * Reads the tag a chunk send carries, in the form {@code getUpdateTag} wrote it.
+	 * <p>
+	 * Forge's default routes that tag through {@code readFromNBT}, which reads it as the
+	 * <em>save</em> form -- so every key written only under {@code descPacket}, which is all four
+	 * of the in-world readout's, was dropped on the way in. The box therefore read "Unlinked" to
+	 * anyone who had just logged in or walked into the chunk, whatever the grid was actually doing,
+	 * and stayed that way until something changed a setting and sent a real update packet.
+	 * <p>
+	 * On a dedicated server that is the normal case rather than an edge one: nothing changes a
+	 * setting after a restart, so the readout never corrected itself. Single player hid it, because
+	 * there the player is usually the one who just assigned the box.
+	 */
+	@Override
+	public void handleUpdateTag(@Nonnull NBTTagCompound tag)
+	{
+		//Exactly what onDataPacket above does, because the tag is the same shape: getUpdateTag
+		//writes the description form. Deliberately not chaining to readFromNBT, which would read
+		//the same tag a second time as the save form and reset everything the save form owns.
+		readCustomNBT(tag, true);
 	}
 
 	//	=================================

@@ -9,14 +9,19 @@
 package blusunrize.immersiveengineering.common.util.fluidnet;
 
 import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
+import blusunrize.immersiveengineering.common.blocks.fluidnet.TileEntityFluidNetDevice;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
 import net.minecraft.world.storage.WorldSavedData;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.relauncher.Side;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 
 /**
  * World-save persistence for the virtual fluid network.
@@ -79,6 +84,35 @@ public class FluidNetSaveData extends WorldSavedData
 		}
 		setInstance(data);
 		VirtualFluidNet.INSTANCE.setDirtyListener(FluidNetSaveData::setDirty);
+		reattachLoadedDevices();
+	}
+
+	/**
+	 * Re-registers every fitting whose chunk was already loaded when the save file was read.
+	 * <p>
+	 * The fluid network is the grid's sibling and had the grid's bug: see
+	 * {@code GridSaveData.reattachLoadedDevices} for why this is needed and what it looked like
+	 * without it.
+	 */
+	private static void reattachLoadedDevices()
+	{
+		MinecraftServer server = FMLCommonHandler.instance().getMinecraftServerInstance();
+		if(server==null)
+			return;
+		int count = 0;
+		for(WorldServer w : server.worlds)
+		{
+			if(w==null)
+				continue;
+			for(TileEntity te : new ArrayList<>(w.loadedTileEntityList))
+				if(te instanceof TileEntityFluidNetDevice)
+				{
+					((TileEntityFluidNetDevice)te).attachToNet();
+					count++;
+				}
+		}
+		if(count > 0)
+			IELogger.info("Virtual fluid network: re-attached "+count+" fitting(s) loaded before the save file");
 	}
 
 	public static void setInstance(@Nullable FluidNetSaveData instance)

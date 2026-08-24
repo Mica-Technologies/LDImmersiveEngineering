@@ -115,6 +115,20 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 	public void onLoad()
 	{
 		super.onLoad();
+		attachToNet();
+	}
+
+	/**
+	 * Registers this fitting with {@link VirtualFluidNet} and takes hold of its live record.
+	 * <p>
+	 * Split out of {@link #onLoad} for the same reason the grid's version is -- see
+	 * {@code TileEntityGridDevice.attachToGrid}. On a dedicated server the spawn region loads
+	 * before the save file is read, and that read rebuilds every record with no endpoint, so a
+	 * fitting already loaded is left detached for the life of the server.
+	 * {@code FluidNetSaveData} calls this once the file is in.
+	 */
+	public void attachToNet()
+	{
 		if(world==null||world.isRemote)
 			return;
 		DimensionBlockPos dPos = new DimensionBlockPos(pos, world);

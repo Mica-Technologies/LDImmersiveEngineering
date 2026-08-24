@@ -66,3 +66,4 @@ docs/manual/*.toc
 docs/manual/*.fls
 docs/manual/*.fdb_latexmk
 docs/manual/*.synctex.gz
+run-server

@@ -47,6 +47,19 @@ public interface IGridEndpoint
 	}
 
 	/**
+	 * Recompute whatever this device shows the world, and sync it if it changed.
+	 * <p>
+	 * Called on a slow, staggered cadence rather than every tick. Until it existed the in-world
+	 * readout was only ever recomputed by {@link #onGridConfigChanged}, so a box that was
+	 * delivering happily still read "idle  0 IF/t" until somebody changed one of its settings --
+	 * the state lamp could effectively never reach "active". Implementations are expected to be
+	 * change-gated, so a grid running at a steady rate still sends nothing.
+	 */
+	default void refreshReadout()
+	{
+	}
+
+	/**
 	 * Read the world's redstone state at this device. Called on SIGNAL devices in input
 	 * mode, once per tick, before anything else happens.
 	 *

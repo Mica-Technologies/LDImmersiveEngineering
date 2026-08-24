@@ -159,12 +159,8 @@ public final class FluidNetEngine
 		//mains happened to be created in.
 		for(FluidMain main : net.getMains())
 		{
+			//The per-device meters were zeroed by FluidMain.beginTick above, for both modes.
 			List<FluidDevice> inlets = main.getActiveInlets();
-			for(int i = 0; i < inlets.size(); i++)
-				inlets.get(i).setLastThroughput(0);
-			List<FluidDevice> outlets = main.getActiveOutlets();
-			for(int i = 0; i < outlets.size(); i++)
-				outlets.get(i).setLastThroughput(0);
 			if(main.isOperational())
 				collect(main, inlets);
 		}

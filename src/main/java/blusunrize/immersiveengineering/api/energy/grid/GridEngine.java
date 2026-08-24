@@ -151,12 +151,8 @@ public final class GridEngine
 		//depend on the order segments happened to be created in.
 		for(GridSegment segment : grid.getSegments())
 		{
+			//The per-device meters were zeroed by GridSegment.beginTick above, for both modes.
 			List<GridDevice> feeds = segment.getActiveFeeds();
-			for(int i = 0; i < feeds.size(); i++)
-				feeds.get(i).setLastThroughput(0);
-			List<GridDevice> services = segment.getActiveServices();
-			for(int i = 0; i < services.size(); i++)
-				services.get(i).setLastThroughput(0);
 			if(segment.isOperational())
 				collect(segment, feeds);
 		}

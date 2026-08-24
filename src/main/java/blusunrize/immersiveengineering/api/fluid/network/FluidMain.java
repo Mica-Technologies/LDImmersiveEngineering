@@ -577,6 +577,16 @@ public class FluidMain
 	{
 		tickIn = 0;
 		tickOut = 0;
+		//Zeroed here rather than in the engine's normal-mode pass, for the same reason the grid
+		//does it in GridSegment.beginTick: city mode never ran that pass, so an Outlet's
+		//"last tick" figure accumulated into a lifetime total reported in a per-tick field.
+		//This is the fluid network's copy of that bug -- fix one, check the other.
+		List<FluidDevice> inlets = getActiveInlets();
+		for(int i = 0; i < inlets.size(); i++)
+			inlets.get(i).setLastThroughput(0);
+		List<FluidDevice> outlets = getActiveOutlets();
+		for(int i = 0; i < outlets.size(); i++)
+			outlets.get(i).setLastThroughput(0);
 		stats.beginTick();
 	}
 
