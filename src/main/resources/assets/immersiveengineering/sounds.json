@@ -129,5 +129,40 @@
       "immersiveengineering:chute3"
     ],
     "subtitle": "subtitle.immersiveengineering.chute"
+  },
+  "crawlerEngine": {
+    "category": "neutral",
+    "sounds": [
+      "immersiveengineering:crawler_engine"
+    ],
+    "subtitle": "subtitle.immersiveengineering.crawlerEngine"
+  },
+  "crawlerTracks": {
+    "category": "neutral",
+    "sounds": [
+      "immersiveengineering:crawler_tracks"
+    ],
+    "subtitle": "subtitle.immersiveengineering.crawlerTracks"
+  },
+  "crawlerHydraulic": {
+    "category": "neutral",
+    "sounds": [
+      "immersiveengineering:crawler_hydraulic"
+    ],
+    "subtitle": "subtitle.immersiveengineering.crawlerHydraulic"
+  },
+  "crawlerBeeper": {
+    "category": "neutral",
+    "sounds": [
+      "immersiveengineering:crawler_beeper"
+    ],
+    "subtitle": "subtitle.immersiveengineering.crawlerBeeper"
+  },
+  "crawlerDump": {
+    "category": "neutral",
+    "sounds": [
+      "immersiveengineering:crawler_dump"
+    ],
+    "subtitle": "subtitle.immersiveengineering.crawlerDump"
   }
 }

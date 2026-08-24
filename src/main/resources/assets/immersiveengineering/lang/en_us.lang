@@ -996,6 +996,12 @@ subtitle.immersiveengineering.railgunFire=Railgun fire
 subtitle.immersiveengineering.tesla=Tesla Coil zapping
 subtitle.immersiveengineering.direSwitch=Direwolf20 imitating a knifeswitch
 subtitle.immersiveengineering.skyhook=Skyhook slides along a wire
+subtitle.immersiveengineering.chute=Items rattle down a chute
+subtitle.immersiveengineering.crawlerEngine=Diesel engine idles
+subtitle.immersiveengineering.crawlerTracks=Tracks clank
+subtitle.immersiveengineering.crawlerHydraulic=Hydraulics strain
+subtitle.immersiveengineering.crawlerBeeper=Machine reversing
+subtitle.immersiveengineering.crawlerDump=Bucket empties
 
 #RECIPES
 recipe.immersiveengineering.hammerCrushing=Crushing

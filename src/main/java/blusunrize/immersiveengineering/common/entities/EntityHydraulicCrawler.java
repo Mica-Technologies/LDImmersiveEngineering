@@ -8,10 +8,12 @@
 
 package blusunrize.immersiveengineering.common.entities;
 
+import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.Lib;
 import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.util.ChatUtils;
 import blusunrize.immersiveengineering.common.util.IEDamageSources;
+import blusunrize.immersiveengineering.common.util.IESounds;
 import blusunrize.immersiveengineering.common.util.Utils;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
@@ -245,6 +247,33 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	private static final int WORKING_SMOKE_PUFFS = 3;
 	private static final double SMOKE_SPREAD = 0.18;
 	private static final double SMOKE_RISE = 0.04;
+
+	/**
+	 * How often the backup alarm sounds while the machine is reversing, and how fast it has to be
+	 * going backwards before it does.
+	 * <p>
+	 * A real one beeps at about one a second, which is what makes it a warning rather than a tone;
+	 * twenty ticks is that. The threshold is a tenth of a walking pace, below which the machine is
+	 * settling rather than reversing and a beep would be a machine talking to itself.
+	 */
+	private static final int BEEP_PERIOD = 20;
+	private static final double REVERSING = 0.01;
+	/** Loud, because that is the entire point of one. */
+	private static final float BEEP_VOLUME = 1.6F;
+
+	/** Whether this client has already opened the machine's running loops. See {@link #startSounds()}. */
+	private boolean soundsStarted;
+
+	/**
+	 * How far the machine travelled along its own heading last tick, signed.
+	 * <p>
+	 * Kept because it is the one measure of what the machine is doing that both sides have. The
+	 * server has {@link #groundSpeed}, which is the throttle's answer rather than the ground's, and
+	 * the client has no throttle at all -- so the smoke and the engine note, which are drawn and
+	 * played on the client, are worked out from the distance actually covered. It is set in
+	 * {@link #rollTracks()}, which already has to compute it to wind the tracks on.
+	 */
+	private double travelled;
 
 	private static final DataParameter<Float> SLEW = EntityDataManager
 			.createKey(EntityHydraulicCrawler.class, DataSerializers.FLOAT);
@@ -947,7 +976,6 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			//
 			// Now there is one authority, and the client's only job is to catch up to it smoothly.
 			tickLerp();
-			smoke();
 		}
 		else
 		{
@@ -961,6 +989,15 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		}
 		//After the move, on both sides, because it is measured from the move.
 		rollTracks();
+		if(world.isRemote)
+		{
+			//After rollTracks and not before it: both of these read how far the machine actually
+			//got this tick, and that is the number rollTracks works out.
+			startSounds();
+			smoke();
+		}
+		else
+			warnBehind();
 		//Positioned on both sides -- see positionParts -- and after the machine has moved, so the arm is
 		//tested where it is now rather than where it was last tick.
 		positionParts();
@@ -970,6 +1007,82 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			bumpEntities();
 			lastToolTip = getToolTip();
 		}
+	}
+
+	/**
+	 * @return how far the machine covered along its own heading last tick, signed: negative is
+	 * reversing
+	 *
+	 * @see #travelled
+	 */
+	public double getTravelled()
+	{
+		return travelled;
+	}
+
+	/**
+	 * @return true if there is somebody aboard and something to burn
+	 * <p>
+	 * The reserve is not consulted. It stops the tool, not the engine -- a machine limping home on
+	 * its last bucket of diesel is still running, and would sound very odd if it were not.
+	 */
+	public boolean isEngineRunning()
+	{
+		return getControllingPassenger()!=null&&!CrawlerConfig.isDry(getFuel());
+	}
+
+	/**
+	 * @return true if any joint of the arm moved between the last two ticks
+	 * <p>
+	 * Off the interpolation fields rather than off the controls, because the controls are held on
+	 * the server and these are synced for the renderer anyway. It also answers the right question:
+	 * an arm being held against its stop is a machine with a control pressed and a pump doing
+	 * nothing, and there is no reason for it to whine.
+	 */
+	public boolean isArmMoving()
+	{
+		return Math.abs(getBoomAngle()-prevBoom)+Math.abs(getStickAngle()-prevStick)
+				+Math.abs(getToolAngle()-prevTool) > ARM_STIRRING;
+	}
+
+	/** Degrees a tick of total joint movement below which the arm counts as parked. */
+	private static final float ARM_STIRRING = 0.01F;
+
+	/**
+	 * Open the machine's three running loops, once, the first time it is ticked on a client.
+	 * <p>
+	 * Here rather than in the constructor because a client-side entity is constructed empty and then
+	 * filled in from the spawn packet: at construction it has no position, no passenger and no fuel,
+	 * and a sound started against that is a sound started at the origin of the world.
+	 * <p>
+	 * The loops are never stopped by hand. Each ends itself when the machine does -- see
+	 * {@code CrawlerSound#isDonePlaying} -- and until then it is turned down rather than off.
+	 */
+	private void startSounds()
+	{
+		if(soundsStarted)
+			return;
+		soundsStarted = true;
+		ImmersiveEngineering.proxy.startCrawlerSound(this);
+	}
+
+	/**
+	 * The backup alarm.
+	 * <p>
+	 * <strong>Server-side, and broadcast, because that is what a backup alarm is for.</strong> It is
+	 * not a sound the operator makes for their own benefit -- it exists so that whoever is standing
+	 * behind the machine hears it, which means it has to be played to them and not to the person
+	 * driving. Everything else this machine sounds like is a client-side loop; this one is an event.
+	 * <p>
+	 * Every {@link #BEEP_PERIOD} ticks rather than continuously, because a backup alarm is a beep and
+	 * a pause. The file is one beep; the pattern is here.
+	 */
+	private void warnBehind()
+	{
+		if(groundSpeed > -REVERSING||ticksExisted%BEEP_PERIOD!=0)
+			return;
+		world.playSound(null, posX, posY+CrawlerGeometry.EXHAUST_HEIGHT, posZ,
+				IESounds.crawlerBeeper, SoundCategory.NEUTRAL, BEEP_VOLUME, 1F);
 	}
 
 	/**
@@ -1003,10 +1116,10 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 	{
 		//No operator, no combustion. Dry is dry: the reserve stops the tool, not the engine, so a
 		//machine limping home on its last bucket of diesel is still smoking.
-		if(getControllingPassenger()==null||CrawlerConfig.isDry(getFuel()))
+		if(!isEngineRunning())
 			return;
 		double load = CrawlerGeometry.clamp(
-				Math.hypot(posX-prevPosX, posZ-prevPosZ)/CrawlerDrive.TOP_SPEED, 0, 1);
+				Math.abs(travelled)/CrawlerDrive.TOP_SPEED, 0, 1);
 		//Idling, a puff every IDLE_SMOKE_PERIOD ticks; working, up to WORKING_SMOKE_PUFFS a tick.
 		int puffs = (int)Math.round(load*WORKING_SMOKE_PUFFS);
 		if(puffs < 1)
@@ -1048,7 +1161,7 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 		double[] facing = CrawlerGeometry.heading(rotationYaw);
 		//Signed along the heading rather than taken as a distance: a machine reversing has to run
 		//its tracks backwards, and a hypot cannot tell the difference.
-		double travelled = (posX-prevPosX)*facing[0]+(posZ-prevPosZ)*facing[1];
+		travelled = (posX-prevPosX)*facing[0]+(posZ-prevPosZ)*facing[1];
 		//Positive yaw is a turn to the right -- see CrawlerDrive.targetTurn -- so it is the left
 		//track that goes the long way round.
 		double slip = Math.toRadians(CrawlerGeometry.shortestTurn(prevRotationYaw, rotationYaw))
@@ -1352,8 +1465,14 @@ public class EntityHydraulicCrawler extends Entity implements IEntityMultiPart
 			}
 		}
 		if(anything)
+		{
+			//Played from the server so that everybody nearby hears the load go down, rather than only
+			//the operator who tipped it.
+			world.playSound(null, posX, posY, posZ, IESounds.crawlerDump, SoundCategory.NEUTRAL,
+					1F, 0.9F+rand.nextFloat()*0.2F);
 			ChatUtils.sendServerNoSpamMessages(operator,
 					new TextComponentTranslation(Lib.CHAT_INFO+"crawlerBucketDumped"));
+		}
 	}
 
 	//	=================================

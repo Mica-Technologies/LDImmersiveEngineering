@@ -42,6 +42,20 @@ public class IESounds
 	public static SoundEvent dieselGenerator = registerSound("dieselGenerator");
 	public static SoundEvent direSwitch = registerSound("direSwitch");
 	public static SoundEvent chute = registerSound("chute");
+	//	=================================
+	//		The Hydraulic Crawler
+	//	=================================
+	//
+	// The first three are loops, held open for as long as the machine exists and turned up and down
+	// rather than started and stopped -- see CrawlerSound. The last two are single events: one beep
+	// of a backup alarm, which the machine repeats on a timer, and one bucket-load going on the
+	// floor. All five are generated rather than recorded; docs/tools/make_crawler_sounds.py is the
+	// synthesiser and the only thing that has ever written them.
+	public static SoundEvent crawlerEngine = registerSound("crawlerEngine");
+	public static SoundEvent crawlerTracks = registerSound("crawlerTracks");
+	public static SoundEvent crawlerHydraulic = registerSound("crawlerHydraulic");
+	public static SoundEvent crawlerBeeper = registerSound("crawlerBeeper");
+	public static SoundEvent crawlerDump = registerSound("crawlerDump");
 
 	private static SoundEvent registerSound(String name)
 	{

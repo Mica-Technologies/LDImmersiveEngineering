@@ -86,10 +86,12 @@ import blusunrize.immersiveengineering.common.items.IEItemInterfaces.IGuiItem;
 import blusunrize.immersiveengineering.common.items.ItemDrillhead.DrillHeadPerm;
 import blusunrize.immersiveengineering.common.items.ItemToolUpgrade.ToolUpgrades;
 import blusunrize.immersiveengineering.common.util.IELogger;
+import blusunrize.immersiveengineering.common.util.IESounds;
 import blusunrize.immersiveengineering.common.util.ItemNBTHelper;
 import blusunrize.immersiveengineering.common.util.chickenbones.Matrix4;
 import blusunrize.immersiveengineering.common.util.commands.CommandHandler;
 import blusunrize.immersiveengineering.common.util.compat.IECompatModule;
+import blusunrize.immersiveengineering.common.util.sound.CrawlerSound;
 import blusunrize.immersiveengineering.common.util.sound.IETileSound;
 import blusunrize.immersiveengineering.common.util.sound.SkyhookSound;
 import blusunrize.lib.manual.IManualPage;
@@ -108,6 +110,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.properties.IProperty;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.audio.SoundHandler;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelMinecart;
@@ -2134,6 +2137,63 @@ public class ClientProxy extends CommonProxy
 	{
 		Minecraft.getMinecraft().getSoundHandler().playSound(new SkyhookSound(hook,
 				new ResourceLocation(ImmersiveEngineering.MODID, "skyhook")));
+	}
+
+	/**
+	 * The Hydraulic Crawler's three running loops: the engine, the tracks and the hydraulics.
+	 * <p>
+	 * Each is the same loop held open for the life of the machine with its volume recomputed every
+	 * tick, so what can be heard is which of the three the machine is actually doing. The curves are
+	 * here rather than in {@code CrawlerSound} because they are a judgement about how the machine
+	 * should sound, and that class is the plumbing under all three of them.
+	 */
+	@Override
+	public void startCrawlerSound(EntityHydraulicCrawler crawler)
+	{
+		SoundHandler sounds = Minecraft.getMinecraft().getSoundHandler();
+		//	=================================
+		//	The engine.
+		//	=================================
+		//
+		// Present whenever the machine is running at all and never the whole of what is heard: an
+		// idling diesel is a floor, and the rest of the machine is what is put on top of it. It
+		// picks up in both volume and pitch under load, which is the two things an engine does when
+		// it is asked for more and the reason a fixed loop sounds like a recording of an engine
+		// rather than like one.
+		sounds.playSound(new CrawlerSound(crawler, IESounds.crawlerEngine,
+				c -> c.isEngineRunning()?0.35+0.35*load(c): 0,
+				c -> 0.85+0.35*load(c)));
+		//	=================================
+		//	The tracks.
+		//	=================================
+		//
+		// Only while the ground is going past. Steel track links clank because they are being pulled
+		// over rollers, so a machine standing still with its engine running makes none of this noise
+		// at all -- and a machine slewing on the spot makes some, which falls out of measuring the
+		// distance covered rather than reading the throttle.
+		sounds.playSound(new CrawlerSound(crawler, IESounds.crawlerTracks,
+				c -> c.isEngineRunning()?0.6*load(c): 0,
+				//Faster tracks clank more often, and the loop is a fixed number of clanks, so the
+				//rate has to come out of the pitch. Kept to a narrow band: past this it stops
+				//sounding like heavier steel moving faster and starts sounding like a toy.
+				c -> 0.9+0.25*load(c)));
+		//	=================================
+		//	The hydraulics.
+		//	=================================
+		//
+		// Only while a joint is actually moving. A pump on an arm being held against its stop is
+		// doing nothing, and the whine of one that never stops is the fastest way to make a machine
+		// unbearable to sit in. Quieter than the other two: it is a detail heard over the engine,
+		// not a third engine.
+		sounds.playSound(new CrawlerSound(crawler, IESounds.crawlerHydraulic,
+				c -> c.isEngineRunning()&&c.isArmMoving()?0.45: 0,
+				c -> 1.0));
+	}
+
+	/** @return how hard the machine is working, from nothing to flat out */
+	private static double load(EntityHydraulicCrawler crawler)
+	{
+		return CrawlerGeometry.clamp(Math.abs(crawler.getTravelled())/CrawlerDrive.TOP_SPEED, 0, 1);
 	}
 
 	static class FluidStateMapper extends StateMapperBase implements ItemMeshDefinition
