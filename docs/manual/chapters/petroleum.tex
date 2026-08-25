@@ -10,23 +10,131 @@ Entirely this fork, and the largest single addition in it.
 \section{Prospecting}
 
 Oil sits in \textbf{reservoirs} beneath the world, which have to be found before they can be
-drilled. The survey kit reports bearings and ranges rather than handing you a coordinate.
+drilled. The \textbf{Seismic Survey Kit} reports bearings and ranges rather than handing you a
+coordinate.
 
 \section{Drilling}
 
-A \textbf{Derrick} sunk over a reservoir brings crude to the surface through a \textbf{Wellhead}. A
-reservoir is finite: its flow decays as it empties, and it can be blown out by mishandling.
+A \textbf{Drilling Derrick} sunk over a reservoir brings crude to the surface through a
+\textbf{Wellhead}, which is what the derrick leaves behind when it is done. A reservoir is finite:
+its flow decays as it empties, and it can be blown out by mishandling --- fit a \textbf{Blowout
+Preventer} to the well before that becomes your problem.
+
+\subsection*{Pumpjack}
+
+A $3\times6\times5$ machine built \emph{around} an existing Wellhead --- the well bay is drawn in
+its plan but is not a part you supply, and forming the structure will not eat the well. It holds no
+fluid of its own; it simply drives the well beneath it, for \textbf{512\,IF/t}.
+
+\begin{ietip}
+A pumpjack on a healthy field does nothing, and knows it. While a deposit is still above its
+free-flow threshold it already produces at full rate unaided, so the machine idles rather than
+charge you for nothing. It starts working when the field starts tiring. In city mode it always
+runs, because there reservoirs never deplete.
+\end{ietip}
+
+\subsection*{Re-injection Well}
+
+A single block that puts water or gas back downhole and gets a second tranche out of a tiring
+field --- the thinking player's alternative to burning the gas off in a \textbf{Flare Stack}.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Injectant & Recovered per mB \\
+\midrule
+Water                                & 0.35 \\
+Sour gas, straight off the wellhead  & 0.55 \\
+Natural gas, scrubbed                & 0.70 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The middle row is the one that matters: a field can drive its own enhanced recovery on the waste
+stream it was already producing. Recovery is capped per deposit --- by default a permanent
+allowance of 20\,\% of the field's original capacity, which a server restart does not refund --- so
+this extends a field rather than making it eternal.
 
 \section{Refining}
 
-Crude is separated into fractions, and a \textbf{Cracking Unit} converts between them. The cracker
-has no temperature dial --- the dial is the firebox. Run it hot on heavy fuel oil and it yields
-gasoline; run it cool on gas and it yields diesel. A knob built out of blocks.
+Crude is separated into its fractions by the \textbf{Distillation Tower}, and a \textbf{Cracking
+Unit} converts between them. The cracker has no temperature dial --- the dial is the firebox. Run
+it hot on heavy fuel oil and it yields gasoline; run it cool on gas and it yields diesel. A knob
+built out of blocks.
+
+\subsection*{Industrial Burner}
+
+A $3\times3\times3$ firebox of blast brick under a steel sheetmetal crown, with an Oilfield Frame
+burner head in the front face where the fuel line lands and a second frame in the middle of the
+crown for the flue. It makes \emph{no Flux at all}. What it makes is heat, and the crown is the
+working face: whatever the burner serves sits on top of it.
+
+Its reason to exist is heavy fuel oil, which is deliberately not a Diesel Generator fuel. The
+burner is what makes owning a barrel of the stuff better than owning nothing.
+
+\begin{ietip}
+Build it whichever way round you like. Formation tries all four facings and takes the one you
+actually built, so a correct burner is never refused for having been approached from the wrong
+side.
+\end{ietip}
+
+\subsection*{Gas Scrubber}
+
+A $3\times3\times6$ pair of vessels that sweetens sour gas: 100\,mB of sour gas yields 80\,mB of
+natural gas, and every 2\,000\,mB scrubbed also drops a sulfur dust.
+
+\textbf{It runs on heat, not Flux.} It draws heat from an Industrial Burner standing against its
+skid, and does nothing whatever without one. That is also the prettiest loop in the chain --- a
+burner will run on the scrubber's own natural gas, so the plant bootstraps itself; feed the burner
+heavy fuel oil instead and you keep all of the gas. Two waste streams cancelling out.
+
+An underfed scrubber runs slowly rather than stalling, and its overlay names which of four states
+it is in: idle, scrubbing, no heat, or backed up. Its comparator reports the sour feed level,
+because a feed backing up means it is not keeping pace with the field.
+
+\subsection*{Lubrication Manifold}
+
+A single block bolted onto a working machine that rebates a flat \textbf{8\,FE/t} of its running
+cost while it has lubricant in it, drawing 2\,mB per 20-tick batch --- about eight minutes of
+continuous running per bucket.
+
+This is what lubricant is \emph{for}: every other cut off the column burns, and this is the one
+that does not. The rebate is flat and absolute rather than proportional, so it stays a helpful
+discount on a big machine instead of turning one net-positive.
+
+\begin{ietip}
+It greases nothing while its host is idle, so it will not quietly drain a bucket into a machine
+that has no work queued.
+\end{ietip}
 
 \section{Storage}
 
-Three \textbf{buried tanks} --- Domestic, Commercial and Bulk --- are invisible except for a surface
-fill cap carrying the gauge. Build the shell, cover the roof, and hammer the cap.
+Three \textbf{buried tanks} are invisible except for a \textbf{Tank Fill Cap} at the surface, which
+carries the gauge, the comparator level and the pipe connection. Build the shell, cover the roof,
+and hammer the cap.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+Tier & Box & Blocks & Capacity & Metal \\
+\midrule
+Domestic Tank   & $2\times2\times2$ & 8   & 32\,000 mB     & Iron sheetmetal \\
+Commercial Tank & $5\times5\times4$ & 82  & 512\,000 mB    & Steel sheetmetal \\
+Bulk Depot      & $9\times9\times6$ & 290 & 4\,000\,000 mB & Steel sheetmetal \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Capacity per block rises with the tier, which is the reason to dig the bigger hole. All three are
+\emph{hollow} --- you are lining an excavation, not filling one.
+
+\begin{ietip}
+The tank forms only once every roof block but the cap is buried. If the shape is right and only
+the cover is missing it will say so, rather than refuse silently, because a tank that looks
+completely correct is a miserable thing to debug.
+\end{ietip}
 
 The \textbf{Storage Tank} is the other kind: a hollow box of any rectangular shape from
 $3\times3\times3$ to $16\times16\times16$, holding sixteen buckets per enclosed block. Build the
@@ -45,8 +153,65 @@ suits what you are building: a barbecue, a workshop wall, or the end of a garden
 
 \section{Burning it}
 
-A ladder of power plants ending at the Gas Turbine, plus the \textbf{Portable Generator} for a build
-site.
+A ladder of power plants, built along one axis: \textbf{response against efficiency}. At the bottom
+sits the \textbf{Portable Generator}, a single block for a build site.
+
+\begin{description}
+\item[Reciprocating Engine Bank] $4\times5\times5$ of cylinders burning diesel, biodiesel or
+      natural gas. Instant response, mediocre efficiency, and the only plant that scales by
+      building another one --- place a second bank alongside and they run as a set.
+\item[Gas Turbine] The top of the gas-burning line, and the machine the rest of the chain is
+      pointed at.
+\item[Fuel Oil Boiler] A $5\times5\times7$ furnace making \emph{steam, not Flux}. Water and fuel in
+      along the base course, steam out of the crown. Crude and diesel burn in it too, both worse
+      trades than the heavy fuel oil it exists for.
+\item[Heat Recovery Steam Generator] A $3\times5\times3$ bank of finned tubes that burns nothing at
+      all. Butted flush against a Gas Turbine's exhaust end, it makes steam from heat that was
+      going up the stack anyway.
+\item[Steam Turbine Hall] $5\times9\times5$, the largest structure in the fork and the most
+      efficient thing in the mod at turning fuel into Flux. Steam in at the condenser end, Flux out
+      at the switchyard.
+\end{description}
+
+Steam is a real fluid here precisely so that the boiler house and the hall can be two buildings
+plumbed together across a yard, rather than one enormous machine.
+
+\subsection*{The combined cycle}
+
+Gas Turbine $\rightarrow$ HRSG $\rightarrow$ Steam Turbine Hall. The turbine's waste heat becomes
+steam and the steam becomes more Flux, so a millibucket of gas does considerably more work than it
+does alone. It is also the least forgiving thing here to build: three structures in a line, one
+fuel line, one steam line, and any of the three idle makes the other two worse.
+
+\begin{ietip}
+Only one HRSG may claim a given turbine's exhaust --- a second bolted to the same machine gets
+nothing, because the waste heat is a fixed quantity and stacking would multiply it out of nowhere.
+The HRSG is three by three because that is exactly the turbine's exhaust face: if it will not sit
+flush, it is not in line.
+\end{ietip}
+
+\begin{iewarning}
+The Steam Turbine Hall is deliberately slow to start and punished for cycling. Fed steadily it
+beats everything; switched on and off against a wobbling demand it spends most of its life
+spinning up.
+\end{iewarning}
+
+\section{Roads}
+
+The bottom of the barrel is \textbf{bitumen}, and paving is what stops it being a waste product.
+Put 250\,mB of bitumen through a \textbf{Mixer} with one sand and two gravel for 500\,mB of
+\textbf{Wet Asphalt}, then pour it. It flows, finds its own level, and a moment later sets into a
+full block of \textbf{Asphalt}.
+
+There are no forms and no depth to judge, because a road is flat by definition: however sloppily it
+is poured, it always sets flat. The mess is in the paving, not in the result. Set asphalt is a
+little slippery --- enough that a road reads as faster than the mud beside it, without being ice.
+
+\begin{iewarning}
+Two further finishes exist as blocks --- \textbf{Asphalt Tile}, for forecourts and yards, and
+\textbf{Asphalt with Markings} --- but nothing currently makes either one. There is no recipe and
+no world generation for them, so at present they are reachable only in creative.
+\end{iewarning}
 
 \section{The forecourt}
 

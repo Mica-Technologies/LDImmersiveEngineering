@@ -7,17 +7,23 @@ structures are in \autoref{ch:multiblocks}.
 \section{Powered}
 
 \begin{description}
-\item[Sample Drill] Takes a core sample of the chunk, telling you what mineral vein is beneath it.
-      The prerequisite for an Excavator.
+\item[Core Sample Drill] Takes a core sample of the chunk, telling you what mineral vein is beneath
+      it. The prerequisite for an Excavator.
 \item[Charging Station] Charges tools, armour and any item that holds flux.
 \item[Fluid Pump] Moves fluid through pipes, and is what makes a pipe network do anything.
 \item[Fluid Placer] Places fluid into the world as a source block.
 \item[Garden Cloche (Belljar)] Grows a crop in a glass jar from water and fertiliser. Slow, tidy,
       and entirely automatic.
-\item[Floodlight] A directional lamp. Expensive to run and the brightest light in the mod.
+\item[Floodlight] A directional lamp, the brightest light in the mod and the dearest to run. Power
+      alone will not light it: a Floodlight wants a \emph{redstone signal} to switch on. Hammer it
+      to aim --- which axis swings depends on the face you strike, and sneaking reverses the
+      direction --- and sneak-hammer its base to invert the redstone control so it lights when the
+      signal is removed instead.
 \item[Turret (Gun / Chemical)] An automated defence, configurable by owner and target type.
 \item[Tesla Coil] Damages entities in a radius. Genuinely dangerous to its owner.
-\item[Electric Lantern] A small lamp. Cheap enough to use in quantity.
+\item[Powered Lantern] A small lamp, cheap enough to use in quantity. It is a wire endpoint in its
+      own right: run an LV wire to the lantern itself, with no connector bolted to it. Do not
+      confuse it with the decorative \textbf{Lantern}, which takes no power at all.
 \end{description}
 
 \begin{iefork}
@@ -36,6 +42,16 @@ the most expensive block in a city build.
 \item[Item Router] Sorts items by filter into up to six outputs.
 \item[Fluid Sorter] The same for fluid.
 \item[Redstone Wire Connector] Carries a redstone signal down a wire rather than along the ground.
+      The \textbf{Redstone Probe Connector} is its reading half, putting the state of a redstone
+      network onto the block it is attached to.
+\item[Turntable] Rotates whatever block is placed against it when it is given a redstone pulse.
+      Hold an Engineer's Hammer and look at it to see which side it acts on and which way it turns;
+      right-click with the hammer to reorient it, and sneak while doing so to reverse the
+      direction.
+\item[Razor Wire] A barrier that cuts anything crossing it --- 1.5 hearts bare, halved by boots or
+      leggings, and a quarter with both. Strung together it forms a fence, and because it takes an
+      \emph{LV wire} of its own you can electrify a run: an energised stretch shocks everything
+      standing in it for a further two, at a cost of 64\,IF a pulse.
 \end{description}
 
 \section{Fluid pipes}

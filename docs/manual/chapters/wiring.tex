@@ -34,33 +34,53 @@ A \textbf{connector} is where a wire meets a machine: it takes power from the bl
 to, or gives power to it. A \textbf{relay} only passes wire to wire --- it is a pole, not a socket
 --- and relays are how you get a line across a distance without a machine at every corner.
 
-\begin{iewarning}
-A connector accepts only its own tier's wire. Attaching the wrong one destroys the connector.
-\end{iewarning}
+\begin{ietip}
+A connector accepts only its own tier's wire. The wrong coil is simply refused --- nothing is
+damaged --- but the refusal is announced only as a line in the status bar, and the coil clears its
+first click exactly as it does on success. If a link seems not to have taken, read the chat.
+\end{ietip}
 
 \section{Transformers}
 
-Step between tiers. An \textbf{LV/MV Transformer} joins a low-voltage side to a medium-voltage one;
-an \textbf{MV/HV Transformer} does the same higher up. Wire the correct tier to each side --- they
-are not symmetrical, and the block's model tells you which side is which.
+Step between tiers. The \textbf{Transformer} joins a low-voltage side to a medium-voltage one. The
+\textbf{HV Transformer} takes high voltage on its high side and steps it down to \emph{either} MV or
+LV --- going from HV to LV needs one transformer, not two.
+
+A transformer is three blocks tall, and wire attaches only to the \emph{top} block. That block
+carries two terminals on opposite faces, one per tier; aim at the correct half of it, because the
+two blocks beneath it accept nothing. Mounted on a post, it takes its wires at the post instead.
+
+\begin{ietip}
+Neither transformer is symmetrical, and both refuse a wire silently. If a terminal will not take a
+coil, you are either on the wrong face or on the wrong block of the three.
+\end{ietip}
 
 \section{Wire coils and the wirecutter}
 
 Wire is placed by holding a \textbf{coil} and right-clicking one connector, then the other. The
 \textbf{Engineer's Wirecutter} removes a wire and returns the coil.
 
-\section{Posts and arms}
+\section{Posts and wallmounts}
 
-\textbf{Wooden} and \textbf{Steel Posts} are what you actually string wire between across country.
-Both accept arms, which give you somewhere to mount connectors and transformers off the pole itself.
+\textbf{Wooden}, \textbf{Steel} and \textbf{Aluminium Posts} are what you actually string wire
+between across country. A post carries arms, which give you somewhere to hang connectors, relays
+and transformers off the pole itself rather than needing a building behind them.
+
+\textbf{Wooden}, \textbf{Steel} and \textbf{Aluminium Wallmounts} are the same idea against a wall:
+a bracket that stands a connector or a transformer off the face of a building, so a line can reach
+it without the hardware sitting flat against the brick.
 
 \section{Breaker switches and meters}
 
 \begin{description}
-\item[Breaker Switch] A manual on/off in a wire run, also switchable by redstone.
-\item[Redstone Breaker] The same, driven by redstone alone.
-\item[Energy Meter] Reports throughput on the line passing through it.
-\item[Current Transformer] Emits a redstone signal proportional to the power flowing.
+\item[Breaker Switch] A manual on/off in a wire run. Right-click to throw it. It joins at most two
+      wires of any one tier, and it \emph{emits} a redstone signal while closed rather than
+      listening for one; a hammer inverts that.
+\item[Redstone Breaker] The same cut-off, driven by an incoming redstone signal instead of by hand.
+\item[Current Transformer] The meter. Two blocks tall and spliced into a run, it passes power
+      through like a relay while measuring it. Right-click it to read the average throughput and
+      packet count. It also drives a \textbf{comparator} from 0 to 15, scaled against the transfer
+      rate of the wire it sits on --- so a saturated line reads 15 and a half-loaded one reads 8.
 \end{description}
 
 \section{Feedthroughs}
