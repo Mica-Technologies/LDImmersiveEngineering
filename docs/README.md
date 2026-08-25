@@ -41,6 +41,10 @@ implements which system and how those systems behave. All entries cite real sour
   oil reservoirs, the Wellhead/Drilling Derrick/Pumpjack progression, core-sample prospecting,
   distillation and cracking, the large-scale power plants and their combined cycle, buried tanks,
   the forecourt, and enhanced recovery.
+- **[CRAWLER.md](CRAWLER.md)** — this fork's Hydraulic Crawler: a drivable tracked excavator with
+  swappable attachments, the first vehicle and first ridable entity here. Look-to-slew controls,
+  the skid-steer drivetrain, diesel, and why its demolition is safe on a server. Not to be confused
+  with IE's own bucket-wheel Excavator.
 - **[MULTIBLOCK_SYSTEM.md](MULTIBLOCK_SYSTEM.md)** — the multiblock structure framework
   (master/slave/mirror), formation/disassembly, and the machine catalog (crusher, blast
   furnace, arc furnace, assembler, refinery, etc.).

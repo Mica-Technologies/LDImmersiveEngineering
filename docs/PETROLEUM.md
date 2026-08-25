@@ -234,9 +234,9 @@ master part only (`update`, `TileEntityDerrick.java:127-159`), staggered by posi
 ticks, `TileEntityDerrick.java:78`). A full bore takes `DRILL_TIME = 1200` ticks — one minute
 (`TileEntityDerrick.java:67`) — at `ENERGY_PER_TICK = 256` FE/t (`TileEntityDerrick.java:73`), for
 307,200 FE total (`TileEntityDerrick.java:69-72`). `ENERGY_CAPACITY = 25600` FE
-(`TileEntityDerrick.java:83`) buffers the draw; the doc comment above it calls this "roughly ten
-seconds of drilling" (`TileEntityDerrick.java:80-82`), but at the stated 256 FE/t continuous rate
-that buffer is 100 ticks — **five seconds**, not ten. Worth a second look; not fixed here.
+(`TileEntityDerrick.java:83`) buffers the draw — 100 ticks, five seconds at the continuous rate —
+so a rig on a thin wire keeps turning through the gaps instead of stuttering between stalled and
+running.
 
 The **site is checked once, at formation**, and cached (`resolveSite`,
 `TileEntityDerrick.java:191-205`; called from `reportSiteTo`,
@@ -1083,11 +1083,16 @@ letting the pour keep flowing and find its own level, then replaces the block ou
 road surface, with a lowered `getSlipperiness` of `0.68` — enough that a road reads as faster than
 the mud beside it without turning into an ice rink (`BlockPetroleumDecoration.java:36-44`).
 `BlockTypes_PetroleumDecoration` (`common/blocks/petroleum/BlockTypes_PetroleumDecoration.java`)
-carries three metas — `ASPHALT` (`:32`), `ASPHALT_TILE` (`:36`) and `ASPHALT_MARKED` (`:40`), all
-three `listForCreative` (`:54-58`) — but **only `ASPHALT` is currently reachable through normal
-play**: the wet-asphalt fluid always sets into it, and nothing in the tree — no recipe, no world
-generation — produces `ASPHALT_TILE` or `ASPHALT_MARKED`. They exist as block metas and nothing
-else today; worth a second look if the intent was for them to be craftable, not fixed here.
+carries four metas — `ASPHALT`, `ASPHALT_TILE`, `ASPHALT_MARKED` and `FORECOURT_CANOPY` — all of
+them `listForCreative`. **Every one is reachable in survival.** Plain asphalt needs no recipe
+because the wet fluid sets into it; the other three are crafted
+(`assets/immersiveengineering/recipes/petroleum/`): four plain blocks in a 2×2 give four tiles, and
+a plain block plus `dyeYellow` gives a marked one.
+
+A block reachable only in creative is, in practice, not in the game, so
+`PetroleumAssetsTest.everyRoadSurfaceIsReachable` walks the enum and asserts a recipe file exists
+for every meta except `ASPHALT` — which means a meta appended later cannot quietly arrive with no
+way to obtain it.
 
 ---
 

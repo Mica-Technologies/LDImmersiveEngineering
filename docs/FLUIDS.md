@@ -149,12 +149,14 @@ free, with no retrogen step.
   computed from the deposit's pressure, but nothing is actually removed from the pool
   (`ReservoirModel.extract`, `:126`-`:171`).
 
-As of this snapshot there is no in-world extraction block wired up to `ReservoirHandler` —
-the doc comments in `ReservoirModel` describe "extraction blocks" as thin callers, but the
-only caller in the source tree is `common/util/commands/CommandReservoir.java`, the
-`/ie reservoir` admin/debug command (`info`, `types`, `deplete`, `refill`) used to inspect and
-recover deposits. Treat the reservoir system as backend-complete but not yet exposed to
-survival play.
+The "extraction blocks" the `ReservoirModel` doc comments describe are the petroleum chain:
+`TileEntityWellhead` and `WellheadFlow` take the deposit down, `TileEntityDerrick` sinks the bore,
+`TileEntityPumpjack` drives a well past free flow, `TileEntityReinjectionWell` puts water or gas
+back into one, and `TileEntitySampleDrill` reads a cell without touching it. See
+[PETROLEUM.md](PETROLEUM.md).
+
+`common/util/commands/CommandReservoir.java` — the `/ie reservoir` admin command (`info`, `types`,
+`deplete`, `refill`) — remains alongside them for inspecting and recovering deposits.
 
 ---
 
