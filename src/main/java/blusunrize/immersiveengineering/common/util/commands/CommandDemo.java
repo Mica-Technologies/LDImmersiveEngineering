@@ -747,7 +747,7 @@ public class CommandDemo extends CommandTreeBase
 			BlockPos energy = centre.offset(dir, -1).offset(dir.rotateY(), -1);
 			BlockPos redstone = centre.offset(dir, -1).offset(dir.rotateY(), 1);
 			connector(energy.up(), BlockTypes_Connector.CONNECTOR_LV, EnumFacing.DOWN);
-			set(redstone.up(), Blocks.LEVER.getStateFromMeta(5));
+			leverOn(redstone, dir);
 
 			BlockPos generator = at(-4, 1, -2);
 			set(generator, IEContent.blockPetroleumDevice
@@ -781,6 +781,32 @@ public class CommandDemo extends CommandTreeBase
 
 			form(MultiblockFermenter.instance, centre, dir, "Fermenter");
 			feedHopper(centre, dir, new ItemStack(Items.REEDS, 64));
+		}
+
+		/**
+		 * Puts a switch beside a machine's redstone block, on a post of its own.
+		 * <p>
+		 * The lever used to sit directly on top of the redstone block. That reads better and worked
+		 * right up until somebody hammered the machine together: this command cannot form a
+		 * multiblock -- only a player can -- so the structure is still loose blocks when the lever
+		 * goes on, and forming it replaces the block underneath the lever, which drops it. The
+		 * station then had no lever at all, which is awkward for the one station whose sign says to
+		 * watch the lever.
+		 * <p>
+		 * A post one block outside the footprint is untouched by forming, and the redstone block
+		 * still reads it: a lever powers the block it is fixed to, and a powered solid block powers
+		 * its neighbours, which is what {@code isRSDisabled} asks about.
+		 * <p>
+		 * The post has to be a vanilla-normal cube for that last step. Light Engineering looks the
+		 * part and does not work -- it is not a normal cube, so it never passes the lever's power on
+		 * and the machine ignores the switch entirely. An iron block is plain, but it conducts.
+		 */
+		private void leverOn(BlockPos redstone, EnumFacing dir)
+		{
+			BlockPos post = redstone.offset(dir.rotateY(), 1);
+			set(post, Blocks.IRON_BLOCK.getDefaultState());
+			//Meta 5 is the floor mount, so the post below it is what holds it up.
+			set(post.up(), Blocks.LEVER.getStateFromMeta(5));
 		}
 
 		/**
