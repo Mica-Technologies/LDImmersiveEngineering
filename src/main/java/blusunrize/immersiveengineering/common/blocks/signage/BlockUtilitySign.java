@@ -26,7 +26,7 @@ import net.minecraft.world.World;
 import javax.annotation.Nullable;
 
 /**
- * Identification for a pole line: thirteen kinds of utility tag, bolted flat to whatever holds the
+ * Identification for a pole line: fifteen kinds of utility tag, bolted flat to whatever holds the
  * wires up.
  * <p>
  * <strong>A grid you cannot read is a grid you cannot maintain.</strong> That is the whole of the
@@ -38,7 +38,7 @@ import javax.annotation.Nullable;
  * <p>
  * One block, one meta, one item. The kind is a listed integer property filled from the tile entity,
  * so the blockstate can be a plain {@code variants} file naming one flat plate model per kind and
- * facing -- fifty-two models' worth of nothing but a textured slab. Only the lettering costs
+ * facing -- sixty models' worth of nothing but a textured slab. Only the lettering costs
  * anything per frame, and only within forty-eight blocks; see {@code TileRenderUtilitySign}.
  *
  * @author LDImmersiveEngineering -- signage
@@ -46,7 +46,7 @@ import javax.annotation.Nullable;
 public class BlockUtilitySign extends BlockIETileProvider<BlockTypes_Signage>
 {
 	/**
-	 * Which of the thirteen plates this is. Listed so a blockstate can select on it, and filled from
+	 * Which of the fifteen plates this is. Listed so a blockstate can select on it, and filled from
 	 * the tile entity through {@code IAttachedIntegerProperies} -- it is saved on the tile, not in
 	 * the meta, because the text has to be there anyway.
 	 */
@@ -137,7 +137,7 @@ public class BlockUtilitySign extends BlockIETileProvider<BlockTypes_Signage>
 	@Override
 	public String getCustomStateMapping(int meta, boolean itemBlock)
 	{
-		//The item resolves against signage.json's `inventory` variant; the block half has fifty-two
+		//The item resolves against signage.json's `inventory` variant; the block half has sixty
 		//variants of its own and lives in its own file. Both have to exist -- a custom mapping with
 		//no matching file is a purple block with nothing in the log.
 		return itemBlock?null: "utility_sign";

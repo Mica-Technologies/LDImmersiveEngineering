@@ -13,12 +13,12 @@ import net.minecraft.util.IStringSerializable;
 import java.util.Locale;
 
 /**
- * The thirteen tags a utility pole wears, and what each of them is.
+ * The fifteen tags a utility pole wears, and what each of them is.
  * <p>
  * <strong>Every one of these is a real sign on a real pole.</strong> The list came from a
  * playtester who reads them for a living -- the shapes, the colours and what each one means are the
  * Los Angeles Department of Water and Power's and Southern California Edison's, not invented. That
- * is the whole argument for building thirteen of them rather than one blank plate: a pole with a
+ * is the whole argument for building fifteen of them rather than one blank plate: a pole with a
  * yellow strip on it says something different from a pole with a red one, and a grid that is
  * legible from the ground is the point of putting tags on it at all.
  * <p>
@@ -90,15 +90,41 @@ public enum UtilitySignKind implements IStringSerializable
 	 */
 	LINE_CROSSING_DIAMOND(12, 12, 0, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.DIAMOND, SignDivider.NONE),
 	/**
-	 * The vertical tower identifier, in three parts reading downwards: the initials of the plant
-	 * the run starts at, the tower's number, then -- under a rule printed on the plate -- the
-	 * initials of the station it ends at.
+	 * The tall transmission tower identifier: a narrow pale strip carrying three things down the
+	 * length of it -- the tower's own number, then the two stations the run joins, then the circuit
+	 * across the foot of the plate.
+	 * <p>
+	 * Redrawn from photographs after a playtester said the first cut was not right. It had three
+	 * lines read across an eight-pixel plate with a rule printed at two thirds height; the real one
+	 * is narrower than that, has no rule at all, and its first two groups are columns of upright
+	 * characters read <em>downwards</em> -- "H35" over "HAY-ATW" -- with only the circuit, "L1",
+	 * printed across the bottom. See {@link SignTextFlow#DOWN_FOOT_ACROSS}.
 	 */
-	TOWER_VERTICAL(8, 14, 3, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.TOWER_RULE),
+	TOWER_VERTICAL(6, 16, 3, 0x1A1A1A, SignTextFlow.DOWN_FOOT_ACROSS, SignShape.RECT, SignDivider.NONE),
 	/**
 	 * The horizontal tower identifier, hung on the DC towers of the Pacific Intertie among others.
 	 */
-	TOWER_HORIZONTAL(14, 4, 1, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE);
+	TOWER_HORIZONTAL(14, 4, 1, 0x1A1A1A, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE),
+	/**
+	 * The short transmission tower identifier: the same tag as {@link #TOWER_VERTICAL} without the
+	 * tower number -- the station pair reading downwards, "HAY-VEL.", and the circuit across the
+	 * foot.
+	 * <p>
+	 * Wider rather than shorter, which is what the photograph shows. Dropping a group leaves the
+	 * remaining letters more of the plate each, and the tag that carries two of them is cut broader
+	 * so its characters come out the size the three-group one's do rather than half again as big.
+	 */
+	TOWER_SHORT(8, 16, 2, 0x1A1A1A, SignTextFlow.DOWN_FOOT_ACROSS, SignShape.RECT, SignDivider.NONE),
+	/**
+	 * The number-only transmission tower sign: an amber panel with the tower number stencilled
+	 * across it in characters as tall as the panel is wide, lying on their side.
+	 * <p>
+	 * The one kind in the set that really is a line turned a quarter round -- see
+	 * {@link SignTextFlow#TURNED}. It is painted straight onto the leg of the tower rather than
+	 * bolted on, which is why it is the widest plate here and why it has the least on it: from the
+	 * ground the number is the whole of the message.
+	 */
+	TOWER_NUMBER(10, 16, 1, 0x1A1A1A, SignTextFlow.TURNED, SignShape.RECT, SignDivider.NONE);
 
 	/**
 	 * Cached because {@code values()} allocates, and this is read once per sign per frame by the
@@ -175,13 +201,28 @@ public enum UtilitySignKind implements IStringSerializable
 	}
 
 	/**
-	 * @return true if the text is a column of upright characters read downwards rather than a stack
+	 * @return true if the text is columns of upright characters read downwards rather than a stack
 	 * of lines read across -- worth a name of its own because it is what every draw checks first.
 	 * See {@link SignTextFlow#DOWN}.
 	 */
 	public boolean isStacked()
 	{
 		return flow.isStacked();
+	}
+
+	/** @return true if this plate's one line lies on its side. See {@link SignTextFlow#TURNED}. */
+	public boolean isTurned()
+	{
+		return flow.isTurned();
+	}
+
+	/**
+	 * @return true if line {@code index} reads across the foot of the plate rather than down it,
+	 * which is the last line of a {@link SignTextFlow#DOWN_FOOT_ACROSS} tag and nothing else
+	 */
+	public boolean isFootLine(int index)
+	{
+		return flow.isFootLine(index, lines);
 	}
 
 	/**
@@ -219,25 +260,30 @@ public enum UtilitySignKind implements IStringSerializable
 	}
 
 	/**
-	 * @return the plate's width, in block pixels. A line that reads across is fitted to this
-	 * directly; a stacked column is not -- each of its characters is fitted to this in turn, one
-	 * row at a time, rather than the whole run of them being fitted to it at once.
+	 * @return how far the lettering has to fit along, in block pixels. The plate's width for
+	 * everything printed upright: a line that reads across is fitted to it directly, and a stacked
+	 * column has each of its characters fitted to it in turn, one row at a time, rather than the
+	 * whole run of them at once. The plate's <em>height</em> for a {@link SignTextFlow#TURNED}
+	 * plate, whose one line lies on its side and therefore runs down the long way.
 	 */
 	public int getTextSpan()
 	{
-		return width;
+		return flow.isTurned()?height: width;
 	}
 
 	/**
-	 * @return the plate's height, in block pixels -- what a stack of lines, or a column of
-	 * characters, fits into. Unlike the strips' old rotation, this no longer swaps with
-	 * {@link #getTextSpan()}: turning a whole line ninety degrees put its length along the height
-	 * and its depth along the width, but a column of upright characters does not turn at all -- it
-	 * is still limited by the width and still runs down the height.
+	 * @return what the lettering has to fit across, in block pixels: the plate's height, which is
+	 * what a stack of lines or a column of characters divides between them.
+	 * <p>
+	 * This swaps with {@link #getTextSpan()} for a {@link SignTextFlow#TURNED} plate and for
+	 * nothing else. Turning a whole line a quarter round puts its length along the plate's height
+	 * and the height of its letters along the plate's width -- which is the arithmetic the vertical
+	 * strips used to do and were wrong to, because a column of upright characters does not turn at
+	 * all: it is still limited by the width and still runs down the height.
 	 */
 	public int getTextDepth()
 	{
-		return height;
+		return flow.isTurned()?width: height;
 	}
 
 	/**

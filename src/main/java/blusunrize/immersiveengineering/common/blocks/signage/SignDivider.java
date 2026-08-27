@@ -11,11 +11,16 @@ package blusunrize.immersiveengineering.common.blocks.signage;
 /**
  * What is printed across the middle of a plate, and which line of its text stops there.
  * <p>
- * <strong>Three kinds of tag have something in the way of their lettering, and it is not always
- * ink.</strong> The vertical tower tag has a rule with the receiving station's initials under it;
- * the painted oval is a fraction, and a fraction without its bar is two numbers stacked for no
- * reason; and the round inspection tag is bolted through its own middle, which a playtester noticed
- * was missing -- the nail is how the sign is held on, and it sits exactly where the text would.
+ * <strong>Two kinds of tag have something in the way of their lettering, and on one of them it is
+ * not ink at all.</strong> The painted oval is a fraction, and a fraction without its bar is two
+ * numbers stacked for no reason; and the round inspection tag is bolted through its own middle,
+ * which a playtester noticed was missing -- the nail is how the sign is held on, and it sits
+ * exactly where the text would.
+ * <p>
+ * There was a third: a rule printed two thirds of the way down the vertical tower tag, with the
+ * receiving station's initials under it. The same playtester's photographs of the real tags showed
+ * no rule on any of them -- the groups are divided by a gap and nothing else -- so the tag was
+ * redrawn without one and the constant went with it.
  * <p>
  * <strong>One token, so the generator and the layout cannot disagree.</strong> The plate artwork is
  * drawn in Python and the text is laid out in Java, and both need to know where the divider falls
@@ -27,13 +32,8 @@ package blusunrize.immersiveengineering.common.blocks.signage;
  */
 public enum SignDivider
 {
-	/** Nothing across the plate. Ten of the thirteen. */
+	/** Nothing across the plate. Fourteen of the sixteen. */
 	NONE(-1, Float.NaN, 0f),
-	/**
-	 * The rule on the vertical tower tag, two thirds of the way down: the plant's initials and the
-	 * tower number above it, the receiving station's initials below.
-	 */
-	TOWER_RULE(1, 2f/3f, 1f),
 	/**
 	 * The bar of the fraction a series-wired street light wears: the series number over the pole
 	 * number, which is what makes the two of them one reading rather than two.

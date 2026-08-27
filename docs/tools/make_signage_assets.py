@@ -2,10 +2,10 @@
 """
 Regenerates the utility pole signage block's textures, models and blockstates.
 
-Thirteen tags, every one of them a sign that exists on a real pole -- LADWP's and SCE's.
+Fifteen tags, every one of them a sign that exists on a real pole -- LADWP's and SCE's.
 A tag is a flat plate bolted to whatever holds the wires up, so each is one thin
 axis-aligned box wearing one 16x16 sprite, and the only thing drawn per frame is the
-lettering (see TileRenderUtilitySign).  Fifty-two variants: thirteen plates times four
+lettering (see TileRenderUtilitySign).  Sixty variants: fifteen plates times four
 horizontal facings, and the facings are y-rotations of one model rather than four files.
 
 **The geometry comes out of UtilitySignKind.java rather than being restated here.**  A
@@ -37,6 +37,14 @@ RED = (176, 46, 40, 255)
 RED_LIT = (198, 62, 54, 255)
 YELLOW = (226, 186, 34, 255)
 YELLOW_LIT = (242, 208, 70, 255)
+# The transmission tower identifiers are a paler, creamier yellow than the LADWP distribution
+# strips -- that is what the reference photographs of them show, and telling a tower tag from a
+# pole tag at a glance is worth as much here as telling a red strip from a yellow one.
+PALE_YELLOW = (236, 214, 118, 255)
+PALE_YELLOW_LIT = (248, 232, 164, 255)
+# The number stencilled onto a tower leg is painted on amber primer rather than on a plate.
+AMBER = (232, 160, 74, 255)
+AMBER_LIT = (246, 186, 108, 255)
 WHITE = (238, 238, 236, 255)
 WHITE_LIT = (250, 250, 248, 255)
 SILVER = (176, 180, 184, 255)
@@ -66,7 +74,7 @@ FACING_ROTATION = {"north": 0, "east": 90, "south": 180, "west": 270}
 
 
 def read_kinds(repo):
-    """The thirteen kinds, in ordinal order, straight out of the enum.
+    """The kinds, in ordinal order, straight out of the enum.
 
     Parsed rather than duplicated: the ordinal is what a sign saves and what the
     blockstate keys on, so a list here that drifted out of order would repaint every
@@ -78,7 +86,7 @@ def read_kinds(repo):
         source = handle.read()
     body = source[source.index("public enum UtilitySignKind"):source.index("public static final UtilitySignKind[]")]
     pattern = re.compile(r"^\t([A-Z_]+)\((\d+), (\d+), (\d+), 0x([0-9A-Fa-f]+), "
-                         r"SignTextFlow\.([A-Z]+), SignShape\.([A-Z]+), SignDivider\.([A-Z_]+)\)",
+                         r"SignTextFlow\.([A-Z_]+), SignShape\.([A-Z]+), SignDivider\.([A-Z_]+)\)",
                          re.MULTILINE)
     kinds = []
     for match in pattern.finditer(body):
@@ -311,7 +319,7 @@ def assert_fourfold_symmetric(image, rect, name):
 # What SignDivider's Java table says, mirrored here so the generator can switch on it without
 # a second copy of the fractions and thicknesses living in the sprite instead of in the enum
 # they are meant to come from.  See SignDivider.java for what each one actually is.
-DIVIDER_ARITHMETIC = {"TOWER_RULE": (2/3, 1), "FRACTION_BAR": (0.5, 2), "NAIL": (0.5, 2)}
+DIVIDER_ARITHMETIC = {"FRACTION_BAR": (0.5, 2), "NAIL": (0.5, 2)}
 
 
 def divider_row(rect, fraction, thickness):
@@ -361,12 +369,7 @@ def paint_divider(draw, image, rect, kind):
     fraction, thickness = DIVIDER_ARITHMETIC[divider]
     row = divider_row(rect, fraction, thickness)
     x0, y0, x1, y1 = rect
-    if divider == "TOWER_RULE":
-        # The rule the receiving station's initials sit under, two thirds of the way down the
-        # vertical tower tag.  Unmoved from where it has always been -- SignageTest reads this
-        # row back off the sprite.
-        draw.line([x0+1, row, x1-2, row], fill=EDGE)
-    elif divider == "FRACTION_BAR":
+    if divider == "FRACTION_BAR":
         # The bar of the fraction a series-wired light wears, inset two pixels from each side
         # so it stops short of the oval's own painted outline rather than touching it -- a bar
         # that ran into the outline read as part of the border instead of as a divider.  Two
@@ -424,8 +427,10 @@ def build_texture(assets, kind):
         paint_x(image, rect, EDGE, margin=3)
         assert_fourfold_symmetric(image, rect, name)
         routine = "diamond"
-    elif name == "tower_vertical":
-        strip(draw, rect, YELLOW, YELLOW_LIT)
+    elif name in ("tower_vertical", "tower_short"):
+        strip(draw, rect, PALE_YELLOW, PALE_YELLOW_LIT)
+    elif name == "tower_number":
+        strip(draw, rect, AMBER, AMBER_LIT)
     else:
         raise SystemExit("no artwork for sign kind %s" % name)
     if SHAPE_OF[routine] != kind["shape"]:

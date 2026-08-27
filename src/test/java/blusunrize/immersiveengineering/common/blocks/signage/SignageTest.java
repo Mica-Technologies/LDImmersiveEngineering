@@ -85,10 +85,10 @@ class SignageTest
 	class Kinds
 	{
 		@Test
-		@DisplayName("thirteen kinds, which is what the report asked for")
-		void thirteenOfThem()
+		@DisplayName("fifteen kinds: the thirteen asked for, plus the two tower tags asked for after")
+		void fifteenOfThem()
 		{
-			assertEquals(13, UtilitySignKind.VALUES.length);
+			assertEquals(15, UtilitySignKind.VALUES.length);
 		}
 
 		@Test
@@ -116,27 +116,35 @@ class SignageTest
 		}
 
 		@Test
-		@DisplayName("a plate's text span is its width and its text depth is its height")
+		@DisplayName("a plate's text span is its width and its depth its height, unless the plate is turned")
 		void spanAndDepthAreWidthAndHeight()
 		{
-			//Unlike the strips' old rotation, which swapped the two, a stacked column does not turn
-			//the plate on its side: each of its characters is limited by the width in turn, and the
-			//column itself runs down the height, so both getters answer the same way for every kind.
+			//A stacked column does not turn the plate on its side: each of its characters is limited
+			//by the width in turn, and the column itself runs down the height. The one kind that
+			//really is a line lying on its side is the other way round, and it is the only one --
+			//which is what this pins down, because the strips used to do it too and were wrong to.
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
-			{
-				assertEquals(kind.getWidth(), kind.getTextSpan());
-				assertEquals(kind.getHeight(), kind.getTextDepth());
-			}
+				if(kind.isTurned())
+				{
+					assertEquals(kind.getHeight(), kind.getTextSpan(),
+							kind+" lies on its side but is not fitted along its height");
+					assertEquals(kind.getWidth(), kind.getTextDepth(),
+							kind+" lies on its side but is not fitted across its width");
+				}
+				else
+				{
+					assertEquals(kind.getWidth(), kind.getTextSpan());
+					assertEquals(kind.getHeight(), kind.getTextDepth());
+				}
 		}
 
 		@Test
-		@DisplayName("a stacked kind is a rectangle taller than it is wide, carrying one line")
+		@DisplayName("a stacked kind is a rectangle taller than it is wide")
 		void stackedKindsAreTallRectangles()
 		{
 			//A strip six pixels wide and fourteen tall holds "M31390V" only one way round: a column
 			//of upright characters running down the long side. Nothing about SignTextFlow.DOWN
-			//requires a rectangle or a single line, so this pins down that every kind that actually
-			//uses it is one.
+			//requires a rectangle, so this pins down that every kind that actually uses it is one.
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
 				if(kind.isStacked())
 				{
@@ -144,23 +152,50 @@ class SignageTest
 							kind+" flows in a column but is not cut to a rectangle");
 					assertTrue(kind.getHeight() > kind.getWidth(),
 							kind+" flows in a column but is not taller than it is wide");
-					assertEquals(1, kind.getLines(),
-							kind+" flows in a column but carries more than the one line it is split from");
+					assertTrue(kind.getLines() >= 1,
+							kind+" flows in a column but has no line to make the column out of");
 				}
 		}
 
 		@Test
-		@DisplayName("only the three kinds with something printed across their middle claim a divider")
+		@DisplayName("only the last line of a tower identifier reads across the foot of the plate")
+		void onlyTheFootLineReadsAcross()
+		{
+			//DOWN_FOOT_ACROSS is the exception and has to stay one: a plate whose middle group
+			//suddenly read across would be laid out by the wrong half of SignLayout with nothing
+			//saying so.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				for(int i = 0; i < kind.getLines(); i++)
+					assertEquals(kind.getFlow()==SignTextFlow.DOWN_FOOT_ACROSS&&i==kind.getLines()-1,
+							kind.isFootLine(i), kind+" line "+i);
+		}
+
+		@Test
+		@DisplayName("a turned plate carries exactly one line, because a quarter turn has room for one")
+		void turnedKindsCarryOneLine()
+		{
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				if(kind.isTurned())
+				{
+					assertEquals(1, kind.getLines(), kind+" lies on its side with more than one line");
+					assertFalse(kind.isStacked(), kind+" is both turned and stacked");
+					assertTrue(kind.getHeight() > kind.getWidth(),
+							kind+" lies on its side but is not taller than it is wide");
+				}
+		}
+
+		@Test
+		@DisplayName("only the two kinds with something printed across their middle claim a divider")
 		void dividerTableMatchesTheKinds()
 		{
 			//One table now, on SignDivider -- this is what pins the table to the kinds it actually
-			//belongs to, rather than trusting the constructor calls not to drift.
-			assertEquals(SignDivider.TOWER_RULE, UtilitySignKind.TOWER_VERTICAL.getDivider());
+			//belongs to, rather than trusting the constructor calls not to drift. There were three:
+			//the tall tower tag had a rule at two thirds height until photographs of the real ones
+			//showed a gap there and nothing else.
 			assertEquals(SignDivider.FRACTION_BAR, UtilitySignKind.OVAL_FRACTION.getDivider());
 			assertEquals(SignDivider.NAIL, UtilitySignKind.INSPECTION_ROUND.getDivider());
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
-				if(kind!=UtilitySignKind.TOWER_VERTICAL&&kind!=UtilitySignKind.OVAL_FRACTION
-						&&kind!=UtilitySignKind.INSPECTION_ROUND)
+				if(kind!=UtilitySignKind.OVAL_FRACTION&&kind!=UtilitySignKind.INSPECTION_ROUND)
 					assertEquals(SignDivider.NONE, kind.getDivider(),
 							kind+" claims a divider nobody asked it for");
 		}
@@ -420,6 +455,156 @@ class SignageTest
 						kind+" has nothing left to print on: "+SignLayout.lineHeight(kind, 0));
 				assertTrue(SignLayout.lineSpan(kind, 0) > 1f,
 						kind+" has nothing left to print on: "+SignLayout.lineSpan(kind, 0));
+			}
+		}
+
+		/**
+		 * How many rows each line of a stacked plate wants, given how long each line is: one row
+		 * per character for a group read downwards, one for the group read across the foot, none
+		 * for an empty line. The same rule both draw sites apply.
+		 */
+		private int[] rowsFor(UtilitySignKind kind, int... lengths)
+		{
+			int[] rows = new int[kind.getLines()];
+			for(int i = 0; i < rows.length; i++)
+			{
+				int length = i < lengths.length?lengths[i]: 0;
+				rows[i] = length <= 0?0: kind.isFootLine(i)?1: length;
+			}
+			return rows;
+		}
+
+		@Test
+		@DisplayName("every row of a stacked plate is the same depth, whichever group it is in")
+		void stackedRowsAreUniform()
+		{
+			//This is the whole point of planning the plate rather than each group: a three-character
+			//group given its own even band prints half again the size of a seven-character one under
+			//it, and a photograph of a real tower tag says it does not.
+			UtilitySignKind kind = UtilitySignKind.TOWER_VERTICAL;
+			SignLayout.StackPlan plan = SignLayout.planStack(kind, rowsFor(kind, 3, 7, 2));
+			float depth = plan.rowDepth();
+			assertTrue(depth > 0, "a planned plate has no depth to print on");
+			for(int line = 0; line < kind.getLines(); line++)
+				for(int row = 1; row < plan.rows(line); row++)
+					assertEquals(depth,
+							plan.rowCentre(line, row)-plan.rowCentre(line, row-1), 1e-3,
+							kind+" group "+line+" spaces its rows unevenly");
+		}
+
+		@Test
+		@DisplayName("a stacked plate's rows run top to bottom, stay on the plate and leave a gap between groups")
+		void stackedGroupsAreOrderedAndSeparated()
+		{
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(!kind.isStacked()||kind.getLines() < 2)
+					continue;
+				int[] rows = rowsFor(kind, 3, 7, 2);
+				SignLayout.StackPlan plan = SignLayout.planStack(kind, rows);
+				float half = SignLayout.halfDepth(kind)*kind.getShape().getStackFactor();
+				float previous = Float.NEGATIVE_INFINITY;
+				int previousLine = -1;
+				for(int line = 0; line < kind.getLines(); line++)
+					for(int row = 0; row < plan.rows(line); row++)
+					{
+						float centre = plan.rowCentre(line, row);
+						assertTrue(Math.abs(centre) <= half+1e-3, kind+" row "+row+" of group "+line
+								+" is centred off the plate at "+centre);
+						assertTrue(centre > previous, kind+" prints its rows out of order");
+						if(line!=previousLine&&previousLine >= 0)
+							assertTrue(centre-previous > plan.rowDepth()+1e-3,
+									kind+" runs group "+previousLine+" into group "+line+" with no gap");
+						previous = centre;
+						previousLine = line;
+					}
+			}
+		}
+
+		@Test
+		@DisplayName("an empty group is skipped, and takes its gap with it")
+		void anEmptyGroupLeavesNoHole()
+		{
+			//Somebody who fills in the first and third boxes should get two groups snug on the
+			//plate, not two groups with an empty band between them where the second would have been.
+			UtilitySignKind kind = UtilitySignKind.TOWER_VERTICAL;
+			//The same two groups of the same lengths, once with the empty line between them and
+			//once without: three rows then one, which is what "H35" and a foot of "L1" comes to.
+			SignLayout.StackPlan sparse = SignLayout.planStack(kind, new int[]{3, 0, 1});
+			SignLayout.StackPlan dense = SignLayout.planStack(kind, new int[]{3, 1, 0});
+			assertEquals(0, sparse.rows(1), "an empty line still claims rows");
+			assertEquals(dense.rowDepth(), sparse.rowDepth(), 1e-3,
+					"a skipped group changes how deep the remaining rows are");
+			assertEquals(dense.rowCentre(1, 0), sparse.rowCentre(2, 0), 1e-3,
+					"a skipped group leaves a hole where it would have been");
+		}
+
+		@Test
+		@DisplayName("a one-group plan is the arithmetic the vertical strips already had")
+		void oneGroupMatchesTheStrips()
+		{
+			//The strips are one line, so their rows are the characters of it and nothing changes for
+			//them -- which is what the wrappers on SignLayout promise and what keeps this rework off
+			//the four kinds it was not for.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(!kind.isStacked()||kind.getLines()!=1)
+					continue;
+				for(int count : new int[]{1, 2, 3, 7})
+				{
+					SignLayout.StackPlan plan = SignLayout.planStack(kind, new int[]{count});
+					assertEquals(SignLayout.stackedSlot(kind, count), plan.rowDepth(), 1e-4);
+					for(int i = 0; i < count; i++)
+						assertEquals(SignLayout.stackedCentre(kind, i, count), plan.rowCentre(0, i),
+								1e-4, kind+" row "+i);
+					assertEquals(SignLayout.stackedScale(kind, count, 6),
+							SignLayout.stackedScale(kind, plan, 6), 1e-4);
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("the word across a tower tag's foot is fitted to the plate, not to one letter")
+		void theFootLineIsFittedToTheWholeWord()
+		{
+			//A group read downwards is scaled by its widest single character, because each character
+			//is centred on its own; the foot is one string of them side by side, so what it has to
+			//fit along is the plate's width. Scaling it the other way put "L1" off the paint.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(!kind.isStacked()||kind.getLines() < 2)
+					continue;
+				int foot = kind.getLines()-1;
+				assertTrue(kind.isFootLine(foot), kind+" has no foot line to fit");
+				SignLayout.StackPlan plan = SignLayout.planStack(kind, rowsFor(kind, 3, 7, 2));
+				for(int stringWidth : new int[]{2, 6, 13, 40})
+				{
+					float scale = SignLayout.rowScale(kind, plan, plan.rowCentre(foot, 0), stringWidth);
+					float painted = scale*SignLayout.inkWidth(stringWidth);
+					float room = kind.getShape().spanAt(SignLayout.halfSpan(kind),
+							SignLayout.halfDepth(kind),
+							Math.abs(plan.rowCentre(foot, 0))
+									+Math.min(plan.rowDepth()*SignLayout.LEADING,
+									SignLayout.MAX_TEXT_HEIGHT)/2f);
+					assertTrue(painted <= room+1e-3, kind+" prints a "+stringWidth
+							+"-pixel foot "+painted+" pixels wide where the plate has "+room);
+				}
+			}
+		}
+
+		@Test
+		@DisplayName("a stacked plate with nothing typed on it answers rather than divides by zero")
+		void anEmptyStackedPlateIsSafe()
+		{
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+			{
+				if(!kind.isStacked())
+					continue;
+				SignLayout.StackPlan plan = SignLayout.planStack(kind, new int[kind.getLines()]);
+				assertTrue(plan.rowDepth() > 0, kind+" divides by zero on an empty plate");
+				assertTrue(SignLayout.stackedScale(kind, plan, 0) > 0,
+						kind+" divides by zero on an empty plate");
+				assertEquals(0f, plan.reach(), 1e-3, kind+" reaches somewhere with nothing on it");
 			}
 		}
 

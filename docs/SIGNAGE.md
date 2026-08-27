@@ -1,6 +1,6 @@
 # Utility pole signage
 
-Thirteen kinds of tag bolted flat to whatever holds the wires up, and a two-gesture interface for
+Fifteen kinds of tag bolted flat to whatever holds the wires up, and a two-gesture interface for
 choosing between them and writing on them.
 
 **A grid you cannot read is a grid you cannot maintain.** That is the whole argument for the block,
@@ -20,7 +20,7 @@ colour, long before anybody is close enough to read the number.
 |---|---|
 | Block | `immersiveengineering:signage`, one meta (`utility_sign`) |
 | Item | One. Four per two Aluminium Plates |
-| Kinds | Thirteen, on the tile entity — not thirteen items and not thirteen metas |
+| Kinds | Fifteen, on the tile entity — not fifteen items and not fifteen metas |
 | Placing | Against a **horizontal** face with something solid behind it |
 | Choosing a plate | **Engineer's Hammer**: steps to the next kind |
 | Writing on it | **Sneak + Engineer's Hammer**: opens the editor |
@@ -29,7 +29,7 @@ colour, long before anybody is close enough to read the number.
 
 ---
 
-## The thirteen kinds
+## The fifteen kinds
 
 Ordinals are what a sign saves, so `UtilitySignKind` may only be appended to.
 
@@ -46,8 +46,20 @@ Ordinals are what a sign saves, so `UtilitySignKind` may only be appended to.
 | 8 | `INSPECTION_ROUND` | 10×10 silver disc | `ELLIPSE` | 2 | grey |
 | 9 | `TOWER_DIAMOND` | 12×12 yellow diamond, no border | `DIAMOND` | 1 | black |
 | 10 | `LINE_CROSSING_DIAMOND` | 12×12 yellow diamond, outline and cross | `DIAMOND` | 0 | — |
-| 11 | `TOWER_VERTICAL` | 8×14 yellow, rule printed at ⅔ height | `RECT` | 3 | black |
+| 11 | `TOWER_VERTICAL` | 6×16 pale yellow strip | `RECT` | 3 | black, two groups down + circuit across the foot |
 | 12 | `TOWER_HORIZONTAL` | 14×4 yellow strip | `RECT` | 1 | black |
+| 13 | `TOWER_SHORT` | 8×16 pale yellow strip | `RECT` | 2 | black, one group down + circuit across the foot |
+| 14 | `TOWER_NUMBER` | 10×16 amber panel | `RECT` | 1 | black, turned a quarter round |
+
+**The three tower identifiers were redrawn from photographs**, after the playtester who supplied the
+first set said they were not right. The tall one had three lines read *across* an eight-pixel plate
+with a rule printed at ⅔ height; the real one is narrower, has no rule at all — the groups are
+divided by a gap and nothing else — and its first two groups are columns of upright characters read
+*downwards*, with only the circuit written across the foot. `SignDivider.TOWER_RULE` went with the
+rule. The short one is the same tag without the tower number, cut *wider* rather than shorter so
+that dropping a group does not print the remaining letters half again as large. The number-only one
+is not a plate: it is the number stencilled onto the leg of the tower, which is the one place in the
+set where a line really is turned a quarter round.
 
 What each means in the field is in the manual chapter (`docs/manual/chapters/signage.tex`) and in
 the `UtilitySignKind` javadoc; it is deliberately not repeated in the code as data, because nothing
@@ -70,7 +82,7 @@ small, exactly as they do on a pole. It is scaled to whichever limit it hits fir
 has to fit along, or its share of the plate's depth.
 
 **Filling the plate means filling the paint, not the sprite.** The first version fitted every line
-to the sprite's bounding box, and every one of the thirteen had text sitting on its border or, on
+to the sprite's bounding box, and every one of them had text sitting on its border or, on
 the round and pointed kinds, hanging off the plate entirely. Four things fix that, and all four are
 in `SignLayout`:
 
@@ -81,10 +93,33 @@ in `SignLayout`:
 | `PADDING` | A tenth of the way in on every side, so the lettering is held off the border rather than stopping against it. A fraction rather than a number of pixels, because a 14×4 strip has two pixels of plate inside its border and no more. |
 | `INK_HEIGHT` | A glyph cell is eight pixels tall and a capital paints seven of them. Scaling and centring by the cell puts every line half a pixel high and half a pixel taller than the plate was measured for. Both draw sites offset by the ink instead — and by `inkWidth`, since `getStringWidth` counts the gap after the last character too. |
 
-`LEADING` keeps a stack of lines from meeting, and `TOWER_VERTICAL` declares
-`getRuleAfterLine()`: its three lines are **not** three even shares of the plate, because the rule
-printed at ⅔ height has the receiving station's initials under it. Divided evenly, the third line's
-letters sat on the rule.
+`LEADING` keeps a stack of lines from meeting, and a plate with something printed across it —
+`OVAL_FRACTION`'s bar, `INSPECTION_ROUND`'s nail — declares `getRuleAfterLine()` so that its lines
+are divided either side of that rather than laid over it.
+
+### Stacked plates, and the one that lies on its side
+
+`SignTextFlow` says which way a plate's lettering runs, and three of its four values are not
+"across":
+
+| | |
+|---|---|
+| `DOWN` | A column of upright characters, one to a row, reading downwards. The vertical strips — a strip six pixels wide holds a pole number no other way. Its rows are the characters of the kind's one line, not lines of their own. |
+| `DOWN_FOOT_ACROSS` | The same, in groups, except the last line, which reads **across the foot** of the plate. Both transmission tower identifiers: the tower number and the station pair read downwards, and the circuit — "L1" — is two characters side by side at the bottom. |
+| `TURNED` | One line lying on its side, reading top to bottom with every character's top edge toward the right. `TOWER_NUMBER` and nothing else. This is the rotation that was **wrong** for the strips and is right here, because on a tower leg it is what is really painted. It is also the only case where `getTextSpan()` and `getTextDepth()` swap. |
+
+`SignLayout.planStack` divides a stacked plate's depth: one row per character of each group that
+reads downwards, one row for a group that reads across the foot, and `GROUP_GAP` — three quarters of
+a row — between groups. **Every row on the plate is the same depth**, and that is the point of
+planning the plate rather than each group: giving each group an even band of its own printed a
+three-character group half again the size of a seven-character one under it, which is exactly what a
+photograph of the real tag says it is not. An empty line claims no rows and takes its gap with it,
+so filling in the first and third boxes gives two groups snug on the plate rather than a hole where
+the second would have been.
+
+The foot group goes through `rowScale` with its whole string's width rather than through
+`stackedScale` with the widest character's: a column is scaled by one letter because each letter is
+centred on its own, and a word is not.
 
 `SignageTest` walks every kind, every line and a spread of string widths and asserts the painted box
 lands inside the shape; it also reads the sprites back off disk to check that each plate is really
@@ -95,14 +130,14 @@ leaves for it.
 
 ## Where a kind lives
 
-**On the tile entity, and in a listed block property filled from it.** Thirteen kinds times four
-facings is fifty-two states, which is affordable — the *text* is what is not, and once the text has
+**On the tile entity, and in a listed block property filled from it.** Fifteen kinds times four
+facings is sixty states, which is affordable — the *text* is what is not, and once the text has
 to be on the tile entity there is no reason for the kind to be anywhere else.
 
 `TileEntityUtilitySign` implements `IAttachedIntegerProperies`, which is what
 `BlockIETileProvider.getActualState` reads to fill `BlockUtilitySign.KIND`. That lets the blockstate
 be a plain Forge `variants` file — a `facing` submap supplying a y-rotation and a `kind` submap
-supplying a model — instead of a smart model with a loader behind it. Thirteen flat textured slabs
+supplying a model — instead of a smart model with a loader behind it. Fifteen flat textured slabs
 do not need one.
 
 Both blockstate files have to exist: `signage.json` carries the `inventory` variant the item model
@@ -130,7 +165,7 @@ made that one misbehave.
 `GuiUtilitySign`, over a slotless `ContainerUtilitySign` whose only job is to *be* the permission
 check for `MessageSignText`.
 
-**The preview is the point.** Thirteen kinds is thirteen shapes, colours and text layouts, and
+**The preview is the point.** Fifteen kinds is fifteen shapes, colours and text layouts, and
 choosing between them from a list of names would mean hanging one, climbing down, looking, and
 climbing back up. The preview draws the real atlas sprite at four times size with the real lettering
 laid out by `SignLayout` — the same arithmetic the world renderer uses, shared precisely so a
@@ -154,18 +189,19 @@ whatever hangs off the end lost. A line is scaled to whichever limit it hits fir
 the plate, or the share of its width one line of a stack gets — and capped at five pixels tall so a
 single character on a big diamond is not blown up until it fills the plate corner to corner.
 
-Lines are stacked evenly across the plate's other axis. `TOWER_VERTICAL`'s printed rule sits at two
-thirds of its height, which is between the second and third of three evenly spaced lines — the rule
-is in the texture, and the layout is what puts the text either side of it.
+Lines are stacked evenly across the plate's other axis, except either side of a printed divider —
+the oval's fraction bar and the round tag's nail, which are in the texture, and the layout is what
+puts the text either side of them.
 
-The vertical strips turn their whole text block ninety degrees and read **downwards**, which is how
-the real ones are printed and the only way a strip six pixels wide holds a pole number at all.
+The vertical strips and both tall tower tags are **columns of upright characters read downwards**,
+not lines turned on their side; `TOWER_NUMBER` is the one that really is turned. See the "Stacked
+plates" section above.
 
 ---
 
 ## What it costs to look at
 
-**The plate is an ordinary baked block model.** One of fifty-two, picked by the blockstate from the
+**The plate is an ordinary baked block model.** One of sixty, picked by the blockstate from the
 kind and the facing, and baked into the chunk mesh like any other block. A pole line of tags costs
 what a pole line of blocks costs.
 
@@ -198,7 +234,7 @@ box: nobody wants to be stopped by a pole number, and a one-pixel collision box 
 to fall off one.
 
 `ITileDrop` puts the kind and the three lines into the dropped item's `sign` compound, and
-`readOnPlacement` reads them back — so hammering thirteen times to find the plate you meant and then
+`readOnPlacement` reads them back — so hammering fifteen times to find the plate you meant and then
 mining it by accident costs nothing. A blank sign of the default kind carries no tag at all, so a box
 of unused ones still stacks.
 
@@ -208,7 +244,7 @@ of unused ones still stacks.
 
 | Concern | Where |
 |---|---|
-| The thirteen kinds | `common/blocks/signage/UtilitySignKind.java` |
+| The kinds | `common/blocks/signage/UtilitySignKind.java` |
 | Text layout, shared | `common/blocks/signage/SignLayout.java` |
 | The block | `common/blocks/signage/BlockUtilitySign.java` |
 | The tile entity | `common/blocks/signage/TileEntityUtilitySign.java` |

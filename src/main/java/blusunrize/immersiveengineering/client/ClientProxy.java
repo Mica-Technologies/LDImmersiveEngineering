@@ -922,7 +922,8 @@ public class ClientProxy extends CommonProxy
 								BlockTypes_Signage.UTILITY_SIGN.getMeta())),
 				new ManualPages.Text(ManualHelper.getManual(), "signage1"),
 				new ManualPages.Text(ManualHelper.getManual(), "signage2"),
-				new ManualPages.Text(ManualHelper.getManual(), "signage3"));
+				new ManualPages.Text(ManualHelper.getManual(), "signage3"),
+				new ManualPages.Text(ManualHelper.getManual(), "signage4"));
 		//Petroleum. In CAT_ENERGY because the whole chain ends in fuel: everything a player builds
 		//out here is on the way to a diesel generator, a turbine or a firebox, and the chapter only
 		//makes sense read next to those.

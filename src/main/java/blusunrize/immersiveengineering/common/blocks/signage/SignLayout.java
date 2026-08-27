@@ -35,8 +35,10 @@ package blusunrize.immersiveengineering.common.blocks.signage;
  * on the round and pointed kinds its corners come near the paint's edge and on the rectangular ones
  * its sides come near the inside of the outline, and neither ever reaches it.
  * <p>
- * A plate with a rule printed across it -- the vertical tower tag -- divides its lines either side
- * of the rule rather than laying them over it.
+ * A plate with something printed across it -- the oval's fraction bar, the round tag's nail --
+ * divides its lines either side of that rather than laying them over it. A plate whose lettering is
+ * columns of upright characters rather than lines divides its depth by {@link #planStack} instead:
+ * one row per character, the same depth for every row on the plate, and a gap between groups.
  * <p>
  * Shared between the renderer and the editing window on purpose. The window shows a preview, and a
  * preview that lays text out by its own arithmetic is a preview that lies as soon as either side is
@@ -276,60 +278,196 @@ public final class SignLayout
 	}
 
 	/**
-	 * How much depth one row of a stacked column gets, in block pixels.
+	 * How much of a row's depth the gap between two groups of a stacked plate is worth.
 	 * <p>
-	 * The same idea as a line's share of a stack, and for the same reason: the printable depth,
-	 * narrowed by the shape's stack factor so a column pushed to the top of an oval or a diamond
-	 * still has plate beside it, divided evenly between however many characters somebody typed.
-	 * A stacked kind carries no divider, so there is no rule to split the band around -- one row
-	 * gets a plain, even share.
+	 * A transmission tower tag is several columns down one plate -- the tower number, the stations
+	 * the run joins, the circuit -- and what separates them on the real one is a space and nothing
+	 * else: no rule, no bar, just a gap about three quarters of a character deep. Counted in rows
+	 * rather than in pixels so it shrinks with the lettering when somebody types a long station
+	 * name, exactly as {@link #LEADING} does within a group.
+	 */
+	public static final float GROUP_GAP = 0.75f;
+
+	/**
+	 * How a stacked plate's rows divide its depth: one row per character of each group that reads
+	 * downwards, one for a group that reads across the foot, and a gap between groups.
+	 * <p>
+	 * <strong>Every row is the same depth, whichever group it belongs to.</strong> A printed column
+	 * is uniform -- the letters of "HAY-ATW" are the size of the digits of "H35" above them, not
+	 * larger because there happen to be more of them -- so the plate's depth is divided by the
+	 * total number of rows rather than group by group. Giving each group an equal band instead
+	 * printed a three-character group half again the size of a seven-character one, which is the
+	 * one thing a photograph of the real tag says it is not.
+	 * <p>
+	 * Built from row counts rather than from strings, so it stays what the rest of this class is:
+	 * arithmetic in block pixels that both draw sites share and that tests can walk without a game
+	 * running.
+	 */
+	public static final class StackPlan
+	{
+		private final float rowDepth;
+		private final float[] start;
+		private final int[] rows;
+		private final float reach;
+
+		private StackPlan(float rowDepth, float[] start, int[] rows, float reach)
+		{
+			this.rowDepth = rowDepth;
+			this.start = start;
+			this.rows = rows;
+			this.reach = reach;
+		}
+
+		/** @return how deep one row is, in block pixels -- the same for every group */
+		public float rowDepth()
+		{
+			return rowDepth;
+		}
+
+		/** @return how many rows group {@code line} occupies, which is zero if it is empty */
+		public int rows(int line)
+		{
+			return line >= 0&&line < rows.length?rows[line]: 0;
+		}
+
+		/**
+		 * Where one row sits, measured from the plate's centre and positive in the direction the
+		 * rows stack -- downwards, on every kind that flows this way.
+		 *
+		 * @param line the group it belongs to
+		 * @param row  which row of that group it is
+		 */
+		public float rowCentre(int line, int row)
+		{
+			if(line < 0||line >= start.length)
+				return 0;
+			return start[line]+rowDepth*(row+0.5f);
+		}
+
+		/**
+		 * @return how far from the plate's middle the furthest row's centre is, which is where the
+		 * lettering leaves the paint first on a shape that narrows -- the stacked kinds are all
+		 * rectangles today, and this is what would keep them honest if one were not
+		 */
+		public float reach()
+		{
+			return reach;
+		}
+	}
+
+	/**
+	 * Divide a stacked plate's depth between its groups.
+	 *
+	 * @param kind the plate
+	 * @param rows how many rows each of its lines wants: one per character for a group that reads
+	 *             downwards, one for a group that reads across the foot, zero for an empty line,
+	 *             which is skipped along with the gap that would have followed it
+	 *
+	 * @return the plan, whose row depth is never zero -- a plate with nothing typed on it divides
+	 * by one row rather than by no characters
+	 */
+	public static StackPlan planStack(UtilitySignKind kind, int[] rows)
+	{
+		float half = halfDepth(kind)*kind.getShape().getStackFactor();
+		int groups = 0, total = 0;
+		for(int count : rows)
+			if(count > 0)
+			{
+				groups++;
+				total += count;
+			}
+		float slots = total+GROUP_GAP*Math.max(0, groups-1);
+		float rowDepth = 2*half/Math.max(1f, slots);
+		float[] start = new float[rows.length];
+		float reach = 0;
+		float cursor = -half;
+		int seen = 0;
+		for(int i = 0; i < rows.length; i++)
+		{
+			start[i] = cursor;
+			if(rows[i] <= 0)
+				continue;
+			for(int row = 0; row < rows[i]; row++)
+				reach = Math.max(reach, Math.abs(cursor+rowDepth*(row+0.5f)));
+			cursor += rows[i]*rowDepth;
+			//The gap goes between groups and not after the last one, which is what makes the plan
+			//fill the plate's depth exactly rather than overrunning it by one gap.
+			if(++seen < groups)
+				cursor += GROUP_GAP*rowDepth;
+		}
+		return new StackPlan(rowDepth, start, rows, reach);
+	}
+
+	/**
+	 * The one scale every character of every stacked group on a plate is drawn at.
+	 * <p>
+	 * A printed column is uniform -- every digit of a pole number the size of its neighbours -- so
+	 * unlike a line, which is scaled to its own string, a stacked plate is scaled once and every
+	 * character drawn at that. It is the smaller of what a row's depth allows and what the plate's
+	 * width allows at the row that reaches furthest from the middle: the same two limits
+	 * {@link #scaleFor} weighs, read off the row rather than off the whole line.
+	 *
+	 * @param kind            the plate the columns are on
+	 * @param plan            how its rows divide its depth
+	 * @param widestCharWidth the widest any one character is, in font pixels -- not the width of a
+	 *                        whole string, because each character is centred and scaled on its own
+	 *
+	 * @return the scale, never zero
+	 */
+	public static float stackedScale(UtilitySignKind kind, StackPlan plan, int widestCharWidth)
+	{
+		return rowScale(kind, plan, plan.reach(), widestCharWidth);
+	}
+
+	/**
+	 * What one row of a stacked plate may be drawn at, given how far from the middle it sits and
+	 * how much ink it has to fit along.
+	 * <p>
+	 * The group that reads across the foot of a tower tag goes through here with its whole string's
+	 * width and its own row's reach, rather than through {@link #stackedScale}: it is one row of
+	 * lettering like any other, but it is a word rather than a character, so what limits it is the
+	 * width of the plate and not the width of the widest letter on it.
+	 */
+	public static float rowScale(UtilitySignKind kind, StackPlan plan, float rowReach, int stringWidth)
+	{
+		float rowHeight = Math.min(plan.rowDepth()*LEADING, MAX_TEXT_HEIGHT);
+		float byHeight = rowHeight/INK_HEIGHT;
+		float ink = inkWidth(stringWidth);
+		if(ink <= 0)
+			return byHeight;
+		float span = kind.getShape().spanAt(halfSpan(kind), halfDepth(kind),
+				Math.abs(rowReach)+rowHeight/2f);
+		return Math.min(byHeight, span/ink);
+	}
+
+	/**
+	 * How much depth one row of a single-group stacked column gets, in block pixels -- the vertical
+	 * strips, which are one line and therefore one group with no gap in it.
 	 *
 	 * @return the slot's depth, never zero -- an empty column divides by one row rather than by
 	 * zero characters
 	 */
 	public static float stackedSlot(UtilitySignKind kind, int count)
 	{
-		return 2*halfDepth(kind)*kind.getShape().getStackFactor()/Math.max(1, count);
+		return planStack(kind, new int[]{count}).rowDepth();
 	}
 
 	/**
-	 * Where row {@code index} of a stacked column of {@code count} characters sits, measured from
-	 * the plate's centre and positive in the direction the rows stack -- downwards, on every kind
-	 * that flows this way. The same arithmetic as {@link #lineCentre}, without a divider to split
-	 * around.
+	 * Where row {@code index} of a single-group stacked column of {@code count} characters sits,
+	 * measured from the plate's centre and positive in the direction the rows stack.
 	 */
 	public static float stackedCentre(UtilitySignKind kind, int index, int count)
 	{
-		float half = halfDepth(kind)*kind.getShape().getStackFactor();
-		return -half+stackedSlot(kind, count)*(index+0.5f);
+		return planStack(kind, new int[]{count}).rowCentre(0, index);
 	}
 
 	/**
-	 * The one scale every character of a stacked column is drawn at.
-	 * <p>
-	 * A printed column is uniform -- every digit of a pole number the same size as its neighbours
-	 * -- so unlike a line, which is scaled to its own string, a stacked column is scaled once and
-	 * every character drawn at that. It is the smaller of what a row's depth allows and what the
-	 * plate's width allows at the row that reaches furthest from the middle, which by symmetry is
-	 * row 0 (and equally row {@code count-1}): the same two limits {@link #scaleFor} weighs, read
-	 * off the row rather than off the whole line.
-	 *
-	 * @param kind             the plate the column is on
-	 * @param count            how many characters are in it
-	 * @param widestCharWidth  the widest any one of them is, in font pixels -- not the width of the
-	 *                         whole string, because each character is centred and scaled on its own
-	 *
-	 * @return the scale, never zero
+	 * {@link #stackedScale} for a single-group column. Expressed through the plan rather than
+	 * beside it, because two pieces of arithmetic for the same column is how a preview comes to
+	 * lie about what the pole will look like.
 	 */
 	public static float stackedScale(UtilitySignKind kind, int count, int widestCharWidth)
 	{
-		float rowHeight = Math.min(stackedSlot(kind, count)*LEADING, MAX_TEXT_HEIGHT);
-		float byHeight = rowHeight/INK_HEIGHT;
-		float ink = inkWidth(widestCharWidth);
-		if(ink <= 0)
-			return byHeight;
-		float reach = Math.abs(stackedCentre(kind, 0, count))+rowHeight/2f;
-		float span = kind.getShape().spanAt(halfSpan(kind), halfDepth(kind), reach);
-		return Math.min(byHeight, span/ink);
+		return stackedScale(kind, planStack(kind, new int[]{count}), widestCharWidth);
 	}
 }

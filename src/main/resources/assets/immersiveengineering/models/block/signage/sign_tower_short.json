@@ -1,17 +1,17 @@
 {
 	"textures": {
-		"sign": "immersiveengineering:blocks/sign_tower_vertical",
-		"particle": "immersiveengineering:blocks/sign_tower_vertical"
+		"sign": "immersiveengineering:blocks/sign_tower_short",
+		"particle": "immersiveengineering:blocks/sign_tower_short"
 	},
 	"elements": [
 		{
 			"from": [
-				5,
+				4,
 				0,
 				0
 			],
 			"to": [
-				11,
+				12,
 				16,
 				1
 			],
@@ -19,18 +19,18 @@
 				"south": {
 					"texture": "#sign",
 					"uv": [
-						5,
+						4,
 						0,
-						11,
+						12,
 						16
 					]
 				},
 				"north": {
 					"texture": "#sign",
 					"uv": [
-						11,
+						12,
 						0,
-						5,
+						4,
 						16
 					]
 				},

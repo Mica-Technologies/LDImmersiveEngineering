@@ -55,6 +55,12 @@
 			},
 			"12": {
 				"model": "immersiveengineering:signage/sign_tower_horizontal"
+			},
+			"13": {
+				"model": "immersiveengineering:signage/sign_tower_short"
+			},
+			"14": {
+				"model": "immersiveengineering:signage/sign_tower_number"
 			}
 		},
 		"type": {

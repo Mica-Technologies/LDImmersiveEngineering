@@ -33,18 +33,18 @@ import net.minecraft.util.math.AxisAlignedBB;
 import javax.annotation.Nullable;
 
 /**
- * One tag on a pole: which of the thirteen kinds it is, and what is printed on it.
+ * One tag on a pole: which of the fifteen kinds it is, and what is printed on it.
  * <p>
- * <strong>Everything a sign is lives here rather than in the block state.</strong> Thirteen kinds
- * times four facings would be fifty-two states, which is affordable -- the text is what is not, and
+ * <strong>Everything a sign is lives here rather than in the block state.</strong> Fifteen kinds
+ * times four facings would be sixty states, which is affordable -- the text is what is not, and
  * once the text has to be on the tile entity there is no reason for the kind to be anywhere else.
  * The kind reaches the block state through {@link IAttachedIntegerProperies} only so that a plain
- * {@code variants} blockstate can pick the plate model, which is the cheapest way to draw thirteen
+ * {@code variants} blockstate can pick the plate model, which is the cheapest way to draw fifteen
  * flat plates: static geometry, no smart model, and nothing per frame except the lettering.
  * <p>
  * <strong>The hammer is the whole interface.</strong> Hit a sign with an Engineer's Hammer and it
  * steps to the next kind; sneak and hit it and the editing window opens. That is one tool and two
- * gestures for a thing with thirteen shapes and three lines of text, and it is the gesture the same
+ * gestures for a thing with fifteen shapes and three lines of text, and it is the gesture the same
  * playtester asked for on junction boxes in the same breath -- a tool you are already holding beats
  * a menu you have to find.
  *
@@ -199,7 +199,7 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 	public boolean canHammerRotate(EnumFacing side, float hitX, float hitY, float hitZ, EntityLivingBase entity)
 	{
 		//False so the hammer reaches hammerUseSide. Rotating a sign means taking it down and putting
-		//it on the face you meant, which is one click either way; cycling thirteen kinds without
+		//it on the face you meant, which is one click either way; cycling fifteen kinds without
 		//leaving the ladder is worth more than that.
 		return false;
 	}
@@ -252,7 +252,7 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 	@Override
 	public void readOnPlacement(@Nullable EntityLivingBase placer, ItemStack stack)
 	{
-		//A sign taken down and put back up is the same sign. Without this, hammering thirteen times
+		//A sign taken down and put back up is the same sign. Without this, hammering fifteen times
 		//to find the right plate and then mining it by accident throws all of it away, which is a
 		//thing a player only has to be caught by once.
 		NBTTagCompound tag = stack.getSubCompound("sign");

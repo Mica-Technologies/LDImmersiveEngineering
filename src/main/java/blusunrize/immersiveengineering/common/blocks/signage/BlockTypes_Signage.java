@@ -16,7 +16,7 @@ import java.util.Locale;
 /**
  * Metas of the {@code signage} block.
  * <p>
- * One, deliberately. The thirteen kinds of tag are not thirteen items: a player crafts one Utility
+ * One, deliberately. The fifteen kinds of tag are not fifteen items: a player crafts one Utility
  * Pole Sign and hits it with a hammer until it is the one they meant, which is one recipe, one entry
  * in the creative tab and one thing to learn. The kind lives on the tile entity -- see
  * {@link UtilitySignKind}.
@@ -27,7 +27,7 @@ import java.util.Locale;
  */
 public enum BlockTypes_Signage implements IStringSerializable, BlockIEBase.IBlockEnum
 {
-	/** A tag bolted flat to a pole. Thirteen shapes, up to three lines of text. */
+	/** A tag bolted flat to a pole. Fifteen shapes, up to three lines of text. */
 	UTILITY_SIGN;
 
 	@Override

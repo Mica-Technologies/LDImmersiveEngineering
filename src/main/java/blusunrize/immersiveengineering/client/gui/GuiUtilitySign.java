@@ -30,7 +30,7 @@ import java.io.IOException;
 /**
  * The window for writing on a utility pole tag: pick a plate, type what goes on it, see it.
  * <p>
- * <strong>The preview is the point.</strong> Thirteen kinds of sign is thirteen shapes, colours and
+ * <strong>The preview is the point.</strong> Fifteen kinds of sign is fifteen shapes, colours and
  * text layouts, and choosing between them from a list of names would mean hanging one, climbing
  * down, looking, and climbing back up. The preview draws the real plate sprite at four times size
  * with the real lettering laid out by {@link SignLayout} -- the same arithmetic the world renderer
@@ -172,25 +172,41 @@ public class GuiUtilitySign extends GuiIEContainerBase
 
 		int centreX = left+PREVIEW/2;
 		int centreY = top+PREVIEW/2;
-		if(kind.isStacked())
-			drawStackedPreview(centreX, centreY, fields[0].getText());
+		if(kind.isTurned())
+		{
+			//The world renderer turns this plate's one line a quarter round clockwise about the
+			//plate's normal; on a screen whose Y already points down, the same turn is +90 rather
+			//than -90. That is the whole of the difference, and it is the same mirroring the rest
+			//of this preview does by not negating the line offsets below.
+			GlStateManager.pushMatrix();
+			GlStateManager.translate(centreX, centreY, 0);
+			GlStateManager.rotate(90, 0, 0, 1);
+			GlStateManager.translate(-centreX, -centreY, 0);
+			drawLinePreview(centreX, centreY, 0, fields[0].getText());
+			GlStateManager.popMatrix();
+		}
+		else if(kind.isStacked())
+			drawStackedPreview(centreX, centreY);
 		else
 			for(int i = 0; i < kind.getLines(); i++)
-			{
-				String text = fields[i].getText();
-				if(text.isEmpty())
-					continue;
-				int width = fontRenderer.getStringWidth(text);
-				float scale = SignLayout.scaleFor(kind, i, width)*ZOOM;
-				GlStateManager.pushMatrix();
-				GlStateManager.translate(centreX, centreY, 0);
-				GlStateManager.translate(0, SignLayout.lineCentre(kind, i)*ZOOM, 0);
-				GlStateManager.scale(scale, scale, 1);
-				//Centred on the paint, exactly as the world renderer does it -- see the note there.
-				fontRenderer.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
-						0xFF000000|kind.getTextColour(), false);
-				GlStateManager.popMatrix();
-			}
+				drawLinePreview(centreX, centreY, i, fields[i].getText());
+	}
+
+	/** One line of a plate that reads across, laid out by {@link SignLayout} exactly as the pole will. */
+	private void drawLinePreview(int centreX, int centreY, int index, String text)
+	{
+		if(text.isEmpty())
+			return;
+		int width = fontRenderer.getStringWidth(text);
+		float scale = SignLayout.scaleFor(kind, index, width)*ZOOM;
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(centreX, centreY, 0);
+		GlStateManager.translate(0, SignLayout.lineCentre(kind, index)*ZOOM, 0);
+		GlStateManager.scale(scale, scale, 1);
+		//Centred on the paint, exactly as the world renderer does it -- see the note there.
+		fontRenderer.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
+				0xFF000000|kind.getTextColour(), false);
+		GlStateManager.popMatrix();
 	}
 
 	/**
@@ -200,28 +216,55 @@ public class GuiUtilitySign extends GuiIEContainerBase
 	 * screen's already points down, so this does not have to. That is the whole of the mirroring
 	 * -- there is no rotation to undo any more, because the world side no longer applies one.
 	 */
-	private void drawStackedPreview(int centreX, int centreY, String text)
+	private void drawStackedPreview(int centreX, int centreY)
 	{
-		String trimmed = text.trim();
-		int count = trimmed.length();
-		if(count==0)
-			return;
-		int widest = 0;
-		for(int i = 0; i < count; i++)
-			widest = Math.max(widest, fontRenderer.getStringWidth(String.valueOf(trimmed.charAt(i))));
-		float scale = SignLayout.stackedScale(kind, count, widest)*ZOOM;
-		for(int i = 0; i < count; i++)
+		int lines = kind.getLines();
+		String[] text = new String[lines];
+		int[] rows = new int[lines];
+		for(int i = 0; i < lines; i++)
 		{
-			String ch = String.valueOf(trimmed.charAt(i));
-			int width = fontRenderer.getStringWidth(ch);
-			GlStateManager.pushMatrix();
-			GlStateManager.translate(centreX, centreY, 0);
-			GlStateManager.translate(0, SignLayout.stackedCentre(kind, i, count)*ZOOM, 0);
-			GlStateManager.scale(scale, scale, 1);
-			fontRenderer.drawString(ch, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
-					0xFF000000|kind.getTextColour(), false);
-			GlStateManager.popMatrix();
+			text[i] = fields[i].getText().trim();
+			rows[i] = text[i].isEmpty()?0: kind.isFootLine(i)?1: text[i].length();
 		}
+		SignLayout.StackPlan plan = SignLayout.planStack(kind, rows);
+		int widest = 0;
+		for(int i = 0; i < lines; i++)
+			if(rows[i] > 0&&!kind.isFootLine(i))
+				for(int c = 0; c < text[i].length(); c++)
+					widest = Math.max(widest,
+							fontRenderer.getStringWidth(String.valueOf(text[i].charAt(c))));
+		float scale = SignLayout.stackedScale(kind, plan, widest)*ZOOM;
+		for(int i = 0; i < lines; i++)
+		{
+			if(rows[i]==0)
+				continue;
+			if(kind.isFootLine(i))
+			{
+				int width = fontRenderer.getStringWidth(text[i]);
+				drawRowPreview(centreX, centreY, text[i], width, plan.rowCentre(i, 0),
+						SignLayout.rowScale(kind, plan, plan.rowCentre(i, 0), width)*ZOOM);
+			}
+			else
+				for(int row = 0; row < text[i].length(); row++)
+				{
+					String ch = String.valueOf(text[i].charAt(row));
+					drawRowPreview(centreX, centreY, ch, fontRenderer.getStringWidth(ch),
+							plan.rowCentre(i, row), scale);
+				}
+		}
+	}
+
+	/** One row of a stacked plate: a single character, or the word across its foot. */
+	private void drawRowPreview(int centreX, int centreY, String text, int width, float centre,
+								float scale)
+	{
+		GlStateManager.pushMatrix();
+		GlStateManager.translate(centreX, centreY, 0);
+		GlStateManager.translate(0, centre*ZOOM, 0);
+		GlStateManager.scale(scale, scale, 1);
+		fontRenderer.drawString(text, -SignLayout.inkWidth(width)/2f, -SignLayout.INK_HEIGHT/2f,
+				0xFF000000|kind.getTextColour(), false);
+		GlStateManager.popMatrix();
 	}
 
 	@Override
