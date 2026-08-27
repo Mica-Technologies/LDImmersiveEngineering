@@ -1,6 +1,6 @@
 # Utility pole signage
 
-Fifteen kinds of tag bolted flat to whatever holds the wires up, and a two-gesture interface for
+Sixteen kinds of tag bolted flat to whatever holds the wires up, and a two-gesture interface for
 choosing between them and writing on them.
 
 **A grid you cannot read is a grid you cannot maintain.** That is the whole argument for the block,
@@ -20,7 +20,7 @@ colour, long before anybody is close enough to read the number.
 |---|---|
 | Block | `immersiveengineering:signage`, one meta (`utility_sign`) |
 | Item | One. Four per two Aluminium Plates |
-| Kinds | Fifteen, on the tile entity — not fifteen items and not fifteen metas |
+| Kinds | Sixteen, on the tile entity — not sixteen items and not sixteen metas |
 | Placing | Against a **horizontal** face with something solid behind it |
 | Choosing a plate | **Engineer's Hammer**: steps to the next kind |
 | Writing on it | **Sneak + Engineer's Hammer**: opens the editor |
@@ -29,7 +29,7 @@ colour, long before anybody is close enough to read the number.
 
 ---
 
-## The fifteen kinds
+## The sixteen kinds
 
 Ordinals are what a sign saves, so `UtilitySignKind` may only be appended to.
 
@@ -50,6 +50,7 @@ Ordinals are what a sign saves, so `UtilitySignKind` may only be appended to.
 | 12 | `TOWER_HORIZONTAL` | 14×4 yellow strip | `RECT` | 1 | black |
 | 13 | `TOWER_SHORT` | 8×16 pale yellow strip | `RECT` | 2 | black, one group down + circuit across the foot |
 | 14 | `TOWER_NUMBER` | 10×16 amber panel | `RECT` | 1 | black, turned a quarter round |
+| 15 | `TRANSFORMER_GROUNDED` | 14×6 green strip | `RECT` | 2 | white |
 
 **The three tower identifiers were redrawn from photographs**, after the playtester who supplied the
 first set said they were not right. The tall one had three lines read *across* an eight-pixel plate
@@ -60,6 +61,11 @@ rule. The short one is the same tag without the tower number, cut *wider* rather
 that dropping a group does not print the remaining letters half again as large. The number-only one
 is not a plate: it is the number stencilled onto the leg of the tower, which is the one place in the
 set where a line really is turned a quarter round.
+
+`TRANSFORMER_GROUNDED` is `PARALLEL_GENERATION` in green — same plate, same two lines, same white
+lettering — because on a real pole it is the same kind of strip saying a different thing, and the
+colour is what tells them apart from the ground. The two-pole banks with the jumbo transformers wear
+it, and there was nothing in the set for them.
 
 What each means in the field is in the manual chapter (`docs/manual/chapters/signage.tex`) and in
 the `UtilitySignKind` javadoc; it is deliberately not repeated in the code as data, because nothing
@@ -130,14 +136,14 @@ leaves for it.
 
 ## Where a kind lives
 
-**On the tile entity, and in a listed block property filled from it.** Fifteen kinds times four
-facings is sixty states, which is affordable — the *text* is what is not, and once the text has
+**On the tile entity, and in a listed block property filled from it.** Sixteen kinds times four
+facings is sixty-four states, which is affordable — the *text* is what is not, and once the text has
 to be on the tile entity there is no reason for the kind to be anywhere else.
 
 `TileEntityUtilitySign` implements `IAttachedIntegerProperies`, which is what
 `BlockIETileProvider.getActualState` reads to fill `BlockUtilitySign.KIND`. That lets the blockstate
 be a plain Forge `variants` file — a `facing` submap supplying a y-rotation and a `kind` submap
-supplying a model — instead of a smart model with a loader behind it. Fifteen flat textured slabs
+supplying a model — instead of a smart model with a loader behind it. Sixteen flat textured slabs
 do not need one.
 
 Both blockstate files have to exist: `signage.json` carries the `inventory` variant the item model
@@ -165,7 +171,7 @@ made that one misbehave.
 `GuiUtilitySign`, over a slotless `ContainerUtilitySign` whose only job is to *be* the permission
 check for `MessageSignText`.
 
-**The preview is the point.** Fifteen kinds is fifteen shapes, colours and text layouts, and
+**The preview is the point.** Sixteen kinds is sixteen shapes, colours and text layouts, and
 choosing between them from a list of names would mean hanging one, climbing down, looking, and
 climbing back up. The preview draws the real atlas sprite at four times size with the real lettering
 laid out by `SignLayout` — the same arithmetic the world renderer uses, shared precisely so a
@@ -201,7 +207,7 @@ plates" section above.
 
 ## What it costs to look at
 
-**The plate is an ordinary baked block model.** One of sixty, picked by the blockstate from the
+**The plate is an ordinary baked block model.** One of sixty-four, picked by the blockstate from the
 kind and the facing, and baked into the chunk mesh like any other block. A pole line of tags costs
 what a pole line of blocks costs.
 
@@ -234,7 +240,7 @@ box: nobody wants to be stopped by a pole number, and a one-pixel collision box 
 to fall off one.
 
 `ITileDrop` puts the kind and the three lines into the dropped item's `sign` compound, and
-`readOnPlacement` reads them back — so hammering fifteen times to find the plate you meant and then
+`readOnPlacement` reads them back — so hammering sixteen times to find the plate you meant and then
 mining it by accident costs nothing. A blank sign of the default kind carries no tag at all, so a box
 of unused ones still stacks.
 

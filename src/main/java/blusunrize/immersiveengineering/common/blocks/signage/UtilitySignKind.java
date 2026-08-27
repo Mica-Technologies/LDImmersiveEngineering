@@ -13,12 +13,12 @@ import net.minecraft.util.IStringSerializable;
 import java.util.Locale;
 
 /**
- * The fifteen tags a utility pole wears, and what each of them is.
+ * The sixteen tags a utility pole wears, and what each of them is.
  * <p>
  * <strong>Every one of these is a real sign on a real pole.</strong> The list came from a
  * playtester who reads them for a living -- the shapes, the colours and what each one means are the
  * Los Angeles Department of Water and Power's and Southern California Edison's, not invented. That
- * is the whole argument for building fifteen of them rather than one blank plate: a pole with a
+ * is the whole argument for building sixteen of them rather than one blank plate: a pole with a
  * yellow strip on it says something different from a pole with a red one, and a grid that is
  * legible from the ground is the point of putting tags on it at all.
  * <p>
@@ -124,7 +124,16 @@ public enum UtilitySignKind implements IStringSerializable
 	 * bolted on, which is why it is the widest plate here and why it has the least on it: from the
 	 * ground the number is the whole of the message.
 	 */
-	TOWER_NUMBER(10, 16, 1, 0x1A1A1A, SignTextFlow.TURNED, SignShape.RECT, SignDivider.NONE);
+	TOWER_NUMBER(10, 16, 1, 0x1A1A1A, SignTextFlow.TURNED, SignShape.RECT, SignDivider.NONE),
+	/**
+	 * The horizontal green strip: the bank of transformers on this pole is grounded.
+	 * <p>
+	 * The two-pole banks wear it -- the big ones, with the jumbo transformers -- and there was
+	 * nothing in the set for them. It is {@link #PARALLEL_GENERATION} in green: the same plate, the
+	 * same two lines, the same white lettering, because on a real pole it is the same kind of strip
+	 * saying a different thing, and the colour is what tells them apart from the ground.
+	 */
+	TRANSFORMER_GROUNDED(14, 6, 2, 0xFFFFFF, SignTextFlow.ACROSS, SignShape.RECT, SignDivider.NONE);
 
 	/**
 	 * Cached because {@code values()} allocates, and this is read once per sign per frame by the

@@ -2,10 +2,10 @@
 """
 Regenerates the utility pole signage block's textures, models and blockstates.
 
-Fifteen tags, every one of them a sign that exists on a real pole -- LADWP's and SCE's.
+Sixteen tags, every one of them a sign that exists on a real pole -- LADWP's and SCE's.
 A tag is a flat plate bolted to whatever holds the wires up, so each is one thin
 axis-aligned box wearing one 16x16 sprite, and the only thing drawn per frame is the
-lettering (see TileRenderUtilitySign).  Sixty variants: fifteen plates times four
+lettering (see TileRenderUtilitySign).  Sixty-four variants: sixteen plates times four
 horizontal facings, and the facings are y-rotations of one model rather than four files.
 
 **The geometry comes out of UtilitySignKind.java rather than being restated here.**  A
@@ -51,6 +51,11 @@ SILVER = (176, 180, 184, 255)
 SILVER_LIT = (198, 202, 206, 255)
 ORANGE = (216, 118, 32, 255)
 ORANGE_LIT = (234, 142, 56, 255)
+# The grounded-bank strip: the same plate as the red parallel generation one in the colour a
+# grounded transformer bank is marked with, and dark enough that the white lettering it shares
+# with the red one still reads against it.
+GREEN = (44, 118, 62, 255)
+GREEN_LIT = (62, 146, 82, 255)
 CLEAR = (0, 0, 0, 0)
 # The bolt the round inspection tag hangs on -- a fastening, not paint, so it gets its own two
 # tones rather than borrowing SILVER's: dark enough to read against every plate colour a nail
@@ -402,6 +407,8 @@ def build_texture(assets, kind):
     routine = "strip"
     if name == "parallel_generation":
         strip(draw, rect, RED, RED_LIT)
+    elif name == "transformer_grounded":
+        strip(draw, rect, GREEN, GREEN_LIT)
     elif name in ("yellow_vertical", "yellow_horizontal", "tower_horizontal"):
         strip(draw, rect, YELLOW, YELLOW_LIT)
     elif name == "white_vertical":

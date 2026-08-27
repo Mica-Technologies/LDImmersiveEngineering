@@ -85,10 +85,10 @@ class SignageTest
 	class Kinds
 	{
 		@Test
-		@DisplayName("fifteen kinds: the thirteen asked for, plus the two tower tags asked for after")
-		void fifteenOfThem()
+		@DisplayName("sixteen kinds: thirteen, plus two tower tags and a grounded-bank strip asked for after")
+		void sixteenOfThem()
 		{
-			assertEquals(15, UtilitySignKind.VALUES.length);
+			assertEquals(16, UtilitySignKind.VALUES.length);
 		}
 
 		@Test

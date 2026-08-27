@@ -30,7 +30,7 @@ import java.io.IOException;
 /**
  * The window for writing on a utility pole tag: pick a plate, type what goes on it, see it.
  * <p>
- * <strong>The preview is the point.</strong> Fifteen kinds of sign is fifteen shapes, colours and
+ * <strong>The preview is the point.</strong> Sixteen kinds of sign is sixteen shapes, colours and
  * text layouts, and choosing between them from a list of names would mean hanging one, climbing
  * down, looking, and climbing back up. The preview draws the real plate sprite at four times size
  * with the real lettering laid out by {@link SignLayout} -- the same arithmetic the world renderer

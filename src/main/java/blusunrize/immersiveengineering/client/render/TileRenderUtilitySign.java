@@ -22,7 +22,7 @@ import net.minecraft.util.EnumFacing;
  * Draws the lettering on a utility pole tag. The plate itself is not drawn here.
  * <p>
  * <strong>Only the text costs anything per frame.</strong> The plate is a flat textured slab baked
- * into the chunk mesh like any other block model -- one of sixty, picked by the blockstate from
+ * into the chunk mesh like any other block model -- one of sixty-four, picked by the blockstate from
  * the kind and the facing -- because a pole line is dozens of tags and a renderer that drew the
  * plate as well would be paying for the ninety-nine percent of a sign that never changes. The tile
  * entity's {@code getMaxRenderDistanceSquared} then keeps even this off the books past forty-eight
