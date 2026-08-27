@@ -1,0 +1,145 @@
+{
+	"textures": {
+		"sign": "immersiveengineering:blocks/sign_tower_horizontal",
+		"particle": "immersiveengineering:blocks/sign_tower_horizontal",
+		"standoff": "immersiveengineering:blocks/sign_standoff"
+	},
+	"elements": [
+		{
+			"from": [
+				1,
+				6,
+				0
+			],
+			"to": [
+				15,
+				10,
+				1
+			],
+			"faces": {
+				"south": {
+					"texture": "#sign",
+					"uv": [
+						1,
+						6,
+						15,
+						10
+					]
+				},
+				"north": {
+					"texture": "#sign",
+					"uv": [
+						15,
+						6,
+						1,
+						10
+					]
+				},
+				"up": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"down": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"west": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				},
+				"east": {
+					"texture": "#sign",
+					"uv": [
+						8,
+						7,
+						9,
+						8
+					]
+				}
+			}
+		},
+		{
+			"from": [
+				6,
+				6,
+				-1
+			],
+			"to": [
+				10,
+				10,
+				0
+			],
+			"faces": {
+				"north": {
+					"texture": "#standoff",
+					"uv": [
+						6,
+						6,
+						10,
+						10
+					]
+				},
+				"south": {
+					"texture": "#standoff",
+					"uv": [
+						6,
+						6,
+						10,
+						10
+					]
+				},
+				"up": {
+					"texture": "#standoff",
+					"uv": [
+						6,
+						6,
+						10,
+						10
+					]
+				},
+				"down": {
+					"texture": "#standoff",
+					"uv": [
+						6,
+						6,
+						10,
+						10
+					]
+				},
+				"west": {
+					"texture": "#standoff",
+					"uv": [
+						6,
+						6,
+						10,
+						10
+					]
+				},
+				"east": {
+					"texture": "#standoff",
+					"uv": [
+						6,
+						6,
+						10,
+						10
+					]
+				}
+			}
+		}
+	]
+}

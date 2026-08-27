@@ -21,7 +21,7 @@ colour, long before anybody is close enough to read the number.
 | Block | `immersiveengineering:signage`, one meta (`utility_sign`) |
 | Item | One. Four per two Aluminium Plates |
 | Kinds | Sixteen, on the tile entity — not sixteen items and not sixteen metas |
-| Placing | Against a **horizontal** face with something solid behind it |
+| Placing | Against a **horizontal** face with something behind it: a wall, or a pole the plate reaches back to |
 | Choosing a plate | **Engineer's Hammer**: steps to the next kind |
 | Writing on it | **Sneak + Engineer's Hammer**: opens the editor |
 | Lines | 0–3 depending on the kind, auto-scaled to fill the plate's *paint* — see below |
@@ -137,7 +137,7 @@ leaves for it.
 ## Where a kind lives
 
 **On the tile entity, and in a listed block property filled from it.** Sixteen kinds times four
-facings is sixty-four states, which is affordable — the *text* is what is not, and once the text has
+facings and seven reaches is 448 states, which is affordable — the *text* is what is not, and once the text has
 to be on the tile entity there is no reason for the kind to be anywhere else.
 
 `TileEntityUtilitySign` implements `IAttachedIntegerProperies`, which is what
@@ -207,7 +207,7 @@ plates" section above.
 
 ## What it costs to look at
 
-**The plate is an ordinary baked block model.** One of sixty-four, picked by the blockstate from the
+**The plate is an ordinary baked block model.** One of a hundred and twelve, picked by the blockstate from the
 kind and the facing, and baked into the chunk mesh like any other block. A pole line of tags costs
 what a pole line of blocks costs.
 
@@ -234,10 +234,47 @@ would be useless at exactly the hour somebody is out with a torch reading it.
 direction the plate's *back* points, toward whatever it is bolted to. Clicking the south face of a
 pole therefore hangs a sign that reads from the south.
 
-`canPlaceBlockOnSide` refuses vertical faces and faces with nothing solid behind them, and
+`canPlaceBlockOnSide` refuses vertical faces and faces with nothing behind them, and
 `neighborChanged` drops the sign when its support goes, the way a torch does. There is no collision
 box: nobody wants to be stopped by a pole number, and a one-pixel collision box on a ladder is a way
 to fall off one.
+
+### Reaching for the pole
+
+**A pole is not a wall, and a pole is what signs go on.** A sign is placed in the empty cell beside
+its support with its plate against the face they share — which is right against a wall, and two to
+four pixels short of a pole, because a pole's skin is inside its own block. City Super Mod's light
+poles and traffic poles are an eighth to a quarter of a block in on every side, so a tag hung on one
+hung in the air beside it. That is what a playtester reported.
+
+Two things follow, both in `SignMount`:
+
+| | |
+|---|---|
+| **Placing** | Forge's `isSideSolid` falls through to "opaque, full cube, no redstone", which a wall is and a four-pixel pole is not. `BlockUtilitySign.hasSupport` therefore accepts either that *or* a solid, non-replaceable block whose own bounding box comes within `SignMount.MAX` of the face — which lets in poles, fences and posts and still keeps out torches, flowers and air. |
+| **Reaching** | The plate grows a short **standoff** back to whatever is really there, measured off that block's own bounding box rather than guessed at or configured. Four pixels square, up to six deep, hidden behind every plate in the set. |
+
+**The plate does not move, and that is deliberate.** Sliding it into the pole's cell would look the
+same and would make the sign unclickable: `World.rayTraceBlocks` walks cell by cell and only ever
+tests the block that owns the cell it is in, so a plate drawn inside its neighbour's cell is a plate
+whose neighbour gets hit instead. A standoff keeps every pixel of the clickable plate in the sign's
+own block, and the selection box is unchanged.
+
+The reach is measured on placement and again whenever a neighbour changes, and — like the conduits
+and the junction boxes before it — `refreshMount` only notifies when the measured value actually
+changed. A tile that marks its block for update on every neighbour change is a tick-hang bomb beside
+another one that does the same.
+
+**Why the kind and the reach are one property.** Forge builds a variant out of the cartesian product
+of the submaps it is given and merges the partial variants, so two submaps that both want to name a
+model cannot both be honoured — the second simply wins. What a sign draws depends on *both*, so the
+two travel as one integer, `kind * 7 + mount`, and the blockstate has one `plate` submap of 112
+entries. `make_signage_assets.py` reads `SignMount.MAX` out of the Java for the same reason it parses
+the kind table: a generator that writes models for reaches the block cannot select is a generator
+that writes purple blocks.
+
+CSM's traffic poles grow a mount collar of their own toward anything solid beside them, signs
+included, and that is left alone — it is the pole's own hardware and it was asked to stay.
 
 `ITileDrop` puts the kind and the three lines into the dropped item's `sign` compound, and
 `readOnPlacement` reads them back — so hammering sixteen times to find the plate you meant and then
@@ -252,6 +289,7 @@ of unused ones still stacks.
 |---|---|
 | The kinds | `common/blocks/signage/UtilitySignKind.java` |
 | Text layout, shared | `common/blocks/signage/SignLayout.java` |
+| Reaching for the pole | `common/blocks/signage/SignMount.java` |
 | The block | `common/blocks/signage/BlockUtilitySign.java` |
 | The tile entity | `common/blocks/signage/TileEntityUtilitySign.java` |
 | The lettering | `client/render/TileRenderUtilitySign.java` |

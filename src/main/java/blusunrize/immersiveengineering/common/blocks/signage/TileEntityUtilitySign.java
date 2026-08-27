@@ -29,6 +29,7 @@ import net.minecraft.network.play.server.SPacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.util.math.BlockPos;
 
 import javax.annotation.Nullable;
 
@@ -36,9 +37,10 @@ import javax.annotation.Nullable;
  * One tag on a pole: which of the sixteen kinds it is, and what is printed on it.
  * <p>
  * <strong>Everything a sign is lives here rather than in the block state.</strong> Sixteen kinds
- * times four facings would be sixty-four states, which is affordable -- the text is what is not, and
- * once the text has to be on the tile entity there is no reason for the kind to be anywhere else.
- * The kind reaches the block state through {@link IAttachedIntegerProperies} only so that a plain
+ * times four facings times seven standoff reaches is 448 states, which is affordable -- the text is
+ * what is not, and once the text has to be on the tile entity there is no reason for the kind to be
+ * anywhere else. The kind and the reach travel to the block state together, through
+ * {@link IAttachedIntegerProperies} and {@link SignMount}'s packing, only so that a plain
  * {@code variants} blockstate can pick the plate model, which is the cheapest way to draw sixteen
  * flat plates: static geometry, no smart model, and nothing per frame except the lettering.
  * <p>
@@ -56,11 +58,22 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 	/** How thick a plate is, in block pixels. A tag is bolted flat to a pole, not hung off it. */
 	public static final float THICKNESS = 1;
 
-	/** The name the kind travels under, in the block state and in NBT. */
+	/** The name the kind travels under in NBT. */
 	public static final String KIND = "kind";
+
+	/** The name the standoff travels under in NBT. */
+	public static final String MOUNT = "mount";
+
+	/**
+	 * The name the two of them travel under together in the block state, packed by
+	 * {@link SignMount}: which plate, and how far it reaches back to the pole.
+	 */
+	public static final String PLATE = "plate";
 
 	private EnumFacing facing = EnumFacing.NORTH;
 	private UtilitySignKind kind = UtilitySignKind.YELLOW_VERTICAL;
+	/** How far the plate stands off its own block face, in block pixels. See {@link SignMount}. */
+	private int mount = 0;
 	private final String[] lines = new String[UtilitySignKind.MAX_LINES];
 
 	public TileEntityUtilitySign()
@@ -142,28 +155,65 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 	//		STATE AND SHAPE
 	//	=================================
 
+	/**
+	 * How far the plate stands off its own block face, in block pixels: nothing against a wall, two
+	 * to four against a pole whose skin is inside its own block. See {@link SignMount}.
+	 */
+	public int getMount()
+	{
+		return mount;
+	}
+
+	/**
+	 * Measure the standoff again against whatever the sign is bolted to.
+	 * <p>
+	 * <strong>Only when it changed.</strong> This runs from {@code neighborChanged}, and a tile that
+	 * marks its block for update on every neighbour change is a tick-hang bomb next to another one
+	 * that does the same -- the lesson the conduits and the junction boxes taught. Guarding on the
+	 * measured value means the notification this sends out settles on the next pass instead of
+	 * bouncing.
+	 *
+	 * @return true if the standoff changed
+	 */
+	public boolean refreshMount()
+	{
+		if(world==null)
+			return false;
+		BlockPos support = pos.offset(facing);
+		IBlockState state = world.getBlockState(support);
+		int measured = SignMount.clamp(
+				SignMount.gapPixels(state.getBoundingBox(world, support), facing.getOpposite()));
+		if(measured==mount)
+			return false;
+		mount = measured;
+		markDirty();
+		markContainingBlockForUpdate(null);
+		return true;
+	}
+
 	@Override
 	public String[] getIntPropertyNames()
 	{
-		return new String[]{KIND};
+		return new String[]{PLATE};
 	}
 
 	@Override
 	public PropertyInteger getIntProperty(String name)
 	{
-		return BlockUtilitySign.KIND;
+		return BlockUtilitySign.PLATE;
 	}
 
 	@Override
 	public int getIntPropertyValue(String name)
 	{
-		return kind.ordinal();
+		return SignMount.pack(kind, mount);
 	}
 
 	@Override
 	public void setValue(String name, int value)
 	{
-		setKind(UtilitySignKind.byIndex(value));
+		setKind(SignMount.kindOf(value));
+		mount = SignMount.mountOf(value);
 	}
 
 	@Override
@@ -302,6 +352,9 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 	public void writeCustomNBT(NBTTagCompound nbt, boolean descPacket)
 	{
 		nbt.setInteger("facing", facing.ordinal());
+		//Not part of writeSign: the standoff belongs to where a sign is hung, not to the sign, so it
+		//is measured again wherever the item is put up next rather than carried there in the stack.
+		nbt.setInteger(MOUNT, mount);
 		writeSign(nbt);
 	}
 
@@ -313,6 +366,7 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 		int ordinal = nbt.getInteger("facing");
 		setFacing(ordinal >= 0&&ordinal < EnumFacing.VALUES.length
 				?EnumFacing.VALUES[ordinal]: EnumFacing.NORTH);
+		mount = SignMount.clamp(nbt.getInteger(MOUNT));
 		readSign(nbt);
 	}
 
@@ -329,8 +383,9 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 	{
 		UtilitySignKind before = kind;
 		EnumFacing wasFacing = facing;
+		int wasMount = mount;
 		super.onDataPacket(net, pkt);
-		if(world!=null&&world.isRemote&&(kind!=before||facing!=wasFacing))
+		if(world!=null&&world.isRemote&&(kind!=before||facing!=wasFacing||mount!=wasMount))
 			world.markBlockRangeForRenderUpdate(getPos(), getPos());
 	}
 

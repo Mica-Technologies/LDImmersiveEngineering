@@ -42,9 +42,13 @@ YELLOW_LIT = (242, 208, 70, 255)
 # pole tag at a glance is worth as much here as telling a red strip from a yellow one.
 PALE_YELLOW = (236, 214, 118, 255)
 PALE_YELLOW_LIT = (248, 232, 164, 255)
-# The number stencilled onto a tower leg is painted on amber primer rather than on a plate.
-AMBER = (232, 160, 74, 255)
-AMBER_LIT = (246, 186, 108, 255)
+# The number stencilled onto a tower leg is painted on amber primer rather than on a plate, so it
+# gets no black outline: what edges it is the paint stopping, which is a shade of itself and not a
+# frame.  Lighter than the first cut, which came out brown in game -- a block face is shaded before
+# it is drawn, and a colour picked against a photograph has to be picked with that shading in mind.
+AMBER = (242, 174, 92, 255)
+AMBER_LIT = (250, 196, 122, 255)
+AMBER_EDGE = (198, 132, 58, 255)
 WHITE = (238, 238, 236, 255)
 WHITE_LIT = (250, 250, 248, 255)
 SILVER = (176, 180, 184, 255)
@@ -74,6 +78,9 @@ METAL_GRAIN = 10
 MODEL_DIR = os.path.join("models", "block", "signage")
 TEXTURE_REF = "immersiveengineering:blocks/sign_%s"
 MODEL_REF = "immersiveengineering:signage/sign_%s"
+# The same folder, addressed by a whole model name rather than by a kind -- what the standoff
+# variants need, since their names carry a reach as well.
+MODEL_PATH_REF = "immersiveengineering:signage/%s"
 
 FACING_ROTATION = {"north": 0, "east": 90, "south": 180, "west": 270}
 
@@ -437,7 +444,7 @@ def build_texture(assets, kind):
     elif name in ("tower_vertical", "tower_short"):
         strip(draw, rect, PALE_YELLOW, PALE_YELLOW_LIT)
     elif name == "tower_number":
-        strip(draw, rect, AMBER, AMBER_LIT)
+        strip(draw, rect, AMBER, AMBER_LIT, edge=AMBER_EDGE)
     else:
         raise SystemExit("no artwork for sign kind %s" % name)
     if SHAPE_OF[routine] != kind["shape"]:
@@ -454,6 +461,26 @@ def build_texture(assets, kind):
     return out
 
 
+def build_standoff_texture(assets):
+    """The strap that reaches from the back of a plate to the skin of a pole.
+
+    Galvanised steel rather than painted: it is the fastening, not the sign, and the same
+    argument that gave the inspection tag's bolt its own two tones applies here -- it has to
+    read as hardware against every plate colour in the set and against every pole it is
+    bolted to.  Filled edge to edge because every face of the strap samples the middle of it
+    and nothing samples the rim.
+    """
+    image = Image.new("RGBA", (16, 16), BOLT)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([5, 5, 10, 10], fill=(96, 98, 102, 255))
+    draw.line([5, 5, 10, 5], fill=BOLT_LIT)
+    draw.line([5, 5, 5, 10], fill=BOLT_LIT)
+    out = os.path.join(assets, "textures", "blocks", "sign_standoff.png")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    image.save(out, "PNG", optimize=True)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -461,8 +488,35 @@ def build_texture(assets, kind):
 THICKNESS = 1
 
 
-def build_model(assets, kind):
-    """One thin box, authored for a sign whose back is against the block to the north.
+# The strap itself: four pixels square in the middle of the plate, which is the largest that is
+# still hidden behind every kind -- the shallowest plate in the set is the four-pixel horizontal
+# strip -- and the smallest that still reads as hardware rather than as a wire.
+STANDOFF_HALF = 2
+
+
+def read_max_mount(repo):
+    """SignMount.MAX, straight out of the Java, for the same reason read_kinds parses the enum."""
+    path = os.path.join(repo, "src", "main", "java", "blusunrize", "immersiveengineering",
+                        "common", "blocks", "signage", "SignMount.java")
+    with open(path, encoding="utf-8") as handle:
+        match = re.search(r"public static final int MAX = (\d+);", handle.read())
+    if not match:
+        raise SystemExit("could not read SignMount.MAX out of SignMount.java")
+    return int(match.group(1))
+
+
+def model_name(kind, mount):
+    """What one plate-and-reach combination's model is called.
+
+    Mount zero keeps the plain name it has always had: it is what the item model resolves
+    through and what every sign bolted to a wall uses, which is most of them.
+    """
+    return "sign_%s" % kind["name"] if mount == 0 else "sign_%s_m%d" % (kind["name"], mount)
+
+
+def build_model(assets, kind, mount):
+    """One thin box, authored for a sign whose back is against the block to the north, plus the
+    standoff that reaches back to whatever is really there.
 
     The other three facings are that model turned about Y by the blockstate.  A plate is
     the same plate whichever way it is bolted, and four copies of one box is four chances
@@ -472,6 +526,12 @@ def build_model(assets, kind):
     the sprite is drawn at exactly one texel per block pixel.  The four edges are one
     pixel wide and take a single texel from the middle of the plate: sampling their own
     coordinates would put the transparent corner of a diamond along its rim.
+
+    **The standoff reaches into the neighbour's cell and the plate does not.**  A pole's skin
+    is two to four pixels inside its own block, so a tag hung beside one stands off it by that
+    much; the strap crosses the gap from z=0 back to z=-mount, and the plate stays put, because
+    a plate drawn inside the neighbour's cell is a plate whose neighbour gets clicked instead.
+    See SignMount.
     """
     x0, y0, x1, y1 = plate_rect(kind)
     mid_x, mid_y = (x0+x1)//2, (y0+y1)//2
@@ -488,18 +548,32 @@ def build_model(assets, kind):
         "west": {"texture": "#sign", "uv": edge_uv},
         "east": {"texture": "#sign", "uv": edge_uv},
     }
-    body = {
-        "textures": {
-            "sign": TEXTURE_REF % kind["name"],
-            "particle": TEXTURE_REF % kind["name"],
-        },
-        "elements": [{
-            "from": [x0, y0, 0],
-            "to": [x1, y1, THICKNESS],
-            "faces": faces,
-        }],
+    elements = [{
+        "from": [x0, y0, 0],
+        "to": [x1, y1, THICKNESS],
+        "faces": faces,
+    }]
+    textures = {
+        "sign": TEXTURE_REF % kind["name"],
+        "particle": TEXTURE_REF % kind["name"],
     }
-    path = os.path.join(assets, MODEL_DIR, "sign_%s.json" % kind["name"])
+    if mount > 0:
+        textures["standoff"] = TEXTURE_REF % "standoff"
+        # One square of texture on every face of the strap.  It is four pixels across and at most
+        # six deep, and it spends its life hidden behind a plate that is bigger than it in both
+        # directions; per-face UVs would be arithmetic nobody will ever see the result of.
+        strap_uv = [8-STANDOFF_HALF, 8-STANDOFF_HALF, 8+STANDOFF_HALF, 8+STANDOFF_HALF]
+        elements.append({
+            "from": [8-STANDOFF_HALF, 8-STANDOFF_HALF, -mount],
+            "to": [8+STANDOFF_HALF, 8+STANDOFF_HALF, 0],
+            "faces": {side: {"texture": "#standoff", "uv": strap_uv}
+                      for side in ("north", "south", "up", "down", "west", "east")},
+        })
+    body = {
+        "textures": textures,
+        "elements": elements,
+    }
+    path = os.path.join(assets, MODEL_DIR, "%s.json" % model_name(kind, mount))
     write_json(path, body)
     return path
 
@@ -515,20 +589,25 @@ def write_json(path, body):
 # Blockstates
 # ---------------------------------------------------------------------------
 
-def build_blockstates(assets, kinds):
+def build_blockstates(assets, kinds, steps):
     """The two files, and both have to exist.
 
     `signage.json` carries the `inventory` variant the item model resolves through;
-    `signage_utility_sign.json` carries the block's own fifty-two, and is named by
+    `signage_utility_sign.json` carries the block's own, and is named by
     BlockUtilitySign.getCustomStateMapping.  A custom state mapping with no matching
     file is one of the two silent causes of a purple block in 1.12 and neither of them
     logs anything.
 
-    The block file is written as Forge property submaps rather than fifty-two spelled-out
-    keys: the loader takes the cartesian product, so `facing` supplies a rotation, `kind`
-    supplies a model and `type` supplies nothing at all.  **Every listed property has to
-    appear.**  A submap file that leaves one out does not resolve the variant string the
-    state mapper hands it, and again nothing is logged.
+    The block file is written as Forge property submaps rather than spelled-out keys: the
+    loader takes the cartesian product, so `facing` supplies a rotation, `plate` supplies a
+    model and `type` supplies nothing at all.  **Every listed property has to appear.**  A
+    submap file that leaves one out does not resolve the variant string the state mapper
+    hands it, and again nothing is logged.
+
+    **`plate` is the kind and the standoff packed together**, because what a sign draws
+    depends on both and two submaps cannot each name a model -- Forge merges the partial
+    variants and the second simply wins.  See SignMount, which does the packing, and which
+    this has to agree with exactly: index = kind * steps + mount.
     """
     item = {
         "forge_marker": 1,
@@ -543,14 +622,18 @@ def build_blockstates(assets, kinds):
     }
     write_json(os.path.join(assets, "blockstates", "signage.json"), item)
 
+    plates = {}
+    for index, kind in enumerate(kinds):
+        for mount in range(steps):
+            plates[str(index*steps+mount)] = {"model": MODEL_PATH_REF % model_name(kind, mount)}
+
     block = {
         "forge_marker": 1,
         "defaults": {"model": MODEL_REF % kinds[0]["name"]},
         "variants": {
             "facing": {facing: ({} if angle == 0 else {"y": angle})
                        for facing, angle in FACING_ROTATION.items()},
-            "kind": {str(index): {"model": MODEL_REF % kind["name"]}
-                     for index, kind in enumerate(kinds)},
+            "plate": plates,
             "type": {"utility_sign": {}},
         },
     }
@@ -566,12 +649,18 @@ def main():
     args = parser.parse_args()
 
     kinds = read_kinds(repo)
-    print("%d kinds read from UtilitySignKind.java" % len(kinds))
+    steps = read_max_mount(repo)+1
+    print("%d kinds read from UtilitySignKind.java, %d standoff reaches from SignMount.java"
+          % (len(kinds), steps))
+    models = 0
     for kind in kinds:
         build_texture(args.assets, kind)
-        build_model(args.assets, kind)
-    build_blockstates(args.assets, kinds)
-    print("wrote %d textures, %d models and 2 blockstates" % (len(kinds), len(kinds)))
+        for mount in range(steps):
+            build_model(args.assets, kind, mount)
+            models += 1
+    build_standoff_texture(args.assets)
+    build_blockstates(args.assets, kinds, steps)
+    print("wrote %d textures, %d models and 2 blockstates" % (len(kinds)+1, models))
 
 
 if __name__ == "__main__":

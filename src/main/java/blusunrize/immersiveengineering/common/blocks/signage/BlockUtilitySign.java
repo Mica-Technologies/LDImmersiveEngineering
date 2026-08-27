@@ -15,6 +15,7 @@ import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyEnum;
 import net.minecraft.block.properties.PropertyInteger;
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.BlockRenderLayer;
 import net.minecraft.util.EnumFacing;
@@ -36,27 +37,32 @@ import javax.annotation.Nullable;
  * they are told apart the way the real ones are, by shape and colour before anybody is close enough
  * to read the number.
  * <p>
- * One block, one meta, one item. The kind is a listed integer property filled from the tile entity,
- * so the blockstate can be a plain {@code variants} file naming one flat plate model per kind and
- * facing -- sixty-four models' worth of nothing but a textured slab. Only the lettering costs
- * anything per frame, and only within forty-eight blocks; see {@code TileRenderUtilitySign}.
+ * One block, one meta, one item. The kind and how far the plate reaches back to what it is bolted to
+ * are one listed integer property filled from the tile entity, so the blockstate can be a plain
+ * {@code variants} file naming one flat model per plate, reach and facing -- a hundred and twelve
+ * models' worth of nothing but a textured slab and a strap. Only the lettering costs anything per
+ * frame, and only within forty-eight blocks; see {@code TileRenderUtilitySign}.
  *
  * @author LDImmersiveEngineering -- signage
  */
 public class BlockUtilitySign extends BlockIETileProvider<BlockTypes_Signage>
 {
 	/**
-	 * Which of the sixteen plates this is. Listed so a blockstate can select on it, and filled from
-	 * the tile entity through {@code IAttachedIntegerProperies} -- it is saved on the tile, not in
-	 * the meta, because the text has to be there anyway.
+	 * Which of the sixteen plates this is <em>and</em> how far it reaches back to what it is bolted
+	 * to, packed into one integer by {@link SignMount}. Listed so a blockstate can select on it, and
+	 * filled from the tile entity through {@code IAttachedIntegerProperies} -- both halves are saved
+	 * on the tile, not in the meta, because the text has to be there anyway.
+	 * <p>
+	 * One property rather than two because the model depends on both, and Forge's submaps cannot
+	 * name a model from two of them at once -- see {@link SignMount}.
 	 */
-	public static final PropertyInteger KIND = PropertyInteger.create(TileEntityUtilitySign.KIND,
-			0, UtilitySignKind.VALUES.length-1);
+	public static final PropertyInteger PLATE = PropertyInteger.create(TileEntityUtilitySign.PLATE,
+			0, SignMount.packedCount()-1);
 
 	public BlockUtilitySign()
 	{
 		super("signage", Material.IRON, PropertyEnum.create("type", BlockTypes_Signage.class),
-				ItemBlockIEBase.class, IEProperties.FACING_HORIZONTAL, KIND);
+				ItemBlockIEBase.class, IEProperties.FACING_HORIZONTAL, PLATE);
 		this.setHardness(0.5F);
 		this.setResistance(2.0F);
 		this.lightOpacity = 0;
@@ -97,8 +103,29 @@ public class BlockUtilitySign extends BlockIETileProvider<BlockTypes_Signage>
 		//would draw fine and read as a bug.
 		if(side.getAxis()==EnumFacing.Axis.Y)
 			return false;
-		BlockPos support = pos.offset(side.getOpposite());
-		return world.getBlockState(support).isSideSolid(world, support, side);
+		return hasSupport(world, pos.offset(side.getOpposite()), side);
+	}
+
+	/**
+	 * Whether there is something at {@code support} worth bolting a tag to, looking at its
+	 * {@code face}.
+	 * <p>
+	 * <strong>A pole is not a side-solid block, and it is the thing this block is for.</strong>
+	 * Forge's {@code isSideSolid} falls through to "opaque, full cube, no redstone", which a wall
+	 * is and a four-pixel pole is not, so the first version of this refused to hang a sign on
+	 * anything shaped like the thing signs go on. The second test is what a pole passes: something
+	 * solid whose own geometry comes within a standoff's reach of the face -- which lets in poles,
+	 * fences and posts and still keeps out torches, flowers and air, none of which are solid
+	 * materials.
+	 */
+	private static boolean hasSupport(IBlockAccess world, BlockPos support, EnumFacing face)
+	{
+		IBlockState state = world.getBlockState(support);
+		if(state.isSideSolid(world, support, face))
+			return true;
+		if(!state.getMaterial().isSolid()||state.getBlock().isReplaceable(world, support))
+			return false;
+		return SignMount.gapPixels(state.getBoundingBox(world, support), face) <= SignMount.MAX;
 	}
 
 	@Override
@@ -114,12 +141,31 @@ public class BlockUtilitySign extends BlockIETileProvider<BlockTypes_Signage>
 		//The pole came down. Vanilla signs and torches drop rather than hang in mid-air, and a tag
 		//that stayed behind would be a tag nobody could tell was orphaned.
 		EnumFacing facing = ((TileEntityUtilitySign)tile).getFacing();
-		BlockPos support = pos.offset(facing);
-		if(!world.getBlockState(support).isSideSolid(world, support, facing.getOpposite()))
+		if(!hasSupport(world, pos.offset(facing), facing.getOpposite()))
 		{
 			dropBlockAsItem(world, pos, state, 0);
 			world.setBlockToAir(pos);
+			return;
 		}
+		//The pole is still there but may not be the same shape it was -- a light pole replaced by a
+		//wall, or the other way about -- so the standoff is measured again rather than kept.
+		((TileEntityUtilitySign)tile).refreshMount();
+	}
+
+	@Override
+	public void onIEBlockPlacedBy(World world, BlockPos pos, IBlockState state, EnumFacing side,
+								  float hitX, float hitY, float hitZ,
+								  net.minecraft.entity.EntityLivingBase placer, ItemStack stack)
+	{
+		super.onIEBlockPlacedBy(world, pos, state, side, hitX, hitY, hitZ, placer, stack);
+		//Here rather than in onBlockPlacedBy, and that is the whole of why the first cut measured
+		//nothing: ItemBlockIEBase.placeBlockAt calls vanilla's placeBlockAt -- which is what runs
+		//onBlockPlacedBy -- and only afterwards calls this, which is where IE sets the tile's
+		//facing. A standoff measured before the facing is set is measured against whatever happens
+		//to be north of the sign, which is usually air, which is no reach at all.
+		TileEntity tile = world.getTileEntity(pos);
+		if(tile instanceof TileEntityUtilitySign)
+			((TileEntityUtilitySign)tile).refreshMount();
 	}
 
 	@Override
@@ -137,9 +183,9 @@ public class BlockUtilitySign extends BlockIETileProvider<BlockTypes_Signage>
 	@Override
 	public String getCustomStateMapping(int meta, boolean itemBlock)
 	{
-		//The item resolves against signage.json's `inventory` variant; the block half has sixty-four
-		//variants of its own and lives in its own file. Both have to exist -- a custom mapping with
-		//no matching file is a purple block with nothing in the log.
+		//The item resolves against signage.json's `inventory` variant; the block half has variants
+		//of its own and lives in its own file. Both have to exist -- a custom mapping with no
+		//matching file is a purple block with nothing in the log.
 		return itemBlock?null: "utility_sign";
 	}
 }

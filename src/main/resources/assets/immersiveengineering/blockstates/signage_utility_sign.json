@@ -16,54 +16,342 @@
 				"y": 270
 			}
 		},
-		"kind": {
+		"plate": {
 			"0": {
 				"model": "immersiveengineering:signage/sign_parallel_generation"
 			},
 			"1": {
-				"model": "immersiveengineering:signage/sign_yellow_vertical"
+				"model": "immersiveengineering:signage/sign_parallel_generation_m1"
 			},
 			"2": {
-				"model": "immersiveengineering:signage/sign_white_vertical"
+				"model": "immersiveengineering:signage/sign_parallel_generation_m2"
 			},
 			"3": {
-				"model": "immersiveengineering:signage/sign_silver_vertical"
+				"model": "immersiveengineering:signage/sign_parallel_generation_m3"
 			},
 			"4": {
-				"model": "immersiveengineering:signage/sign_oval_fraction"
+				"model": "immersiveengineering:signage/sign_parallel_generation_m4"
 			},
 			"5": {
-				"model": "immersiveengineering:signage/sign_yellow_horizontal"
+				"model": "immersiveengineering:signage/sign_parallel_generation_m5"
 			},
 			"6": {
-				"model": "immersiveengineering:signage/sign_orange_horizontal"
+				"model": "immersiveengineering:signage/sign_parallel_generation_m6"
 			},
 			"7": {
-				"model": "immersiveengineering:signage/sign_orange_vertical"
+				"model": "immersiveengineering:signage/sign_yellow_vertical"
 			},
 			"8": {
-				"model": "immersiveengineering:signage/sign_inspection_round"
+				"model": "immersiveengineering:signage/sign_yellow_vertical_m1"
 			},
 			"9": {
-				"model": "immersiveengineering:signage/sign_tower_diamond"
+				"model": "immersiveengineering:signage/sign_yellow_vertical_m2"
 			},
 			"10": {
-				"model": "immersiveengineering:signage/sign_line_crossing_diamond"
+				"model": "immersiveengineering:signage/sign_yellow_vertical_m3"
 			},
 			"11": {
-				"model": "immersiveengineering:signage/sign_tower_vertical"
+				"model": "immersiveengineering:signage/sign_yellow_vertical_m4"
 			},
 			"12": {
-				"model": "immersiveengineering:signage/sign_tower_horizontal"
+				"model": "immersiveengineering:signage/sign_yellow_vertical_m5"
 			},
 			"13": {
-				"model": "immersiveengineering:signage/sign_tower_short"
+				"model": "immersiveengineering:signage/sign_yellow_vertical_m6"
 			},
 			"14": {
-				"model": "immersiveengineering:signage/sign_tower_number"
+				"model": "immersiveengineering:signage/sign_white_vertical"
 			},
 			"15": {
+				"model": "immersiveengineering:signage/sign_white_vertical_m1"
+			},
+			"16": {
+				"model": "immersiveengineering:signage/sign_white_vertical_m2"
+			},
+			"17": {
+				"model": "immersiveengineering:signage/sign_white_vertical_m3"
+			},
+			"18": {
+				"model": "immersiveengineering:signage/sign_white_vertical_m4"
+			},
+			"19": {
+				"model": "immersiveengineering:signage/sign_white_vertical_m5"
+			},
+			"20": {
+				"model": "immersiveengineering:signage/sign_white_vertical_m6"
+			},
+			"21": {
+				"model": "immersiveengineering:signage/sign_silver_vertical"
+			},
+			"22": {
+				"model": "immersiveengineering:signage/sign_silver_vertical_m1"
+			},
+			"23": {
+				"model": "immersiveengineering:signage/sign_silver_vertical_m2"
+			},
+			"24": {
+				"model": "immersiveengineering:signage/sign_silver_vertical_m3"
+			},
+			"25": {
+				"model": "immersiveengineering:signage/sign_silver_vertical_m4"
+			},
+			"26": {
+				"model": "immersiveengineering:signage/sign_silver_vertical_m5"
+			},
+			"27": {
+				"model": "immersiveengineering:signage/sign_silver_vertical_m6"
+			},
+			"28": {
+				"model": "immersiveengineering:signage/sign_oval_fraction"
+			},
+			"29": {
+				"model": "immersiveengineering:signage/sign_oval_fraction_m1"
+			},
+			"30": {
+				"model": "immersiveengineering:signage/sign_oval_fraction_m2"
+			},
+			"31": {
+				"model": "immersiveengineering:signage/sign_oval_fraction_m3"
+			},
+			"32": {
+				"model": "immersiveengineering:signage/sign_oval_fraction_m4"
+			},
+			"33": {
+				"model": "immersiveengineering:signage/sign_oval_fraction_m5"
+			},
+			"34": {
+				"model": "immersiveengineering:signage/sign_oval_fraction_m6"
+			},
+			"35": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal"
+			},
+			"36": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal_m1"
+			},
+			"37": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal_m2"
+			},
+			"38": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal_m3"
+			},
+			"39": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal_m4"
+			},
+			"40": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal_m5"
+			},
+			"41": {
+				"model": "immersiveengineering:signage/sign_yellow_horizontal_m6"
+			},
+			"42": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal"
+			},
+			"43": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal_m1"
+			},
+			"44": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal_m2"
+			},
+			"45": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal_m3"
+			},
+			"46": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal_m4"
+			},
+			"47": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal_m5"
+			},
+			"48": {
+				"model": "immersiveengineering:signage/sign_orange_horizontal_m6"
+			},
+			"49": {
+				"model": "immersiveengineering:signage/sign_orange_vertical"
+			},
+			"50": {
+				"model": "immersiveengineering:signage/sign_orange_vertical_m1"
+			},
+			"51": {
+				"model": "immersiveengineering:signage/sign_orange_vertical_m2"
+			},
+			"52": {
+				"model": "immersiveengineering:signage/sign_orange_vertical_m3"
+			},
+			"53": {
+				"model": "immersiveengineering:signage/sign_orange_vertical_m4"
+			},
+			"54": {
+				"model": "immersiveengineering:signage/sign_orange_vertical_m5"
+			},
+			"55": {
+				"model": "immersiveengineering:signage/sign_orange_vertical_m6"
+			},
+			"56": {
+				"model": "immersiveengineering:signage/sign_inspection_round"
+			},
+			"57": {
+				"model": "immersiveengineering:signage/sign_inspection_round_m1"
+			},
+			"58": {
+				"model": "immersiveengineering:signage/sign_inspection_round_m2"
+			},
+			"59": {
+				"model": "immersiveengineering:signage/sign_inspection_round_m3"
+			},
+			"60": {
+				"model": "immersiveengineering:signage/sign_inspection_round_m4"
+			},
+			"61": {
+				"model": "immersiveengineering:signage/sign_inspection_round_m5"
+			},
+			"62": {
+				"model": "immersiveengineering:signage/sign_inspection_round_m6"
+			},
+			"63": {
+				"model": "immersiveengineering:signage/sign_tower_diamond"
+			},
+			"64": {
+				"model": "immersiveengineering:signage/sign_tower_diamond_m1"
+			},
+			"65": {
+				"model": "immersiveengineering:signage/sign_tower_diamond_m2"
+			},
+			"66": {
+				"model": "immersiveengineering:signage/sign_tower_diamond_m3"
+			},
+			"67": {
+				"model": "immersiveengineering:signage/sign_tower_diamond_m4"
+			},
+			"68": {
+				"model": "immersiveengineering:signage/sign_tower_diamond_m5"
+			},
+			"69": {
+				"model": "immersiveengineering:signage/sign_tower_diamond_m6"
+			},
+			"70": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond"
+			},
+			"71": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond_m1"
+			},
+			"72": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond_m2"
+			},
+			"73": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond_m3"
+			},
+			"74": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond_m4"
+			},
+			"75": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond_m5"
+			},
+			"76": {
+				"model": "immersiveengineering:signage/sign_line_crossing_diamond_m6"
+			},
+			"77": {
+				"model": "immersiveengineering:signage/sign_tower_vertical"
+			},
+			"78": {
+				"model": "immersiveengineering:signage/sign_tower_vertical_m1"
+			},
+			"79": {
+				"model": "immersiveengineering:signage/sign_tower_vertical_m2"
+			},
+			"80": {
+				"model": "immersiveengineering:signage/sign_tower_vertical_m3"
+			},
+			"81": {
+				"model": "immersiveengineering:signage/sign_tower_vertical_m4"
+			},
+			"82": {
+				"model": "immersiveengineering:signage/sign_tower_vertical_m5"
+			},
+			"83": {
+				"model": "immersiveengineering:signage/sign_tower_vertical_m6"
+			},
+			"84": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal"
+			},
+			"85": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal_m1"
+			},
+			"86": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal_m2"
+			},
+			"87": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal_m3"
+			},
+			"88": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal_m4"
+			},
+			"89": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal_m5"
+			},
+			"90": {
+				"model": "immersiveengineering:signage/sign_tower_horizontal_m6"
+			},
+			"91": {
+				"model": "immersiveengineering:signage/sign_tower_short"
+			},
+			"92": {
+				"model": "immersiveengineering:signage/sign_tower_short_m1"
+			},
+			"93": {
+				"model": "immersiveengineering:signage/sign_tower_short_m2"
+			},
+			"94": {
+				"model": "immersiveengineering:signage/sign_tower_short_m3"
+			},
+			"95": {
+				"model": "immersiveengineering:signage/sign_tower_short_m4"
+			},
+			"96": {
+				"model": "immersiveengineering:signage/sign_tower_short_m5"
+			},
+			"97": {
+				"model": "immersiveengineering:signage/sign_tower_short_m6"
+			},
+			"98": {
+				"model": "immersiveengineering:signage/sign_tower_number"
+			},
+			"99": {
+				"model": "immersiveengineering:signage/sign_tower_number_m1"
+			},
+			"100": {
+				"model": "immersiveengineering:signage/sign_tower_number_m2"
+			},
+			"101": {
+				"model": "immersiveengineering:signage/sign_tower_number_m3"
+			},
+			"102": {
+				"model": "immersiveengineering:signage/sign_tower_number_m4"
+			},
+			"103": {
+				"model": "immersiveengineering:signage/sign_tower_number_m5"
+			},
+			"104": {
+				"model": "immersiveengineering:signage/sign_tower_number_m6"
+			},
+			"105": {
 				"model": "immersiveengineering:signage/sign_transformer_grounded"
+			},
+			"106": {
+				"model": "immersiveengineering:signage/sign_transformer_grounded_m1"
+			},
+			"107": {
+				"model": "immersiveengineering:signage/sign_transformer_grounded_m2"
+			},
+			"108": {
+				"model": "immersiveengineering:signage/sign_transformer_grounded_m3"
+			},
+			"109": {
+				"model": "immersiveengineering:signage/sign_transformer_grounded_m4"
+			},
+			"110": {
+				"model": "immersiveengineering:signage/sign_transformer_grounded_m5"
+			},
+			"111": {
+				"model": "immersiveengineering:signage/sign_transformer_grounded_m6"
 			}
 		},
 		"type": {

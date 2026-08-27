@@ -23,6 +23,14 @@ it, the way a torch does.
 
 Signs have no collision box. Walking into a pole covered in them is walking into the pole.
 
+\begin{ietip}
+A pole is not a wall: its skin is a couple of pixels inside its own block, so a plate bolted flat
+against the block face would hang in the air beside it. A sign hung on one grows a short
+\textbf{standoff} back to the metal instead, measured off whatever it is really bolted to --- so
+City Super Mod's light poles and traffic poles take a tag the same way a wall does, and it sits
+against them rather than off them.
+\end{ietip}
+
 \section{Choosing the plate}
 
 \textbf{Hit a sign with an Engineer's Hammer} and it steps to the next of the sixteen. Keep hitting
@@ -100,8 +108,7 @@ meant and then mining it by accident costs nothing.
 \section{What a sign costs to look at}
 
 Nothing you will notice. The plate is an ordinary block model baked into the chunk mesh like any
-other --- one of sixty-four, sixteen plates times four facings --- so a pole line of them costs what
-a pole line of blocks costs.
+other, so a pole line of them costs what a pole line of blocks costs.
 
 Only the \emph{lettering} is drawn per frame, and only within forty-eight blocks. Past that the
 plate is a pixel or two across and the number was never legible anyway, so nothing is drawn at all.

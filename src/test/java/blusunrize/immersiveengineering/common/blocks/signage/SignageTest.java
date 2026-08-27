@@ -12,6 +12,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import net.minecraft.util.EnumFacing;
+import net.minecraft.util.math.AxisAlignedBB;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -53,7 +55,17 @@ class SignageTest
 
 	private static String modelName(UtilitySignKind kind)
 	{
-		return "signage/sign_"+kind.getName();
+		return modelName(kind, 0);
+	}
+
+	/**
+	 * What one plate-and-reach combination's model is called. Mount zero keeps the plain name it has
+	 * always had -- it is what the item model resolves through and what every sign bolted to a wall
+	 * uses, which is most of them.
+	 */
+	private static String modelName(UtilitySignKind kind, int mount)
+	{
+		return "signage/sign_"+kind.getName()+(mount==0?"": "_m"+mount);
 	}
 
 	private static BufferedImage sprite(UtilitySignKind kind)
@@ -621,6 +633,76 @@ class SignageTest
 	}
 
 	@Nested
+	@DisplayName("reaching for the pole")
+	class Mounting
+	{
+		@Test
+		@DisplayName("a plate and a reach survive being packed into one number and taken back out")
+		void packingIsReversible()
+		{
+			//This number is what the tile entity puts into the block state and what the blockstate
+			//reads a model out of, so the two directions have to be exact inverses for every
+			//combination there is -- a packing that drifted would draw a different sign.
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				for(int mount = 0; mount <= SignMount.MAX; mount++)
+				{
+					int packed = SignMount.pack(kind, mount);
+					assertTrue(packed >= 0&&packed < SignMount.packedCount(),
+							kind+" +"+mount+" packs to "+packed+", outside the property's range");
+					assertSame(kind, SignMount.kindOf(packed));
+					assertEquals(mount, SignMount.mountOf(packed));
+				}
+			assertEquals(UtilitySignKind.VALUES.length*SignMount.STEPS, SignMount.packedCount());
+		}
+
+		@Test
+		@DisplayName("a reach out of range is brought back in rather than trusted")
+		void reachesAreClamped()
+		{
+			assertEquals(0, SignMount.clamp(-3));
+			assertEquals(0, SignMount.clamp(0));
+			assertEquals(SignMount.MAX, SignMount.clamp(SignMount.MAX));
+			assertEquals(SignMount.MAX, SignMount.clamp(SignMount.MAX+9));
+			//And the same for a packed value that came off disk or out of a hand-made packet.
+			assertNotNull(SignMount.kindOf(-1));
+			assertNotNull(SignMount.kindOf(99999));
+			assertEquals(0, SignMount.mountOf(-1));
+		}
+
+		@Test
+		@DisplayName("a wall needs no reach and a pole needs one, measured off its own bounding box")
+		void gapsAreMeasuredFromTheNeighbour()
+		{
+			//The numbers are City Super Mod's own: its large traffic and light poles are an eighth
+			//of a block in on each side and its small traffic pole a quarter, which is two and four
+			//block pixels. A wall is a wall and needs nothing.
+			AxisAlignedBB wall = new AxisAlignedBB(0, 0, 0, 1, 1, 1);
+			AxisAlignedBB largePole = new AxisAlignedBB(0.125, 0, 0.125, 0.875, 1, 0.875);
+			AxisAlignedBB smallPole = new AxisAlignedBB(0.25, 0, 0.25, 0.75, 1, 0.75);
+			for(EnumFacing towardSign : EnumFacing.HORIZONTALS)
+			{
+				assertEquals(0, SignMount.gapPixels(wall, towardSign),
+						"a full cube is asked to be stood off "+towardSign);
+				assertEquals(2, SignMount.gapPixels(largePole, towardSign),
+						"a large pole measures wrong "+towardSign);
+				assertEquals(4, SignMount.gapPixels(smallPole, towardSign),
+						"a small pole measures wrong "+towardSign);
+			}
+			//Along the pole rather than across it there is nothing to stand off, which is the case
+			//a sign never actually meets -- it hangs on a side -- but the arithmetic still answers.
+			assertEquals(0, SignMount.gapPixels(largePole, EnumFacing.UP));
+			//A model that overhangs its own cell, as CSM's octagonal pole top does, reaches past
+			//the shared face rather than short of it. Negative reach is not a thing.
+			assertEquals(0, SignMount.gapPixels(
+					new AxisAlignedBB(0, 0, -0.15625, 1, 1, 1), EnumFacing.NORTH));
+			//And something genuinely far away measures far away rather than being quietly clamped,
+			//which is what lets the placement check tell a pole from a block with a hole in it.
+			assertTrue(SignMount.gapPixels(new AxisAlignedBB(0, 0, 0, 0.25, 1, 1), EnumFacing.EAST)
+					> SignMount.MAX);
+		}
+	}
+
+	@Nested
 	@DisplayName("the generated assets")
 	class Assets
 	{
@@ -731,32 +813,75 @@ class SignageTest
 		}
 
 		@Test
-		@DisplayName("the blockstate names a model for every kind and a rotation for every facing")
+		@DisplayName("the blockstate names a model for every plate and reach, and a rotation for every facing")
 		void blockstateCoversEverything()
 		{
 			//Both files have to exist and every listed property has to appear: Forge takes the
 			//cartesian product of the submaps, and a variant string it cannot resolve is a purple
-			//block with nothing in the log.
+			//block with nothing in the log. The packing has to match SignMount's exactly, because
+			//nothing else checks that the number the tile entity puts in the state is the number the
+			//blockstate reads out of it.
 			JsonObject variants = read("blockstates/signage_utility_sign.json")
 					.getAsJsonObject("variants");
 			assertTrue(variants.has("facing"), "the blockstate does not select on facing");
-			assertTrue(variants.has("kind"), "the blockstate does not select on kind");
+			assertTrue(variants.has("plate"), "the blockstate does not select on plate");
 			assertTrue(variants.has("type"), "the blockstate does not select on type");
 			JsonObject facings = variants.getAsJsonObject("facing");
 			for(String facing : new String[]{"north", "east", "south", "west"})
 				assertTrue(facings.has(facing), "no variant for facing="+facing);
 			assertEquals(4, facings.entrySet().size(), "a sign has four facings and no more");
-			JsonObject kinds = variants.getAsJsonObject("kind");
-			assertEquals(UtilitySignKind.VALUES.length, kinds.entrySet().size(),
-					"the blockstate and the kind table disagree about how many kinds there are");
+			JsonObject plates = variants.getAsJsonObject("plate");
+			assertEquals(SignMount.packedCount(), plates.entrySet().size(),
+					"the blockstate and SignMount disagree about how many plates there are");
 			for(UtilitySignKind kind : UtilitySignKind.VALUES)
-			{
-				String key = Integer.toString(kind.ordinal());
-				assertTrue(kinds.has(key), "no variant for kind="+key+" ("+kind+")");
-				assertEquals("immersiveengineering:"+modelName(kind),
-						kinds.getAsJsonObject(key).get("model").getAsString(),
-						"kind="+key+" draws the wrong plate");
-			}
+				for(int mount = 0; mount <= SignMount.MAX; mount++)
+				{
+					String key = Integer.toString(SignMount.pack(kind, mount));
+					assertTrue(plates.has(key), "no variant for plate="+key+" ("+kind+" +"+mount+")");
+					assertEquals("immersiveengineering:"+modelName(kind, mount),
+							plates.getAsJsonObject(key).get("model").getAsString(),
+							"plate="+key+" draws the wrong plate");
+				}
+		}
+
+		@Test
+		@DisplayName("a plate that reaches grows a standoff into its neighbour's cell, and the plate stays put")
+		void standoffsReachAndThePlateDoesNot()
+		{
+			//The whole of the fix for a tag hung on a pole: the strap crosses the gap and the plate
+			//does not move, because a plate drawn inside its neighbour's cell is a plate whose
+			//neighbour gets clicked instead -- rayTraceBlocks only ever tests the block owning the
+			//cell it is stepping through. See SignMount.
+			assertTrue(new File(ASSETS+"textures/blocks/sign_standoff.png").isFile(),
+					"the strap has no sprite");
+			for(UtilitySignKind kind : UtilitySignKind.VALUES)
+				for(int mount = 0; mount <= SignMount.MAX; mount++)
+				{
+					JsonArray elements = read("models/block/"+modelName(kind, mount)+".json")
+							.getAsJsonArray("elements");
+					assertEquals(mount==0?1: 2, elements.size(),
+							kind+" +"+mount+" has the wrong number of pieces");
+					JsonArray plateFrom = elements.get(0).getAsJsonObject().getAsJsonArray("from");
+					assertEquals(0, plateFrom.get(2).getAsInt(),
+							kind+" +"+mount+" moved its plate instead of reaching for the pole");
+					if(mount==0)
+						continue;
+					JsonObject strap = elements.get(1).getAsJsonObject();
+					assertEquals(-mount, strap.getAsJsonArray("from").get(2).getAsInt(),
+							kind+" +"+mount+" does not reach the pole's skin");
+					assertEquals(0, strap.getAsJsonArray("to").get(2).getAsInt(),
+							kind+" +"+mount+" leaves a gap behind its own plate");
+					//Narrower and shallower than the shallowest plate in the set, so it is hidden
+					//behind every one of them rather than sticking out past the four-pixel strips.
+					for(int axis = 0; axis < 2; axis++)
+					{
+						int width = strap.getAsJsonArray("to").get(axis).getAsInt()
+								-strap.getAsJsonArray("from").get(axis).getAsInt();
+						assertTrue(width <= kind.getWidth()&&width <= kind.getHeight(),
+								kind+" +"+mount+" has a strap "+width+" pixels across, wider than "
+										+"the plate that is meant to hide it");
+					}
+				}
 		}
 
 		@Test
@@ -773,7 +898,7 @@ class SignageTest
 		void namedModelsExist()
 		{
 			JsonObject kinds = read("blockstates/signage_utility_sign.json")
-					.getAsJsonObject("variants").getAsJsonObject("kind");
+					.getAsJsonObject("variants").getAsJsonObject("plate");
 			for(java.util.Map.Entry<String, com.google.gson.JsonElement> entry : kinds.entrySet())
 			{
 				String reference = entry.getValue().getAsJsonObject().get("model").getAsString();
