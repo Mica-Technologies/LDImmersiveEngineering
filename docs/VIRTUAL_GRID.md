@@ -252,7 +252,7 @@ All under `Config → Immersive Engineering → VirtualGrid`, mirrored into `Gri
 | `gridConsoleRequiresPower` | true | Whether the console needs standby power to light its screen. |
 | `gridConsoleStandbyDraw` | 8 | Console standby draw, IF/t. |
 | `gridAllowChunkloading` | true | Master for the per-device chunk-load toggle. |
-| `gridChunkloadBudget` | 25 | Server-wide ceiling on chunks held by grid devices. |
+| `gridChunkloadBudget` | 25 | Server-wide ceiling on chunks held by grid devices. Each device holds only its own chunk, not an area. |
 | `gridMaxFailoverDepth` | 4 | How far a shortfall may propagate down a chain. |
 | `gridBreakersEnabled` | false | Whether sustained saturation trips a segment. |
 | `gridBreakerTripSeconds` | 5 | Seconds of saturation before a trip. |

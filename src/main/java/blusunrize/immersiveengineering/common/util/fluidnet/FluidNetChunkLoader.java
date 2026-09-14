@@ -8,16 +8,12 @@
 
 package blusunrize.immersiveengineering.common.util.fluidnet;
 
-import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.fluid.network.FluidDevice;
 import blusunrize.immersiveengineering.api.fluid.network.FluidNetConfig;
 import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
+import blusunrize.immersiveengineering.common.util.ForcedChunkTickets;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraftforge.common.DimensionManager;
-import net.minecraftforge.common.ForgeChunkManager;
-import net.minecraftforge.common.ForgeChunkManager.Ticket;
-import net.minecraft.world.World;
 
 import java.util.*;
 
@@ -31,41 +27,40 @@ import java.util.*;
  * control: a player who switches it on and watches their Outlet stop working when they walk away
  * has been actively misled.
  * <p>
- * One ticket per dimension rather than one per fitting: Forge caps tickets per mod, and a
- * city-scale network would exhaust that allowance immediately. Everything is rebuilt from
+ * Each flagged fitting keeps its own chunk loaded. Everything is rebuilt from
  * {@link VirtualFluidNet} rather than tracked incrementally, so the forced set cannot drift out of
  * step with the records -- the rebuild is O(devices) and only runs when something actually changes.
+ * Which Forge ticket holds which chunk is {@link ForcedChunkTickets}' business.
  * <p>
  * The budget is a hard server-wide cap on how many chunks the network may pin. Anything past it is
  * dropped and logged rather than silently ignored, because a network quietly not loading the chunks
  * you asked it to is worse than being told it ran out.
  * <p>
- * The deliberate mirror of {@code GridChunkLoader} -- including its shutdown discipline, which was
- * bought the hard way: see {@link #release(int)}.
+ * The deliberate mirror of {@code GridChunkLoader}.
  *
  * @author LDImmersiveEngineering -- virtual fluid network
  */
 public class FluidNetChunkLoader
 {
-	private static final Map<Integer, Ticket> tickets = new HashMap<>();
+	private static final ForcedChunkTickets tickets = new ForcedChunkTickets("Virtual fluid network");
 	/**
 	 * What is currently forced, so a rebuild that changes nothing costs nothing.
 	 */
 	private static final Map<Integer, Set<ChunkPos>> forced = new HashMap<>();
 	private static int lastDroppedCount;
+	/**
+	 * See {@code GridChunkLoader.active}.
+	 */
+	private static boolean active;
 
 	//	=================================
 	//	No init() here, deliberately.
 	//	=================================
 	//
 	// ForgeChunkManager.setForcedChunkLoadingCallback stores ONE callback per mod container, so a
-	// second call silently replaces the first. GridChunkLoader.init() already registers the
-	// mod-wide callback, and it does the only thing either loader wants -- returns nothing, telling
-	// Forge to drop every ticket it persisted from the last session, because both networks rebuild
-	// their forced sets from their own save data.
-	//
-	// Registering a second identical callback would work by luck rather than by design, and would
-	// break the moment either one needed to do something different.
+	// second call silently replaces the first. GridChunkLoader.init() registers the mod-wide one,
+	// ForcedChunkTickets.registerCallback, which releases every ticket persisted from the last
+	// session for both networks.
 
 	/**
 	 * Recomputes the forced-chunk set. Safe to call often; does nothing when the result matches what
@@ -73,6 +68,7 @@ public class FluidNetChunkLoader
 	 */
 	public static void refresh()
 	{
+		active = true;
 		Map<Integer, Set<ChunkPos>> wanted = new HashMap<>();
 		int budget = Math.max(0, FluidNetConfig.chunkloadBudget);
 		int used = 0;
@@ -107,10 +103,16 @@ public class FluidNetChunkLoader
 			lastDroppedCount = dropped;
 		}
 
-		//Release dimensions that no longer want anything.
-		for(Integer dim : new ArrayList<>(tickets.keySet()))
+		//Release dimensions that no longer want anything. Both sets: a dimension whose last apply
+		//fell short holds tickets without a record.
+		Set<Integer> held = new HashSet<>(forced.keySet());
+		held.addAll(tickets.getDimensions());
+		for(Integer dim : held)
 			if(!wanted.containsKey(dim))
-				release(dim);
+			{
+				tickets.release(dim);
+				forced.remove(dim);
+			}
 
 		for(Map.Entry<Integer, Set<ChunkPos>> entry : wanted.entrySet())
 			apply(entry.getKey(), entry.getValue());
@@ -118,74 +120,43 @@ public class FluidNetChunkLoader
 
 	private static void apply(int dimension, Set<ChunkPos> chunks)
 	{
-		Set<ChunkPos> current = forced.get(dimension);
-		if(chunks.equals(current))
+		if(chunks.equals(forced.get(dimension)))
 			return;
-
-		World world = DimensionManager.getWorld(dimension);
-		if(world==null)
-			return;//dimension not loaded; nothing to force yet
-
-		Ticket ticket = tickets.get(dimension);
-		if(ticket==null)
-		{
-			ticket = ForgeChunkManager.requestTicket(ImmersiveEngineering.instance, world,
-					ForgeChunkManager.Type.NORMAL);
-			if(ticket==null)
-			{
-				IELogger.warn("Virtual fluid network could not obtain a chunk-loading ticket for "
-						+"dimension "+dimension+"; Forge's per-mod ticket allowance may be exhausted.");
-				return;
-			}
-			tickets.put(dimension, ticket);
-			current = null;
-		}
-
-		if(current!=null)
-			for(ChunkPos chunk : current)
-				if(!chunks.contains(chunk))
-					ForgeChunkManager.unforceChunk(ticket, chunk);
-		for(ChunkPos chunk : chunks)
-			if(current==null||!current.contains(chunk))
-				ForgeChunkManager.forceChunk(ticket, chunk);
-
-		forced.put(dimension, new HashSet<>(chunks));
+		//Recorded only if it took, so a dimension not loaded yet is retried by the next refresh.
+		if(tickets.apply(dimension, chunks)==chunks.size())
+			forced.put(dimension, new HashSet<>(chunks));
+		else
+			forced.remove(dimension);
 	}
 
-	private static void release(int dimension)
+	/**
+	 * A dimension finished loading; see {@code GridChunkLoader.onWorldLoad}.
+	 */
+	public static void onWorldLoad(int dimension)
 	{
-		Ticket ticket = tickets.remove(dimension);
+		if(active)
+			refresh();
+	}
+
+	/**
+	 * A dimension unloaded. Its tickets died with it, so they are forgotten rather than released.
+	 */
+	public static void onWorldUnload(int dimension)
+	{
+		tickets.forget(dimension);
 		forced.remove(dimension);
-		if(ticket==null)
-			return;
-		try
-		{
-			ForgeChunkManager.releaseTicket(ticket);
-		} catch(RuntimeException e)
-		{
-			//ForgeChunkManager.releaseTicket dereferences the ticket's world with no null check, and
-			//once a world is unloaded its row is gone from that map. At server stop the worlds are
-			//already gone, and an exception escaping the FMLServerStoppedEvent handler kills the
-			//Server thread mid-shutdown -- which does not present as a crash, it presents as the
-			//client hanging forever on world exit. The grid's loader shipped exactly that.
-			//
-			//Dropping the ticket is all that matters: Forge discards every ticket it holds when the
-			//server stops.
-			IELogger.warn("Virtual fluid network could not hand back its chunk ticket for dimension "
-					+dimension+" (the dimension is already gone). Harmless at shutdown: "+e);
-		}
 	}
 
 	/**
 	 * Drops every ticket. Called on server stop so a second world starts clean.
 	 * <p>
-	 * Must not throw -- see {@link #release(int)}.
+	 * Must not throw. It runs inside {@code FMLServerStoppedEvent}, and anything escaping from
+	 * there takes the Server thread down mid-shutdown and hangs the client.
 	 */
 	public static void releaseAll()
 	{
-		for(Integer dim : new ArrayList<>(tickets.keySet()))
-			release(dim);
-		tickets.clear();
+		active = false;
+		tickets.releaseAll();
 		forced.clear();
 		lastDroppedCount = 0;
 	}

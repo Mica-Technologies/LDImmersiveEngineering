@@ -141,8 +141,9 @@ public class TileEntityGridService extends TileEntityGridDevice implements INeig
 			return 0;
 		if(CityMode.grid())
 			//City mode is presence rather than accounting, and the wire side of it is lossless by
-			//the same argument. Simulation still reports the demand honestly, so the engine's probe
-			//is not fooled into thinking a dark network is hungry.
+			//the same argument. The city push has no dry run, so a simulation reports no demand from
+			//the wires. Nothing relies on that today: the engine's city tick only ever commits, and
+			//the one simulating caller -- failover top-up -- belongs to normal mode.
 			return simulate?0: WireNetTransfer.city(world, pos, amount);
 		return WireNetTransfer.transfer(world, pos, rate, rate, amount, simulate, 0, transferEndCache);
 	}

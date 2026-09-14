@@ -231,7 +231,8 @@ public class Config
 			public static int gridConsoleStandbyDraw = 8;
 			@Comment({"Master switch for the per-device chunk loading toggle. When false, the toggle is ignored and no grid device keeps chunks loaded."})
 			public static boolean gridAllowChunkloading = true;
-			@Comment({"Server-wide maximum number of chunks that grid devices may hold loaded between them."})
+			@Comment({"Server-wide maximum number of chunks that grid devices may hold loaded between them.",
+					"Each device with chunk loading on keeps only the one chunk it stands in loaded, not an area around it; devices sharing a chunk count once."})
 			@RangeInt(min = 0)
 			public static int gridChunkloadBudget = 25;
 			@Comment({"City mode only: how often, in ticks, a Feed Unit checks that its power source is still live. 100 ticks is once every five seconds."})
@@ -291,7 +292,8 @@ public class Config
 			public static int fluidNetConsoleStandbyDraw = 8;
 			@Comment({"Master switch for the per-fitting chunk loading toggle. When false, the toggle is ignored and no fluid network fitting keeps chunks loaded."})
 			public static boolean fluidNetAllowChunkloading = true;
-			@Comment({"Server-wide maximum number of chunks that fluid network fittings may hold loaded between them."})
+			@Comment({"Server-wide maximum number of chunks that fluid network fittings may hold loaded between them.",
+					"Each fitting with chunk loading on keeps only the one chunk it stands in loaded, not an area around it; fittings sharing a chunk count once."})
 			@RangeInt(min = 0)
 			public static int fluidNetChunkloadBudget = 25;
 			@Comment({"City mode only: how often, in ticks, an Inlet checks that its source is still live. 100 ticks is once every five seconds."})

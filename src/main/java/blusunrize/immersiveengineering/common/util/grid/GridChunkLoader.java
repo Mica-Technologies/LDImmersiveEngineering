@@ -8,54 +8,52 @@
 
 package blusunrize.immersiveengineering.common.util.grid;
 
-import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.GridDevice;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
+import blusunrize.immersiveengineering.common.util.ForcedChunkTickets;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.World;
-import net.minecraftforge.common.ForgeChunkManager;
-import net.minecraftforge.common.ForgeChunkManager.Ticket;
-import net.minecraftforge.common.DimensionManager;
 
 import java.util.*;
 
 /**
  * Keeps the chunks of chunk-load-flagged grid devices loaded.
  * <p>
- * One ticket per dimension rather than one per device: Forge caps tickets per mod, and a
- * city-scale grid would exhaust that allowance immediately. Everything is rebuilt from
- * {@link VirtualGrid} rather than tracked incrementally, so the forced set cannot drift
- * out of step with the device records -- the rebuild is O(devices) and only runs when
- * something actually changes.
+ * Each flagged device keeps <em>its own</em> chunk loaded -- one chunk, not an area around it.
+ * Everything is rebuilt from {@link VirtualGrid} rather than tracked incrementally, so the forced
+ * set cannot drift out of step with the device records -- the rebuild is O(devices) and only runs
+ * when something actually changes. Which Forge ticket holds which chunk is
+ * {@link ForcedChunkTickets}' business.
  * <p>
- * The budget is a hard server-wide cap on how many chunks the grid may pin. Anything past
- * it is dropped and logged rather than silently ignored, because a grid quietly not
- * loading the chunks you asked it to is worse than being told it ran out.
+ * The budget is a hard server-wide cap on how many chunks the grid may pin. Anything past it is
+ * dropped and logged rather than silently ignored, because a grid quietly not loading the chunks
+ * you asked it to is worse than being told it ran out.
  *
  * @author LDImmersiveEngineering -- virtual grid
  */
 public class GridChunkLoader
 {
-	private static final Map<Integer, Ticket> tickets = new HashMap<>();
+	private static final ForcedChunkTickets tickets = new ForcedChunkTickets("Virtual grid");
 	/**
 	 * What is currently forced, so a rebuild that changes nothing costs nothing.
 	 */
 	private static final Map<Integer, Set<ChunkPos>> forced = new HashMap<>();
 	private static int lastDroppedCount;
+	/**
+	 * True between the grid's save data loading and the server stopping. A dimension that loads
+	 * outside that window must not trigger a rebuild from whatever the grid happens to hold -- at
+	 * startup that is nothing yet, and in a second singleplayer world it could be the last one's.
+	 */
+	private static boolean active;
 
 	/**
-	 * Forge hands back any tickets it persisted from the last session. The grid rebuilds
-	 * its own set from save data, so those are released and replaced rather than adopted --
-	 * adopting them would resurrect chunk loads for devices that have since been removed.
+	 * Registers the mod-wide ticket callback. The fluid network shares it -- see
+	 * {@link ForcedChunkTickets#registerCallback()}.
 	 */
 	public static void init()
 	{
-		ForgeChunkManager.setForcedChunkLoadingCallback(ImmersiveEngineering.instance,
-				(tickets, world) -> {
-					//Returning an empty list tells Forge to drop every persisted ticket.
-				});
+		ForcedChunkTickets.registerCallback();
 	}
 
 	/**
@@ -64,6 +62,7 @@ public class GridChunkLoader
 	 */
 	public static void refresh()
 	{
+		active = true;
 		Map<Integer, Set<ChunkPos>> wanted = new HashMap<>();
 		int budget = Math.max(0, GridConfig.chunkloadBudget);
 		int used = 0;
@@ -99,9 +98,15 @@ public class GridChunkLoader
 		}
 
 		//Release dimensions that no longer want anything.
-		for(Integer dim : new ArrayList<>(tickets.keySet()))
+		//Both sets: a dimension whose last apply fell short holds tickets without a record.
+		Set<Integer> held = new HashSet<>(forced.keySet());
+		held.addAll(tickets.getDimensions());
+		for(Integer dim : held)
 			if(!wanted.containsKey(dim))
-				release(dim);
+			{
+				tickets.release(dim);
+				forced.remove(dim);
+			}
 
 		for(Map.Entry<Integer, Set<ChunkPos>> entry : wanted.entrySet())
 			apply(entry.getKey(), entry.getValue());
@@ -109,74 +114,34 @@ public class GridChunkLoader
 
 	private static void apply(int dimension, Set<ChunkPos> chunks)
 	{
-		Set<ChunkPos> current = forced.get(dimension);
-		if(chunks.equals(current))
+		if(chunks.equals(forced.get(dimension)))
 			return;
-
-		World world = DimensionManager.getWorld(dimension);
-		if(world==null)
-			return;//dimension not loaded; nothing to force yet
-
-		Ticket ticket = tickets.get(dimension);
-		if(ticket==null)
-		{
-			ticket = ForgeChunkManager.requestTicket(ImmersiveEngineering.instance, world,
-					ForgeChunkManager.Type.NORMAL);
-			if(ticket==null)
-			{
-				IELogger.warn("Virtual grid could not obtain a chunk-loading ticket for dimension "
-						+dimension+"; Forge's per-mod ticket allowance may be exhausted.");
-				return;
-			}
-			tickets.put(dimension, ticket);
-			current = null;
-		}
-
-		if(current!=null)
-			for(ChunkPos chunk : current)
-				if(!chunks.contains(chunk))
-					ForgeChunkManager.unforceChunk(ticket, chunk);
-		for(ChunkPos chunk : chunks)
-			if(current==null||!current.contains(chunk))
-				ForgeChunkManager.forceChunk(ticket, chunk);
-
-		forced.put(dimension, new HashSet<>(chunks));
+		//Recorded only if it took. A dimension that is not loaded yet, or a ticket Forge refused,
+		//leaves the record short, so the next refresh tries again rather than believing it is done.
+		if(tickets.apply(dimension, chunks)==chunks.size())
+			forced.put(dimension, new HashSet<>(chunks));
+		else
+			forced.remove(dimension);
 	}
 
-	private static void release(int dimension)
+	/**
+	 * A dimension finished loading. Devices there could not be chunk-loaded before now -- at server
+	 * start only the dimensions Minecraft loads eagerly exist when the grid first refreshes -- so
+	 * this is where a device in the Nether starts holding its chunk after a restart.
+	 */
+	public static void onWorldLoad(int dimension)
 	{
-		Ticket ticket = tickets.remove(dimension);
+		if(active)
+			refresh();
+	}
+
+	/**
+	 * A dimension unloaded. Its tickets died with it, so they are forgotten rather than released.
+	 */
+	public static void onWorldUnload(int dimension)
+	{
+		tickets.forget(dimension);
 		forced.remove(dimension);
-		if(ticket==null)
-			return;
-		try
-		{
-			ForgeChunkManager.releaseTicket(ticket);
-		} catch(RuntimeException e)
-		{
-			//	=================================
-			//	Why this is caught rather than prevented
-			//	=================================
-			//
-			// ForgeChunkManager.releaseTicket does `tickets.get(ticket.world).containsEntry(...)`
-			// with no null check. Once a world has been unloaded its row is gone from that map, so
-			// releasing a ticket against it throws NPE -- and there is no public way to ask whether
-			// a ticket is still releasable.
-			//
-			// That mattered a great deal. releaseAll() runs from the FMLServerStoppedEvent handler,
-			// by which point the worlds are already gone; the NPE propagated out of the mod's event
-			// handler as a LoaderExceptionModCrash, killed the Server thread partway through
-			// shutdown, and the integrated server never signalled that it had stopped. The symptom
-			// was the client hanging forever on world exit -- with the real cause invisible, because
-			// the dev-environment log config cannot build a console appender and the stack trace
-			// only ever reached run/logs/latest.log.
-			//
-			// Dropping the ticket is all that actually matters here: Forge discards every ticket it
-			// holds when the server stops, so a failure to hand one back has no consequence beyond
-			// this log line.
-			IELogger.warn("Virtual grid could not hand back its chunk ticket for dimension "
-					+dimension+" (the dimension is already gone). Harmless at shutdown: "+e);
-		}
 	}
 
 	/**
@@ -187,9 +152,8 @@ public class GridChunkLoader
 	 */
 	public static void releaseAll()
 	{
-		for(Integer dim : new ArrayList<>(tickets.keySet()))
-			release(dim);
-		tickets.clear();
+		active = false;
+		tickets.releaseAll();
 		forced.clear();
 		lastDroppedCount = 0;
 	}

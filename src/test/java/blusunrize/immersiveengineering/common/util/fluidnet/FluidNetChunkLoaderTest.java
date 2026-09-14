@@ -268,10 +268,34 @@ class FluidNetChunkLoaderTest
 					"the fluid network must not register a second callback -- it would replace the "
 							+"grid's rather than coexist with it");
 
+			assertFalse(fluid.contains("registerCallback("),
+					"the fluid network must not register the shared callback a second time either");
+
 			String grid = source("src/main/java/blusunrize/immersiveengineering/common/util/"
 					+"grid/GridChunkLoader.java");
-			assertTrue(grid.contains("setForcedChunkLoadingCallback("),
-					"somebody has to register it, and the grid's loader is where it lives");
+			assertTrue(grid.contains("ForcedChunkTickets.registerCallback("),
+					"somebody has to register it, and the grid's init is where that happens");
+			String tickets = source("src/main/java/blusunrize/immersiveengineering/common/util/"
+					+"ForcedChunkTickets.java");
+			assertTrue(tickets.contains("setForcedChunkLoadingCallback("),
+					"the shared callback no longer registers with Forge");
+		}
+
+		@Test
+		@DisplayName("the callback releases the tickets Forge persisted, rather than leaving them registered")
+		void callbackReleasesPersistedTickets()
+		{
+			//A plain LoadingCallback is handed tickets Forge has ALREADY registered; doing nothing
+			//keeps them, and each restart added one more dead ticket per network per dimension
+			//against the per-mod ticket limit. Returning nothing only drops tickets from an
+			//OrderedLoadingCallback's filtering method, which this is not.
+			String tickets = source("src/main/java/blusunrize/immersiveengineering/common/util/"
+					+"ForcedChunkTickets.java");
+			int register = tickets.indexOf("setForcedChunkLoadingCallback(");
+			assertTrue(register > 0);
+			String callback = tickets.substring(register, tickets.indexOf("});", register));
+			assertTrue(callback.contains("releaseQuietly("),
+					"the persisted-ticket callback must release every ticket it is given");
 		}
 
 		@Test
@@ -281,17 +305,22 @@ class FluidNetChunkLoaderTest
 			//ForgeChunkManager.releaseTicket dereferences the ticket's world with no null check, and
 			//at server stop that world is already gone. An exception escaping the stop handler kills
 			//the Server thread mid-shutdown and hangs the client -- the grid shipped exactly that.
+			//Both loaders go through ForcedChunkTickets now, so neither may call Forge directly, and
+			//the one call in there must be guarded.
 			for(String path : new String[]{
 					"src/main/java/blusunrize/immersiveengineering/common/util/grid/GridChunkLoader.java",
 					"src/main/java/blusunrize/immersiveengineering/common/util/fluidnet/FluidNetChunkLoader.java"})
-			{
-				String text = source(path);
-				int release = text.indexOf("ForgeChunkManager.releaseTicket");
-				assertTrue(release > 0, path+" no longer hands tickets back at all");
-				assertTrue(text.lastIndexOf("catch", release+400) > release
-								||text.substring(release, Math.min(text.length(), release+400)).contains("catch"),
-						path+": releaseTicket must be inside a try/catch");
-			}
+				assertFalse(source(path).contains("ForgeChunkManager.releaseTicket"),
+						path+" calls releaseTicket directly instead of through ForcedChunkTickets");
+
+			String path = "src/main/java/blusunrize/immersiveengineering/common/util/ForcedChunkTickets.java";
+			String text = source(path);
+			int release = text.indexOf("ForgeChunkManager.releaseTicket");
+			assertTrue(release > 0, path+" no longer hands tickets back at all");
+			assertEquals(release, text.lastIndexOf("ForgeChunkManager.releaseTicket"),
+					path+": releaseTicket is called in more than one place");
+			assertTrue(text.substring(release, Math.min(text.length(), release+400)).contains("catch"),
+					path+": releaseTicket must be inside a try/catch");
 		}
 	}
 }

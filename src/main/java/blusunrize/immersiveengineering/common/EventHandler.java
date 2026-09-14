@@ -40,6 +40,8 @@ import blusunrize.immersiveengineering.common.items.ItemIEShield;
 import blusunrize.immersiveengineering.common.items.ItemRevolver;
 import blusunrize.immersiveengineering.common.util.*;
 import blusunrize.immersiveengineering.common.util.IEDamageSources.ElectricDamageSource;
+import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetChunkLoader;
+import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.network.MessageCityModeSync;
 import blusunrize.immersiveengineering.common.util.network.MessageMinecartShaderSync;
 import blusunrize.immersiveengineering.common.util.network.MessageMineralListSync;
@@ -154,6 +156,14 @@ public class EventHandler
 		ImmersiveEngineering.proxy.onWorldLoad();
 		if(IEConfig.blocksBreakWires)
 			event.getWorld().addEventListener(ImmersiveNetHandler.INSTANCE.LISTENER);
+		//A dimension loading after startup -- the Nether, the End, a mod's -- is the first moment the
+		//networks can pin chunks in it. Both ignore this until their save data has loaded.
+		if(!event.getWorld().isRemote)
+		{
+			int dim = event.getWorld().provider.getDimension();
+			GridChunkLoader.onWorldLoad(dim);
+			FluidNetChunkLoader.onWorldLoad(dim);
+		}
 	}
 
 	//transferPerTick
@@ -167,6 +177,12 @@ public class EventHandler
 	public void onUnload(WorldEvent.Unload event)
 	{
 		IESaveData.setDirty(0);
+		if(!event.getWorld().isRemote)
+		{
+			int dim = event.getWorld().provider.getDimension();
+			GridChunkLoader.onWorldUnload(dim);
+			FluidNetChunkLoader.onWorldUnload(dim);
+		}
 	}
 
 	@SubscribeEvent

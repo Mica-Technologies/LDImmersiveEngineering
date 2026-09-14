@@ -45,6 +45,11 @@ class ShutdownSafetyTest
 			"src/main/java/blusunrize/immersiveengineering/ImmersiveEngineering.java";
 	private static final String CHUNK_LOADER =
 			"src/main/java/blusunrize/immersiveengineering/common/util/grid/GridChunkLoader.java";
+	/**
+	 * Where the Forge ticket calls actually live since both networks' loaders share them.
+	 */
+	private static final String TICKETS =
+			"src/main/java/blusunrize/immersiveengineering/common/util/ForcedChunkTickets.java";
 
 	private static String source(String path)
 	{
@@ -115,11 +120,17 @@ class ShutdownSafetyTest
 	@DisplayName("releasing a chunk ticket cannot throw")
 	void ticketReleaseIsGuarded()
 	{
-		String body = methodBody(source(CHUNK_LOADER), "private static void release(int dimension)");
-		assertTrue(body.contains("releaseTicket"), "release() no longer hands the ticket back");
+		String body = methodBody(source(TICKETS), "private static void releaseQuietly(");
+		assertTrue(body.contains("releaseTicket"), "releaseQuietly() no longer hands the ticket back");
 		assertTrue(body.contains("catch"),
-				"release() must not let ForgeChunkManager.releaseTicket throw: it dereferences the "
+				"releaseQuietly() must not let ForgeChunkManager.releaseTicket throw: it dereferences the "
 						+"ticket's world with no null check, and at server stop that world is gone");
+		//And nothing else may call releaseTicket directly, or the guard is only half the story.
+		String text = source(TICKETS);
+		assertEquals(text.indexOf("ForgeChunkManager.releaseTicket"), text.lastIndexOf("ForgeChunkManager.releaseTicket"),
+				"releaseTicket is called outside releaseQuietly");
+		assertFalse(source(CHUNK_LOADER).contains("ForgeChunkManager.releaseTicket"),
+				"the grid's loader calls releaseTicket itself instead of through ForcedChunkTickets");
 	}
 
 	@Test
@@ -127,7 +138,10 @@ class ShutdownSafetyTest
 	void releaseAllClearsItsMaps()
 	{
 		String body = methodBody(source(CHUNK_LOADER), "public static void releaseAll()");
-		assertTrue(body.contains("tickets.clear()")&&body.contains("forced.clear()"),
+		assertTrue(body.contains("tickets.releaseAll()")&&body.contains("forced.clear()"),
+				"the grid's releaseAll must drop its tickets and clear its record");
+		body = methodBody(source(TICKETS), "public void releaseAll()");
+		assertTrue(body.contains("tickets.clear()"),
 				"releaseAll must clear its own maps unconditionally, so a failed hand-back cannot "
 						+"leave a stale ticket to be re-used by the next world");
 	}
