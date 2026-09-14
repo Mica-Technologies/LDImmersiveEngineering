@@ -1,0 +1,27 @@
+{
+	"type": "forge:ore_shaped",
+	"result": {
+		"item": "immersiveengineering:grid_device",
+		"data": 4
+	},
+	"pattern": [
+		"SVS",
+		"CTC",
+		"SSS"
+	],
+	"key": {
+		"S": {
+			"item": "#plateSteel"
+		},
+		"V": {
+			"item": "immersiveengineering:tool",
+			"data": 2
+		},
+		"C": {
+			"item": "#copperCoil"
+		},
+		"T": {
+			"item": "#elecTube"
+		}
+	}
+}

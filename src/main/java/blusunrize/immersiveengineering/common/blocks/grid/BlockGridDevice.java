@@ -73,7 +73,9 @@ public class BlockGridDevice extends BlockIETileProvider<BlockTypes_GridDevice>
 	@Override
 	public boolean isSideSolid(IBlockState state, IBlockAccess world, BlockPos pos, EnumFacing side)
 	{
-		return state.getValue(property)==BlockTypes_GridDevice.CONSOLE_HOUSING;
+		//The meter is a full cube, and a wire connector has to be able to bolt onto its front.
+		BlockTypes_GridDevice type = state.getValue(property);
+		return type==BlockTypes_GridDevice.CONSOLE_HOUSING||type==BlockTypes_GridDevice.GENERATION_METER;
 	}
 
 	@Override
@@ -107,6 +109,9 @@ public class BlockGridDevice extends BlockIETileProvider<BlockTypes_GridDevice>
 		TileEntity te = world.getTileEntity(pos);
 		if(te instanceof TileEntityGridDevice)
 			((TileEntityGridDevice)te).onBlockBroken();
+		//Likewise a meter: a plant with no meter must stop supplying from memory.
+		if(te instanceof TileEntityGenerationMeter)
+			((TileEntityGenerationMeter)te).onBlockBroken();
 		super.breakBlock(world, pos, state);
 	}
 
@@ -121,6 +126,8 @@ public class BlockGridDevice extends BlockIETileProvider<BlockTypes_GridDevice>
 				return new TileEntityGridService();
 			case SIGNAL_UNIT:
 				return new TileEntityGridSignal();
+			case GENERATION_METER:
+				return new TileEntityGenerationMeter();
 			case CONSOLE_HOUSING:
 				//Inert until four of them are hammered into a Grid Management Console.
 				return null;

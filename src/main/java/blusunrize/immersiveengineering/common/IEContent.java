@@ -832,6 +832,7 @@ public class IEContent
 		registerTile(TileEntityGridFeed.class);
 		registerTile(TileEntityGridService.class);
 		registerTile(TileEntityGridSignal.class);
+		registerTile(TileEntityGenerationMeter.class);
 		registerTile(TileEntityGridConsole.class);
 		registerTile(TileEntityFluidInlet.class);
 		registerTile(TileEntityFluidOutlet.class);

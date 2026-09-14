@@ -12,6 +12,8 @@ import blusunrize.immersiveengineering.api.energy.virtualgen.IVirtualGenWorld;
 import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGenConfig;
 import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGenEngine;
 import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGeneration;
+import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualSource;
+import blusunrize.immersiveengineering.common.blocks.grid.TileEntityGenerationMeter;
 import blusunrize.immersiveengineering.api.energy.wires.IImmersiveConnectable;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.AbstractConnection;
 import blusunrize.immersiveengineering.common.util.CityMode;
@@ -23,7 +25,9 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,13 +40,45 @@ import java.util.Map;
 public class VirtualGenTickHandler
 {
 	private static final WorldPort PORT = new WorldPort();
+	/**
+	 * Ticks between orphan sweeps. See {@link #sweepOrphans()}.
+	 */
+	private static final int SWEEP_INTERVAL = 200;
+	private static long tickCounter;
 
 	@SubscribeEvent
 	public static void onServerTick(TickEvent.ServerTickEvent event)
 	{
-		if(event.phase!=TickEvent.Phase.END||!VirtualGenConfig.enabled||VirtualGeneration.INSTANCE.size()==0)
+		if(event.phase!=TickEvent.Phase.END||VirtualGeneration.INSTANCE.size()==0)
 			return;
-		VirtualGenEngine.tick(VirtualGeneration.INSTANCE, PORT, CityMode.wires());
+		if(++tickCounter%SWEEP_INTERVAL==0)
+			sweepOrphans();
+		if(VirtualGenConfig.enabled)
+			VirtualGenEngine.tick(VirtualGeneration.INSTANCE, PORT, CityMode.wires());
+	}
+
+	/**
+	 * Drops records whose meter is gone.
+	 * <p>
+	 * Breaking a meter removes its record, but not every removal breaks a block: a world edit, a
+	 * {@code /setblock}, or a mod replacing blocks all skip {@code breakBlock}. A record left behind would
+	 * supply a town from a plant that no longer exists. Checked only where the meter's chunk is loaded --
+	 * an unloaded chunk cannot be inspected without loading it, and the record is exactly what should keep
+	 * working there.
+	 */
+	static void sweepOrphans()
+	{
+		List<VirtualSource> orphans = new ArrayList<>();
+		for(VirtualSource source : VirtualGeneration.INSTANCE.getSources())
+		{
+			World world = DimensionManager.getWorld(source.getDimension());
+			if(world==null||!world.isBlockLoaded(source.getMeterPos()))
+				continue;
+			if(!(world.getTileEntity(source.getMeterPos()) instanceof TileEntityGenerationMeter))
+				orphans.add(source);
+		}
+		for(VirtualSource orphan : orphans)
+			VirtualGeneration.INSTANCE.remove(orphan.getDimension(), orphan.getMeterPos());
 	}
 
 	/**

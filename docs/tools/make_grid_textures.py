@@ -251,6 +251,76 @@ def console_housing():
     return img
 
 
+# ---------------------------------------------------------------------------
+# Generation Meter
+# ---------------------------------------------------------------------------
+# A full cube, unlike the utility boxes, because a wire connector bolts onto its
+# front. Every face is a framed plate filling the block, with a one-pixel OUTLINE
+# ring so the art rules hold and neighbouring meters read as separate blocks.
+def meter_plate():
+    img = new_image(OUTLINE)
+    px = img.load()
+    brushed_metal(px, 1, 1, 14, 14, STEEL, STEEL_DARK)
+    rect(px, 1, 1, 14, 1, STEEL_HILIGHT)
+    rect(px, 1, 2, 1, 14, STEEL_LIT)
+    rect(px, 2, 14, 14, 14, STEEL_DARK)
+    rect(px, 14, 2, 14, 13, STEEL_DARK)
+    dots(px, [(2, 2), (13, 2), (2, 13), (13, 13)], BOLT)
+    return img, px
+
+
+def meter_side():
+    """The gauge: a dark dial window with a scale and an orange needle near the top of its travel.
+    Seen from the sides, which is where a player walking past a plant looks."""
+    img, px = meter_plate()
+    rect(px, 3, 4, 12, 11, GLASS_DARK)
+    outline_rect(px, 3, 4, 12, 11, OUTLINE)
+    # Scale ticks along an arc.
+    dots(px, [(4, 9), (5, 7), (6, 6), (8, 5), (10, 6), (11, 7)], SCANLINE)
+    # Needle from the pivot up and to the right: high output.
+    dots(px, [(7, 10), (8, 9), (9, 8), (10, 7)], ORANGE)
+    px[7, 10] = BOLT
+    # Nameplate strip under the dial.
+    rect(px, 5, 12, 10, 12, STEEL_DARK)
+    return img
+
+
+def meter_output():
+    """Front: where the connector bolts on. A terminal socket with an arrow leading out of it."""
+    img, px = meter_plate()
+    rect(px, 5, 5, 10, 10, STEEL_DARK)
+    outline_rect(px, 5, 5, 10, 10, OUTLINE)
+    rect(px, 6, 6, 9, 9, BOLT_SHADE)
+    rect(px, 7, 7, 8, 8, BOLT)
+    # Arrow pointing out, above the socket.
+    rect(px, 6, 3, 9, 3, ORANGE)
+    rect(px, 7, 2, 8, 2, ORANGE)
+    # Lit lamp: the meter is passing power.
+    px[12, 12] = LAMP_GREEN
+    return img
+
+
+def meter_input():
+    """Back: faces the generator. A heavy intake flange with an arrow leading in."""
+    img, px = meter_plate()
+    outline_rect(px, 4, 4, 11, 11, OUTLINE)
+    rect(px, 5, 5, 10, 10, STEEL_LIT)
+    rect(px, 6, 6, 9, 9, STEEL_DARK)
+    dots(px, [(5, 5), (10, 5), (5, 10), (10, 10)], BOLT)
+    # Arrow pointing in, below the flange.
+    rect(px, 6, 12, 9, 12, ORANGE_DARK)
+    rect(px, 7, 13, 8, 13, ORANGE_DARK)
+    return img
+
+
+def meter_top():
+    """Top and bottom: a plain plate with a lifting lug."""
+    img, px = meter_plate()
+    rect(px, 6, 7, 9, 8, STEEL_DARK)
+    outline_rect(px, 6, 7, 9, 8, OUTLINE)
+    return img
+
+
 # The console's side, lid, split screen halves and switch panel used to live here.
 # The formed console is a single OBJ now -- see docs/tools/make_terminal_assets.py for
 # the grid's and make_fluid_console_assets.py for the fluid network's -- so the block
@@ -316,6 +386,10 @@ TEXTURES = {
     "grid_device_side": device_side,
     "grid_device_top": device_top,
     "grid_console_housing": console_housing,
+    "grid_generation_meter_side": meter_side,
+    "grid_generation_meter_output": meter_output,
+    "grid_generation_meter_input": meter_input,
+    "grid_generation_meter_top": meter_top,
 }
 
 DEFAULT_OUT = os.path.join("src", "main", "resources", "assets", "immersiveengineering",

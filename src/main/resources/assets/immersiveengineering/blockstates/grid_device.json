@@ -42,6 +42,21 @@
 				}
 			}
 		],
+		"inventory,type=generation_meter": [
+			{
+				"y": 180,
+				"model": "cube",
+				"textures": {
+					"particle": "immersiveengineering:blocks/grid_generation_meter_side",
+					"north": "immersiveengineering:blocks/grid_generation_meter_input",
+					"south": "immersiveengineering:blocks/grid_generation_meter_output",
+					"east": "immersiveengineering:blocks/grid_generation_meter_side",
+					"west": "immersiveengineering:blocks/grid_generation_meter_side",
+					"up": "immersiveengineering:blocks/grid_generation_meter_top",
+					"down": "immersiveengineering:blocks/grid_generation_meter_top"
+				}
+			}
+		],
 		"type": {
 			"feed_unit": {
 				"model": "immersiveengineering:smartmodel/connector",
@@ -73,6 +88,18 @@
 			"signal_unit": {
 				"textures": {
 					"front": "immersiveengineering:blocks/grid_device_signal_front"
+				}
+			},
+			"generation_meter": {
+				"model": "cube",
+				"textures": {
+					"particle": "immersiveengineering:blocks/grid_generation_meter_side",
+					"north": "immersiveengineering:blocks/grid_generation_meter_input",
+					"south": "immersiveengineering:blocks/grid_generation_meter_output",
+					"east": "immersiveengineering:blocks/grid_generation_meter_side",
+					"west": "immersiveengineering:blocks/grid_generation_meter_side",
+					"up": "immersiveengineering:blocks/grid_generation_meter_top",
+					"down": "immersiveengineering:blocks/grid_generation_meter_top"
 				}
 			}
 		},

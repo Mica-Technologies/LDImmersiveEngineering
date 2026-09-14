@@ -81,13 +81,47 @@ public class OutputMeter
 	}
 
 	/**
+	 * Decides what to publish, given a fresh reading and the figure already on record.
+	 * <p>
+	 * <b>A meter that has just loaded knows nothing yet.</b> Its window starts empty, so for the first
+	 * window after its chunk loads a low reading means "not watched long enough", not "the plant got
+	 * weaker". Publishing it would let a player flying past a plant -- loading its chunk for a second --
+	 * reset the plant to zero and leave a town dark when they had gone. So until a whole window has been
+	 * observed a reading may only raise the record. After that the window is the truth, in both directions.
+	 * <p>
+	 * A missing generator is the exception: that is known immediately, and publishes zero at once.
+	 *
+	 * @param observedTicks how long this meter has been measuring since it was loaded
+	 */
+	public static int chooseRate(int reading, int recorded, long observedTicks, int windowSeconds,
+								 boolean generatorPresent)
+	{
+		if(!generatorPresent)
+			return 0;
+		if(observedTicks < (long)Math.max(1, windowSeconds)*TICKS_PER_SECOND)
+			return Math.max(reading, recorded);
+		return reading;
+	}
+
+	/**
 	 * Applies a changed window length. Measurements are discarded, because a ring cannot be re-sliced;
 	 * the caller keeps its last known rate until the new window has something to say.
 	 */
 	public void setWindow(int windowSeconds)
 	{
-		if(Math.max(1, windowSeconds)!=seconds.length)
-			resize(windowSeconds);
+		setWindowChanged(windowSeconds);
+	}
+
+	/**
+	 * {@link #setWindow}, reporting whether the window actually changed -- and so whether the caller's
+	 * measurements have just been discarded.
+	 */
+	public boolean setWindowChanged(int windowSeconds)
+	{
+		if(Math.max(1, windowSeconds)==seconds.length)
+			return false;
+		resize(windowSeconds);
+		return true;
 	}
 
 	/**

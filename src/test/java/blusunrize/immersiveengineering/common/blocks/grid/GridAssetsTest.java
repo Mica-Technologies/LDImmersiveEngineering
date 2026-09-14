@@ -277,7 +277,7 @@ class GridAssetsTest
 		void everyMetaHasAnInventoryVariant()
 		{
 			JsonObject deviceVariants = blockstate("grid_device").getAsJsonObject("variants");
-			for(String type : new String[]{"feed_unit", "service_unit", "console_housing"})
+			for(String type : new String[]{"feed_unit", "service_unit", "console_housing", "generation_meter"})
 				assertTrue(deviceVariants.has("inventory,type="+type),
 						"grid_device is missing the inventory variant for "+type);
 			assertTrue(blockstate("grid_multiblock").getAsJsonObject("variants").has("inventory,type=grid_console"));
@@ -937,7 +937,8 @@ class GridAssetsTest
 					{"feed_unit", "immersiveengineering:grid_device", BlockTypes_GridDevice.FEED_UNIT.getMeta()},
 					{"service_unit", "immersiveengineering:grid_device", BlockTypes_GridDevice.SERVICE_UNIT.getMeta()},
 					{"console_housing", "immersiveengineering:grid_device", BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta()},
-					{"signal_unit", "immersiveengineering:grid_device", BlockTypes_GridDevice.SIGNAL_UNIT.getMeta()}
+					{"signal_unit", "immersiveengineering:grid_device", BlockTypes_GridDevice.SIGNAL_UNIT.getMeta()},
+					{"generation_meter", "immersiveengineering:grid_device", BlockTypes_GridDevice.GENERATION_METER.getMeta()}
 			};
 			for(Object[] row : expected)
 			{
@@ -974,7 +975,7 @@ class GridAssetsTest
 		@DisplayName("recipe keys are all referenced by the pattern and vice versa")
 		void recipeKeysMatchPattern()
 		{
-			for(String name : new String[]{"feed_unit", "service_unit", "console_housing", "signal_unit"})
+			for(String name : new String[]{"feed_unit", "service_unit", "console_housing", "signal_unit", "generation_meter"})
 			{
 				JsonObject json = read("recipes/grid/"+name+".json");
 				Set<String> recipeKeys = keys(json.getAsJsonObject("key"));

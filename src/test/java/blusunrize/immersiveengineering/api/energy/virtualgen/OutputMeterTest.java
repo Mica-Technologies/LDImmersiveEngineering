@@ -100,6 +100,36 @@ class OutputMeterTest
 	}
 
 	@Test
+	@DisplayName("a freshly loaded meter can raise the record but not lower it until it has watched a whole window")
+	void warmUpNeverLowers()
+	{
+		//A player flying past loads the plant for a moment: the empty window must not zero the plant.
+		assertEquals(4096, OutputMeter.chooseRate(0, 4096, 20, 60, true));
+		assertEquals(4096, OutputMeter.chooseRate(1000, 4096, 20*59, 60, true));
+		assertEquals(5000, OutputMeter.chooseRate(5000, 4096, 20, 60, true), "a higher reading still counts at once");
+		assertEquals(1000, OutputMeter.chooseRate(1000, 4096, 20*60, 60, true), "after a whole window the reading is the truth");
+		assertEquals(0, OutputMeter.chooseRate(0, 4096, 20*60, 60, true));
+	}
+
+	@Test
+	@DisplayName("a missing generator publishes zero at once, warm-up or not")
+	void missingGenerator()
+	{
+		assertEquals(0, OutputMeter.chooseRate(4096, 4096, 0, 60, false));
+		assertEquals(0, OutputMeter.chooseRate(4096, 4096, 20*600, 60, false));
+	}
+
+	@Test
+	@DisplayName("setWindowChanged reports a real change only")
+	void windowChangeReported()
+	{
+		OutputMeter meter = new OutputMeter(60);
+		assertFalse(meter.setWindowChanged(60));
+		assertTrue(meter.setWindowChanged(30));
+		assertFalse(meter.setWindowChanged(30));
+	}
+
+	@Test
 	@DisplayName("changing the window discards measurements rather than mis-slicing them")
 	void resize()
 	{

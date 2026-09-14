@@ -159,6 +159,7 @@ public class JEIHelper implements IModPlugin
 		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SERVICE_UNIT.getMeta()));
 		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.SIGNAL_UNIT.getMeta()));
 		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.CONSOLE_HOUSING.getMeta()));
+		addInfo(new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.GENERATION_METER.getMeta()));
 		addInfo(new ItemStack(IEContent.blockGridMultiblock, 1, BlockTypes_GridMultiblock.GRID_CONSOLE.getMeta()));
 		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.FLUID_INLET.getMeta()));
 		addInfo(new ItemStack(IEContent.blockFluidNetDevice, 1, BlockTypes_FluidNetDevice.FLUID_OUTLET.getMeta()));

@@ -124,6 +124,7 @@ public class CommandDemo extends CommandTreeBase
 	{
 		addSubcommand(new SubBuild());
 		addSubcommand(new SubClear());
+		addSubcommand(new SubPlant());
 		addSubcommand(new CommandTreeHelp(this));
 	}
 
@@ -258,6 +259,56 @@ public class CommandDemo extends CommandTreeBase
 			new Builder(world, origin, null).clear();
 			msg(sender, "Cleared the demo region at "+origin.getX()+" "+origin.getY()+" "
 					+origin.getZ()+".");
+		}
+	}
+
+	/**
+	 * {@code /ie demo plant [length]} -- a metered power plant and a long wire run, for seeing virtual
+	 * generation work.
+	 * <p>
+	 * A thermoelectric generator (magma against packed ice, so it burns nothing and qualifies in either
+	 * mode) pushes through a Generation Meter into an LV connector; copper runs east from relay to relay
+	 * for {@code length} blocks and ends in an LV capacitor. Stand at the plant for a minute so the meter
+	 * measures, walk or teleport to the capacitor end, and the capacitor keeps filling although the plant's
+	 * chunks have unloaded. {@code /ie virtualgen} shows the plant switch to virtual.
+	 */
+	private class SubPlant extends CommandBase
+	{
+		/** Copper's reach is 16; one short of it keeps every span legal. */
+		private static final int SPAN = 15;
+
+		@Nonnull
+		@Override
+		public String getName()
+		{
+			return "plant";
+		}
+
+		@Nonnull
+		@Override
+		public String getUsage(@Nonnull ICommandSender sender)
+		{
+			return "/ie demo plant [length] -- metered generator where you stand, wire east for length blocks (default 480)";
+		}
+
+		@Override
+		public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender,
+							@Nonnull String[] args) throws CommandException
+		{
+			World world = sender.getEntityWorld();
+			if(world.isRemote)
+				return;
+			int length = args.length >= 1?CommandBase.parseInt(args[0], SPAN, 20000): 480;
+			BlockPos origin = sender.getPosition();
+			Builder builder = new Builder(world, origin, null);
+			BlockPos end = builder.plant(origin, length, SPAN);
+			msg(sender, TextFormatting.GOLD+"Metered plant built"+TextFormatting.RESET+" at "+origin.getX()+" "
+					+origin.getY()+" "+origin.getZ()+"; the wire ends at a capacitor at "+end.getX()+" "+end.getY()
+					+" "+end.getZ()+".");
+			msg(sender, TextFormatting.GRAY+"Wait here a minute so the meter measures, then go to the far end "
+					+"and watch /ie virtualgen."+TextFormatting.RESET);
+			for(String note : builder.notes)
+				msg(sender, TextFormatting.YELLOW+"  "+note+TextFormatting.RESET);
 		}
 	}
 
@@ -533,6 +584,46 @@ public class CommandDemo extends CommandTreeBase
 			world.addBlockEvent(pos, world.getBlockState(pos).getBlock(), -1, 0);
 			IBlockState state = world.getBlockState(pos);
 			world.notifyBlockUpdate(pos, state, state, 3);
+		}
+
+		/**
+		 * The virtual generation test rig. Not a boulevard station: it has to reach far enough that the
+		 * two ends cannot both be loaded around one player, which no station on the street can.
+		 *
+		 * @return where the capacitor at the far end is
+		 */
+		private BlockPos plant(BlockPos origin, int length, int span)
+		{
+			int x = origin.getX(), y = origin.getY(), z = origin.getZ();
+			BlockPos generator = new BlockPos(x, y, z);
+			//The heat pair first, so the generator's first look at its neighbours already sees them.
+			set(generator.north(), Blocks.MAGMA.getDefaultState());
+			set(generator.south(), Blocks.PACKED_ICE.getDefaultState());
+			set(generator, IEContent.blockMetalDevice1.getStateFromMeta(BlockTypes_MetalDevice1.THERMOELECTRIC_GEN.getMeta()));
+			BlockPos meter = generator.east();
+			place(meter, IEContent.blockGridDevice.getStateFromMeta(BlockTypes_GridDevice.GENERATION_METER.getMeta()),
+					EnumFacing.WEST);
+			BlockPos last = meter.east();
+			connector(last, BlockTypes_Connector.CONNECTOR_LV, EnumFacing.WEST);
+			EnumFacing lastFace = EnumFacing.WEST;
+
+			int spans = Math.max(1, length/span);
+			for(int i = 1; i < spans; i++)
+			{
+				BlockPos relay = new BlockPos(last.getX()+span, y, z);
+				set(relay.down(), Blocks.STONE.getDefaultState());
+				connector(relay, BlockTypes_Connector.RELAY_LV, EnumFacing.DOWN);
+				wire(last, lastFace, relay, EnumFacing.DOWN, WireType.COPPER);
+				last = relay;
+				lastFace = EnumFacing.DOWN;
+			}
+			BlockPos capacitor = new BlockPos(last.getX()+span, y, z);
+			set(capacitor.down(), Blocks.STONE.getDefaultState());
+			sinkCapacitor(capacitor, EnumFacing.UP);
+			BlockPos sink = capacitor.up();
+			connector(sink, BlockTypes_Connector.CONNECTOR_LV, EnumFacing.DOWN);
+			wire(last, lastFace, sink, EnumFacing.DOWN, WireType.COPPER);
+			return capacitor;
 		}
 
 		private void fillInventory(BlockPos pos, ItemStack stack)

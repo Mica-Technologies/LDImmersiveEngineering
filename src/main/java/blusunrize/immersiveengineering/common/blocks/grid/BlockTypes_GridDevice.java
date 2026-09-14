@@ -38,9 +38,15 @@ public enum BlockTypes_GridDevice implements IStringSerializable, BlockIEBase.IB
 	/**
 	 * Bridges a segment to redstone, in either direction.
 	 */
-	SIGNAL_UNIT;
+	SIGNAL_UNIT,
 	//SUBSTATION_FRAME was removed with the Substation itself, before either shipped. It sat at
-	//meta 4, the last value, so dropping it moved no other block's metadata.
+	//meta 4, the last value, so dropping it moved no other block's metadata -- and since no world
+	//ever held one, the Generation Meter could take the slot.
+	/**
+	 * In line between a generator and its wire connector: measures the plant, and keeps its output
+	 * reaching the wire network while the plant's chunks are unloaded. Needs nothing else from the grid.
+	 */
+	GENERATION_METER;
 
 	@Override
 	public String getName()
