@@ -27,6 +27,9 @@ implements which system and how those systems behave. All entries cite real sour
 - **[VIRTUAL_GRID.md](VIRTUAL_GRID.md)** — this fork's virtual power grid: named segments of Feed
   and Service Units that move flux with no wire between them, failover chains, breakers, schedules,
   Signal Units, and the Grid Management Console.
+- **[VIRTUAL_GENERATION.md](VIRTUAL_GENERATION.md)** — this fork's Generation Meter: a power plant
+  keeps supplying its wire network or grid Feed Unit at its measured output while its chunks are
+  unloaded, with no chunk loader and nothing kept loaded.
 - **[FLUID_NETWORK.md](FLUID_NETWORK.md)** — this fork's virtual fluid network: named mains of
   Inlets and Outlets that move fluid with no pipe between them, the one-fluid-per-main rule, Main
   Valves, and the Fluid Control Console. A deliberate mirror of the virtual grid.

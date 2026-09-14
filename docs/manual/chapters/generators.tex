@@ -42,6 +42,38 @@ A tall multiblock that captures strikes for \textbf{16\,000\,000 IF} apiece by d
 weather-dependent, spectacular, and useless as a base load --- pair it with storage large enough to
 hold a strike or most of it is wasted.
 
+\section{Keeping a Distant Plant Running}
+\label{sec:generation-meter}
+
+A generator only works while its chunk is loaded. Wire carries power through unloaded chunks, but a
+plant nobody is standing near produces nothing, so the town at the far end of the line goes dark the
+moment you leave the plant behind.
+
+\begin{iefork}
+The \textbf{Generation Meter} solves this without a chunk loader. Place it against the generator's
+output face and bolt the wire connector onto its front. Power passes straight through; the meter
+stores none of its own and measures what the generator produces. Right-click it for a readout.
+
+While the plant's chunks are unloaded, the wire network keeps receiving that measured output at every
+consumer that is still loaded. Nothing is kept loaded to do it.
+\end{iefork}
+
+\begin{description}
+\item[Let it measure] Leave a new meter beside the running plant for a minute. It reports the best
+      output it saw over that minute, not the last reading.
+\item[Fuel] Outside city mode only fuel-free generators keep supplying while unloaded --- a dynamo on
+      a water wheel or windmill, or a thermoelectric generator. In city mode every generator does, and
+      burns no fuel while unloaded.
+\item[Consumers] Still have to be loaded. The meter keeps the plant running, not the town.
+\item[Grid Feed Units] A meter in front of a Feed Unit instead of a connector keeps that unit supplying
+      its segment while unloaded; the console lists it as \emph{virtual}. \autoref{ch:grid}.
+\end{description}
+
+\begin{ietip}
+Operators can list every metered plant, and whether it is running for real or virtually, with
+\texttt{/ie virtualgen}.
+\end{ietip}
+
 \section{Storage}
 
 \begin{description}

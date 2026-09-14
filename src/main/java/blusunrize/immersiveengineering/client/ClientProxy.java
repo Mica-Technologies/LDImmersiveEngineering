@@ -892,6 +892,15 @@ public class ClientProxy extends CommonProxy
 				//segment is and have thirty boxes to put on one.
 				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGrid11",
 						new ItemStack(IEContent.itemNetworkLinker, 1, ItemNetworkLinker.META_GRID)));
+		//Virtual generation. Its own entry rather than more grid pages: the meter works on a plain wire
+		//network with no grid anywhere, and a player looking for "why does my town go dark" should not
+		//have to read about segments first.
+		ManualHelper.getManual().addEntry("virtualGeneration", ManualHelper.CAT_ENERGY,
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGeneration0"),
+				new ManualPages.Crafting(ManualHelper.getManual(), "virtualGeneration1",
+						new ItemStack(IEContent.blockGridDevice, 1, BlockTypes_GridDevice.GENERATION_METER.getMeta())),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGeneration2"),
+				new ManualPages.Text(ManualHelper.getManual(), "virtualGeneration3"));
 		//Conduits. Next to the wires and the grid, because the three are the same question asked
 		//three ways: how does power get from there to here, and what does it look like on the way.
 		ManualHelper.getManual().addEntry("conduits", ManualHelper.CAT_ENERGY,

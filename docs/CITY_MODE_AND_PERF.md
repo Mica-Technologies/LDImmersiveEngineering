@@ -694,6 +694,31 @@ presence accounting. If you want a grid where the arithmetic is honest, leave
 
 ---
 
+## Virtual Generation
+
+Not gated by city mode — it works in both — but city mode widens it. Full documentation lives in
+[VIRTUAL_GENERATION.md](VIRTUAL_GENERATION.md).
+
+A **Generation Meter** between a generator and its wire connector (or grid Feed Unit) keeps the plant
+supplying at its measured output while its chunks are unloaded. It is the performance-friendly answer
+to "the town goes dark when nobody is at the plant": nothing is chunk-loaded, and only consumers that
+are loaded anyway receive power.
+
+What city mode changes:
+
+- Outside city mode only **fuel-free** generators (kinetic dynamo, thermoelectric generator, and any
+  listed in `virtualGenFreeSources`) run virtually. In city mode **every** generator does, and a
+  fuel-burning plant burns nothing while unloaded — the same trade of simulation for tick time the
+  diesel generator's cosmetic fuel already makes.
+- The virtual push uses `WireNetTransfer.city` (lossless, greedy) instead of the normal-mode
+  simulate-then-commit transfer with loss.
+
+**Cost.** One cached route walk per metered connector per tick — what that connector's own tick
+does while loaded — and nothing at all when a server has no meters. It exists to *replace* chunk
+loaders, so it should be measured against them, not against nothing.
+
+---
+
 ## Fluid Pipes
 
 Gated behind `cityModePipes`, resolved through `CityMode.pipes()`. Implemented in

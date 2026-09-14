@@ -316,6 +316,10 @@ A device whose chunk is unloaded stays **listed** in the console (greyed, "offli
 by the tick loop. Nothing routes *through* a device, so unlike wires there is no proxy machinery
 needed. Chunk-loaded devices never go offline.
 
+The exception is a Feed Unit with a **Generation Meter** in front of it: while the metered plant's
+real path is broken it keeps supplying the segment at the plant's measured output, and the console
+shows it as "virtual". See [VIRTUAL_GENERATION.md](VIRTUAL_GENERATION.md).
+
 ---
 
 ## Performance notes
