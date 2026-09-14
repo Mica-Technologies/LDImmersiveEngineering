@@ -364,12 +364,31 @@ public class ImmersiveNetHandler
 			IImmersiveConnectable iic = toIIC(next, w);
 			if(iic!=null)
 				iic.onConnectivityUpdate(next, dimension);
+			else
+				//Neither loaded nor proxied, but routes can still be cached for it: a virtual plant pushes
+				//from its connector's position while that connector's chunk is unloaded. The cache is
+				//keyed by position, so evict by position rather than leave that plant a stale route list.
+				evictCachedRoutes(next, dimension);
 			Set<Connection> connsAtBlock = connsForDim.get(next);
 			if(connsAtBlock!=null)
 				for(Connection c : connsAtBlock)
 					if(!closed.contains(c.end))
 						open.add(c.end);
 		}
+	}
+
+	/**
+	 * Drops the cached routes starting at {@code pos}, exactly as the default
+	 * {@link IImmersiveConnectable#onConnectivityUpdate} does, for a node with nothing to call it on.
+	 */
+	public void evictCachedRoutes(BlockPos pos, int dimension)
+	{
+		Map<BlockPos, Set<AbstractConnection>> routes = indirectConnections.get(dimension);
+		if(routes!=null)
+			routes.remove(pos);
+		routes = indirectConnectionsIgnoreOut.get(dimension);
+		if(routes!=null)
+			routes.remove(pos);
 	}
 
 	//Queues a deferred, coalesced cache flood for a connector that just (re)loaded, flushed at the next

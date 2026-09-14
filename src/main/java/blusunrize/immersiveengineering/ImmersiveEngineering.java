@@ -29,6 +29,7 @@ import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetTickHandler;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
 import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
+import blusunrize.immersiveengineering.common.util.virtualgen.VirtualGenSaveData;
 import blusunrize.immersiveengineering.common.util.network.*;
 import blusunrize.immersiveengineering.common.util.petroleum.PetroleumSaveData;
 import blusunrize.immersiveengineering.common.util.petroleum.PetroleumTickHandler;
@@ -279,6 +280,9 @@ public class ImmersiveEngineering
 				GridTickHandler.reset();
 				GridSaveData.load(world);
 				GridChunkLoader.refresh();
+
+				//Metered plants, in their own file for the same reasons.
+				VirtualGenSaveData.load(world);
 
 				//The virtual fluid network is the grid's sibling and keeps its own save file for
 				//the same reasons -- see FluidNetSaveData. Same reset-then-load order, so a second

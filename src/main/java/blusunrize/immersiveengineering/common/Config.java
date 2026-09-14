@@ -12,6 +12,7 @@ import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.crafting.*;
 import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
+import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGenConfig;
 import blusunrize.immersiveengineering.api.fluid.network.FluidNetConfig;
 import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
@@ -193,6 +194,27 @@ public class Config
 		public static FluidNetwork fluidNetwork;
 		@SubConfig
 		public static Petroleum petroleum;
+		@SubConfig
+		public static VirtualGeneration virtualGeneration;
+
+		/**
+		 * Metered plants that keep supplying their wire networks while their chunks are unloaded. Values
+		 * are pushed into {@link blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGenConfig}.
+		 */
+		public static class VirtualGeneration
+		{
+			@Comment({"Master switch for virtual generation. When true, a power plant with a Generation Meter between its generator and its wire connector keeps supplying that wire network at its measured output while the plant's chunks are unloaded -- no chunk loader needed, and nothing is ever force-loaded.",
+					"Only consumers that are loaded anyway receive power. When false, an unloaded plant simply stops, as in stock Immersive Engineering."})
+			public static boolean enableVirtualGeneration = true;
+			@Comment({"How many seconds a Generation Meter looks back over. Its measured output is the highest per-second average the generator offered within this window."})
+			@RangeInt(min = 1, max = 3600)
+			public static int virtualGenMeasureWindowSeconds = 60;
+			@Comment({"Ceiling on any one meter's virtual output, in Flux/t. A virtual plant is also never allowed more than its wire connector's own rate."})
+			@RangeInt(min = 0)
+			public static int virtualGenMaxRate = 32768;
+			@Comment({"Registry names of generator blocks from other mods that burn no fuel. Outside City Mode only fuel-free generators run virtually; Immersive Engineering's kinetic dynamo and thermoelectric generator are always counted as fuel-free. In City Mode every generator qualifies and burns nothing while unloaded."})
+			public static String[] virtualGenFreeSources = new String[0];
+		}
 
 		/**
 		 * The virtual power grid: named segments of Feed and Service Units that move flux
@@ -809,6 +831,12 @@ public class Config
 		FluidNetConfig.tripsEnabled = IEConfig.FluidNetwork.fluidNetTripsEnabled;
 		FluidNetConfig.tripSeconds = IEConfig.FluidNetwork.fluidNetTripSeconds;
 		VirtualFluidNet.INSTANCE.onConfigChanged();
+
+		VirtualGenConfig.enabled = IEConfig.VirtualGeneration.enableVirtualGeneration;
+		VirtualGenConfig.measureWindowSeconds = IEConfig.VirtualGeneration.virtualGenMeasureWindowSeconds;
+		VirtualGenConfig.maxRate = IEConfig.VirtualGeneration.virtualGenMaxRate;
+		VirtualGenConfig.freeSources = new java.util.HashSet<>(java.util.Arrays.asList(
+				IEConfig.VirtualGeneration.virtualGenFreeSources));
 
 		//Push the petroleum settings into the api-side mirror. Same arrangement as the virtual
 		//grid above: the reservoir model in api never reaches back into common.
