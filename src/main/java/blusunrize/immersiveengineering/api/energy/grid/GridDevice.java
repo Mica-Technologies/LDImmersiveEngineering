@@ -292,6 +292,22 @@ public class GridDevice
 		return lastThroughput;
 	}
 
+	/**
+	 * Set by the engine each tick: whether a metered plant supplied this feed virtually. Live only -- sent to
+	 * the console, never saved.
+	 */
+	private transient boolean virtualSupplied;
+
+	public boolean isVirtualSupplied()
+	{
+		return virtualSupplied;
+	}
+
+	public void setVirtualSupplied(boolean virtualSupplied)
+	{
+		this.virtualSupplied = virtualSupplied;
+	}
+
 	public void setLastThroughput(int lastThroughput)
 	{
 		this.lastThroughput = lastThroughput;
@@ -383,6 +399,7 @@ public class GridDevice
 		{
 			nbt.setBoolean("online", isOnline());
 			nbt.setInteger("throughput", lastThroughput);
+			nbt.setBoolean("virtual", virtualSupplied);
 		}
 		return nbt;
 	}
@@ -415,6 +432,7 @@ public class GridDevice
 		//endpoint attachment decides, exactly as before.
 		device.remoteOnline = nbt.getBoolean("online");
 		device.lastThroughput = nbt.getInteger("throughput");
+		device.virtualSupplied = nbt.getBoolean("virtual");
 		return device;
 	}
 

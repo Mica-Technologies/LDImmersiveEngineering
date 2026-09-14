@@ -8,6 +8,8 @@
 
 package blusunrize.immersiveengineering.api.energy.virtualgen;
 
+import blusunrize.immersiveengineering.api.energy.grid.GridDevice;
+import blusunrize.immersiveengineering.api.energy.grid.IVirtualFeedSupply;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.math.BlockPos;
@@ -85,6 +87,57 @@ public class VirtualGeneration
 	public void clear()
 	{
 		sources.clear();
+	}
+
+	/**
+	 * The grid engine's view of this registry: the plants metered straight into a Feed Unit.
+	 * <p>
+	 * A Feed Unit is found by position, so every meter pointing at it counts -- two generators on two faces
+	 * of one unit supply twice. A linear scan per unloaded feed per tick: meters are a handful per server,
+	 * not thousands, and an index would have to be kept honest through rotation and removal for no gain.
+	 */
+	public IVirtualFeedSupply gridFeedSupply()
+	{
+		return feedSupply;
+	}
+
+	private final IVirtualFeedSupply feedSupply = new IVirtualFeedSupply()
+	{
+		@Override
+		public int rate(GridDevice feed, boolean cityMode)
+		{
+			if(!VirtualGenConfig.enabled)
+				return 0;
+			long total = 0;
+			for(VirtualSource source : sources.values())
+				//Only while the plant's real path is broken: a fully loaded plant is pushing into the unit
+				//itself, and counting it here as well would double its supply.
+				if(feeds(source, feed)&&source.isEnabled()&&!source.isRealPath()&&source.qualifies(cityMode))
+					total += source.getVirtualRate();
+			return (int)Math.min(Integer.MAX_VALUE, total);
+		}
+
+		@Override
+		public void delivered(GridDevice feed, int amount)
+		{
+			VirtualSource first = null;
+			for(VirtualSource source : sources.values())
+				if(feeds(source, feed))
+				{
+					source.setLive(amount > 0, 0);
+					if(first==null&&amount > 0)
+						first = source;
+				}
+			//The engine only knows the unit's total; the first meter carries the figure, as the wire engine
+			//gives a coalesced group's remainder to its first member.
+			if(first!=null)
+				first.setLive(true, amount);
+		}
+	};
+
+	private static boolean feeds(VirtualSource source, GridDevice feed)
+	{
+		return source.feedsGrid()&&source.getDimension()==feed.getDimension()&&source.getSourcePos().equals(feed.getPos());
 	}
 
 	public void setDirtyListener(@Nullable Runnable listener)

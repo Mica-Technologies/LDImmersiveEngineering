@@ -36,6 +36,22 @@ public final class GridEngine
 	}
 
 	/**
+	 * Where an unloaded, metered Feed Unit's supply comes from. {@link IVirtualFeedSupply#NONE} until
+	 * virtual generation installs itself; tests assign a fake.
+	 */
+	public static IVirtualFeedSupply virtualFeeds = IVirtualFeedSupply.NONE;
+
+	/**
+	 * @return true for a feed a metered plant may supply virtually: any enabled Feed Unit, loaded or not. A
+	 * loaded unit can still have lost its real supply -- the plant in front of it may sit across a chunk
+	 * border and be unloaded -- so it is the plant's real path that decides, not the unit's.
+	 */
+	private static boolean isVirtualCandidate(GridDevice device)
+	{
+		return device.getType()==GridDeviceType.FEED&&device.isEnabled();
+	}
+
+	/**
 	 * Runs one server tick of the whole grid.
 	 *
 	 * @param grid     the registry to tick
@@ -47,7 +63,14 @@ public final class GridEngine
 		if(!GridConfig.enabled)
 			return;
 		for(GridSegment segment : grid.getSegments())
+		{
 			segment.beginTick();
+			//Cleared every tick, including for segments that will not collect, so a feed shows "virtual" only
+			//on a tick it really was.
+			if(virtualFeeds!=IVirtualFeedSupply.NONE)
+				for(GridDevice device : segment.getDevices())
+					device.setVirtualSupplied(false);
+		}
 
 		//Kill switches are read before anything moves, so a segment that is being held down
 		//never collects a tick of energy it is not allowed to deliver.
@@ -206,6 +229,56 @@ public final class GridEngine
 			segment.recordIn(pulled);
 			feed.recordThroughput(pulled);
 		}
+		collectVirtual(segment, keep);
+	}
+
+	/**
+	 * Phase A, continued -- feeds whose metered plant has lost its real path supply the plant's measured
+	 * rate, under exactly the budget, buffer room, loss and per-device cap a live feed would. A loaded unit
+	 * that already drew something real this tick has only what is left of its cap.
+	 * <p>
+	 * After the live feeds, so a loaded source is always drawn first and a virtual plant only covers what
+	 * real ones did not.
+	 */
+	private static void collectVirtual(GridSegment segment, double keep)
+	{
+		if(virtualFeeds==IVirtualFeedSupply.NONE)
+			return;
+		GridPolicy policy = segment.getPolicy();
+		List<GridDevice> devices = segment.getDevices();
+		for(int i = 0; i < devices.size(); i++)
+		{
+			GridDevice feed = devices.get(i);
+			if(!isVirtualCandidate(feed))
+				continue;
+			int rate = virtualFeeds.rate(feed, false);
+			if(rate <= 0)
+				continue;
+			int capLeft = feed.getTransferCap()-(feed.getEndpoint()!=null?feed.getLastThroughput(): 0);
+			int room = policy.getBufferCap()-segment.getBuffer();
+			int inputBudget = segment.getInputBudget();
+			if(room <= 0||inputBudget <= 0)
+			{
+				virtualFeeds.delivered(feed, 0);
+				continue;
+			}
+			int grossForRoom = keep >= 1.0?room: (int)Math.min(Integer.MAX_VALUE, Math.ceil(room/keep));
+			int pulled = Math.min(Math.min(Math.min(inputBudget, capLeft), grossForRoom), rate);
+			if(pulled <= 0)
+			{
+				virtualFeeds.delivered(feed, 0);
+				continue;
+			}
+			//An unloaded unit is outside GridSegment.beginTick's reset -- that only walks active devices -- so
+			//its per-tick figure is zeroed here before adding, or it would count up forever.
+			if(feed.getEndpoint()==null)
+				feed.setLastThroughput(0);
+			segment.addToBuffer((int)Math.floor(pulled*keep));
+			segment.recordIn(pulled);
+			feed.recordThroughput(pulled);
+			feed.setVirtualSupplied(true);
+			virtualFeeds.delivered(feed, pulled);
+		}
 	}
 
 	/**
@@ -362,6 +435,25 @@ public final class GridEngine
 				}
 				if(feed.isLive(tick))
 					live = true;
+			}
+			//A feed whose metered plant has lost its real path proves its source by the measurement: there is
+			//nothing live to sip from, and the plant is exactly what virtual generation vouches for.
+			if(virtualFeeds!=IVirtualFeedSupply.NONE)
+			{
+				List<GridDevice> devices = segment.getDevices();
+				for(int i = 0; i < devices.size(); i++)
+				{
+					GridDevice feed = devices.get(i);
+					if(!isVirtualCandidate(feed))
+						continue;
+					int rate = virtualFeeds.rate(feed, true);
+					virtualFeeds.delivered(feed, rate > 0&&segment.isOperational()?rate: 0);
+					if(rate > 0)
+					{
+						live = true;
+						feed.setVirtualSupplied(true);
+					}
+				}
 			}
 			segment.setSourceLive(live);
 		}

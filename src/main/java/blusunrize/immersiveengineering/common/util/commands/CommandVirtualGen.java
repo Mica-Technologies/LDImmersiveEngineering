@@ -76,7 +76,8 @@ public class CommandVirtualGen extends CommandBase
 				state = TextFormatting.GRAY+"idle (nothing measured, or its dimension is unloaded)";
 			msg(sender, " dim "+source.getDimension()+" "+m.getX()+" "+m.getY()+" "+m.getZ()+": "
 					+source.getMeasuredRate()+" IF/t measured, "+source.getVirtualRate()+" IF/t virtual cap, "
-					+(source.isFreeSource()?"fuel-free": "burns fuel")+" -- "+state+TextFormatting.RESET);
+					+(source.isFreeSource()?"fuel-free": "burns fuel")+(source.feedsGrid()?", feeds a grid Feed Unit": "")
+					+" -- "+state+TextFormatting.RESET);
 		}
 	}
 

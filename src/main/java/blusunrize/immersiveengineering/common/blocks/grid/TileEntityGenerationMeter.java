@@ -240,6 +240,8 @@ public class TileEntityGenerationMeter extends TileEntityIEBase implements ITick
 				generator!=null);
 		boolean changed = source.updateMeasurement(rate, connectorRate(), isFreeSource(generator),
 				generatorId(), time);
+		//In front of a Feed Unit the plant supplies a grid segment rather than a wire network.
+		changed |= source.setFeedsGrid(Utils.getExistingTileEntity(world, getSourcePos()) instanceof TileEntityGridFeed);
 		if(changed)
 			VirtualGeneration.INSTANCE.markDirty();
 	}
@@ -332,6 +334,8 @@ public class TileEntityGenerationMeter extends TileEntityIEBase implements ITick
 			lines.add("Nothing on the output side. Put the wire connector against the meter's front.");
 		else if(target instanceof TileEntityConnectorLV)
 			lines.add("Feeds a connector rated "+((TileEntityConnectorLV)target).getMaxOutput()+" IF/t.");
+		else if(target instanceof TileEntityGridFeed)
+			lines.add("Feeds a Grid Feed Unit: while unloaded the plant keeps supplying its segment.");
 		int rate = source==null?0: source.getMeasuredRate();
 		lines.add("Measured output: "+rate+" IF/t (peak over the last "+VirtualGenConfig.measureWindowSeconds+" s).");
 		if(!VirtualGenConfig.enabled)

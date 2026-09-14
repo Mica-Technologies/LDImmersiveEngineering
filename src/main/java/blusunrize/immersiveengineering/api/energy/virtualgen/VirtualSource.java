@@ -54,10 +54,20 @@ public class VirtualSource
 	 */
 	private long lastMeasuredTime;
 	private boolean enabled = true;
+	/**
+	 * Whether the meter feeds a Virtual Grid Feed Unit rather than a wire connector. Such a plant is not
+	 * pushed onto wires; the grid engine counts it as an unloaded feed's supply instead.
+	 */
+	private boolean feedsGrid;
 
 	//Live, not saved
 	private int lastVirtualDelivered;
 	private boolean virtualActive;
+	/**
+	 * Whether generator, meter and target were all loaded at the last check, so the plant is supplying for
+	 * real. Starts true: until something has looked, assume the real path, so a plant is never counted twice.
+	 */
+	private boolean realPath = true;
 
 	public VirtualSource(int dimension, BlockPos meterPos, BlockPos generatorPos, BlockPos sourcePos)
 	{
@@ -142,6 +152,21 @@ public class VirtualSource
 		return freeSource;
 	}
 
+	public boolean feedsGrid()
+	{
+		return feedsGrid;
+	}
+
+	/**
+	 * @return true if the value changed
+	 */
+	public boolean setFeedsGrid(boolean feedsGrid)
+	{
+		boolean changed = this.feedsGrid!=feedsGrid;
+		this.feedsGrid = feedsGrid;
+		return changed;
+	}
+
 	public String getGeneratorId()
 	{
 		return generatorId;
@@ -181,7 +206,17 @@ public class VirtualSource
 		return virtualActive;
 	}
 
-	void setLive(boolean virtualActive, int delivered)
+	public boolean isRealPath()
+	{
+		return realPath;
+	}
+
+	public void setRealPath(boolean realPath)
+	{
+		this.realPath = realPath;
+	}
+
+	public void setLive(boolean virtualActive, int delivered)
 	{
 		this.virtualActive = virtualActive;
 		this.lastVirtualDelivered = delivered;
@@ -200,6 +235,7 @@ public class VirtualSource
 		nbt.setString("generatorId", generatorId);
 		nbt.setLong("measured", lastMeasuredTime);
 		nbt.setBoolean("enabled", enabled);
+		nbt.setBoolean("grid", feedsGrid);
 		return nbt;
 	}
 
@@ -216,6 +252,7 @@ public class VirtualSource
 		source.generatorId = nbt.getString("generatorId");
 		source.lastMeasuredTime = nbt.getLong("measured");
 		source.enabled = !nbt.hasKey("enabled")||nbt.getBoolean("enabled");
+		source.feedsGrid = nbt.getBoolean("grid");
 		return source;
 	}
 }

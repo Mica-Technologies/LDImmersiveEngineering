@@ -288,7 +288,7 @@ public class CommandDemo extends CommandTreeBase
 		@Override
 		public String getUsage(@Nonnull ICommandSender sender)
 		{
-			return "/ie demo plant [length] -- metered generator where you stand, wire east for length blocks (default 480)";
+			return "/ie demo plant [length] [grid] -- metered generator where you stand, wire east for length blocks (default 480); with grid, a Feed Unit and a distant Service Unit instead of wire";
 		}
 
 		@Override
@@ -299,9 +299,10 @@ public class CommandDemo extends CommandTreeBase
 			if(world.isRemote)
 				return;
 			int length = args.length >= 1?CommandBase.parseInt(args[0], SPAN, 20000): 480;
+			boolean grid = args.length >= 2&&"grid".equalsIgnoreCase(args[1]);
 			BlockPos origin = sender.getPosition();
 			Builder builder = new Builder(world, origin, null);
-			BlockPos end = builder.plant(origin, length, SPAN);
+			BlockPos end = grid?builder.gridPlant(origin, length): builder.plant(origin, length, SPAN);
 			msg(sender, TextFormatting.GOLD+"Metered plant built"+TextFormatting.RESET+" at "+origin.getX()+" "
 					+origin.getY()+" "+origin.getZ()+"; the wire ends at a capacitor at "+end.getX()+" "+end.getY()
 					+" "+end.getZ()+".");
@@ -623,6 +624,33 @@ public class CommandDemo extends CommandTreeBase
 			BlockPos sink = capacitor.up();
 			connector(sink, BlockTypes_Connector.CONNECTOR_LV, EnumFacing.DOWN);
 			wire(last, lastFace, sink, EnumFacing.DOWN, WireType.COPPER);
+			return capacitor;
+		}
+
+		/**
+		 * The grid version of {@link #plant}: the meter feeds a Feed Unit, and a Service Unit {@code length}
+		 * blocks east fills a capacitor, both on the segment "demo plant".
+		 */
+		private BlockPos gridPlant(BlockPos origin, int length)
+		{
+			GridSegment segment = VirtualGrid.INSTANCE.getSegmentByName("demo plant");
+			if(segment==null)
+				segment = VirtualGrid.INSTANCE.createSegment("demo plant");
+			segment.setEnabled(true);
+			BlockPos generator = new BlockPos(origin.getX(), origin.getY(), origin.getZ());
+			set(generator.north(), Blocks.MAGMA.getDefaultState());
+			set(generator.south(), Blocks.PACKED_ICE.getDefaultState());
+			set(generator, IEContent.blockMetalDevice1.getStateFromMeta(BlockTypes_MetalDevice1.THERMOELECTRIC_GEN.getMeta()));
+			BlockPos meter = generator.east();
+			place(meter, IEContent.blockGridDevice.getStateFromMeta(BlockTypes_GridDevice.GENERATION_METER.getMeta()),
+					EnumFacing.WEST);
+			gridDevice(meter.east(), BlockTypes_GridDevice.FEED_UNIT, EnumFacing.WEST, GridDeviceType.FEED, segment);
+			BlockPos capacitor = new BlockPos(origin.getX()+Math.max(16, length), origin.getY(), origin.getZ());
+			set(capacitor.down(), Blocks.STONE.getDefaultState());
+			sinkCapacitor(capacitor, EnumFacing.UP);
+			gridDevice(capacitor.up(), BlockTypes_GridDevice.SERVICE_UNIT, EnumFacing.DOWN, GridDeviceType.SERVICE,
+					segment);
+			GridSaveData.setDirty();
 			return capacitor;
 		}
 

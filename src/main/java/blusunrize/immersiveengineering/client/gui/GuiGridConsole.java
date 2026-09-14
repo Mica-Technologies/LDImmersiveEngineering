@@ -352,7 +352,10 @@ public class GuiGridConsole extends GuiIEContainerBase
 				?device.getPos().getX()+","+device.getPos().getY()+","+device.getPos().getZ()
 				: device.getCustomName();
 		StringBuilder flags = new StringBuilder();
-		if(!device.isOnline())
+		if(device.isVirtualSupplied())
+			//Before "offline": an unloaded feed still supplying from a metered plant is not a fault.
+			flags.append(" virtual");
+		else if(!device.isOnline())
 			flags.append(" offline");
 		if(!device.isEnabled())
 			flags.append(" off");

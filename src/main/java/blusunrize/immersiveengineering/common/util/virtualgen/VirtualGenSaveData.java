@@ -8,6 +8,7 @@
 
 package blusunrize.immersiveengineering.common.util.virtualgen;
 
+import blusunrize.immersiveengineering.api.energy.grid.GridEngine;
 import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGeneration;
 import blusunrize.immersiveengineering.common.util.IELogger;
 import net.minecraft.nbt.NBTTagCompound;
@@ -66,6 +67,8 @@ public class VirtualGenSaveData extends WorldSavedData
 		if(FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
 			INSTANCE = data;
 		VirtualGeneration.INSTANCE.setDirtyListener(VirtualGenSaveData::setDirty);
+		//Let unloaded, metered Feed Units keep supplying their segments.
+		GridEngine.virtualFeeds = VirtualGeneration.INSTANCE.gridFeedSupply();
 	}
 
 	public static void setDirty()

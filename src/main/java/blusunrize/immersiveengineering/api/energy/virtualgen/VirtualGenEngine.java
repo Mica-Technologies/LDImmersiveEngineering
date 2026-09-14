@@ -51,13 +51,18 @@ public final class VirtualGenEngine
 		Map<Group, List<VirtualSource>> groups = new LinkedHashMap<>();
 		for(VirtualSource source : registry.getSources())
 		{
+			int dim = source.getDimension();
+			//Whether the real path is intact is recorded for every plant, including those feeding a grid
+			//Feed Unit, because the grid engine needs it and has no world to ask.
+			source.setRealPath(!world.isDimensionLoaded(dim)||isRunningForReal(world, source));
+			//A plant feeding a Feed Unit is supplied through the grid engine, which owns its live figures too
+			//-- see VirtualGeneration.gridFeedSupply.
+			if(source.feedsGrid())
+				continue;
 			source.setLive(false, 0);
 			if(!source.isEnabled()||!source.qualifies(cityMode)||source.getVirtualRate() <= 0)
 				continue;
-			int dim = source.getDimension();
-			if(!world.isDimensionLoaded(dim))
-				continue;
-			if(isRunningForReal(world, source))
+			if(source.isRealPath())
 				continue;
 			groups.computeIfAbsent(new Group(dim, source.getSourcePos()), g -> new ArrayList<>()).add(source);
 		}
