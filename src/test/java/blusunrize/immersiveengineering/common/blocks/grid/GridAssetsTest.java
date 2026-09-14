@@ -949,6 +949,28 @@ class GridAssetsTest
 		}
 
 		@Test
+		@DisplayName("no recipe file crafts a grid_device meta that does not exist")
+		void noRecipeForMissingMeta()
+		{
+			//The Substation Frame's recipe outlived the Substation by weeks, still crafting four of a
+			//meta that no longer existed -- and a meta that is later reused would have made it a cheap
+			//recipe for whatever block took the slot. Scans the directory rather than a list, so a
+			//forgotten file is exactly what it catches.
+			File[] files = new File(ASSETS+"recipes/grid").listFiles((dir, name) -> name.endsWith(".json"));
+			assertNotNull(files);
+			int metas = BlockTypes_GridDevice.values().length;
+			for(File file : files)
+			{
+				JsonObject result = read("recipes/grid/"+file.getName()).getAsJsonObject("result");
+				if(result==null||!"immersiveengineering:grid_device".equals(result.get("item").getAsString()))
+					continue;
+				int data = result.has("data")?result.get("data").getAsInt(): 0;
+				assertTrue(data >= 0&&data < metas, file.getName()+" crafts grid_device meta "+data
+						+", but only metas 0-"+(metas-1)+" exist");
+			}
+		}
+
+		@Test
 		@DisplayName("recipe keys are all referenced by the pattern and vice versa")
 		void recipeKeysMatchPattern()
 		{
