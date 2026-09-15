@@ -15,6 +15,7 @@ import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
 import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGenConfig;
 import blusunrize.immersiveengineering.api.fluid.network.FluidNetConfig;
 import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
+import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.petroleum.PetroleumConfig;
 import blusunrize.immersiveengineering.api.petroleum.ReservoirHandler;
@@ -63,6 +64,10 @@ public class Config
 				"This option will check and load all connection endpoints and may slow down the world loading process."})
 		@RequiresWorldRestart
 		public static boolean validateConnections = false;
+		@Comment({"The most wire nodes -- connectors, relays, insulators, transformers -- one power route search may visit. Anything further along the network from a source than this many nodes never receives power from it.",
+				"Stock Immersive Engineering stopped at 1200, which a large city district of pole-mounted insulators exceeds. Searches are cached per source and only re-run when the network changes. The log says once per source if a search hits this."})
+		@RangeInt(min = 1200)
+		public static int wireRouteNodeLimit = 16384;
 		@Comment({"The transfer rates in Flux/t for the wire tiers (copper, electrum, HV, Structural Rope, Cable & Redstone(no transfer) )"})
 		@Mapped(mapClass = Config.class, mapName = "manual_intA")
 		public static int[] wireTransferRate = new int[]{2048, 8192, 32768, 0, 0, 0};
@@ -859,6 +864,7 @@ public class Config
 		//Cells cached as empty while the feature was off would otherwise stay empty forever.
 		ReservoirHandler.invalidateEmptyCells();
 
+		ImmersiveNetHandler.routeNodeLimit = IEConfig.wireRouteNodeLimit;
 		WireType.wireLossRatio = IEConfig.wireLossRatio;
 		WireType.wireTransferRate = IEConfig.wireTransferRate;
 		WireType.wireColouration =

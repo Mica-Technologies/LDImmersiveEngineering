@@ -16,6 +16,7 @@ import blusunrize.immersiveengineering.api.TargetingInfo;
 import blusunrize.immersiveengineering.common.Config.IEConfig;
 import blusunrize.immersiveengineering.common.IESaveData;
 import blusunrize.immersiveengineering.common.util.IEDamageSources;
+import blusunrize.immersiveengineering.common.util.IELogger;
 import blusunrize.immersiveengineering.common.util.Utils;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -34,6 +35,7 @@ import net.minecraft.util.SoundEvent;
 import net.minecraft.util.math.*;
 import net.minecraft.world.IWorldEventListener;
 import net.minecraft.world.World;
+import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.relauncher.Side;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -63,6 +65,16 @@ public class ImmersiveNetHandler
 	public Map<DimensionBlockPos, IICProxy> proxies = new ConcurrentHashMap<>();
 
 	public IntHashMap<Map<BlockPos, BlockWireInfo>> blockWireMap = new IntHashMap<>();
+
+	/**
+	 * Most nodes one route search may visit. Pushed from {@code wireRouteNodeLimit}; stock IE hardcoded 1200.
+	 */
+	public static int routeNodeLimit = 16384;
+	/**
+	 * Sources already warned about hitting {@link #routeNodeLimit}, so the log says it once rather than every
+	 * time the route cache is rebuilt.
+	 */
+	private final Set<DimensionBlockPos> warnedRouteLimit = newSetFromMap(new ConcurrentHashMap<>());
 
 	/**
 	 * Returns the connection map for a dimension, creating it if absent.
@@ -474,10 +486,39 @@ public class ImmersiveNetHandler
 
 	public void setProxy(DimensionBlockPos pos, IICProxy p)
 	{
-		if(p==null)
-			proxies.remove(pos);
-		else
-			proxies.put(pos, p);
+		//Proxies are saved state, so a change has to reach the next save rather than wait for a wire to change.
+		boolean changed = p==null?proxies.remove(pos)!=null: proxies.put(pos, p)!=p;
+		if(changed)
+			IESaveData.setDirty(pos.dimension);
+	}
+
+	/**
+	 * The proxies to write to the save: every live one, plus one for each wired connector that is loaded right now.
+	 * A connector only gets its proxy when its chunk unloads, and on shutdown the server saves before it unloads
+	 * anything -- so without these, every connector that was loaded when the server stopped came back with neither a
+	 * tile nor a proxy, and power could not cross it until something loaded its chunk again. A proxy for a loaded
+	 * connector is harmless: the connector clears it as it loads.
+	 */
+	public Collection<IICProxy> proxiesToSave()
+	{
+		Map<DimensionBlockPos, IICProxy> ret = new HashMap<>(proxies);
+		for(Integer dim : getRelevantDimensions())
+		{
+			World world = DimensionManager.getWorld(dim);
+			if(world==null)
+				continue;
+			for(Map.Entry<BlockPos, Set<Connection>> e : getMultimap(dim).entrySet())
+			{
+				BlockPos node = e.getKey();
+				//Conduit boxes only take a proxy for their wires, never for bundles alone.
+				if(!world.isBlockLoaded(node)||e.getValue().stream().allMatch(Connection::isBundle))
+					continue;
+				TileEntity te = world.getTileEntity(node);
+				if(te instanceof IImmersiveConnectable&&!te.isInvalid())
+					ret.put(new DimensionBlockPos(node, dim), new IICProxy(te));
+			}
+		}
+		return ret.values();
 	}
 
 	public void addProxy(IICProxy p)
@@ -647,7 +688,11 @@ public class ImmersiveNetHandler
 				}
 			}
 
-		final int closedListMax = 1200;
+		//Stock IE stopped at 1200, and in the ignore-output search every node counts, relays and
+		//insulators included -- so a city district of 3,000 pole nodes had everything past the nearest
+		//1,200 simply never receive power, however strong the source. Configurable now, and generous by
+		//default: the search is cached per source and only re-run when the network changes.
+		final int closedListMax = Math.max(1, routeNodeLimit);
 
 		while(closedList.size() < closedListMax&&!queue.isEmpty())
 		{
@@ -706,6 +751,12 @@ public class ImmersiveNetHandler
 					}
 			checked.add(nextPos);
 		}
+		//Said once per source, because the symptom -- the far end of a large network never lights -- looks
+		//exactly like a broken wire or an unloaded chunk, and nothing else would ever point at this.
+		if(closedList.size() >= closedListMax&&!queue.isEmpty()&&warnedRouteLimit.add(new DimensionBlockPos(node, dimension)))
+			IELogger.warn("Wire route search from "+node+" in dimension "+dimension
+					+" stopped at the node limit of "+closedListMax+"; parts of that network beyond it receive no power. "
+					+"Raise wireRouteNodeLimit in the Immersive Engineering config.");
 		if(FMLCommonHandler.instance().getEffectiveSide()==Side.SERVER)
 		{
 			if(ignoreIsEnergyOutput)

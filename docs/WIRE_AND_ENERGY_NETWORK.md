@@ -231,7 +231,30 @@ dimension; any wire whose accumulated flow exceeded its `cableType.getTransferRa
   `backtracker` to assemble the full `subConnections[]` and `minimumType`, and emits an
   `AbstractConnection` (`:557`).
 - Relaxes neighbours that `allowEnergyToPass` (`:563`).
-- Bounded by `closedListMax = 1200` (`:520`).
+- Bounded by `routeNodeLimit`, the `wireRouteNodeLimit` config option (default 16384, minimum 1200).
+  Upstream hard-coded 1200, which silently cut off the far side of a long pole line: a search that
+  stops at the limit caches what it found, and nothing past it ever receives power. Hitting the limit
+  now logs one warning per source node naming the option.
+
+### Proxies across a restart
+
+A connector whose chunk unloads leaves an `IICProxy` so routes can still cross it. Proxies are saved
+in `IESaveData`, but the server saves *before* it unloads chunks on shutdown, so upstream lost the
+proxy of every connector that was loaded when the server stopped. `proxiesToSave()` writes one for
+each loaded, wired connector as well, and `setProxy` marks the save dirty on a change.
+
+### Ghost wires
+
+Wires live in save data, apart from their blocks, so a WorldEdit/FAWE delete or paste leaves the
+connection behind. `/ie wires ghosts [check] [remove]` (permission 2, current dimension) audits
+them with `GhostConnectionAudit`:
+
+- **missing**: the endpoint's chunk is loaded and holds no connectable block. Certain.
+- **unproxied**: the chunk is unloaded and has no proxy. Only a suspect: worlds saved by older
+  builds show this for real connectors (see above). `check` loads those chunks (up to 256 per run)
+  to settle them, and a connector that is really there takes its proxy back as the chunk unloads.
+
+`remove` deletes only the missing ones.
 
 **Caching:** results are stored into `indirectConnections` (or `indirectConnectionsIgnoreOut`)
 keyed by source node, but **only on the server** (`:580`). On a cache hit (`:494`) the stored set

@@ -954,7 +954,8 @@ That prediction is so far unmeasured, not confirmed.
 |---|---|---|
 | `enableWireDamage` | `true` | **`false`** — the single biggest win. See above. |
 | `cityMode` | `false` | `true` only for a city/roleplay pack; it is not the fastest option. |
-| `validateConnections` | `false` | **Leave `false`.** It loads and checks every connection endpoint at world load and slows startup. Turn it on temporarily only when you suspect corrupted connection data, with a backup. |
+| `validateConnections` | `false` | **Leave `false`.** It loads and checks every connection endpoint at world load and slows startup. Turn it on temporarily only when you suspect corrupted connection data, with a backup. For wires left behind by WorldEdit, prefer `/ie wires ghosts check remove`, which only loads the chunks it has to. |
+| `wireRouteNodeLimit` | `16384` | Most connectors one wire route search may visit. Upstream's fixed 1200 left the far end of long pole lines unpowered. Raise it if the log warns that a search stopped at the limit; a search only runs when the network changes. |
 | `pump_placeCobble` | `true` | **Leave `true`.** The fluid pump replaces the fluid it drains with cobblestone, which stops flowing-water updates propagating — a genuine tick saving that is on by default. |
 | `retrogen_*` | all `false` | Leave off unless you deliberately want ore retrogen. Retrogen is throttled to 2 chunks/tick, but it is still work you do not need. |
 | `retrogen_log_flagChunk`, `retrogen_log_remaining` | `true` | Set `false` if you ever enable retrogen — otherwise they log per chunk. |

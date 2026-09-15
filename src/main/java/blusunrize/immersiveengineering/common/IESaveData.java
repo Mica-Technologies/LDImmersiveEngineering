@@ -111,7 +111,7 @@ public class IESaveData extends WorldSavedData
 		}
 
 		NBTTagList proxies = new NBTTagList();
-		for(IICProxy iic : ImmersiveNetHandler.INSTANCE.proxies.values())
+		for(IICProxy iic : ImmersiveNetHandler.INSTANCE.proxiesToSave())
 			proxies.appendTag(iic.writeToNBT());
 		nbt.setTag("iicProxies", proxies);
 
