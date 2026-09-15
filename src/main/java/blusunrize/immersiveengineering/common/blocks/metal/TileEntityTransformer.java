@@ -182,6 +182,18 @@ public class TileEntityTransformer extends TileEntityImmersiveConnectable implem
 	}
 
 	@Override
+	protected boolean clearCableLimits()
+	{
+		boolean changed = super.clearCableLimits();
+		if(secondCable!=null)
+		{
+			secondCable = null;
+			changed = true;
+		}
+		return changed;
+	}
+
+	@Override
 	public WireType getCableLimiter(TargetingInfo target)
 	{
 		switch(getTargetedConnector(target))

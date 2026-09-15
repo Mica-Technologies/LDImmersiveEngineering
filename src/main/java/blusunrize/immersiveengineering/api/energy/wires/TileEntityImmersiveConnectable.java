@@ -409,7 +409,40 @@ public abstract class TileEntityImmersiveConnectable extends TileEntityIEBase im
 	{
 		super.validate();
 		if(!world.isRemote)
-			ApiUtils.addFutureServerTask(world, () -> ImmersiveNetHandler.INSTANCE.onTEValidated(this));
+			ApiUtils.addFutureServerTask(world, () -> {
+				ImmersiveNetHandler.INSTANCE.onTEValidated(this);
+				forgetStaleCableLimits();
+			});
+	}
+
+	/**
+	 * A connector that loads with no wires forgets the wire types it remembers. A block pasted from a schematic carries
+	 * the limit of the connector it was copied from but none of its wires, and a stale limit refuses cable: a
+	 * transformer takes nothing on a side that remembers a wire, and a breaker remembering steel turns copper away.
+	 * Marks the tile dirty only when something was actually set, so an unwired connector costs nothing on later loads.
+	 */
+	private void forgetStaleCableLimits()
+	{
+		if(isInvalid())
+			return;
+		//Multiblock parts keep their wires at their master, not at themselves.
+		BlockPos master = getConnectionMaster(null, null);
+		Set<Connection> conns = ImmersiveNetHandler.INSTANCE.getConnections(world, master!=null?master: pos);
+		if((conns==null||conns.isEmpty())&&clearCableLimits())
+			markDirty();
+	}
+
+	/**
+	 * Clears every wire type this connector remembers. Only called while it has no wires.
+	 *
+	 * @return whether anything was set
+	 */
+	protected boolean clearCableLimits()
+	{
+		if(limitType==null)
+			return false;
+		limitType = null;
+		return true;
 	}
 
 	@Override

@@ -9,6 +9,7 @@
 package blusunrize.immersiveengineering.common.blocks.metal;
 
 import blusunrize.immersiveengineering.ImmersiveEngineering;
+import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.IEProperties;
 import blusunrize.immersiveengineering.api.IEProperties.PropertyBoolInverted;
 import blusunrize.immersiveengineering.api.Lib;
@@ -73,6 +74,35 @@ public class TileEntityBreakerSwitch extends TileEntityImmersiveConnectable impl
 	public boolean allowEnergyToPass(Connection con)
 	{
 		return active;
+	}
+
+	@Override
+	public void validate()
+	{
+		super.validate();
+		if(!world.isRemote)
+			ApiUtils.addFutureServerTask(world, this::recountWires);
+	}
+
+	/**
+	 * Takes the wire count from the connections that actually exist. The stored count used to drop by two for every
+	 * wire taken down, and a block pasted from a schematic keeps the count of the switch it was copied from while its
+	 * wires stay behind -- either way a switch could hold wires it did not know about, accept more than two, and skip
+	 * the route reset when flipped.
+	 */
+	private void recountWires()
+	{
+		if(isInvalid())
+			return;
+		Set<Connection> conns = ImmersiveNetHandler.INSTANCE.getConnections(world, pos);
+		int actual = conns==null?0: conns.size();
+		if(actual==wires)
+			return;
+		wires = actual;
+		if(wires <= 0)
+			limitType = null;
+		ImmersiveNetHandler.INSTANCE.resetCachedIndirectConnections(world, pos);
+		markDirty();
 	}
 
 	@Override

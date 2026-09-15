@@ -256,6 +256,22 @@ them with `GhostConnectionAudit`:
 
 `remove` deletes only the missing ones.
 
+### Wire counts and cable limits on connectors
+
+`removeConnection` calls `removeCable` once per end, with the half of the pair stored at that end.
+It used to hand each end both halves, so anything that counts its wires (breaker switches, and
+addon insulators and switches) dropped two per wire removed.
+
+Stored state is also repaired when a connector loads. That covers blocks pasted from a schematic,
+which keep the NBT of the block they were copied from but none of its wires:
+
+- `TileEntityImmersiveConnectable` forgets its `limitType` when it loads with no wires at its
+  connection master (`clearCableLimits`, which the transformer extends to `secondCable`). Otherwise
+  a pasted transformer refuses every cable and a pasted breaker turns away anything but its old
+  wire type.
+- `TileEntityBreakerSwitch` recounts `wires` from its live connections. A pasted breaker that still
+  says `wires:2` would otherwise refuse all wire.
+
 **Caching:** results are stored into `indirectConnections` (or `indirectConnectionsIgnoreOut`)
 keyed by source node, but **only on the server** (`:580`). On a cache hit (`:494`) the stored set
 is returned directly without traversal. The cache is invalidated per connected-component by

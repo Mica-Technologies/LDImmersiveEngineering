@@ -214,18 +214,16 @@ public class ImmersiveNetHandler
 			return false;
 		}, (p) -> handle.accept(p.getLeft(), mapForDim), vecStart, vecEnd);
 
+		//One wire, so one call per end, each handed the half stored at that end. Handing both ends both
+		//halves, as this used to, meant every counting implementation took as two wires gone: a breaker switch that
+		//lost one of its two wires read zero, would then accept a third, and stopped resetting routes when
+		//flipped. Implementations that clear state rather than count never noticed.
 		IImmersiveConnectable iic = toIIC(con.end, world);
 		if(iic!=null)
-		{
-			iic.removeCable(con);
-			back.ifPresent(iic::removeCable);
-		}
+			iic.removeCable(back.orElse(con));
 		iic = toIIC(con.start, world);
 		if(iic!=null)
-		{
 			iic.removeCable(con);
-			back.ifPresent(iic::removeCable);
-		}
 
 		if(world.isBlockLoaded(con.start))
 			world.addBlockEvent(con.start, world.getBlockState(con.start).getBlock(), -1, 0);
