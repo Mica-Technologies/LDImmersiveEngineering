@@ -484,18 +484,17 @@ public class TileEntityDerrick extends TileEntityMultiblockPart<TileEntityDerric
 							+" -- there is no reservoir under this site."));
 			return true;
 		}
-		ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
-				TextFormatting.GOLD+"Drilling"+TextFormatting.RESET+": "
-						+progressPercent(master.drillProgress, DRILL_TIME)+"%, about "
-						+master.secondsRemaining()+"s remaining"));
+		//Gathered and sent once: separate no-spam messages replace one another, so the power and pressure
+		//warnings used to wipe the progress line -- and the pressure warning the power one.
+		java.util.List<String> lines = new java.util.ArrayList<>();
+		lines.add(TextFormatting.GOLD+"Drilling"+TextFormatting.RESET+": "
+				+progressPercent(master.drillProgress, DRILL_TIME)+"%, about "+master.secondsRemaining()+"s remaining");
 		if(master.stalled)
-			ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
-					TextFormatting.RED+"No power"+TextFormatting.RESET+" -- the rig draws "
-							+ENERGY_PER_TICK+" FE/t"));
+			lines.add(TextFormatting.RED+"No power"+TextFormatting.RESET+" -- the rig draws "+ENERGY_PER_TICK+" FE/t");
 		if(warnsAboutPressure(master))
-			ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
-					TextFormatting.GOLD+"High pressure"+TextFormatting.RESET
-							+" -- fit a Blowout Preventer before this well comes in."));
+			lines.add(TextFormatting.GOLD+"High pressure"+TextFormatting.RESET
+					+" -- fit a Blowout Preventer before this well comes in.");
+		ChatUtils.sendServerNoSpamLines(player, lines);
 		return true;
 	}
 

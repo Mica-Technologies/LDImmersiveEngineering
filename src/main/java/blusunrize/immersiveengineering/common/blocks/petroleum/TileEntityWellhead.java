@@ -350,11 +350,11 @@ public class TileEntityWellhead extends TileEntityIEBase implements IPlayerInter
 							+" -- there is no reservoir under this block."));
 			return true;
 		}
-		ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
+		//One message: the second of two separate no-spam messages replaced the first, so the remaining-oil line
+		//never stayed on screen.
+		ChatUtils.sendServerNoSpamLines(player, java.util.Arrays.asList(
 				TextFormatting.GOLD+"Wellhead"+TextFormatting.RESET+": "
-						+String.format(Locale.ENGLISH, "%.1f%%", 100*reservoir.getFraction())
-						+" remaining"));
-		ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(
+						+String.format(Locale.ENGLISH, "%.1f%%", 100*reservoir.getFraction())+" remaining",
 				ReservoirModel.isFreeFlowing(reservoir)
 						?TextFormatting.GREEN+"Free-flowing"+TextFormatting.RESET
 						: pumped?TextFormatting.YELLOW+"Pumped"+TextFormatting.RESET

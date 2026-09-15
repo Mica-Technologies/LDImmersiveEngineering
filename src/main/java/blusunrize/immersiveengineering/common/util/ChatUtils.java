@@ -15,8 +15,11 @@ import net.minecraft.client.gui.GuiNewChat;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.util.text.ITextComponent;
+import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
+
+import java.util.List;
 
 public class ChatUtils
 {
@@ -38,5 +41,20 @@ public class ChatUtils
 	{
 		if(messages.length > 0&&player instanceof EntityPlayerMP)
 			ImmersiveEngineering.packetHandler.sendTo(new MessageNoSpamChatComponents(messages), (EntityPlayerMP)player);
+	}
+
+	/**
+	 * Sends a multi-line readout as <em>one</em> no-spam message.
+	 * <p>
+	 * Every no-spam message deletes the lines the previous one printed, so sending a readout a line at a
+	 * time -- which is what the grid and fluid-network boxes and the Generation Meter all did -- left only its
+	 * last line on screen.
+	 */
+	public static void sendServerNoSpamLines(EntityPlayer player, List<String> lines)
+	{
+		ITextComponent[] components = new ITextComponent[lines.size()];
+		for(int i = 0; i < components.length; i++)
+			components[i] = new TextComponentString(lines.get(i));
+		sendServerNoSpamMessages(player, components);
 	}
 }

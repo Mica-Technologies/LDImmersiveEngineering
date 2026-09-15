@@ -53,7 +53,7 @@ observed, a new reading may only *raise* the recorded output — otherwise a pla
 load the plant for a second, reset it to zero, and leave the town dark behind them
 (`OutputMeter.chooseRate`). A missing generator zeroes the record immediately.
 
-**Readout.** Right-click: the generator and whether it burns fuel, what the meter feeds, the measured
+**Readout.** Right-click with an empty hand (anything held -- such as the connector being placed on its front -- is used normally): the generator and whether it burns fuel, what the meter feeds, the measured
 output, and what the plant will supply while unloaded — or why it will not.
 
 ---

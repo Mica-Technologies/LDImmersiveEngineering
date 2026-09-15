@@ -31,7 +31,6 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 
 import javax.annotation.Nonnull;
@@ -418,8 +417,7 @@ public abstract class TileEntityGridDevice extends TileEntityImmersiveConnectabl
 		if(!player.isSneaking())
 			return false;
 		if(!world.isRemote)
-			for(String line : buildStatusLines())
-				ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(line));
+			ChatUtils.sendServerNoSpamLines(player, buildStatusLines());
 		return true;
 	}
 

@@ -33,7 +33,6 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.ITickable;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.energy.CapabilityEnergy;
 import net.minecraftforge.energy.IEnergyStorage;
@@ -310,11 +309,17 @@ public class TileEntityGenerationMeter extends TileEntityIEBase implements ITick
 	public boolean interact(EnumFacing side, EntityPlayer player, EnumHand hand, ItemStack heldItem, float hitX,
 							float hitY, float hitZ)
 	{
+		//Only an empty hand reads the meter. Anything held goes on to do what it does -- above all, an HV
+		//connector must be placeable on the meter's front, and claiming the click turned "place the connector"
+		//into "print the readout" with nothing on screen saying to sneak.
+		if(!heldItem.isEmpty())
+			return false;
 		if(world.isRemote)
 			return true;
 		publish(world.getTotalWorldTime());
-		for(String line : describe())
-			ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(line));
+		//One message with every line: the no-spam channel replaces its previous lines, so sending them one at a
+		//time left only the last on screen.
+		ChatUtils.sendServerNoSpamLines(player, describe());
 		return true;
 	}
 

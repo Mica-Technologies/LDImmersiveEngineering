@@ -28,7 +28,6 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.text.TextComponentString;
 import net.minecraft.util.text.TextFormatting;
 
 import javax.annotation.Nullable;
@@ -323,8 +322,7 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 		if(!player.isSneaking())
 			return false;
 		if(!world.isRemote)
-			for(String line : buildStatusLines())
-				ChatUtils.sendServerNoSpamMessages(player, new TextComponentString(line));
+			ChatUtils.sendServerNoSpamLines(player, buildStatusLines());
 		return true;
 	}
 
