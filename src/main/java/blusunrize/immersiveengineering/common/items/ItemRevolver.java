@@ -38,6 +38,7 @@ import blusunrize.immersiveengineering.common.util.network.MessageSpeedloaderSyn
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.mojang.realmsclient.gui.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.ItemCameraTransforms.TransformType;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureMap;
@@ -76,6 +77,7 @@ import org.apache.commons.lang3.tuple.Triple;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.io.IOException;
 import java.util.*;
 import java.util.function.DoubleBinaryOperator;
 import java.util.function.DoublePredicate;
@@ -102,8 +104,26 @@ public class ItemRevolver extends ItemUpgradeableTool implements IOBJModelCallba
 				int split = key.lastIndexOf("_");
 				if(split < 0)
 					split = key.length();
-				revolverIcons.put(key, ApiUtils.getRegisterSprite(map, "immersiveengineering:revolvers/revolver_"+key.substring(0, split).toLowerCase()));
+				String name = "revolver_"+key.substring(0, split).toLowerCase();
+				//The list is downloaded and grows on its own; a revolver whose texture this build does not ship keeps
+				//the plain one instead of a missing-texture sprite and an error at every resource reload.
+				if(hasRevolverTexture(name))
+					revolverIcons.put(key, ApiUtils.getRegisterSprite(map, "immersiveengineering:revolvers/"+name));
 			}
+	}
+
+	@SideOnly(Side.CLIENT)
+	private static boolean hasRevolverTexture(String name)
+	{
+		try
+		{
+			Minecraft.getMinecraft().getResourceManager()
+					.getResource(new ResourceLocation(ImmersiveEngineering.MODID, "textures/revolvers/"+name+".png")).close();
+			return true;
+		} catch(IOException e)
+		{
+			return false;
+		}
 	}
 
 	/* ------------- CORE ITEM METHODS ------------- */
@@ -647,7 +667,7 @@ public class ItemRevolver extends ItemUpgradeableTool implements IOBJModelCallba
 	{
 		String tag = ItemNBTHelper.getString(stack, "elite");
 		if(!tag.isEmpty())
-			return this.revolverIcons.get(tag);
+			return this.revolverIcons.getOrDefault(tag, this.revolverDefaultTexture);
 		else
 			return this.revolverDefaultTexture;
 	}
