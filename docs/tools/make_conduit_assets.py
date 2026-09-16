@@ -701,26 +701,54 @@ def rect(px, x0, y0, x1, y1, colour):
             px[x, y] = colour
 
 
-def build_texture(assets, depth):
+# Where the coupling ring sits along a block, in pixels from the low end of the block on that
+# axis, and how wide it is.  It has to stay clear of every strip a face samples *across* the
+# tube: 0..depth-1 and 16-depth..15 (the sides of a run, which sample the mounting axis) and
+# 8-half..8+half-1 (the top of a run, which samples the across axis).  With depth 3 and half 2
+# that leaves 3..5 and 10..12, and one ring per block wants only one of them.
+COUPLING_AT = 3
+COUPLING_WIDTH = 3
+
+
+def build_texture(assets, depth, half):
     """One 16x16 tile, used by every face of every piece.
 
-    Laid out as a run of tubing seen side-on: a highlight along the top of the tube, a
-    shaded underside, and clip bands at the quarter points so a long straight run reads
-    as clipped down at intervals rather than as one extruded stick.
+    Every face samples this at its own block coordinates -- see model_json -- so the tile is
+    read *along* a run on some faces and *across* it on others, and which is which depends on
+    the run's direction and the face it is clipped to.  A vertical run reads the rows, a
+    horizontal one reads the columns, and the sides of a floor run only ever see the bottom
+    three rows.  The first version of this tile was a tube seen side-on, lit along the top and
+    shaded along the bottom with clip bands at the quarter points, and under that sampling a
+    vertical run showed one seam per block and no clips while a horizontal one showed two clips
+    per block on a body that went dark on its sides.  A playtester asked for the horizontal
+    look to match the vertical one (issue #3).
+
+    So the tile is now the same whichever way it is read: a flat steel body with one coupling
+    ring per block, painted as both a column and a row at the same offset.  A face reading along
+    the run sees the ring once; a face reading across the run samples a strip the ring does not
+    cross, and sees plain tube.  The body carries no shading of its own -- the renderer's
+    per-face light does that, and does it consistently for every orientation.
+
+    The ring is a bright edge, the clip, and a dark edge, so it reads as a joint in the tubing
+    rather than as a stripe painted on it.
     """
+    assert depth <= COUPLING_AT < 8 - half, "coupling ring would show on the sides of a run"
+    assert COUPLING_AT + COUPLING_WIDTH <= 8 - half, "coupling ring would show on the top of a run"
     img = Image.new("RGBA", (16, 16), TUBE)
     px = img.load()
     rect(px, 0, 0, 15, 15, TUBE)
-    # The tube's own shading: lit along the top, shaded along the bottom.
-    rect(px, 0, 0, 15, 1, TUBE_LIT)
-    rect(px, 0, 13, 15, 15, TUBE_SHADE)
-    rect(px, 0, 15, 15, 15, OUTLINE)
-    # Clip bands. Two of them, at the quarter points, so a straight run shows a clip
-    # roughly every half block whichever way the UV falls.
-    for band in (3, 11):
-        rect(px, band, 0, band + 1, 15, CLIP)
-        rect(px, band, 0, band + 1, 1, CLIP_LIT)
-        rect(px, band, 15, band + 1, 15, OUTLINE)
+    ring = (TUBE_LIT, CLIP, OUTLINE)
+    assert len(ring) == COUPLING_WIDTH
+    for offset, colour in enumerate(ring):
+        at = COUPLING_AT + offset
+        rect(px, at, 0, at, 15, colour)
+        rect(px, 0, at, 15, at, colour)
+    # Where the row and the column cross, the darker of the two wins so the ring's edges stay
+    # continuous; it is never sampled by a run anyway (both axes inside 3..5), only by the item.
+    for i in range(COUPLING_WIDTH):
+        for j in range(COUPLING_WIDTH):
+            a, b = ring[i], ring[j]
+            px[COUPLING_AT + i, COUPLING_AT + j] = a if sum(a[:3]) <= sum(b[:3]) else b
     out = os.path.join(assets, "textures", "blocks", "conduit.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     img.save(out, "PNG", optimize=True)
@@ -741,7 +769,7 @@ def main():
     build_junction_box(args.assets, depth, box_half)
     build_ground_feeder(args.assets)
     build_item_blockstate(args.assets)
-    texture = build_texture(args.assets, depth)
+    texture = build_texture(args.assets, depth, half)
     build_junction_texture(args.assets)
     build_patch_texture(args.assets)
     build_feeder_texture(args.assets)
