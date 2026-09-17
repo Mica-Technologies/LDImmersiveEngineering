@@ -788,11 +788,17 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(world==null||world.isRemote)
 			return false;
 		boolean changed = false;
+		//Resolved on the first face that actually wants a breakout, not up front: the walk is a
+		//breadth-first search over the run, and the overwhelming majority of calls to this method
+		//patch nothing at all -- it runs on every neighbour change next to every box.
+		int runMask = RUN_MASK_UNRESOLVED;
 		for(EnumFacing face : EnumFacing.VALUES)
 		{
 			if(patch.isPatched(face)||!wantsBreakout(face))
 				continue;
-			int free = JunctionBoxLogic.preferredChannel(face.ordinal(), patchedMask(),
+			if(runMask==RUN_MASK_UNRESOLVED)
+				runMask = conductorsElsewhereOnRun();
+			int free = JunctionBoxLogic.channelForNewBreakout(face.ordinal(), patchedMask(), runMask,
 					WireChannel.VALUES.length);
 			if(free < 0)
 				//Sixteen conductors, all spoken for. Nothing sensible left to do, and stealing one
@@ -802,6 +808,33 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			changed = true;
 		}
 		return changed;
+	}
+
+	/** {@link #autoPatch}'s "the run has not been walked yet" sentinel, outside any valid mask. */
+	private static final int RUN_MASK_UNRESOLVED = -1;
+
+	/** {@link #autoPatch}, plus the saving and the resend a change to the patch table needs. */
+	private void retryAutoPatch()
+	{
+		if(autoPatch())
+		{
+			markDirty();
+			markContainingBlockForUpdate(null);
+		}
+	}
+
+	/**
+	 * @return one bit per conductor broken out on some box of this run other than this one, which is
+	 * the set {@link JunctionBoxLogic#channelForNewBreakout} chooses from. Zero for a box on no run,
+	 * and zero when the wire graph is not up yet -- both of which fall back to the face's colour.
+	 */
+	private int conductorsElsewhereOnRun()
+	{
+		int mask = 0;
+		for(TileEntityJunctionBox box : boxesOnRun())
+			if(box!=this)
+				mask |= box.patchedMask();
+		return mask;
 	}
 
 	/**
@@ -967,13 +1000,23 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			rebuildRuns();
 			if(reconcileWires())
 				markDirty();
+			//Again, now that the run is walkable. onLoad already tried, but a box in a spawn chunk
+			//runs it before IE has read the wire graph back in, so it saw no run and had nothing to
+			//adopt a conductor from -- see channelForNewBreakout. Only bare faces are touched, here
+			//as everywhere: this never re-colours one that already has a conductor behind it.
+			retryAutoPatch();
 		}
 		//One walk a tick, however many neighbour changes asked for it -- see queueRebuild. Cheap
 		//when nothing asked: a boolean, before the live-mask check below.
 		if(rebuildQueued&&world!=null&&!world.isRemote&&rebuildRuns())
+		{
 			//The run's shape changed: if this box carries signals, the walk over its boxes has to
 			//be redone on the new graph.
 			signalsQueued = true;
+			//And a face left bare because this box was on no run when the hardware went on it can
+			//now take the conductor the run it just joined is carrying.
+			retryAutoPatch();
+		}
 		if(signalsQueued&&world!=null&&!world.isRemote)
 		{
 			signalsQueued = false;
@@ -1468,11 +1511,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		reconcilePending = true;
 		//Also on load, not only on a neighbour change: a box placed against a connector that was
 		//already there hears nothing afterwards, and settled hardware never fires another update.
-		if(autoPatch())
-		{
-			markDirty();
-			markContainingBlockForUpdate(null);
-		}
+		retryAutoPatch();
 		//A lever thrown while the chunk was unloaded left no trace, so the run has to re-derive
 		//itself once on the way back rather than trusting what it saved.
 		if(patch.hasRedstone())
@@ -1492,11 +1531,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//else's hardware and cannot have moved a run.
 		if(concernsRuns(other))
 			queueRebuild();
-		if(autoPatch())
-		{
-			markDirty();
-			markContainingBlockForUpdate(null);
-		}
+		retryAutoPatch();
 		//A neighbour changing is the only thing that can move a redstone input, so it is the only
 		//thing that has to re-derive the run's signals. Queued for the same reason the walk is.
 		if(patch.hasRedstone())

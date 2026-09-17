@@ -185,6 +185,47 @@ public final class JunctionBoxLogic
 	}
 
 	/**
+	 * Which conductor a breakout should take when the box is on a run that already carries some.
+	 * <p>
+	 * <strong>A box joining a run takes the run's circuit; a box on its own takes its face's
+	 * colour.</strong> The face colours above are a layout, not a wiring plan, and on their own they
+	 * make the plainest thing anybody builds fail silently: feed a run on one end and tap it on the
+	 * other, and the two boxes auto-patch onto opposite faces, which are opposite colours. The
+	 * energy crosses the run on red the whole way and the far box has only a green breakout, so
+	 * nothing leaves it. Both ends read 0 and the run looks dead -- which is the report this exists
+	 * to answer (private issue #4).
+	 * <p>
+	 * The face colour still wins whenever the run is already carrying it, which is what keeps a row
+	 * of linked poles reading as a row of poles: the second box's west face wants red, the run's
+	 * first box put red on its own west face, so red it is. Only a face whose colour is nowhere on
+	 * the run gives way, and then to the lowest conductor the run does carry.
+	 * <p>
+	 * A box with no run, or one whose run carries nothing this box has not already broken out, is
+	 * exactly {@link #preferredChannel} and nothing here applies -- so a standalone box, a pole box
+	 * and the first box of a run are all unchanged.
+	 *
+	 * @param face         the face wanting a breakout, as an {@code EnumFacing} ordinal
+	 * @param usedMask     one bit per conductor already patched on this box
+	 * @param runMask      one bit per conductor patched on some <em>other</em> box of this run, or 0
+	 *                     for a box that is on no run or whose run has not been walked
+	 * @param channelCount how many conductors a bundle carries
+	 *
+	 * @return the index of the conductor to patch, or -1 if the box has none left
+	 */
+	public static int channelForNewBreakout(int face, int usedMask, int runMask, int channelCount)
+	{
+		//Conductors the run carries that this box has not already broken out. Masked to the bundle's
+		//width so a caller cannot widen the choice with stray high bits.
+		int candidates = runMask&~usedMask&((1 << channelCount)-1);
+		if(candidates==0)
+			return preferredChannel(face, usedMask, channelCount);
+		int wanted = face >= 0&&face < DEFAULT_CHANNEL.length?DEFAULT_CHANNEL[face]: -1;
+		if(wanted >= 0&&wanted < channelCount&&(candidates&(1 << wanted))!=0)
+			return wanted;
+		return Integer.numberOfTrailingZeros(candidates);
+	}
+
+	/**
 	 * The colour each face reaches for first, indexed by {@code EnumFacing.ordinal()} -- down, up,
 	 * north, south, west, east.
 	 * <p>

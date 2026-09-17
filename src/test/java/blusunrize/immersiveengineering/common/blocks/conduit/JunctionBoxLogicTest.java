@@ -518,6 +518,101 @@ class JunctionBoxLogicTest
 		}
 
 		@Test
+		@DisplayName("a box on no run is exactly the face colours")
+		void noRunIsUnchanged()
+		{
+			//The whole of report 4's answer has to survive this: a standalone box, a pole box and
+			//the first box of a run all see an empty run mask and must behave as they always did.
+			for(int face = 0; face < 6; face++)
+				assertEquals(JunctionBoxLogic.preferredChannel(face, 0, CHANNELS),
+						JunctionBoxLogic.channelForNewBreakout(face, 0, 0, CHANNELS),
+						"face "+face+" changed with no run to adopt from");
+		}
+
+		@Test
+		@DisplayName("a box joining a run takes the run's conductor when its own colour is not on it")
+		void joiningARunAdopts()
+		{
+			//Private issue #4: feed a run on its west end and tap it on its east end. The feeding
+			//box put red on its west face; the far box's east face wants green, the run does not
+			//carry green, and a green breakout on a run energised on red passes nothing -- both
+			//ends read 0 and the conduit looks dead.
+			assertEquals(RED, JunctionBoxLogic.channelForNewBreakout(EAST, 0, 1 << RED, CHANNELS));
+			//Same the other way round, and on a north-south line.
+			assertEquals(GREEN, JunctionBoxLogic.channelForNewBreakout(WEST, 0, 1 << GREEN, CHANNELS));
+			assertEquals(RED, JunctionBoxLogic.channelForNewBreakout(SOUTH, 0, 1 << RED, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("the face's own colour still wins when the run is carrying it")
+		void theFaceColourWinsWhenAvailable()
+		{
+			//A row of linked poles: the second box's west face wants red and the run has red, so
+			//red it is. This is what keeps a run of poles reading the same way as a lone one.
+			int runCarriesAllThree = (1 << RED)|(1 << BLUE)|(1 << GREEN);
+			assertEquals(RED, JunctionBoxLogic.channelForNewBreakout(WEST, 0, runCarriesAllThree, CHANNELS));
+			assertEquals(BLUE, JunctionBoxLogic.channelForNewBreakout(UP, 0, runCarriesAllThree, CHANNELS));
+			assertEquals(GREEN, JunctionBoxLogic.channelForNewBreakout(EAST, 0, runCarriesAllThree, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a whole pole box comes out red, blue and green on a run that carries them")
+		void aPoleBoxOnARunIsStillAPoleBox()
+		{
+			//Face by face, feeding each choice back in as this box's own mask, in every order --
+			//the same guarantee theOrderDoesNotMatter makes for a box on its own.
+			int[] faces = {UP, WEST, EAST};
+			int run = (1 << RED)|(1 << BLUE)|(1 << GREEN);
+			for(int first = 0; first < 3; first++)
+			{
+				int used = 0;
+				int[] got = new int[6];
+				for(int step = 0; step < 3; step++)
+				{
+					int face = faces[(first+step)%3];
+					got[face] = JunctionBoxLogic.channelForNewBreakout(face, used, run, CHANNELS);
+					used |= 1 << got[face];
+				}
+				assertEquals(RED, got[WEST]);
+				assertEquals(BLUE, got[UP]);
+				assertEquals(GREEN, got[EAST]);
+			}
+		}
+
+		@Test
+		@DisplayName("a conductor this box already broke out is not adopted twice")
+		void neverTheSameConductorTwice()
+		{
+			//The same conductor on two faces of one box is a short, which is true however the
+			//second face came by it.
+			assertEquals(GREEN, JunctionBoxLogic.channelForNewBreakout(EAST, 1 << RED, 1 << RED, CHANNELS));
+			//And with nothing of the run's left to adopt, the face colour rules again -- including
+			//its own fallback when that colour is spent.
+			assertEquals(0, JunctionBoxLogic.channelForNewBreakout(WEST, (1 << RED)|(1 << GREEN),
+					(1 << RED)|(1 << GREEN), CHANNELS));
+		}
+
+		@Test
+		@DisplayName("several conductors to choose from, and the lowest is taken")
+		void severalCandidates()
+		{
+			//No rule to appeal to once the face's own colour is out, so the answer is at least a
+			//fixed one: two boxes joining the same run the same way come out the same.
+			assertEquals(BLUE, JunctionBoxLogic.channelForNewBreakout(EAST, 0,
+					(1 << BLUE)|(1 << RED), CHANNELS));
+			assertEquals(1, JunctionBoxLogic.channelForNewBreakout(EAST, 0, 0b10, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("stray bits above the bundle's width are not offered")
+		void runMaskIsClamped()
+		{
+			//A mask arriving from somewhere with more channels than this bundle has cannot talk the
+			//box into patching a conductor it does not carry.
+			assertEquals(GREEN, JunctionBoxLogic.channelForNewBreakout(EAST, 0, 1 << CHANNELS, CHANNELS));
+		}
+
+		@Test
 		@DisplayName("the hammer walks every colour and then takes the breakout away")
 		void theWholeCycle()
 		{

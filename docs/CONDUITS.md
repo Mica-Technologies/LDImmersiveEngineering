@@ -173,6 +173,43 @@ It is a *preference*, not a rule. The colour is only taken if it is free; a four
 whose colour has already gone somewhere on that box, falls through to the lowest free conductor
 exactly as every breakout used to.
 
+### A box joining a run takes the run's circuit
+
+**The face colours are a layout, not a wiring plan**, and on their own they made the plainest thing
+anybody builds fail silently. Feed a run at one end and tap it at the other — which is what a run is
+*for* — and the two boxes auto-patch onto opposite faces, which are opposite colours: the west end
+takes red, the east end takes green. The energy crosses the run on red the whole way and the far box
+has only a green breakout, so nothing leaves it. `drainToBreakout` asks `patch.faceOf(channel)` for
+somewhere to put red and there is nowhere. Both ends read 0 and the conduit looks dead, which is the
+report this answers — see [private issue #4](#city-mode).
+
+So auto-patching now looks at the run first. A face whose colour the run is **not** carrying takes a
+conductor the run **is** carrying instead, and only a face with nothing to adopt falls back to the
+colour table. Stated as a rule a player can hold: *a box on its own takes its face's colour; a box
+joining a run takes the run's circuit.*
+
+The face colour still wins whenever the run is already carrying it, and that is the point of the
+ordering rather than a detail of it — a row of linked poles is a run, and the second box's west face
+wants red on a run whose first box put red on *its* west face. Red it is, and the row reads the way
+report 4 asked for. A box on no run, a pole box and the first box of a run are all bit-for-bit what
+they were: `channelForNewBreakout` with an empty run mask *is* `preferredChannel`, which is asserted.
+
+Two limits worth knowing:
+
+- **It never re-colours a face.** Auto-patching has never un-patched anything, and this changes
+  nothing about that. A face that took its colour before the run existed keeps it. What the box does
+  instead is try again — on the first server tick, when the wire graph is finally readable, and again
+  whenever a rebuild finds the run's shape changed — so a *bare* face left over from an earlier pass
+  gets its chance. A box in a spawn chunk needs that: `onLoad` runs before IE has read its wire graph
+  back in, so the run is not walkable yet and the first attempt has nothing to adopt from.
+- **Several candidates means the lowest wins.** Once the face's own colour is out there is no rule
+  left to appeal to, so the answer is at least a fixed one and two boxes joining the same run the
+  same way come out the same.
+
+The walk is `boxesOnRun`, breadth-first over bundle connections, and it is resolved lazily — on the
+first face that actually wants a breakout, not up front. `autoPatch` runs on every neighbour change
+next to every box and the overwhelming majority of those calls patch nothing at all.
+
 ### A breakout reaches the block edge
 
 **The housing used to stop three pixels short of every face a run did not arrive on** — so an LV
