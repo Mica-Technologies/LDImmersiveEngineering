@@ -114,6 +114,22 @@ then, if that reports it did nothing, to the off hand — and the client cannot 
 in the other sent two. The first recoloured the face and the second, arriving empty-handed,
 unpatched it again; the breakout appeared to vanish on the first hit and never come back.
 
+### Readouts
+
+Look at a patched face and the overlay says which conductor it is on and what that conductor is
+doing: `live -- in 256 / out 0 IF/t over LV wire`. *In* is what arrived on the conductor last tick
+from every direction — down a wire, from a connector against a face, along the run — and *out* is
+what left it through this box's breakouts and wires. Both, because the first version showed only
+*out*: a face that takes power in sends nothing out, so a fully lit input face read "0 IF/t", and
+that is the figure a playtester quoted as the conduit having no power. In city mode *in* is what
+the line brought to the door, not the token the box actually charged for it.
+
+The figures are fetched from the server once a second while somebody is looking, the same way the
+voltmeter's are. They used to be fetched never: the "last asked" tick started at `Long.MIN_VALUE`,
+the age check is a subtraction, and `now - Long.MIN_VALUE` overflows negative -- so the first
+request was never due, and the overlay showed whatever the last incidental sync had carried, which
+for a box nobody had touched since the chunk loaded was zero in every column.
+
 ### Auto-patching
 
 **A bare face with power hardware bolted to it patches itself.** Put an LV, MV or HV connector — or
@@ -459,6 +475,16 @@ the energy is going onto and of the nodes at the other end of it; whether the bo
 for what it delivered is `cityModeConduits`, because that is the conduit's own accounting. An
 energised conductor delivers to the block against its face and to the wire on it without being
 drained by either, which is what makes presence spread rather than divide.
+
+**Being lit costs the line one flux a tick.** The box charges whatever fed it a token
+(`JunctionBoxLogic.PRESENCE_DRAW`), not the twentieth of a channel the decay refills. Charged in
+full, a box was a 1,638-a-tick sink on a line an LV connector feeds at 256, and city mode's wire
+push at the time served whichever consumer came first and stopped when it ran out — so a box on a
+line that was already feeding something else either starved that something or was starved by it,
+which is the "no power on either end when a relay is connected to a source already supplying
+power" a playtester reported. The push now offers every consumer an equal share before handing out
+the rest (see [City mode](CITY_MODE_AND_PERF.md#wires)), and the token keeps a lit conductor from
+eating the line regardless.
 
 Turning the master `cityMode` switch off always restores stock behaviour.
 

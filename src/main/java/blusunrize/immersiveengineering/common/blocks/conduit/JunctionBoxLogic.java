@@ -61,6 +61,32 @@ public final class JunctionBoxLogic
 	}
 
 	/**
+	 * What being lit costs the sender under city mode's presence rule, per credit: a token.
+	 * <p>
+	 * Any credit at all sets a city-mode conductor to full, and the decay then measures how long
+	 * it stays lit -- so the amount is a time, not a quantity the source has to keep up with. The
+	 * box used to debit the sender by what it had actually taken anyway, which after the decay was a
+	 * twentieth of a channel every tick: more than any LV or MV connector delivers, so on a line it
+	 * shared with anything else it was a bottomless sink that either starved the rest of the line
+	 * or, if the line served the rest first, was starved by it and read dead (private issue #4).
+	 */
+	public static final int PRESENCE_DRAW = 1;
+
+	/**
+	 * How much of a credit to charge the sender.
+	 *
+	 * @param taken    what {@link #credit} said the channel took
+	 * @param presence true under city mode's presence rule, where the charge is {@link #PRESENCE_DRAW}
+	 * @return the debit, never more than was taken and never negative
+	 */
+	public static int debit(int taken, boolean presence)
+	{
+		if(taken <= 0)
+			return 0;
+		return presence?Math.min(taken, PRESENCE_DRAW): taken;
+	}
+
+	/**
 	 * Resolve the redstone channels across every box on a run.
 	 * <p>
 	 * <strong>Strongest wins, per channel.</strong> A conductor reaches every box on the run, so

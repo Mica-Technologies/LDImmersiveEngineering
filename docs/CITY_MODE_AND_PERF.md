@@ -278,47 +278,50 @@ connector's energy to every reachable node.
 Note the loss model is counter-intuitive: `Connection.getBaseLoss` scales loss *up* when a wire is
 lightly loaded, so a barely-used long wire is proportionally worse than a saturated one.
 
-#### City mode — one pass
+#### City mode — a fair share each, then the rest
 
-`cityModeTransfer()` (`TileEntityConnectorLV.java:365`) in full:
+`cityModeTransfer()` (`TileEntityConnectorLV`) hands its stored energy to `WireNetTransfer.city`,
+which in outline is:
 
 ```java
 Set<AbstractConnection> outputs = ImmersiveNetHandler.INSTANCE
-        .getIndirectEnergyConnections(Utils.toCC(this), world, true);
-if(outputs.isEmpty())
-    return;
-int available = Math.min(getMaxOutput(), energyStorage.getEnergyStored());
-int powerLeft = available;
-for(AbstractConnection con : outputs)
-{
-    if(powerLeft <= 0)
-        break;
-    if(!con.isEnergyOutput || con.cableType == null || con.cableType.getTransferRate() <= 0)
-        continue;                                   // non-conductive wire — rope, cable, redstone
-    IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
-    if(end == null || !end.allowEnergyToPass(null)) // breaker switches still cut
-        continue;
-    int sent = end.outputEnergy(powerLeft, false, 0);
-    powerLeft -= sent;
-    if(sent > 0)
-        /* fire onEnergyPassthrough(sent) on each distinct node along the route, for meters */;
-}
-int consumed = available - powerLeft;
-if(consumed > 0)
-{
-    energyStorage.modifyEnergyStored(-consumed);
-    markDirty();
-}
+        .getIndirectEnergyConnections(pos, world, true);
+int eligible = /* routes to a consumer over conductive wire */;
+int share = Math.max(1, available / eligible);
+// pass one: every eligible output is offered its share
+// pass two: whatever is left is offered to each in turn, until it runs out
+for(each pass)
+    for(AbstractConnection con : outputs)
+    {
+        if(powerLeft <= 0)
+            break;
+        if(!con.isEnergyOutput || con.cableType == null || con.cableType.getTransferRate() <= 0)
+            continue;                                   // non-conductive wire — rope, cable, redstone
+        IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
+        if(end == null || !end.allowEnergyToPass(null)) // breaker switches still cut
+            continue;
+        int sent = end.outputEnergy(Math.min(cap, powerLeft), false, 0, lastHop(con));
+        powerLeft -= sent;
+        if(sent > 0)
+            /* fire onEnergyPassthrough(sent) on each distinct node along the route, for meters */;
+    }
+return available - powerLeft;   // the connector debits itself by this
 ```
 
 Three properties worth stating plainly:
 
 - **Energy is conserved.** Only what receivers actually accepted (`available - powerLeft`) is
   deducted. City mode is lossless, not free — it never creates energy.
-- **Distribution is greedy and unordered.** Each device is offered *all* remaining power, not a
-  share. The iteration order is the hash order of a `ConcurrentHashMap`-backed set, so when demand
-  exceeds supply, which devices get served is arbitrary (though stable for a fixed set of
-  connections). Normal mode's proportional fairness is gone.
+- **Distribution is a fair share first, then first come first served.** Every reachable consumer
+  is offered an equal split of what the connector has before any of them is offered the rest; a
+  device that wants less than its share leaves the difference for the second pass, which walks the
+  same set again in its hash order. Nothing is simulated or sorted, so it costs at most two calls
+  per output. The first version was a single greedy pass — each device offered *everything* left,
+  in hash order — which made "who gets served" arbitrary whenever demand exceeded supply. That was
+  tolerable until a conduit junction box shared a line with anything else: a city-mode box asks for
+  a twentieth of a channel every tick, more than any LV or MV connector supplies, so either the box
+  went dark or everything else on the line did, depending on which the set happened to iterate
+  first. A playtester's conduit read 0 IF/t at both ends for exactly this reason.
 - **The wire's transfer rate is used only as a yes/no conductivity test**, never as a throughput
   limit.
 
@@ -779,6 +782,12 @@ still visibly switches.
 breakout delivers without anything being debited upstream, because nothing upstream is being
 counted.
 
+**What a lit conductor costs the line feeding it: one flux a tick.** Being fed at all is what
+lights a conductor, so the box charges whatever fed it a token (`JunctionBoxLogic.PRESENCE_DRAW`)
+rather than the twentieth of a channel the decay refills. It used to charge the refill, which made
+a box a 1,638-a-tick sink on a line that could carry 256, and with the push above being greedy at
+the time, a box on a shared line either starved everything else on it or was starved by it.
+
 ---
 
 ## What changes, in gameplay terms
@@ -787,7 +796,7 @@ counted.
 |---|---|---|
 | Wire loss | 2.5–5% per 16 blocks, worse when lightly loaded | none |
 | Voltage tiers | throttle throughput to the weakest wire on the path | cosmetic only |
-| Distribution when supply < demand | proportional to demand, nearest-first | greedy, arbitrary order, first served wins |
+| Distribution when supply < demand | proportional to demand, nearest-first | an equal share each, then the leftovers first come first served |
 | **Wire burnout / overload** | wire is destroyed with flame particles above its rate | **cannot happen — see below** |
 | Wire shock damage | sourced from the whole network's advertised energy | sourced from the local connector's own buffer |
 | Breaker switches | cut the network | unchanged |

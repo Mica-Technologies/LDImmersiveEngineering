@@ -203,8 +203,33 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
 
-	/** Client only: the tick the readout last asked the server for fresh figures. */
-	private long lastReadoutRequest = Long.MIN_VALUE;
+	/**
+	 * Per channel, what has arrived since this box last ticked, and the finished figure for the
+	 * tick before, for the readouts. Two arrays because credits come in during <em>other</em>
+	 * tiles' ticks -- a connector pushing down a wire, a peer passing along the run -- on either
+	 * side of this box's own update, so a single counter reset here would show half a tick.
+	 * <p>
+	 * Shown alongside what left, because a wired input face used to read "0 IF/t" while its
+	 * conductor was fully lit: the outgoing figure is honestly zero on a face that only takes
+	 * power in, and a playtester read that as the conduit being dead. Deliberately not saved.
+	 */
+	private final int[] receiving = new int[WireChannel.VALUES.length];
+	private final int[] lastReceived = new int[WireChannel.VALUES.length];
+
+	/**
+	 * Client only: the tick the readout last asked the server for fresh figures.
+	 * <p>
+	 * Starts "long enough ago", not at {@code Long.MIN_VALUE}: the check is a subtraction, and
+	 * {@code worldTime - Long.MIN_VALUE} overflows to a negative number, which is never twenty
+	 * ticks or more -- so the first request was never sent, the field was never advanced, and
+	 * no request was ever sent at all. The readout then showed whatever the last incidental
+	 * description packet had carried, which for a box nobody had touched since it loaded was
+	 * zero in every column, however much was flowing through it.
+	 */
+	private long lastReadoutRequest = -READOUT_INTERVAL;
+
+	/** How often, in ticks, a box being looked at asks the server for fresh readout figures. */
+	private static final int READOUT_INTERVAL = 20;
 
 	/**
 	 * What each conductor is carrying as a redstone signal, 0-15.
@@ -861,7 +886,8 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return 0;
 		int index = channel.ordinal();
 		if(simulate)
-			return Math.max(0, Math.min(CHANNEL_CAPACITY-held[index], amount));
+			return JunctionBoxLogic.debit(JunctionBoxLogic.credit(held[index], amount, CHANNEL_CAPACITY),
+					CityMode.conduits());
 		return credit(channel, amount);
 	}
 
@@ -958,16 +984,21 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(world==null||world.isRemote||liveMask==0)
 			return;
 
+		//Close the readout figures for the tick just gone: what arrived since the last update is
+		//this tick's intake, and what leaves is counted afresh below. Sixteen ints, only while
+		//something is live.
+		for(int i = 0; i < WireChannel.VALUES.length; i++)
+		{
+			lastMoved[i] = 0;
+			lastReceived[i] = receiving[i];
+			receiving[i] = 0;
+		}
+
 		//Out to the connectors first: a box that can get rid of energy should, because the gradient
 		//that opens is what pulls more down the run behind it.
 		for(WireChannel channel : WireChannel.VALUES)
-		{
 			if((liveMask&channel.getMask())!=0)
-			{
-				lastMoved[channel.ordinal()] = 0;
 				drainToBreakout(channel);
-			}
-		}
 
 		//Then along the runs. Connections outside, channels inside, and the handler's own set used
 		//in place rather than copied: this is the one loop in the feature that runs every tick, and
@@ -1008,6 +1039,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			{
 				held[index] = 0;
 				liveMask &= ~channel.getMask();
+				//A conductor that just went dark reads as dark, not as whatever moved last.
+				lastMoved[index] = 0;
+				lastReceived[index] = 0;
 			}
 		}
 	}
@@ -1167,9 +1201,15 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//City mode: presence, not accounting. Being fed at all is what makes a conductor live, so
 		//any credit fills it, and CITY_DECAY then measures how long it stays lit unfed. Outside city
 		//mode the figure is real flux and is added as such.
-		held[index] = CityMode.conduits()?CHANNEL_CAPACITY: held[index]+taken;
+		boolean presence = CityMode.conduits();
+		held[index] = presence?CHANNEL_CAPACITY: held[index]+taken;
 		liveMask |= channel.getMask();
-		return taken;
+		//For the readout, what the line brought to the door: under presence the debit below is a
+		//token and would read "in 1 IF/t" on a line carrying hundreds.
+		receiving[index] += presence?amount: taken;
+		//The sender is charged a token under presence, not the refill -- see JunctionBoxLogic.debit
+		//for the shared line this used to starve.
+		return JunctionBoxLogic.debit(taken, presence);
 	}
 
 	public int getHeld(WireChannel channel)
@@ -1180,6 +1220,16 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	public int getLastMoved(WireChannel channel)
 	{
 		return channel==null?0: lastMoved[channel.ordinal()];
+	}
+
+	public int getLastReceived(WireChannel channel)
+	{
+		return channel==null?0: lastReceived[channel.ordinal()];
+	}
+
+	public boolean isLive(WireChannel channel)
+	{
+		return channel!=null&&(liveMask&channel.getMask())!=0;
 	}
 
 	// -- The face a connector hangs on ---------------------------------
@@ -1200,7 +1250,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(channel==null||world==null||world.isRemote)
 			return 0;
 		if(simulate)
-			return Math.max(0, Math.min(CHANNEL_CAPACITY-held[channel.ordinal()], amount));
+			return JunctionBoxLogic.debit(
+					JunctionBoxLogic.credit(held[channel.ordinal()], amount, CHANNEL_CAPACITY),
+					CityMode.conduits());
 		return credit(channel, amount);
 	}
 
@@ -1758,7 +1810,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//twice, and only when something asks -- see getOverlayText.
 		nbt.setIntArray("held", held);
 		if(descPacket)
+		{
 			nbt.setIntArray("lastMoved", lastMoved);
+			nbt.setIntArray("lastReceived", lastReceived);
+		}
 		//Saved so a run comes back up in the state its levers left it, rather than dark until
 		//somebody happens to change a block next to one of its inputs.
 		nbt.setIntArray("signal", signal);
@@ -1789,6 +1844,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			int[] moved = nbt.getIntArray("lastMoved");
 			for(int i = 0; i < lastMoved.length; i++)
 				lastMoved[i] = i < moved.length?Math.max(0, moved[i]): 0;
+			int[] received = nbt.getIntArray("lastReceived");
+			for(int i = 0; i < lastReceived.length; i++)
+				lastReceived[i] = i < received.length?Math.max(0, received[i]): 0;
 		}
 		int[] stored = nbt.getIntArray("held");
 		liveMask = 0;
@@ -1815,7 +1873,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//Gated on the tick the last request went out on, not on the world time alone: this is
 		//called once per frame, and "world time is a multiple of twenty" is true for every frame of
 		//that tick, which at a hundred frames a second was five or six requests where one was meant.
-		if(world!=null&&world.isRemote&&world.getTotalWorldTime()-lastReadoutRequest >= 20)
+		if(world!=null&&world.isRemote&&world.getTotalWorldTime()-lastReadoutRequest >= READOUT_INTERVAL)
 		{
 			lastReadoutRequest = world.getTotalWorldTime();
 			ImmersiveEngineering.packetHandler.sendToServer(new MessageRequestBlockUpdate(getPos()));
@@ -1851,8 +1909,13 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 				//The tier is worth saying on a wired face and only on a wired face: it is the one
 				//thing about the circuit that is decided by hardware the player cannot see from
 				//here, since the wire leaves the block rather than sitting against it.
+				//
+				//Both directions and the state, not the outgoing figure alone. A face that takes
+				//power in sends nothing out, so "0 IF/t" was the honest answer to the wrong
+				//question, and the conductor behind it -- lit, carrying hundreds -- read as dead.
 				WireType wire = wireOn(face);
-				return getLastMoved(channel)+" IF/t"
+				return (isLive(channel)?"live": "dark")
+						+" -- in "+getLastReceived(channel)+" / out "+getLastMoved(channel)+" IF/t"
 						+(wire==null?"": " over "+wire.getCategory()+" wire");
 		}
 	}

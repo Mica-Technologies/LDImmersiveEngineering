@@ -183,6 +183,43 @@ class JunctionBoxLogicTest
 	}
 
 	@Nested
+	@DisplayName("what a credit costs the sender")
+	class Debit
+	{
+		@Test
+		@DisplayName("stock accounting charges exactly what was taken")
+		void stockChargesWhatWasTaken()
+		{
+			assertEquals(500, JunctionBoxLogic.debit(500, false));
+			assertEquals(1, JunctionBoxLogic.debit(1, false));
+		}
+
+		@Test
+		@DisplayName("presence charges a token, however much was taken")
+		void presenceChargesAToken()
+		{
+			//A city-mode box refills a twentieth of a channel a tick, more than an LV or MV line
+			//carries. Charged in full it was a bottomless sink on a shared line: whichever of the
+			//box and the other loads came first starved the rest (private issue #4).
+			assertEquals(JunctionBoxLogic.PRESENCE_DRAW, JunctionBoxLogic.debit(CAP/20, true));
+			assertEquals(JunctionBoxLogic.PRESENCE_DRAW, JunctionBoxLogic.debit(CAP, true));
+			assertTrue(JunctionBoxLogic.PRESENCE_DRAW >= 1, "a token of nothing would light nothing");
+		}
+
+		@Test
+		@DisplayName("never more than was taken, and never negative")
+		void neverMoreThanTakenNorNegative()
+		{
+			assertEquals(0, JunctionBoxLogic.debit(0, true));
+			assertEquals(0, JunctionBoxLogic.debit(0, false));
+			assertEquals(0, JunctionBoxLogic.debit(-5, true));
+			assertEquals(0, JunctionBoxLogic.debit(-5, false));
+			for(int taken = 0; taken <= 3; taken++)
+				assertTrue(JunctionBoxLogic.debit(taken, true) <= taken);
+		}
+	}
+
+	@Nested
 	@DisplayName("how the redstone conductors resolve across a run")
 	class Signals
 	{

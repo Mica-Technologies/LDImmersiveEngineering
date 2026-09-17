@@ -213,6 +213,22 @@ public final class WireNetTransfer
 	/**
 	 * City mode's push, restricted to one of this node's wires. See the filtered
 	 * {@link #transfer} for why a node with six terminals needs that.
+	 * <p>
+	 * <strong>Two passes: a fair share each, then the leftovers.</strong> The first version was a
+	 * single pass that offered each output everything still in hand and stopped when nothing was
+	 * left, in the hash order of the route set. That made "who gets served" a coin toss whenever
+	 * demand exceeded supply, and a conduit junction box tipped the coin every time: in city mode it
+	 * refills a twentieth of a channel a tick, more than any LV or MV connector can supply, so on a
+	 * line it shared with anything else either the box went dark or everything else did, depending
+	 * on which came first out of the set. A playtester wired a relay from a line that was already
+	 * feeding something and read 0 on both ends of the conduit; the same rig with the set iterating
+	 * the other way starved the capacitor instead.
+	 * <p>
+	 * So every output is now offered an equal share of what is available before anything is offered
+	 * the rest. A device that needs less than its share leaves the difference for the second pass,
+	 * which is the old greedy one. Nothing is simulated and nothing is sorted -- the point of city
+	 * mode is to skip normal mode's simulate-sort-split -- so the cost is at most two calls per
+	 * output instead of one. Energy is still conserved: only what was accepted is returned.
 	 */
 	public static int city(World world, BlockPos pos, int available,
 						   @Nullable Predicate<AbstractConnection> only)
@@ -223,23 +239,65 @@ public final class WireNetTransfer
 				world, true);
 		if(outputs.isEmpty())
 			return 0;
-		int powerLeft = available;
+		int eligible = 0;
+		for(AbstractConnection con : outputs)
+			if(conducts(con, only))
+				eligible++;
+		if(eligible==0)
+			return 0;
+		int powerLeft = cityPass(world, outputs, only, available, equalShare(available, eligible));
+		if(powerLeft > 0)
+			powerLeft = cityPass(world, outputs, only, powerLeft, Integer.MAX_VALUE);
+		return available-powerLeft;
+	}
+
+	/**
+	 * What each output is offered in the first pass of {@link #city}: an equal split of what the
+	 * node has, and never less than one so a presence-driven receiver -- a city-mode machine or a
+	 * conduit, both of which are lit by any credit at all -- is still touched when there are more
+	 * outputs than flux.
+	 */
+	public static int equalShare(int available, int outputs)
+	{
+		if(available <= 0||outputs <= 0)
+			return 0;
+		return Math.max(1, available/outputs);
+	}
+
+	/**
+	 * A route the city push may send along: to a consumer, over conductive wire, and one the
+	 * caller's filter keeps.
+	 */
+	private static boolean conducts(AbstractConnection con, @Nullable Predicate<AbstractConnection> only)
+	{
+		if(!con.isEnergyOutput||con.cableType==null||con.cableType.getTransferRate() <= 0)
+			return false;
+		return only==null||only.test(con);
+	}
+
+	/**
+	 * One pass over the outputs, offering each up to {@code cap} of what is left.
+	 *
+	 * @return what is still left afterwards
+	 */
+	private static int cityPass(World world, Set<AbstractConnection> outputs,
+								@Nullable Predicate<AbstractConnection> only, int powerLeft, int cap)
+	{
 		for(AbstractConnection con : outputs)
 		{
 			if(powerLeft <= 0)
 				break;
-			if(!con.isEnergyOutput||con.cableType==null||con.cableType.getTransferRate() <= 0)
-				continue;
-			if(only!=null&&!only.test(con))
+			if(!conducts(con, only))
 				continue;
 			IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
 			if(end==null||!end.allowEnergyToPass(null))
 				continue;
-			int sent = end.outputEnergy(powerLeft, false, 0, lastHop(con));
+			int sent = end.outputEnergy(Math.min(cap, powerLeft), false, 0, lastHop(con));
 			powerLeft -= sent;
 			//Notify in-line connectables (e.g. the Energy Meter) of throughput so they still measure
 			//power in city mode. City mode is lossless, so the full amount passes through every
-			//sub-connection.
+			//sub-connection. A meter on a route served in both passes is told twice and adds the
+			//two, which is the same total.
 			if(sent > 0)
 			{
 				HashSet<IImmersiveConnectable> passed = new HashSet<>();
@@ -254,6 +312,6 @@ public final class WireNetTransfer
 				}
 			}
 		}
-		return available-powerLeft;
+		return powerLeft;
 	}
 }
