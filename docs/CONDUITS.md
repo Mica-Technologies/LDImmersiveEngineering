@@ -637,6 +637,44 @@ City mode only: it rests on a conductor being energised or not, rather than carr
 Outside city mode a conduit is what it always was — fine while loaded, dark otherwise. The switch is
 `enableVirtualConduit`, and `/ie virtualconduit` lists every breakout currently holding a wire up.
 
+### A run may not feed itself
+
+Presence is generous on purpose — any credit at all fills a conductor, and it stays lit for twenty
+ticks — and on one build that generosity closes a loop and never opens again.
+
+Put two breakouts of one run onto the same wire network. Three connectors bolted to three boxes on
+one pole is what a pole *looks like*, so this is not an exotic build. Box one hands its conductor to
+the connector bolted against it; the connector buffers the flux and pushes it across the network on
+its own tick; the push reaches a connector bolted to box two of the same run; that connector inserts
+into box two, which reads a credit and fills to capacity. Round it goes, forever. Both poles on the
+line this was found on did it, and their far boxes read a full channel in the server save with no run
+connecting them to anything at all.
+
+A marker on the call stack cannot fix it, because a connector does not push in the call that fed it —
+it buffers, and pushes from its own `update()` a tick later, by which time there is no stack left to
+have marked. So the provenance comes from the topology instead: `ConduitRuns` works out, once per
+push, whether the pushing node has a run behind it, and if it has, the push skips every destination
+that leads back into the same run — its boxes, and anything sitting against one.
+
+Nearly every push on a server pays nothing for this. "Is there a run behind this node" is answered by
+a lookup in the wire graph's own map: no chunk, no tile entity, no allocation. Only a node that
+really is a junction box, or really is bolted against one, goes on to walk a run.
+
+A **different** run behind a destination is still served. Run → network → another run is a series
+build somebody meant, and refusing it would break something legitimate to fix something that is not.
+
+The same loop has a second, smaller turn inside the run itself. Two loaded boxes each bring the other
+up to their own level less the hop charge every tick, which undoes the decay both have just taken, so
+with the hop at a single unit a run whose feed had gone was still holding most of a channel a quarter
+of an hour later. The hop charge is a sixty-fourth of a channel now: a pair of unfed boxes is dark in
+about a second and a half, a full mesh in about three. What that costs is reach: presence survives
+some sixty boxes *in series*, which is a corridor with sixty corners in it between the feed and the
+last breakout. Boxes that merely sit beside one run are all joined to each other directly and count
+as one hop however many there are.
+
+Normal mode needs none of this: it conserves energy, so a circle of hand-offs runs down instead of
+locking on.
+
 ---
 
 ## Recipes

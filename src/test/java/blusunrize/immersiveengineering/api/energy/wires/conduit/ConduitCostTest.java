@@ -283,12 +283,15 @@ class ConduitCostTest
 		void rebuildNotifiesOnlyOnChange()
 		{
 			String body = body("public boolean rebuildRuns()", "\n\t}\n");
-			//Every self-notification in the method has to sit under the changed flag. Cheap way to
-			//assert that: the method's own mark is guarded, and it is the only one at method depth.
-			assertTrue(body.contains("if(changed)\n\t\t\tmarkContainingBlockForUpdate(null);"),
+			//Every self-notification in the method has to sit under the changed flag. Asserted by
+			//depth rather than by the exact spelling of the guard, so that adding a second statement
+			//under it -- and therefore a pair of braces -- is not itself a failure: the property is
+			//"nothing at method depth", not "this one line looks like that".
+			assertTrue(body.contains("if(changed)"),
+					"rebuildRuns no longer has a changed flag -- rewrite this test");
+			assertEquals(0, countOf(body, "\n\t\tmarkContainingBlockForUpdate(null);"),
 					"rebuildRuns marks the block for update unconditionally -- that is the loop");
-			assertEquals(1, countOf(body, "\n\t\tmarkContainingBlockForUpdate(null);")
-					+countOf(body, "\n\t\t\tmarkContainingBlockForUpdate(null);"),
+			assertEquals(1, countOf(body, "\n\t\t\tmarkContainingBlockForUpdate(null);"),
 					"rebuildRuns notifies itself somewhere other than under the changed flag");
 		}
 

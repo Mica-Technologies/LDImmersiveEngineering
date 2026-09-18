@@ -13,6 +13,7 @@ import blusunrize.immersiveengineering.api.energy.wires.IImmersiveConnectable;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.AbstractConnection;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Connection;
+import blusunrize.immersiveengineering.common.blocks.conduit.ConduitRuns;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
@@ -211,6 +212,19 @@ public final class WireNetTransfer
 	}
 
 	/**
+	 * City mode's push from a node whose conduit run is already known, for the one caller that cannot
+	 * work it out: the virtual push, whose origin box is unloaded by definition.
+	 *
+	 * @param runBox the junction box this energy came out of, so the push does not hand it back to
+	 *               the run it came from -- see {@link ConduitRuns}
+	 */
+	public static int cityFromRun(World world, BlockPos pos, int available,
+								  @Nullable Predicate<AbstractConnection> only, BlockPos runBox)
+	{
+		return city(world, pos, available, only, ConduitRuns.shadowOfRunAt(world, runBox));
+	}
+
+	/**
 	 * City mode's push, restricted to one of this node's wires. See the filtered
 	 * {@link #transfer} for why a node with six terminals needs that.
 	 * <p>
@@ -241,9 +255,34 @@ public final class WireNetTransfer
 	 * <p>
 	 * Nothing is simulated and nothing is sorted -- the point of city mode is to skip normal mode's
 	 * simulate-sort-split. Energy is conserved: only what was accepted is returned.
+	 * <p>
+	 * <strong>A run may not feed itself.</strong> Presence is generous by design -- any credit at all
+	 * fills a conductor -- and on a network with two breakouts of one run on it that generosity
+	 * closes a loop and never opens again. So a push whose origin has a conduit run behind it skips
+	 * the destinations that lead back into the same run. {@link ConduitRuns} carries the whole story,
+	 * including why almost every push pays nothing for the rule. Normal mode has no latch to break:
+	 * it conserves energy, so a circle of hand-offs runs down instead of locking on.
 	 */
 	public static int city(World world, BlockPos pos, int available,
 						   @Nullable Predicate<AbstractConnection> only)
+	{
+		if(world.isRemote||available <= 0)
+			return 0;
+		return city(world, pos, available, only, ConduitRuns.shadowFor(world, pos));
+	}
+
+	/**
+	 * The same push with the run behind it already worked out, for the two callers that know it
+	 * better than {@link ConduitRuns#runBehind} could: a junction box, which is its own run and
+	 * caches the answer rather than flooding it once per conductor per tick, and the virtual push,
+	 * whose origin box is unloaded.
+	 *
+	 * @param sameRun destinations that lead back into the pushing node's own conduit run, or null
+	 *                when there is no run behind it -- which is the case for virtually every node on
+	 *                a server, and then this behaves exactly as it always did
+	 */
+	public static int city(World world, BlockPos pos, int available,
+						   @Nullable Predicate<AbstractConnection> only, @Nullable Set<BlockPos> sameRun)
 	{
 		if(world.isRemote||available <= 0)
 			return 0;
@@ -256,18 +295,21 @@ public final class WireNetTransfer
 		{
 			if(powerLeft <= 0)
 				break;
-			powerLeft = cityOffer(world, con, only, powerLeft);
+			powerLeft = cityOffer(world, con, only, sameRun, powerLeft);
 		}
 		return available-powerLeft;
 	}
 
 	/**
-	 * A route the city push may send along: to a consumer, over conductive wire, and one the
-	 * caller's filter keeps.
+	 * A route the city push may send along: to a consumer, over conductive wire, one the caller's
+	 * filter keeps, and one that does not arrive back at the run the energy came out of.
 	 */
-	private static boolean conducts(AbstractConnection con, @Nullable Predicate<AbstractConnection> only)
+	private static boolean conducts(AbstractConnection con, @Nullable Predicate<AbstractConnection> only,
+									@Nullable Set<BlockPos> sameRun)
 	{
 		if(!con.isEnergyOutput||con.cableType==null||con.cableType.getTransferRate() <= 0)
+			return false;
+		if(ConduitRuns.blocks(sameRun, con.end))
 			return false;
 		return only==null||only.test(con);
 	}
@@ -278,9 +320,10 @@ public final class WireNetTransfer
 	 * @return what is left afterwards
 	 */
 	private static int cityOffer(World world, AbstractConnection con,
-								 @Nullable Predicate<AbstractConnection> only, int powerLeft)
+								 @Nullable Predicate<AbstractConnection> only,
+								 @Nullable Set<BlockPos> sameRun, int powerLeft)
 	{
-		if(!conducts(con, only))
+		if(!conducts(con, only, sameRun))
 			return powerLeft;
 		IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
 		if(end==null||!end.allowEnergyToPass(null))

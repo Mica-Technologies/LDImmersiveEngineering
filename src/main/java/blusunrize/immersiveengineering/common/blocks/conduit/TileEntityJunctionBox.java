@@ -196,11 +196,25 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	private static final int CITY_DECAY = Math.max(1, CHANNEL_CAPACITY/20);
 
 	/**
-	 * What one hop along a run costs a conductor's presence in city mode: next to nothing. The decay
-	 * above is what makes a run go dark, hop by hop from the source, once the source stops; the hop
-	 * charge only has to be non-zero so that presence never runs in a circle forever.
+	 * What one hop along a run costs a conductor's presence in city mode.
+	 * <p>
+	 * <strong>This is what takes an unfed run down, not the decay.</strong> It was 1, on the
+	 * argument that it only had to be non-zero to stop presence running in a circle for ever -- and
+	 * a circle that loses one a lap is not for ever, it is a quarter of an hour. Two loaded boxes on
+	 * a run each bring the other up to their own level less the hop every tick, which undoes the
+	 * decay both of them have just taken: the pair as a whole loses two hops a tick and nothing
+	 * else, a full mesh of boxes loses one. Measured on a playtester's pole with its feed removed,
+	 * two boxes were still holding 30,000 after ten seconds and falling by two a tick. With the
+	 * feed gone a loaded run went on delivering for some fourteen minutes.
+	 * <p>
+	 * At a sixty-fourth of a channel the same pair is dark in about a second and a half and a mesh
+	 * in about three, which is the promise {@link #CITY_DECAY} makes and could not keep alone.
+	 * What it costs is reach: presence now survives some sixty boxes in series before the last
+	 * one's level is under a tick's decay, which is a corridor with sixty corners in it between the
+	 * feed and the last breakout. Boxes that merely sit beside one run are all joined to each other
+	 * directly and are one hop however many there are.
 	 */
-	private static final int CITY_HOP = 1;
+	private static final int CITY_HOP = Math.max(1, CHANNEL_CAPACITY/64);
 
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
@@ -627,7 +641,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			changed = true;
 		}
 		if(changed)
+		{
 			markContainingBlockForUpdate(null);
+			//This box's own run just changed shape, so what its pushes may not reach has too.
+			runShadow = null;
+		}
 		return changed;
 	}
 
@@ -1251,7 +1269,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//nodes on the far side of it are living by that rule. Whether the box debits itself is the
 		//conduit's own question and is asked separately, just below.
 		int sent = CityMode.wires()
-				?WireNetTransfer.city(world, getPos(), offer, onlyThisWire)
+				?WireNetTransfer.city(world, getPos(), offer, onlyThisWire, runShadow())
 				:WireNetTransfer.transfer(world, getPos(), rate, rate, offered, false, 0,
 						transferEndCache, onlyThisWire);
 		if(sent <= 0)
@@ -1260,6 +1278,33 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			held[index] -= sent;
 		lastMoved[index] += sent;
 		return sent;
+	}
+
+	/**
+	 * The destinations this box's own pushes may not reach: its run, and everything sitting against
+	 * it. See {@link ConduitRuns} for the latch this closes.
+	 * <p>
+	 * <strong>Cached, because the alternative is a flood and a set per conductor per tick.</strong>
+	 * A box with six wired faces pushes six times a tick and the answer is the same six times; a
+	 * connector, which pushes once, works it out afresh and is right to. Dropped whenever a run is
+	 * made or broken here, and re-derived once a second besides -- the same bargain
+	 * {@link #liveElsewhereOnRun} strikes, and for the same reason: the figure changes on a tick
+	 * boundary at most, and a run made at the far end of a bundle does not pass through this box on
+	 * its way into the graph.
+	 */
+	@Nullable
+	private transient Set<BlockPos> runShadow;
+	private long runShadowAt = -READOUT_INTERVAL;
+
+	private Set<BlockPos> runShadow()
+	{
+		long now = world.getTotalWorldTime();
+		if(runShadow==null||now-runShadowAt >= READOUT_INTERVAL)
+		{
+			runShadow = ConduitRuns.shadowOfRunAt(world, getPos());
+			runShadowAt = now;
+		}
+		return runShadow;
 	}
 
 	/**
