@@ -130,6 +130,54 @@ the age check is a subtraction, and `now - Long.MIN_VALUE` overflows negative --
 request was never due, and the overlay showed whatever the last incidental sync had carried, which
 for a box nobody had touched since the chunk loaded was zero in every column.
 
+### A box against a box is not a join
+
+**A run ends at the first box it meets**, and two boxes standing flat against each other are
+therefore not on a run together. `ConduitRoute.junctionsFrom` only records a box the step landed on
+when that step covered more than one block:
+
+```java
+if(node==Node.JUNCTION)
+{
+    if(first.blocks > 1)      // an immediate neighbour is blocks == 1, and is skipped
+        found.put(first.pos, first.blocks);
+    continue;
+}
+```
+
+`across()` starts at `blocks = 1` and only counts higher when it slides through a **feeder** — which
+is what makes box-feeder-box one run while box-box is two. The rule is deliberate and it stays.
+
+**What was wrong is that the build which trips it looks finished.** A playtester stood three fed
+boxes hard against a fourth that carried the run down a pole: each of the three lit its own
+conductor — red, blue and green, 32768 apiece — and delivered into nothing, while the fourth held
+zero on all sixteen and every length below it stayed dark. Nothing anywhere said so. Read from the
+world at the time:
+
+| Box | `patch` | `held` |
+|---|---|---|
+| (2067, 90, −5912) | `{up: "red"}` | `[14] = 32768` — lit, going nowhere |
+| (2066, 90, −5911) | `{up: "blue"}` | `[11] = 32768` — lit, going nowhere |
+| (2067, 90, −5910) | `{up: "green"}` | `[13] = 32768` — lit, going nowhere |
+| (2067, 90, −5911) | `{}` | all zero — the one actually on the run |
+
+So the box now says it, in the overlay, at the moment somebody is looking at it and wondering:
+
+```
+No breakout on this face
+0 of 16 patched
+touching a box on 3 faces, joined to none
+a run ends at the first box it meets -- leave a gap and fill it
+```
+
+Only when there is something to report — a box with no neighbours, or one properly joined to the
+ones it touches, says nothing extra. When some of its neighbours are joined and some are not it
+counts them (`joined to only 1`), because "none" would be a lie about the working half.
+
+The two ways out are a length of conduit between the boxes, or a Ground Feeder. Better still, most
+of the time, is **not to use several boxes at all**: a box takes one wire per face, so one box with
+three wires on three faces is three circuits on one bundle, which is what these three were for.
+
 ### Auto-patching
 
 **A bare face with power hardware bolted to it patches itself.** Put an LV, MV or HV connector — or

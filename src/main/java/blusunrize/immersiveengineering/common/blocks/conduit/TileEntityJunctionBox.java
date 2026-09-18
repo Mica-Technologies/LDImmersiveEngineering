@@ -75,6 +75,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.ArrayDeque;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -1880,11 +1881,64 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		}
 		EnumFacing side = mop==null?null: mop.sideHit;
 		WireChannel here = patch.get(side);
-		return new String[]{
-				here!=null?"Breakout: "+here.getName(): "No breakout on this face",
-				here!=null?describeFace(side, here)
-						: patch.count()+" of "+WireChannel.VALUES.length+" patched"
-		};
+		List<String> lines = new ArrayList<>(4);
+		lines.add(here!=null?"Breakout: "+here.getName(): "No breakout on this face");
+		lines.add(here!=null?describeFace(side, here)
+				: patch.count()+" of "+WireChannel.VALUES.length+" patched");
+		for(String warning : describeTouching())
+			lines.add(warning);
+		return lines.toArray(new String[0]);
+	}
+
+	/**
+	 * What to say about boxes sitting flat against this one that it is not on a run with.
+	 * <p>
+	 * <strong>A box against a box is not a join, and until now it did not look like anything.</strong>
+	 * A run ends at the first box it meets -- {@code ConduitRoute.junctionsFrom} only records a box
+	 * the step landed on when that step covered more than one block, so an immediate neighbour is
+	 * skipped and only a feeder in between makes box-gap-box into one run. That is deliberate and
+	 * stays. What was wrong is that the build which trips it looks finished: a playtester stood three
+	 * fed boxes hard against a fourth that carried the run down a pole, and all three lit their own
+	 * conductor and delivered into nothing while the fourth held zero on all sixteen. Nothing
+	 * anywhere said so (private issue #4).
+	 * <p>
+	 * So the box says so, at the moment somebody is looking at it and wondering. Only when there is
+	 * something to report: a box with no neighbours, or one properly joined to the ones it touches,
+	 * says nothing extra.
+	 *
+	 * @return nothing, or two lines -- what is wrong and what to do about it
+	 */
+	private List<String> describeTouching()
+	{
+		if(world==null)
+			return Collections.emptyList();
+		//The bundle ends once, not once per face: this runs every frame the box is being looked at.
+		Set<BlockPos> joined = new HashSet<>();
+		Set<Connection> links = ImmersiveNetHandler.INSTANCE.getConnections(world, getPos());
+		if(links!=null)
+			for(Connection link : links)
+				if(link.isBundle())
+					joined.add(link.end);
+		int touching = 0;
+		int unjoined = 0;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			BlockPos neighbour = getPos().offset(face);
+			//isBlockLoaded first: a box on a chunk border must not pull the next chunk in to draw
+			//a tooltip.
+			if(!world.isBlockLoaded(neighbour)
+					||!(world.getTileEntity(neighbour) instanceof TileEntityJunctionBox))
+				continue;
+			touching++;
+			if(!joined.contains(neighbour))
+				unjoined++;
+		}
+		if(unjoined==0)
+			return Collections.emptyList();
+		String how = unjoined==touching?"none": "only "+(touching-unjoined);
+		return Arrays.asList(
+				"touching a box on "+touching+(touching==1?" face": " faces")+", joined to "+how,
+				"a run ends at the first box it meets -- leave a gap and fill it");
 	}
 
 	@Override
