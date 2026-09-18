@@ -125,6 +125,7 @@ public class CommandDemo extends CommandTreeBase
 		addSubcommand(new SubBuild());
 		addSubcommand(new SubClear());
 		addSubcommand(new SubPlant());
+		addSubcommand(new SubConduitLink());
 		addSubcommand(new CommandTreeHelp(this));
 	}
 
@@ -308,6 +309,57 @@ public class CommandDemo extends CommandTreeBase
 					+" "+end.getZ()+".");
 			msg(sender, TextFormatting.GRAY+"Wait here a minute so the meter measures, then go to the far end "
 					+"and watch /ie virtualgen."+TextFormatting.RESET);
+			for(String note : builder.notes)
+				msg(sender, TextFormatting.YELLOW+"  "+note+TextFormatting.RESET);
+		}
+	}
+
+	/**
+	 * {@code /ie demo conduitlink [length]} -- the conduit twin of {@code plant}, for seeing virtual
+	 * conduit work.
+	 * <p>
+	 * A creative source feeds a junction box, two blocks of run reach a second box, and copper goes east
+	 * from that box relay to relay for {@code length} blocks into an LV capacitor. Stand at the boxes a
+	 * moment so the breakout is recorded, then go to the capacitor end: both boxes unload, a conduit moves
+	 * nothing through an unloaded box, and the capacitor should fill anyway. {@code /ie virtualconduit}
+	 * shows the breakout as VIRTUAL.
+	 */
+	private class SubConduitLink extends CommandBase
+	{
+		/** Copper's reach is 16; one short of it keeps every span legal. */
+		private static final int SPAN = 15;
+
+		@Nonnull
+		@Override
+		public String getName()
+		{
+			return "conduitlink";
+		}
+
+		@Nonnull
+		@Override
+		public String getUsage(@Nonnull ICommandSender sender)
+		{
+			return "/ie demo conduitlink [length] -- two junction boxes where you stand, wire east for "
+					+"length blocks (default 480) to a capacitor";
+		}
+
+		@Override
+		public void execute(@Nonnull MinecraftServer server, @Nonnull ICommandSender sender,
+							@Nonnull String[] args) throws CommandException
+		{
+			World world = sender.getEntityWorld();
+			if(world.isRemote)
+				return;
+			int length = args.length >= 1?CommandBase.parseInt(args[0], SPAN, 20000): 480;
+			BlockPos origin = sender.getPosition();
+			Builder builder = new Builder(world, origin, null);
+			BlockPos end = builder.conduitLink(origin, length, SPAN);
+			msg(sender, TextFormatting.GOLD+"Conduit link built"+TextFormatting.RESET+" at "+origin.getX()+" "
+					+origin.getY()+" "+origin.getZ()+"; the wire ends at a capacitor at "+end.getX()+" "
+					+end.getY()+" "+end.getZ()+".");
+			msg(sender, TextFormatting.GRAY+"Wait here a moment, then go to the far end and watch "
+					+"/ie virtualconduit."+TextFormatting.RESET);
 			for(String note : builder.notes)
 				msg(sender, TextFormatting.YELLOW+"  "+note+TextFormatting.RESET);
 		}
@@ -612,6 +664,64 @@ public class CommandDemo extends CommandTreeBase
 			for(int i = 1; i < spans; i++)
 			{
 				BlockPos relay = new BlockPos(last.getX()+span, y, z);
+				set(relay.down(), Blocks.STONE.getDefaultState());
+				connector(relay, BlockTypes_Connector.RELAY_LV, EnumFacing.DOWN);
+				wire(last, lastFace, relay, EnumFacing.DOWN, WireType.COPPER);
+				last = relay;
+				lastFace = EnumFacing.DOWN;
+			}
+			BlockPos capacitor = new BlockPos(last.getX()+span, y, z);
+			set(capacitor.down(), Blocks.STONE.getDefaultState());
+			sinkCapacitor(capacitor, EnumFacing.UP);
+			BlockPos sink = capacitor.up();
+			connector(sink, BlockTypes_Connector.CONNECTOR_LV, EnumFacing.DOWN);
+			wire(last, lastFace, sink, EnumFacing.DOWN, WireType.COPPER);
+			return capacitor;
+		}
+
+		/**
+		 * The conduit version of {@link #plant}: a creative source into a junction box, a short run to a
+		 * second box, and a long wire east from that box to a capacitor.
+		 * <p>
+		 * Built to watch virtual conduit work, and shaped so the thing being tested is the only thing that
+		 * can be responsible. A conduit hands power along one box at a time inside each box's own update,
+		 * so an unloaded box moves nothing; stand at the capacitor end and both boxes are far behind you
+		 * and asleep. If the capacitor still fills, it is because the far box's breakout is being replayed
+		 * from its record -- there is no other path for the energy to have taken.
+		 * <p>
+		 * The run between the boxes is deliberately short. What has to be unloaded is the box that feeds
+		 * the wire, not the conduit between them, and a long run would only make the rig harder to walk.
+		 *
+		 * @return the capacitor at the far end
+		 */
+		private BlockPos conduitLink(BlockPos origin, int length, int span)
+		{
+			int x = origin.getX(), y = origin.getY(), z = origin.getZ();
+			//Source into the first box, through a connector bolted against it -- the box auto-patches a
+			//conductor out to the face the connector is on.
+			creativeSource(new BlockPos(x, y, z));
+			BlockPos feed = new BlockPos(x, y+1, z);
+			connector(feed, BlockTypes_Connector.CONNECTOR_LV, EnumFacing.DOWN);
+			BlockPos boxA = new BlockPos(x+2, y+1, z);
+			set(boxA.down(), Blocks.STONE.getDefaultState());
+			box(boxA, new EnumFacing[0], new WireChannel[0]);
+			wire(feed, EnumFacing.EAST, boxA, EnumFacing.WEST, WireType.COPPER);
+
+			//Two blocks of run, so the boxes are joined by conduit rather than touching -- a box against
+			//a box is two runs, not one, and this rig would silently prove nothing.
+			for(int i = 1; i <= 2; i++)
+				run(new BlockPos(x+2+i, y+1, z), EnumFacing.DOWN);
+			BlockPos boxB = new BlockPos(x+5, y+1, z);
+			set(boxB.down(), Blocks.STONE.getDefaultState());
+			box(boxB, new EnumFacing[0], new WireChannel[0]);
+
+			//And out of the far box straight onto a wire, which is the hand-off the record replays.
+			BlockPos last = boxB;
+			EnumFacing lastFace = EnumFacing.EAST;
+			int spans = Math.max(1, length/span);
+			for(int i = 1; i < spans; i++)
+			{
+				BlockPos relay = new BlockPos(last.getX()+span, y+1, z);
 				set(relay.down(), Blocks.STONE.getDefaultState());
 				connector(relay, BlockTypes_Connector.RELAY_LV, EnumFacing.DOWN);
 				wire(last, lastFace, relay, EnumFacing.DOWN, WireType.COPPER);
