@@ -29,6 +29,7 @@ import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetTickHandler;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
 import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
+import blusunrize.immersiveengineering.common.util.conduit.ConduitIndexSaveData;
 import blusunrize.immersiveengineering.common.util.virtualconduit.VirtualConduitSaveData;
 import blusunrize.immersiveengineering.common.util.virtualgen.VirtualGenSaveData;
 import blusunrize.immersiveengineering.common.util.network.*;
@@ -290,6 +291,12 @@ public class ImmersiveEngineering
 				//disposable one: deleting it costs a run rediscovering what it carries the next
 				//time somebody stands near it.
 				VirtualConduitSaveData.load(world);
+
+				//Where every piece of conduit hardware is, so a walk can cross a stretch nobody is
+				//standing on -- the same reason IE's wire graph is global and saved. Its own file,
+				//and a disposable one: delete it and runs go back to only forming while all of them
+				//happens to be loaded, which is where the last outage came from.
+				ConduitIndexSaveData.load(world);
 
 				//The virtual fluid network is the grid's sibling and keeps its own save file for
 				//the same reasons -- see FluidNetSaveData. Same reset-then-load order, so a second

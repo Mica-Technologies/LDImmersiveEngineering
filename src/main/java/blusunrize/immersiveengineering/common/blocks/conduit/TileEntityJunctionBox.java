@@ -531,6 +531,33 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	private int hardwareMask;
 
 	/**
+	 * Ticks until this box walks its run again because the last walk ran out of world, or zero when
+	 * the last walk saw everything it needed to.
+	 * <p>
+	 * <strong>What makes a run link by itself.</strong> A rebuild happens when a box loads and when
+	 * one of its neighbours changes, and the middle of an inter-town run has neither: nobody is there
+	 * to change anything, and the box at each end loaded long ago. So a walk that stopped at a gap
+	 * neither loaded nor indexed -- a stretch nobody has visited since the index was introduced -- had
+	 * no second chance at all. The first person to walk half the line indexes that half, and this is
+	 * what notices.
+	 * <p>
+	 * <strong>Free for a box whose walk was complete</strong>, which is every box on a finished
+	 * installation: one integer comparison a tick, in front of the live-mask exit and next to the
+	 * rebuild flag it shares a purpose with. A box that stays truncated pays one walk every few
+	 * seconds, bounded by {@code ConduitRoute.MAX_NODES} like every other walk, and only while it is
+	 * loaded -- an unloaded box does not tick, which is the whole reason this feature exists.
+	 */
+	private int retryIn;
+
+	/**
+	 * How long a box with an incomplete walk waits before trying again: five seconds.
+	 * <p>
+	 * Long enough that a handful of stuck boxes is not a cost anybody could measure, short enough that
+	 * somebody flying a line sees it join up behind them rather than on the next reload.
+	 */
+	private static final int RETRY_TICKS = 100;
+
+	/**
 	 * Set when a neighbour change may have moved a redstone input; cleared by the next server tick,
 	 * which re-derives the run's signals once. The same bargain as {@link #rebuildQueued}: a lever
 	 * being spammed against a box with a redstone breakout costs one walk over the run's boxes a
@@ -618,7 +645,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return false;
 		rebuildQueued = false;
 		hardwareMask = hardwareAround();
-		ConduitRoute.Walk walk = ConduitRoute.walkFrom(getPos(), new ConduitWorldProbe(world));
+		ConduitRoute.Walk walk = ConduitRoute.walkFrom(getPos(), ConduitWorldProbe.of(world));
 		Map<BlockPos, Integer> peers = walk.boxes();
 		Set<BlockPos> wanted = new HashSet<>(peers.keySet());
 		boolean changed = false;
@@ -636,7 +663,20 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//"Reachable" only means anything when the walk was allowed to look. When it was not, the
 		//honest reading of the result is "these are the peers I can see", which is grounds for
 		//adding one and never for forgetting one.
-		if(!walk.isTruncated())
+		//
+		//Since the conduit index landed there is a second way for a walk to be less than authoritative,
+		//and it is the commoner one: the walk got all the way to the far box, but did it by reading the
+		//index for a stretch nobody is standing on. An index entry is right until something edits the
+		//world without going through breakBlock, and the sweep that catches that only runs when the
+		//chunk in question loads -- which, for the middle of an inter-town run, is the thing that never
+		//happens. So a walk that leant on memory is exactly as trustworthy as a truncated one was: it
+		//may make a run and it may not delete one. Walk.mayPrune is both tests, and it is only true for
+		//a box that really did see its whole run with the chunks in front of it.
+		//
+		//The cost of that conservatism is a run that stays in the graph after its conduit is dug up
+		//while the digger's chunk was the only one loaded. It comes out the next time a walk sees the
+		//whole length at once, which is the same terms the truncation rule has always worked on.
+		if(walk.mayPrune())
 			for(Connection existing : new ArrayList<>(currentBundles()))
 			{
 				BlockPos other = existing.end;
@@ -652,23 +692,43 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			//Still not offered again below: a bundle this box already has is not a bundle to make.
 			for(Connection existing : currentBundles())
 				wanted.remove(existing.end);
+		int dimension = world.provider.getDimension();
 		for(BlockPos peer : wanted)
 		{
-			TileEntity te = world.getTileEntity(peer);
-			if(!(te instanceof TileEntityJunctionBox))
+			//	=================================
+			//	The far box may not be there to ask
+			//	=================================
+			//This used to be a plain getTileEntity, which was fine while a walk could only reach a box
+			//it could see. The index changed that: the far end of a two-hundred block line is found
+			//from a saved entry, and calling getTileEntity on it would *generate that chunk* -- the one
+			//thing this whole feature is forbidden to do, and a chunk loader wearing a hat. So a loaded
+			//peer is confirmed from the world as before, and an unloaded one is confirmed from the same
+			//index the walk found it in. addAndGetConnection is already loaded-safe; it only pokes an
+			//end it can see.
+			boolean loaded = world.isBlockLoaded(peer);
+			TileEntity te = loaded?world.getTileEntity(peer): null;
+			if(loaded
+					?!(te instanceof TileEntityJunctionBox)
+					: ConduitIndex.INSTANCE.nodeAt(dimension, peer)!=ConduitRoute.Node.JUNCTION)
 				continue;
 			Connection made = ImmersiveNetHandler.INSTANCE.addAndGetConnection(world, getPos(), peer,
 					peers.get(peer), ConduitWireType.INSTANCE);
 			//Sixteen conductors, all present. A breakout says where one leaves, not whether it
 			//exists -- see ConduitPatch for why carriage cannot be derived from what is patched.
 			made.channels = fullBundle();
-			Connection back = ImmersiveNetHandler.INSTANCE.getReverseConnection(
-					world.provider.getDimension(), made);
+			Connection back = ImmersiveNetHandler.INSTANCE.getReverseConnection(dimension, made);
 			if(back!=null)
 				back.channels = fullBundle();
-			((TileEntityJunctionBox)te).markContainingBlockForUpdate(null);
+			if(te instanceof TileEntityJunctionBox)
+				((TileEntityJunctionBox)te).markContainingBlockForUpdate(null);
 			changed = true;
 		}
+		//A walk that ran out of world is worth trying again, and nothing else will ask. Rebuilds happen
+		//on load and on a neighbour change, and the middle of an inter-town run has neither -- so
+		//before this, a run whose last gap was filled in by somebody else's chunk loading stayed
+		//unlinked until something happened to poke one of its boxes, which might be never. See
+		//RETRY_TICKS for why the idle box pays nothing for it.
+		retryIn = walk.isTruncated()?RETRY_TICKS: 0;
 		if(changed)
 		{
 			markContainingBlockForUpdate(null);
@@ -1101,6 +1161,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			feedMask = VirtualConduits.INSTANCE.feedMaskAt(world.provider.getDimension(), getPos());
 			Arrays.fill(unfedFor, 0);
 		}
+		//A walk that ran out of world, tried again. One integer comparison for the boxes this does not
+		//apply to, which is all of them on a finished build -- see retryIn.
+		if(retryIn > 0&&world!=null&&!world.isRemote&&--retryIn==0)
+			rebuildQueued = true;
 		//One walk a tick, however many neighbour changes asked for it -- see queueRebuild. Cheap
 		//when nothing asked: a boolean, before the live-mask check below.
 		if(rebuildQueued&&world!=null&&!world.isRemote&&rebuildRuns())
@@ -1875,6 +1939,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		forgetMount();
 		if(world==null||world.isRemote)
 			return;
+		//A box is the end of a run, so a walk crossing an unloaded stretch has to be able to find one
+		//it cannot see -- otherwise the far half of an inter-town line is a run that goes nowhere. See
+		//ConduitIndex; a chunk unloading deliberately leaves the entry alone.
+		ConduitIndex.INSTANCE.rememberJunction(world.provider.getDimension(), getPos());
 		//The runs are re-walked and the wire table is put back in step with the graph on the first
 		//tick rather than here. The spawn chunks load before FMLServerStartedEvent, which is where
 		//IE reads its wire graph back in, so a box in one of them sees an empty graph from here: it

@@ -274,6 +274,19 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		TileEntity te = world.getTileEntity(pos);
 		if(te instanceof TileEntityJunctionBox)
 			((TileEntityJunctionBox)te).onBlockBroken();
+		//	=================================
+		//	The one callback that means "gone"
+		//	=================================
+		//Every meta, and only here. The conduit index has to tell a block that has been broken from one
+		//whose chunk has merely gone away, because the second is exactly what it exists to answer for
+		//-- and in 1.12.2 the obvious hook cannot: TileEntity.invalidate runs for both, since
+		//Chunk.onUnload invalidates every tile entity it is letting go of. onChunkUnload is the other
+		//half of the same story and must equally leave the entry alone. This, breakBlock, is the one
+		//place the block really is being taken out of the world, whether by a player, a piston, an
+		//explosion or another block replacing it. Anything that edits the world without coming through
+		//here -- WorldEdit, /setblock with the wrong flags -- is caught by the per-chunk sweep instead.
+		if(!world.isRemote)
+			ConduitIndex.INSTANCE.forget(world.provider.getDimension(), pos);
 		super.breakBlock(world, pos, state);
 	}
 

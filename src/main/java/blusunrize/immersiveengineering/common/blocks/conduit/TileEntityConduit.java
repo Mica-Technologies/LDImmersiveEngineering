@@ -257,6 +257,12 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		//onLoad already, and a hundred conduits each walking the same run to reach the same two
 		//boxes would be a hundred walks to learn what two walks already knew.
 		//
+		//Write this length down while it can be seen, so that a walk can cross it later when it
+		//cannot. Here and not next tick: the index holds nothing but this block's own facing, which
+		//is already read, and an entry that is a tick late is an entry a rebuild in that tick misses.
+		//See ConduitIndex for why an unloading chunk does *not* take it out again.
+		if(world!=null&&!world.isRemote)
+			ConduitIndex.INSTANCE.rememberConduit(world.provider.getDimension(), getPos(), facing);
 		//And not now, but next tick: a chunk's tile entities are added one after another, and a
 		//conduit refreshed as it lands sees only the neighbours that landed before it. A run of ten
 		//loaded that way came back with a stub in the middle -- the fifth piece never learned about
@@ -288,7 +294,7 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	 */
 	private void wakeBoxes()
 	{
-		for(BlockPos box : ConduitRoute.junctionsAround(getPos(), new ConduitWorldProbe(world)))
+		for(BlockPos box : ConduitRoute.junctionsAround(getPos(), ConduitWorldProbe.of(world)))
 		{
 			TileEntity te = Utils.getExistingTileEntity(world, box);
 			if(te instanceof TileEntityJunctionBox)
@@ -365,6 +371,12 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	{
 		this.facing = facing;
 		refreshConnections();
+		//Which surface this is clipped to is half of what the index remembers about it, and this is
+		//the only thing that ever moves it -- placement runs through here too. Without this a piece
+		//placed and then re-mounted would be remembered on the wall it was first put against, and a
+		//walk over an unloaded stretch would follow a plane that is not there any more.
+		if(world!=null&&!world.isRemote)
+			ConduitIndex.INSTANCE.rememberConduit(world.provider.getDimension(), getPos(), facing);
 	}
 
 	@Override

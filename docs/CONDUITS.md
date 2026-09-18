@@ -85,6 +85,57 @@ Runs are **discovered, not drawn**. Placing the last length between two boxes cr
 connection; pulling a length out of the middle breaks it. A run ends at the *first* box it meets,
 so a corridor with boxes at every corner is a chain, not a mesh.
 
+### Linking a run nobody is standing on
+
+Discovery is a walk over the conduit, in `ConduitRoute`, and the walk **may never load a chunk** — a
+run along a border that pulled chunks in behind it would be a chunk loader wearing a hat. So an
+unloaded position used to read as empty, and a run whose middle is unloaded never linked at all. On a
+server with a view distance of seven that is *every* inter-town run, essentially always: a
+two-hundred block line between two towns was simply absent from the wire graph, and appeared only if a
+rebuild happened to run in the one moment every block of it was loaded at once.
+
+Wires have never had this problem, and the reason is not that wires are cleverer: **IE's wire graph is
+global and saved**, so a route search steps over an unloaded connector without needing to see it.
+`ConduitIndex` is the same answer for conduit. It is a saved table, in its own
+`ImmersiveEngineering-ConduitIndex.dat`, of every piece of conduit hardware on the server and the
+three things a walk asks about one — is it conduit, a box or a feeder; which face is the conduit
+clipped to; which axis does the feeder pass a run along.
+
+| | |
+|---|---|
+| **Filled** | As a block loads or is placed, and when a mount or an axis changes. Every piece of conduit in a chunk writes itself down as that chunk arrives. |
+| **Emptied** | When the block is *broken* — `BlockConduit.breakBlock`, which covers a player, a piston, an explosion, another block replacing it. |
+| **Not emptied** | When a chunk unloads. That is the whole point, and it is why `TileEntity.invalidate` is no use for this: in 1.12.2 it runs for both, because `Chunk.onUnload` invalidates every tile entity it lets go of. |
+| **Swept** | Per chunk, when that chunk loads. An entry whose block is no longer that hardware is dropped — the WorldEdit and `/setblock` case, where nothing calls `breakBlock`. Keyed by chunk, so this is a map lookup rather than a pass over the table. |
+
+`ConduitWorldProbe` reads the world where it can and the index where it cannot, in that order: the
+world is what is actually there, and an entry that disagrees with a block somebody is standing next to
+is a stale entry. Two consequences worth knowing:
+
+- **A walk that leant on the index may add a run and may never delete one.** An entry is right until
+  something edits the world without going through the break path, and the sweep that catches that only
+  runs when the chunk in question loads — which, for the middle of an inter-town run, is the thing that
+  never happens. So an index-backed walk is exactly as authoritative as a truncated one, and the
+  pruning rule (`67dbf6ed4`) now covers both: only a walk that saw the whole run with its own eyes may
+  forget a peer. The cost is a run that lingers in the graph after being dug up with only the digger's
+  chunk loaded; it comes out the next time one walk sees the whole length.
+- **An inner corner nobody can see is taken on trust.** Whether a corner has a block to turn around is
+  a question about an ordinary world block, and indexing those would be a copy of the map. So an
+  unloaded corner answers yes — which is safe because this is only ever asked once *both* lengths of
+  the joint are known, each clipped to a face perpendicular to the other, and two conduits do not end
+  up like that without the block they are clipped to. The guess is recorded, so the walk that made it
+  cannot delete anything either.
+
+**Existing runs need travelling once**, in pieces if you like: fly half a line today and the other
+half tomorrow and it links when the last chunk of it has been read. A box whose walk ran out of world
+tries again every five seconds while it stays that way — rebuilds otherwise happen only on load and on
+a neighbour change, and the middle of a long line has neither. A box whose walk was complete pays one
+integer comparison a tick for that and nothing else.
+
+`/ie conduitindex` says how much is indexed per dimension, which is the first thing to look at if a
+line that should be joined is not. Deleting the `.dat` costs nothing permanent — it puts every
+untravelled run back to where it was before this existed.
+
 ## The junction box
 
 A patch panel with six faces. **It sits in the plane of the runs that reach it** — bolt one to the
@@ -606,6 +657,11 @@ public int outputEnergy(int amount, ...)   { return 0; }
 An unloaded junction box represented by a proxy can therefore carry energy *past* itself and never
 *receive* any — and `getIndirectEnergyConnections` skips bundles outright, so the search cannot cross
 a run either way. The chain dies at the first box.
+
+> This is the *delivery* half of the problem. The *linking* half — a run whose middle is unloaded never
+> being in the wire graph in the first place — is `ConduitIndex`, and everything here assumes it: a
+> bundle has to exist before there is anything to keep alive. See
+> [Linking a run nobody is standing on](#linking-a-run-nobody-is-standing-on).
 
 **Only the last step of a run has to keep happening.** Nothing loaded can observe the middle of one,
 so none of it needs simulating; what does is the far box handing its conductor to the wire that

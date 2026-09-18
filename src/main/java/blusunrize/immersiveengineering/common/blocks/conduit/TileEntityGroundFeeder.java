@@ -216,6 +216,11 @@ public class TileEntityGroundFeeder extends TileEntityIEBase implements IDirecti
 	public void onLoad()
 	{
 		super.onLoad();
+		//Write the hole down while somebody can see it: a run crosses a feeder rather than ending at
+		//one, so a feeder nobody has indexed is a gap a walk cannot get past. See ConduitIndex, and
+		//note that a chunk unloading deliberately does not take this out again.
+		if(world!=null&&!world.isRemote)
+			ConduitIndex.INSTANCE.rememberFeeder(world.provider.getDimension(), getPos(), getAxis());
 		//Only a feeder that never found anything tries again on load. One that has settled is left
 		//alone: a survey run while the chunk next door is still absent sees a different, smaller
 		//neighbourhood, so re-running it every load would let a feeder at a chunk edge change its
@@ -290,6 +295,12 @@ public class TileEntityGroundFeeder extends TileEntityIEBase implements IDirecti
 	public void setFacing(EnumFacing facing)
 	{
 		this.facing = facing;
+		//The axis is the whole of what the index remembers about a feeder, and a hammer turns it in
+		//place -- so unlike a conduit this really does change under a settled block. A remembered axis
+		//left on the old grain would let a walk slide through a feeder that now stops it, which is a
+		//run in the graph that carries nothing.
+		if(world!=null&&!world.isRemote)
+			ConduitIndex.INSTANCE.rememberFeeder(world.provider.getDimension(), getPos(), getAxis());
 	}
 
 	@Override

@@ -106,12 +106,39 @@ public class ConduitRoute
 		 * A caller that prunes on the first reading will delete a perfectly good run every time part
 		 * of it happens to be out of sight. See {@link Walk#truncated}.
 		 * <p>
+		 * <strong>"Seen" now includes "written down".</strong> Since {@link ConduitIndex} landed, a
+		 * probe over a real world answers for an unloaded position out of the saved index, so this is
+		 * true for anything the index knows about and {@link Walk#truncated} has come to mean
+		 * "reached somewhere that is neither loaded nor indexed". That is the whole of what makes an
+		 * inter-town run link at all.
+		 * <p>
 		 * Defaulted to true so every probe over an imagined world -- which is all of the tests --
 		 * keeps answering as it did: a world held in a map is entirely visible.
 		 */
 		default boolean isLoaded(BlockPos pos)
 		{
 			return true;
+		}
+
+		/**
+		 * Whether anything this probe has answered so far came out of a saved record rather than out
+		 * of the world.
+		 * <p>
+		 * <strong>What decides whether the walk's caller may prune.</strong> An index entry is right
+		 * until something edits the world without going through the break path, and the sweep that
+		 * catches that only runs when the chunk in question loads -- so a walk that leant on the index
+		 * is exactly as authoritative as the old truncated walk was, and no more. It may make a run;
+		 * it may not delete one. That is the same rule {@code 67dbf6ed4} put in for truncation, for
+		 * the same reason: this is the only thing that deletes a run, a deleted run is saved as
+		 * deleted, and the two towns it joined stay apart.
+		 * <p>
+		 * Asked once, after the walk. Kept on the probe rather than counted by the walk because the
+		 * probe is the only thing that knows where an answer came from, and a walk that tried to
+		 * infer it would have to remember which of nine probes a node it enqueued had come through.
+		 */
+		default boolean answeredFromMemory()
+		{
+			return false;
 		}
 	}
 
@@ -127,11 +154,13 @@ public class ConduitRoute
 	{
 		private final Map<BlockPos, Integer> boxes;
 		private final boolean truncated;
+		private final boolean fromMemory;
 
-		Walk(Map<BlockPos, Integer> boxes, boolean truncated)
+		Walk(Map<BlockPos, Integer> boxes, boolean truncated, boolean fromMemory)
 		{
 			this.boxes = boxes;
 			this.truncated = truncated;
+			this.fromMemory = fromMemory;
 		}
 
 		/**
@@ -143,18 +172,36 @@ public class ConduitRoute
 		}
 
 		/**
-		 * @return true if the walk stopped at an unloaded block somewhere, so {@link #boxes()} is
-		 * "what could be seen" rather than "what is there"
+		 * @return true if the walk stopped somewhere it could neither see nor remember, so
+		 * {@link #boxes()} is "what could be found" rather than "what is there"
 		 */
 		public boolean isTruncated()
 		{
 			return truncated;
 		}
+
+		/**
+		 * @return true if any part of the route was taken on the index's word rather than on the
+		 * world's. See {@link Probe#answeredFromMemory()} for why a caller that prunes cares.
+		 */
+		public boolean reliedOnMemory()
+		{
+			return fromMemory;
+		}
+
+		/**
+		 * @return true if this walk saw the whole run with its own eyes, which is the only footing on
+		 * which saved state may be deleted
+		 */
+		public boolean mayPrune()
+		{
+			return !truncated&&!fromMemory;
+		}
 	}
 
 	/**
-	 * Somewhere for the walk to record that it ran out of visible world. A one-element array rather
-	 * than a field, because everything here is static and reentrant.
+	 * Somewhere for the walk to record that it ran out of world. A one-element array rather than a
+	 * field, because everything here is static and reentrant.
 	 */
 	private static void noteIfUnseen(BlockPos pos, Probe probe, boolean[] truncated)
 	{
@@ -282,7 +329,7 @@ public class ConduitRoute
 		}
 
 		explore(start, open, visited, distance, found, probe, truncated);
-		return new Walk(found, truncated[0]);
+		return new Walk(found, truncated[0], probe.answeredFromMemory());
 	}
 
 	/**
@@ -470,6 +517,19 @@ public class ConduitRoute
 	 * {@link ConduitGeometry#innerCornerSupport} works it out rather than each end doing it: a walk
 	 * that agreed with the renderer at one end and not at the other would give a run that draws
 	 * joined and carries nothing.
+	 *
+	 * <h3>The corner nobody can see</h3>
+	 * Solidity is a question about an ordinary world block -- a wall, a hillside, the underside of a
+	 * staircase -- and {@link ConduitIndex} cannot answer it. Indexing every solid block on the map so
+	 * that it could would be a copy of the world, and the index exists precisely so that the walk does
+	 * not need one. So the probe answers for an unloaded corner instead, optimistically, and says it
+	 * did: see {@code ConduitIndex.backing}, which carries the argument for why that is safe and what
+	 * it costs the caller. Nothing changes here, which is the point -- there is still one walk.
+	 * <p>
+	 * The hardware test is not relaxed by any of that: a remembered feeder or box in the corner still
+	 * refuses the joint, because a feeder is a cube a run goes <em>through</em> rather than round, and
+	 * a box is not solid at all. That reading comes out of the index like any other and is as good
+	 * unloaded as loaded.
 	 */
 	private static boolean cornerSupported(BlockPos pos, EnumFacing mount, EnumFacing otherMount,
 										   EnumFacing towards, Probe probe)
