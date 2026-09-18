@@ -1975,10 +1975,84 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		lines.add(here!=null?"Breakout: "+here.getName(): "No breakout on this face");
 		lines.add(here!=null?describeFace(side, here)
 				: patch.count()+" of "+WireChannel.VALUES.length+" patched");
+		for(String warning : describeMismatch(here))
+			lines.add(warning);
 		for(String warning : describeTouching())
 			lines.add(warning);
 		return lines.toArray(new String[0]);
 	}
+
+	/**
+	 * What to say about a dark breakout on a run that is carrying something else.
+	 * <p>
+	 * <strong>Feed a run at one end and tap it at the other and the two faces are opposite ones,
+	 * which are opposite colours.</strong> West and north take red, east and south take green, so
+	 * the plainest thing anybody builds -- power in one side, out the other -- puts the two ends on
+	 * two different conductors and delivers nothing. The run is live the whole way; the far box is
+	 * simply listening to the wrong one.
+	 * <p>
+	 * <strong>Why this is a message and not a rule.</strong> Two builds are indistinguishable at
+	 * patch time. One source and one tap wants both ends on the same conductor; several sources on
+	 * one bundle -- three wires onto three faces of a pole, which is a real thing people build --
+	 * wants each on its own, and a rule that joined them would quietly merge three circuits into
+	 * one. Auto-patching sees a face and a mask in both cases. An earlier attempt to have a joining
+	 * box adopt the run's conductor was written and reverted for exactly that; the colour table
+	 * itself is a playtester's request and cannot move either. So the box says what is wrong and
+	 * which dye fixes it, which is true in both builds and destroys neither.
+	 * <p>
+	 * Only ever says it when there is something to say: the face's own conductor dark, and the run
+	 * carrying a live one this box has not already broken out somewhere.
+	 *
+	 * @return nothing, or the one line naming the conductor to dye this face to
+	 */
+	private List<String> describeMismatch(@Nullable WireChannel here)
+	{
+		if(world==null||here==null||isLive(here))
+			return Collections.emptyList();
+		int index = JunctionBoxLogic.mismatchedConductor(isLive(here), liveElsewhereOnRun(),
+				patchedMask(), WireChannel.VALUES.length);
+		if(index < 0)
+			return Collections.emptyList();
+		WireChannel carrying = WireChannel.byIndex(index);
+		if(carrying==null)
+			return Collections.emptyList();
+		//Kept short: the overlay does not wrap, and a narrow window clips the end of a long line --
+		//which on this line would take the colour with it and leave the player none the wiser.
+		return Collections.singletonList("run is live on "+carrying.getName()+" -- dye this face");
+	}
+
+	/**
+	 * One bit per conductor that is live on some box of this run other than this one.
+	 * <p>
+	 * Cached for a second at a time. This is asked once a frame while somebody looks at a box, and
+	 * the answer comes from a breadth-first walk over the run -- cheap for the handful of boxes a
+	 * run really has, and not worth doing a hundred times a second for a figure that changes on a
+	 * tick boundary at most.
+	 */
+	private int liveElsewhereOnRun()
+	{
+		long now = world.getTotalWorldTime();
+		if(now-liveOnRunAt < READOUT_INTERVAL)
+			return liveOnRun;
+		int live = 0;
+		for(TileEntityJunctionBox box : boxesOnRun())
+			if(box!=this)
+				live |= box.liveMask;
+		liveOnRun = live;
+		liveOnRunAt = now;
+		return live;
+	}
+
+	/**
+	 * {@link #liveElsewhereOnRun}'s cache, and the tick it was taken on.
+	 * <p>
+	 * Starts "long enough ago" rather than at {@code Long.MIN_VALUE}, for the reason
+	 * {@link #lastReadoutRequest} carries at length: the check is a subtraction, and
+	 * {@code worldTime - Long.MIN_VALUE} overflows negative, so the cache would be treated as fresh
+	 * forever and the first answer -- zero -- would be the only one it ever gave.
+	 */
+	private int liveOnRun;
+	private long liveOnRunAt = -READOUT_INTERVAL;
 
 	/**
 	 * What to say about boxes sitting flat against this one that it is not on a run with.

@@ -149,6 +149,40 @@ public final class JunctionBoxLogic
 	}
 
 	/**
+	 * Which conductor to tell a player to dye a dark face to, or -1 if there is nothing to say.
+	 * <p>
+	 * <strong>Feed a run at one end and tap it at the other and the two faces are opposite ones,
+	 * which are opposite colours.</strong> West and north take red, east and south take green, so
+	 * the plainest thing anybody builds -- power in one side, out the other -- lands the two ends on
+	 * two different conductors and moves nothing. The run is live the whole way; the far box is
+	 * listening to the wrong one, and from the outside that is indistinguishable from no power.
+	 * <p>
+	 * <strong>Why a message and not a rule.</strong> Two builds are indistinguishable when a face is
+	 * patched. One source and one tap wants both ends on one conductor; several sources on one
+	 * bundle -- three wires onto three faces of a pole, which people really build -- wants each on
+	 * its own, and a rule joining them would merge three circuits into one. An attempt to have a
+	 * joining box adopt the run's conductor was written and reverted for exactly that, and the
+	 * colour table cannot move either, being a playtester's request. Saying which dye fixes it is
+	 * true in both builds and wrecks neither.
+	 *
+	 * @param hereLive    whether the conductor on the face being looked at is energised
+	 * @param runLiveMask one bit per conductor live on some <em>other</em> box of this run
+	 * @param usedMask    one bit per conductor this box already breaks out somewhere
+	 *
+	 * @return the conductor to name, or -1 when the face is live, the run is dark, or everything the
+	 * run carries is already broken out on this box
+	 */
+	public static int mismatchedConductor(boolean hereLive, int runLiveMask, int usedMask, int channelCount)
+	{
+		if(hereLive||channelCount <= 0)
+			return -1;
+		int candidates = runLiveMask&~usedMask&((1 << channelCount)-1);
+		if(candidates==0)
+			return -1;
+		return Integer.numberOfTrailingZeros(candidates);
+	}
+
+	/**
 	 * Which conductor a breakout on that face should take, before falling back to the lowest free
 	 * one.
 	 * <p>

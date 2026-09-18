@@ -96,6 +96,19 @@ list every one of them with \texttt{/ie virtualconduit}.
 \end{ietip}
 
 \begin{iewarning}
+\textbf{In one side and out the other lands on two colours.} West and north take
+\textcolor{red}{\textbf{red}}, east and south take \textcolor{green!50!black}{\textbf{green}} --- so
+feeding a run at one end and tapping it at the other puts the two breakouts on two different
+conductors, and nothing crosses. The run is live the whole way; the far face is simply listening to
+the wrong one. Look at that face and the box tells you which dye fixes it:
+\texttt{run is live on red -- dye this face}.
+
+This is not fixed for you on purpose. Three wires onto three faces of one box is three separate
+circuits and a perfectly good thing to build, and a box cannot tell that apart from a run wired in
+one end and out the other.
+\end{iewarning}
+
+\begin{iewarning}
 \textbf{Two boxes touching each other are not joined.} A run ends at the first box it meets, so a
 box standing flat against another box is two runs and not one --- the conductors light on each side
 and carry nothing across. Leave a gap between them and fill it with a length of conduit, or with a

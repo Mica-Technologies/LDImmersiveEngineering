@@ -518,6 +518,56 @@ class JunctionBoxLogicTest
 		}
 
 		@Test
+		@DisplayName("a dark face on a run carrying something else names the colour to dye it")
+		void darkFaceOnALiveRun()
+		{
+			//The trap this exists for: fed on the west face, tapped on the east, so red one end and
+			//green the other. The run is live the whole way and the far box hears nothing.
+			assertEquals(RED, JunctionBoxLogic.mismatchedConductor(false, 1 << RED, 1 << GREEN, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a live face is not a mismatch, whatever else the run carries")
+		void liveFaceSaysNothing()
+		{
+			assertEquals(-1, JunctionBoxLogic.mismatchedConductor(true, 1 << RED, 1 << GREEN, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a dark face on a dark run is just an unpowered circuit")
+		void darkRunSaysNothing()
+		{
+			//Most dark faces are dark because nothing is switched on. Saying "dye this" to all of
+			//them would be noise on every unpowered box in the world.
+			assertEquals(-1, JunctionBoxLogic.mismatchedConductor(false, 0, 1 << GREEN, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("a conductor this box already breaks out somewhere is not a mismatch")
+		void alreadyBrokenOutSaysNothing()
+		{
+			//Red arrives and this box does have a red breakout -- on another face. That is a working
+			//circuit and a second dark face beside it, not a colour mistake.
+			assertEquals(-1, JunctionBoxLogic.mismatchedConductor(false, 1 << RED,
+					(1 << RED)|(1 << GREEN), CHANNELS));
+		}
+
+		@Test
+		@DisplayName("with several live on the run, the lowest is the one named")
+		void lowestLiveIsNamed()
+		{
+			assertEquals(BLUE, JunctionBoxLogic.mismatchedConductor(false,
+					(1 << BLUE)|(1 << RED), 0, CHANNELS));
+		}
+
+		@Test
+		@DisplayName("stray bits above the bundle's width are not named")
+		void mismatchMaskIsClamped()
+		{
+			assertEquals(-1, JunctionBoxLogic.mismatchedConductor(false, 1 << CHANNELS, 0, CHANNELS));
+		}
+
+		@Test
 		@DisplayName("the hammer walks every colour and then takes the breakout away")
 		void theWholeCycle()
 		{

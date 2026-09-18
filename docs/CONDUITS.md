@@ -221,6 +221,42 @@ It is a *preference*, not a rule. The colour is only taken if it is free; a four
 whose colour has already gone somewhere on that box, falls through to the lowest free conductor
 exactly as every breakout used to.
 
+### In one side and out the other lands on two colours
+
+**Feed a run at one end and tap it at the other and the two faces are opposite ones — which are
+opposite colours.** West and north take red, east and south take green, so the plainest thing
+anybody builds puts its two ends on two different conductors and moves nothing. The run is live the
+whole way; the far box is listening to the wrong conductor, and from the outside that is
+indistinguishable from no power at all.
+
+**This is a message rather than a rule, and deliberately.** Two builds are indistinguishable at the
+moment a face is patched:
+
+| | wants | |
+|---|---|---|
+| One source, one tap | both ends on the *same* conductor | a run from A to B |
+| Several sources, one bundle | each face on *its own* conductor | three wires onto three faces of a pole |
+
+Auto-patching sees a face and a mask in both cases. A rule that joined the first would merge the
+second — three circuits quietly becoming one — and a rule that separated the second is what we
+already have. An attempt to make a box adopt its run's conductor was written and reverted for
+exactly this; the colour table itself cannot move either, being a playtester's request
+(`docs/agent-plans/results4/RESULTS.tex`, issue 3).
+
+So the box says which dye fixes it, which is true in both builds and wrecks neither:
+
+```
+Breakout: green
+dark -- in 0 / out 0 IF/t over LV wire
+run is live on red -- dye this face
+```
+
+Said only when there is something to say: this face's conductor dark, *and* the run carrying a live
+one this box does not already break out somewhere. Most dark faces are dark because nothing is
+switched on, and a box with a working red circuit and a spare dark face is not a mistake.
+`JunctionBoxLogic.mismatchedConductor` owns the decision and is tested; the run's live mask is
+gathered by a walk cached for a second at a time, because the overlay asks once a frame.
+
 ### A breakout reaches the block edge
 
 **The housing used to stop three pixels short of every face a run did not arrive on** — so an LV
