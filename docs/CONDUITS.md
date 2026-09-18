@@ -530,9 +530,10 @@ full, a box was a 1,638-a-tick sink on a line an LV connector feeds at 256, and 
 push at the time served whichever consumer came first and stopped when it ran out — so a box on a
 line that was already feeding something else either starved that something or was starved by it,
 which is the "no power on either end when a relay is connected to a source already supplying
-power" a playtester reported. The push now offers every consumer an equal share before handing out
-the rest (see [City mode](CITY_MODE_AND_PERF.md#wires)), and the token keeps a lit conductor from
-eating the line regardless.
+power" a playtester reported. The token is the whole of the fix: a box is now a cheap thing to serve,
+so the push reaching it in turn is enough. An equal-share pass was tried alongside it and removed
+again — spreading an under-supplied line thinly leaves nothing on it able to run. See
+[City mode](CITY_MODE_AND_PERF.md#wires).
 
 Turning the master `cityMode` switch off always restores stock behaviour.
 

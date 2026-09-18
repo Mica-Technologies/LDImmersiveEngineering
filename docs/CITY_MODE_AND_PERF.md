@@ -278,7 +278,7 @@ connector's energy to every reachable node.
 Note the loss model is counter-intuitive: `Connection.getBaseLoss` scales loss *up* when a wire is
 lightly loaded, so a barely-used long wire is proportionally worse than a saturated one.
 
-#### City mode — a fair share each, then the rest
+#### City mode — served in turn, and the line sheds the rest
 
 `cityModeTransfer()` (`TileEntityConnectorLV`) hands its stored energy to `WireNetTransfer.city`,
 which in outline is:
@@ -286,25 +286,21 @@ which in outline is:
 ```java
 Set<AbstractConnection> outputs = ImmersiveNetHandler.INSTANCE
         .getIndirectEnergyConnections(pos, world, true);
-int eligible = /* routes to a consumer over conductive wire */;
-int share = Math.max(1, available / eligible);
-// pass one: every eligible output is offered its share
-// pass two: whatever is left is offered to each in turn, until it runs out
-for(each pass)
-    for(AbstractConnection con : outputs)
-    {
-        if(powerLeft <= 0)
-            break;
-        if(!con.isEnergyOutput || con.cableType == null || con.cableType.getTransferRate() <= 0)
-            continue;                                   // non-conductive wire — rope, cable, redstone
-        IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
-        if(end == null || !end.allowEnergyToPass(null)) // breaker switches still cut
-            continue;
-        int sent = end.outputEnergy(Math.min(cap, powerLeft), false, 0, lastHop(con));
-        powerLeft -= sent;
-        if(sent > 0)
-            /* fire onEnergyPassthrough(sent) on each distinct node along the route, for meters */;
-    }
+int powerLeft = available;
+for(AbstractConnection con : outputs)
+{
+    if(powerLeft <= 0)
+        break;                                      // the rest of the line goes without
+    if(!con.isEnergyOutput || con.cableType == null || con.cableType.getTransferRate() <= 0)
+        continue;                                   // non-conductive wire — rope, cable, redstone
+    IImmersiveConnectable end = ApiUtils.toIIC(con.end, world);
+    if(end == null || !end.allowEnergyToPass(null)) // breaker switches still cut
+        continue;
+    int sent = end.outputEnergy(powerLeft, false, 0, lastHop(con));
+    powerLeft -= sent;
+    if(sent > 0)
+        /* fire onEnergyPassthrough(sent) on each distinct node along the route, for meters */;
+}
 return available - powerLeft;   // the connector debits itself by this
 ```
 
@@ -312,16 +308,24 @@ Three properties worth stating plainly:
 
 - **Energy is conserved.** Only what receivers actually accepted (`available - powerLeft`) is
   deducted. City mode is lossless, not free — it never creates energy.
-- **Distribution is a fair share first, then first come first served.** Every reachable consumer
-  is offered an equal split of what the connector has before any of them is offered the rest; a
-  device that wants less than its share leaves the difference for the second pass, which walks the
-  same set again in its hash order. Nothing is simulated or sorted, so it costs at most two calls
-  per output. The first version was a single greedy pass — each device offered *everything* left,
-  in hash order — which made "who gets served" arbitrary whenever demand exceeded supply. That was
-  tolerable until a conduit junction box shared a line with anything else: a city-mode box asks for
-  a twentieth of a channel every tick, more than any LV or MV connector supplies, so either the box
-  went dark or everything else on the line did, depending on which the set happened to iterate
-  first. A playtester's conduit read 0 IF/t at both ends for exactly this reason.
+- **Distribution is first come, first served, and an over-subscribed line sheds the rest.** Each
+  consumer in turn is offered everything still in hand; when it runs out, the remaining consumers
+  get nothing this tick. Nothing is simulated or sorted, so it costs one call per output.
+
+  A version of this split the energy evenly between every consumer before anyone was offered the
+  rest, meaning to end the arbitrariness of who gets served first. **It was much worse and was
+  taken out.** An equal share is only equal while there is a share to go round: a district runs far
+  more consumers than its source has flux, so the split floored at one apiece, the first `available`
+  consumers got a single flux each, the budget was gone and the second pass never ran. One flux runs
+  nothing. Before the split the first consumers off the line got the whole supply and worked; after
+  it, a playtester's district went dark. Spreading an insufficient supply thinly is not fairness,
+  it is an outage — a real line sheds load instead, and so does this one.
+
+  The report that prompted the split was a conduit box reading 0 IF/t on a shared line, and the box
+  was not losing a race: it asked for a twentieth of a channel every tick, 1,638, more than any LV
+  or MV connector supplies, so it ate the line or was starved by it depending on set order. That is
+  fixed where it belonged, in `JunctionBoxLogic.debit` — under presence a lit conductor costs its
+  sender one token, so a box is cheap to serve and serving in turn reaches it.
 - **The wire's transfer rate is used only as a yes/no conductivity test**, never as a throughput
   limit.
 
@@ -796,7 +800,7 @@ the time, a box on a shared line either starved everything else on it or was sta
 |---|---|---|
 | Wire loss | 2.5–5% per 16 blocks, worse when lightly loaded | none |
 | Voltage tiers | throttle throughput to the weakest wire on the path | cosmetic only |
-| Distribution when supply < demand | proportional to demand, nearest-first | an equal share each, then the leftovers first come first served |
+| Distribution when supply < demand | proportional to demand, nearest-first | first come first served; the rest of the line is shed |
 | **Wire burnout / overload** | wire is destroyed with flame particles above its rate | **cannot happen — see below** |
 | Wire shock damage | sourced from the whole network's advertised energy | sourced from the local connector's own buffer |
 | Breaker switches | cut the network | unchanged |

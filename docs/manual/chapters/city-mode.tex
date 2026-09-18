@@ -15,8 +15,9 @@ master off is always sufficient to restore stock behaviour.
 
 \begin{description}
 \item[Wires] One lossless push per connector instead of loss, distance weighting, a proportional
-      split and a network-wide broadcast. Every consumer on the line is offered an equal share
-      first, then whatever is left, so nothing on a shared line is starved by its neighbours.
+      split and a network-wide broadcast. Consumers are served in turn with what the connector has,
+      and a line asked for more than it carries sheds the rest rather than thinning out across all
+      of them.
 \item[Fluid pipes] A pipe hands its fluid to the endpoints in order rather than simulating a fill
       against each and splitting in proportion. Which of several tanks fills first is the only
       observable difference.
