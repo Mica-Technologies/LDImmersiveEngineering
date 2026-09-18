@@ -518,9 +518,23 @@ rebuilt the mesh from scratch, which is exactly why that looked like a cure.
 Two nets under it:
 
 - `TileEntityConduit.onDataPacket` and `TileEntityJunctionBox.onDataPacket` mark the block for a
-  render update when the packet actually changed the shape — gated on the shape, not done on every
-  packet, because a box sends one a second to anybody reading its overlay and a chunk section
-  rebuild is not free.
+  render update when the packet actually changed what is drawn — gated, not done on every packet,
+  because a box sends one a second to anybody reading its overlay and a chunk section rebuild is
+  not free.
+
+  **The box's gate used to be `getPatchMask`, and that was a bug.** That mask is six bits, one per
+  face, saying *whether* a face is patched — which is what the model needs to place a plate, and
+  which is exactly what does not move when a face is *recoloured*. So hammering one face from green
+  through to white changed the tile, sent the packet and updated the overlay while the stub went on
+  wearing the colour it was built with, until some unrelated neighbour changed the box's *shape* and
+  the chunk was rebuilt for that instead. That is the "hammer it, then place a block nearby to make
+  it take" reported from the live server. The gate is now `getPatchRenderKey`: seven bits a face,
+  five for the conductor and two for its mode.
+
+  The colour is a **tint index** rather than baked geometry, so `getCacheData` is right to keep
+  using the face mask — sixteen colours to the power of six faces of baked-model cache keys would be
+  a poor trade for something the block colour handler applies afterwards. What has to happen is the
+  chunk mesh being rebuilt so that handler is asked again, which is what the gate now triggers.
 - `BlockConduit.neighborChanged` lets the **client** rebuild its own arms. Every rule in
   `refreshConnections` is arithmetic on what is next door, with no server-only state anywhere in it,
   so there is no reason for a client to sit waiting to be told. The server stays authoritative — it

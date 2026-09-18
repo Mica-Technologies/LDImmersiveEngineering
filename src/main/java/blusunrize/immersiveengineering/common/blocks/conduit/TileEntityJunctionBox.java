@@ -408,10 +408,44 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	@Override
 	public void onDataPacket(NetworkManager net, SPacketUpdateTileEntity pkt)
 	{
-		int before = getPatchMask();
+		long before = getPatchRenderKey();
 		super.onDataPacket(net, pkt);
-		if(world!=null&&world.isRemote&&getPatchMask()!=before)
+		if(world!=null&&world.isRemote&&getPatchRenderKey()!=before)
 			world.markBlockRangeForRenderUpdate(getPos(), getPos());
+	}
+
+	/**
+	 * What tells one box's <em>drawn</em> patch table from another's: which conductor is on each
+	 * face and what that face does, rather than merely which faces have one.
+	 * <p>
+	 * <strong>{@link #getPatchMask} cannot answer this, and gating the redraw on it was a bug.</strong>
+	 * That mask is six bits, one per face, saying whether a face is patched -- which is exactly what
+	 * the model needs to decide where to put a plate, and exactly what does not move when a face is
+	 * recoloured. So hammering a face from green through to white changed the tile, sent the packet,
+	 * updated the overlay, and left the mesh alone, because the gate compared the same six bits
+	 * before and after. The stub went on wearing the colour it was built with until some unrelated
+	 * neighbour changed the box's <em>shape</em> and the chunk was rebuilt for that instead -- which
+	 * is the "place a block nearby and it fixes itself" this was reported as.
+	 * <p>
+	 * The colour is a tint index rather than baked geometry, so the baked model is genuinely the
+	 * same either way and {@link #getCacheData} is right to keep using the face mask -- sixteen
+	 * colours to the power of six faces of cache keys would be a poor trade for a tint. What has to
+	 * happen is the chunk mesh being rebuilt, so the block colour handler is asked again.
+	 *
+	 * @return seven bits a face: five for the conductor, zero meaning bare, and two for its mode.
+	 * Six faces is forty-two bits, which is why this is a long.
+	 */
+	public long getPatchRenderKey()
+	{
+		long key = 0;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			WireChannel channel = patch.get(face);
+			key = (key << 7)
+					|((long)(channel==null?0: channel.ordinal()+1) << 2)
+					|patch.modeOf(face).ordinal();
+		}
+		return key;
 	}
 
 	/**
@@ -638,8 +672,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 				//with hardware on it and no conductor behind it is a dead circuit nobody asked for.
 				//Auto-patching is what claims that face again.
 				autoPatch();
-				markDirty();
-				markContainingBlockForUpdate(null);
+				patchChanged();
 			}
 			return true;
 		}
@@ -651,8 +684,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(!world.isRemote)
 			{
 				patch.setMode(side, patch.modeOf(side).next());
-				markDirty();
-				markContainingBlockForUpdate(null);
+				patchChanged();
 				propagateSignals();
 				world.notifyNeighborsOfStateChange(getPos().offset(side), getBlockType(), false);
 			}
@@ -682,8 +714,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(!world.isRemote)
 			{
 				patch.set(side, null);
-				markDirty();
-				markContainingBlockForUpdate(null);
+				patchChanged();
 			}
 			return true;
 		}
@@ -714,8 +745,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return false;
 		if(!cycleBreakout(side))
 			return false;
-		markDirty();
-		markContainingBlockForUpdate(null);
+		patchChanged();
 		//A conductor that was carrying redstone has just moved or gone. The run re-derives rather
 		//than being pushed at, exactly as it does when the mode itself is cycled.
 		if(patch.hasRedstone())
@@ -821,6 +851,24 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			changed = true;
 		}
 		return changed;
+	}
+
+	/**
+	 * Save a change to the patch table, send it, and get the model redrawn.
+	 * <p>
+	 * <strong>The last of those does not follow from the first two.</strong> A breakout's colour
+	 * lives only in this tile, so changing it leaves the blockstate identical and marks no render
+	 * section dirty; the packet arrives, the tile is right, and the mesh that was built a moment ago
+	 * is not built again. See {@link #getPatchRenderKey} for the gate that decides, and for the
+	 * reason it used to answer "nothing changed" to a face going green, red, black, white.
+	 * <p>
+	 * The redraw itself is the client's, in {@link #onDataPacket}, which compares
+	 * {@link #getPatchRenderKey} across the packet. All this has to do is make sure the packet goes.
+	 */
+	private void patchChanged()
+	{
+		markDirty();
+		markContainingBlockForUpdate(null);
 	}
 
 	/**
@@ -1435,8 +1483,8 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(free >= 0)
 				patch.set(target.side, WireChannel.byIndex(free));
 		}
-		markDirty();
-		markContainingBlockForUpdate(null);
+		//A wire attaching claims a face, so the new plate has to be drawn as well as saved.
+		patchChanged();
 	}
 
 	@Nullable
@@ -1556,10 +1604,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//Also on load, not only on a neighbour change: a box placed against a connector that was
 		//already there hears nothing afterwards, and settled hardware never fires another update.
 		if(autoPatch())
-		{
-			markDirty();
-			markContainingBlockForUpdate(null);
-		}
+			patchChanged();
 		//A lever thrown while the chunk was unloaded left no trace, so the run has to re-derive
 		//itself once on the way back rather than trusting what it saved.
 		if(patch.hasRedstone())
@@ -1580,10 +1625,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(concernsRuns(other))
 			queueRebuild();
 		if(autoPatch())
-		{
-			markDirty();
-			markContainingBlockForUpdate(null);
-		}
+			patchChanged();
 		//A neighbour changing is the only thing that can move a redstone input, so it is the only
 		//thing that has to re-derive the run's signals. Queued for the same reason the walk is.
 		if(patch.hasRedstone())
@@ -1883,7 +1925,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 				}
 			}
 		if(changed&&world!=null)
-			markContainingBlockForUpdate(null);
+			//reconcileWires may have claimed faces for wires the table had lost, so this is a
+			//patch change like any other and needs the model redrawn, not just resent.
+			patchChanged();
 		return changed;
 	}
 
