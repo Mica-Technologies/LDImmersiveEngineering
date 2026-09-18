@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.function.Predicate;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.ChannelSet;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.ConduitWireType;
+import blusunrize.immersiveengineering.api.energy.virtualconduit.VirtualConduits;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IHammerInteraction;
@@ -1060,6 +1061,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 				//A conductor that just went dark reads as dark, not as whatever moved last.
 				lastMoved[index] = 0;
 				lastReceived[index] = 0;
+				//And it stops supplying the far end while unloaded. This is the one moment the box
+				//is loaded and can say so: a circuit switched off must not go on feeding a town
+				//simply because nobody stayed to watch it go out.
+				forgetVirtual(index);
 			}
 		}
 	}
@@ -1167,19 +1172,38 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		BlockPos end = wires.endOf(face);
 		WireType wire = wireOn(face);
 		if(end==null||wire==null)
+		{
+			//No wire on this face means nothing for an unloaded box to hand an unloaded neighbour,
+			//so any record of one is stale -- a cut wire, or a breakout moved to another face.
+			forgetVirtual(index);
 			return 0;
+		}
 		int rate = wire.getTransferRate();
 		if(rate <= 0)
+		{
+			forgetVirtual(index);
 			return 0;
+		}
 		Predicate<AbstractConnection> onlyThisWire = route -> {
 			Connection first = WireNetTransfer.firstHop(route);
 			return first!=null&&first.cableType==wire&&end.equals(first.end);
 		};
+		int offer = Math.min(offered, rate);
+		//What this conductor is *capable* of handing to that wire, recorded so it can go on handing
+		//it over while this box's chunk is unloaded -- see VirtualConduitLink for why a conduit
+		//needs that and a wire does not.
+		//
+		//The offer rather than what came back. A conductor is not less able to deliver on a tick
+		//when the far end happened to be full, and recording the acceptance would have this box
+		//remember a quiet moment and supply that forever. The offer is already steady -- it is the
+		//wire's own rate, against a conductor city mode holds full -- which is why this needs none
+		//of the peak-over-a-window smoothing a generator's output does.
+		rememberVirtual(index, face, wire, end, offer);
 		//City mode's flag here is the *wire* one, because this is a push onto a wire network and the
 		//nodes on the far side of it are living by that rule. Whether the box debits itself is the
 		//conduit's own question and is asked separately, just below.
 		int sent = CityMode.wires()
-				?WireNetTransfer.city(world, getPos(), Math.min(offered, rate), onlyThisWire)
+				?WireNetTransfer.city(world, getPos(), offer, onlyThisWire)
 				:WireNetTransfer.transfer(world, getPos(), rate, rate, offered, false, 0,
 						transferEndCache, onlyThisWire);
 		if(sent <= 0)
@@ -1188,6 +1212,51 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			held[index] -= sent;
 		lastMoved[index] += sent;
 		return sent;
+	}
+
+	/**
+	 * Note that this conductor is delivering into the wire on that face, so that it can go on doing
+	 * it once this box's chunk unloads.
+	 * <p>
+	 * City mode only, and deliberately. Outside it a conductor carries real flux hop by hop and a
+	 * box debits itself for what leaves; reproducing that through unloaded blocks would be a second
+	 * transfer engine to keep honest against the first. Under presence there is nothing to
+	 * reproduce -- the conductor is energised or it is not -- so the offer is the whole of the state.
+	 */
+	private void rememberVirtual(int index, EnumFacing face, WireType wire, BlockPos end, int offer)
+	{
+		if(world==null||world.isRemote||offer <= 0||!CityMode.conduits())
+			return;
+		VirtualConduits.INSTANCE.observe(world.provider.getDimension(), getPos(),
+				WireChannel.VALUES[index], offer, wire.getUniqueName(), end);
+	}
+
+	/**
+	 * Is that conductor still broken out onto the wire ending at that position?
+	 * <p>
+	 * What the orphan sweep asks of a box that has come back, to decide whether a record made while
+	 * it was loaded still describes anything. A dye moving a conductor to another face, wirecutters
+	 * on the wire, or the whole block being replaced by something else all leave a record that would
+	 * otherwise supply a town from a circuit that no longer exists.
+	 */
+	public boolean breaksOutOnto(@Nullable WireChannel channel, @Nullable BlockPos wireEnd)
+	{
+		if(channel==null||wireEnd==null)
+			return false;
+		EnumFacing face = patch.faceOf(channel);
+		return face!=null&&wireEnd.equals(wires.endOf(face));
+	}
+
+	/**
+	 * Forget one conductor's record: it went dark, or lost the wire it was feeding, while somebody
+	 * was here to see it. A record only means "this was true when last observed", so the moment it
+	 * stops being true with the box loaded is the one chance to say so.
+	 */
+	private void forgetVirtual(int index)
+	{
+		if(world==null||world.isRemote)
+			return;
+		VirtualConduits.INSTANCE.remove(world.provider.getDimension(), getPos(), WireChannel.VALUES[index]);
 	}
 
 	private void passAlong(Connection run, TileEntityJunctionBox peer, WireChannel channel)
@@ -1664,6 +1733,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//finds the connections and the other finds nothing.
 		ImmersiveNetHandler.INSTANCE.clearAllConnectionsFor(getPos(), world, this,
 				world.getGameRules().getBoolean("doTileDrops"));
+		//A box that is gone supplies nothing, on any conductor. Breaking one is the clearest signal
+		//there is, and the cheapest place to act on it -- the alternative is the sweep noticing much
+		//later, with the run supplying a town from a block that no longer exists in between.
+		VirtualConduits.INSTANCE.removeBox(world.provider.getDimension(), getPos());
 	}
 
 	// ------------------------------------------------------------------

@@ -29,6 +29,7 @@ import blusunrize.immersiveengineering.common.util.fluidnet.FluidNetTickHandler;
 import blusunrize.immersiveengineering.common.util.grid.GridChunkLoader;
 import blusunrize.immersiveengineering.common.util.grid.GridSaveData;
 import blusunrize.immersiveengineering.common.util.grid.GridTickHandler;
+import blusunrize.immersiveengineering.common.util.virtualconduit.VirtualConduitSaveData;
 import blusunrize.immersiveengineering.common.util.virtualgen.VirtualGenSaveData;
 import blusunrize.immersiveengineering.common.util.network.*;
 import blusunrize.immersiveengineering.common.util.petroleum.PetroleumSaveData;
@@ -283,6 +284,12 @@ public class ImmersiveEngineering
 
 				//Metered plants, in their own file for the same reasons.
 				VirtualGenSaveData.load(world);
+
+				//What each conduit breakout was handing to its wire, so an inter-town run keeps
+				//delivering while its own blocks are unloaded. Its own file again, and a
+				//disposable one: deleting it costs a run rediscovering what it carries the next
+				//time somebody stands near it.
+				VirtualConduitSaveData.load(world);
 
 				//The virtual fluid network is the grid's sibling and keeps its own save file for
 				//the same reasons -- see FluidNetSaveData. Same reset-then-load order, so a second
