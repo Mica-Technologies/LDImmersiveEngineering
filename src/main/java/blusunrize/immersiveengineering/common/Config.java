@@ -12,6 +12,7 @@ import blusunrize.immersiveengineering.ImmersiveEngineering;
 import blusunrize.immersiveengineering.api.crafting.*;
 import blusunrize.immersiveengineering.api.energy.grid.GridConfig;
 import blusunrize.immersiveengineering.api.energy.grid.VirtualGrid;
+import blusunrize.immersiveengineering.api.energy.virtualconduit.VirtualConduitConfig;
 import blusunrize.immersiveengineering.api.energy.virtualgen.VirtualGenConfig;
 import blusunrize.immersiveengineering.api.fluid.network.FluidNetConfig;
 import blusunrize.immersiveengineering.api.fluid.network.VirtualFluidNet;
@@ -219,6 +220,10 @@ public class Config
 			public static int virtualGenMaxRate = 32768;
 			@Comment({"Registry names of generator blocks from other mods that burn no fuel. Outside City Mode only fuel-free generators run virtually; Immersive Engineering's kinetic dynamo and thermoelectric generator are always counted as fuel-free. In City Mode every generator qualifies and burns nothing while unloaded."})
 			public static String[] virtualGenFreeSources = new String[0];
+			@Comment({"The same idea for conduit. A conduit run moves power one junction box at a time, and an unloaded box does not tick, so a run between two towns -- unloaded in the middle almost always -- carries nothing: the far town lights up while somebody flies the line and goes dark once they leave.",
+					"When true, a breakout that was delivering into a wire keeps delivering at the same rate while its own chunk is unloaded. Each of the sixteen conductors is kept separate, and a box that is loaded is always left to do the job itself.",
+					"City Mode only, since it rests on a conductor being energised or not rather than carrying counted flux. When false, conduit behaves as it did: fine while loaded, dark otherwise."})
+			public static boolean enableVirtualConduit = true;
 		}
 
 		/**
@@ -837,6 +842,7 @@ public class Config
 		FluidNetConfig.tripSeconds = IEConfig.FluidNetwork.fluidNetTripSeconds;
 		VirtualFluidNet.INSTANCE.onConfigChanged();
 
+		VirtualConduitConfig.enabled = IEConfig.VirtualGeneration.enableVirtualConduit;
 		VirtualGenConfig.enabled = IEConfig.VirtualGeneration.enableVirtualGeneration;
 		VirtualGenConfig.measureWindowSeconds = IEConfig.VirtualGeneration.virtualGenMeasureWindowSeconds;
 		VirtualGenConfig.maxRate = IEConfig.VirtualGeneration.virtualGenMaxRate;

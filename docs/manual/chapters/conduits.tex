@@ -83,6 +83,18 @@ already spent elsewhere on that box, falls back to the lowest free conductor.
 Whatever is on a power breakout picks up that conductor and nothing else. One bundle down a corridor
 can feed a lighting circuit, a workshop and a furnace, each on its own colour.
 
+\begin{ietip}
+\textbf{A long run keeps working when nobody is near it.} A conduit hands power along one junction
+box at a time, and a box in an unloaded chunk is not doing anything --- so a run between two towns,
+which is unloaded in the middle almost always, would carry nothing at all. Instead each breakout
+remembers what it was feeding into its wire and goes on feeding it while its own chunk is asleep.
+Nothing is kept loaded to make that happen, each of the sixteen conductors stays on its own circuit,
+and a box you are standing next to always does the job itself.
+
+This only applies in City Mode. Look at a breakout to see what it is carrying; a server operator can
+list every one of them with \texttt{/ie virtualconduit}.
+\end{ietip}
+
 \begin{iewarning}
 \textbf{Two boxes touching each other are not joined.} A run ends at the first box it meets, so a
 box standing flat against another box is two runs and not one --- the conductors light on each side

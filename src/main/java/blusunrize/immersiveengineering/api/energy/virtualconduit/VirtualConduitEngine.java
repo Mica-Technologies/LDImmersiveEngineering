@@ -46,7 +46,7 @@ public final class VirtualConduitEngine
 		for(VirtualConduitLink link : registry.getLinks())
 		{
 			link.setLastDelivered(0);
-			if(!cityMode||!link.isUsable())
+			if(!VirtualConduitConfig.enabled||!cityMode||!link.isUsable())
 				continue;
 			int dim = link.getDimension();
 			//An unloaded dimension has nothing loaded on it to receive, so there is nobody to

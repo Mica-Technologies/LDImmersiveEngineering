@@ -537,6 +537,56 @@ again — spreading an under-supplied line thinly leaves nothing on it able to r
 
 Turning the master `cityMode` switch off always restores stock behaviour.
 
+### A run whose blocks are unloaded
+
+**A conduit moves energy one junction box at a time, inside each box's own `update()`.** An unloaded
+block does not tick, so a run with unloaded blocks in it carries nothing. Indoors that never shows;
+between two towns it is the normal state of affairs, and the symptom is exact: fly the line and the
+far town lights up, leave and it goes dark again.
+
+Wires do not have this problem, and the reason is worth stating because it is *not* that wires are
+cleverer. `IICProxy` stands in for an unloaded connector, so the route search steps over the poles
+and delivers to whichever consumers are loaded. But a proxy is a **pass-through and nothing else**:
+
+```java
+public boolean isEnergyOutput()            { return false; }
+public int outputEnergy(int amount, ...)   { return 0; }
+```
+
+An unloaded junction box represented by a proxy can therefore carry energy *past* itself and never
+*receive* any — and `getIndirectEnergyConnections` skips bundles outright, so the search cannot cross
+a run either way. The chain dies at the first box.
+
+**Only the last step of a run has to keep happening.** Nothing loaded can observe the middle of one,
+so none of it needs simulating; what does is the far box handing its conductor to the wire that
+leaves it. That hand-off is recorded while the box is loaded and replayed by a server-tick handler
+while it is not — the Generation Meter's trick applied to a transport rather than to a source, and
+written as that feature's sibling in `api/energy/virtualconduit`.
+
+Four things about it worth knowing:
+
+- **The offer is recorded, not the acceptance.** A conductor is not less able to deliver on a tick
+  when the far end happened to be full, and remembering what came back would have a box hold on to
+  a quiet moment and supply that forever. The offer is already steady — the wire's own rate, against
+  a conductor presence holds full — so this needs none of the peak-over-a-window smoothing a
+  generator's fluctuating output does.
+- **A loaded box is always skipped.** It is doing the real thing. Delivering both ways would double
+  a town's supply, which is the failure here nobody would report, because more power looks like
+  everything working.
+- **The record is per conductor**, which is the whole of how sixteen circuits stay sixteen with
+  nobody standing near them. The push rebuilds the same face filter `handToWire` uses, from the wire
+  type and endpoint stored beside the rate.
+- **A record is only ever judged by a box that can be seen.** It is dropped when a conductor goes
+  dark, when its wire or breakout goes, when the box is broken, and by a sweep for the ways a block
+  can leave without anything being called — but the sweep skips any box whose chunk is unloaded.
+  Reading "cannot see it" as "it is gone" is the mistake that was deleting whole runs out of the
+  wire graph (see [A box against a box](#a-box-against-a-box-is-not-a-join)'s neighbour, and
+  `ConduitRoute.Walk`).
+
+City mode only: it rests on a conductor being energised or not, rather than carrying counted flux.
+Outside city mode a conduit is what it always was — fine while loaded, dark otherwise. The switch is
+`enableVirtualConduit`, and `/ie virtualconduit` lists every breakout currently holding a wire up.
+
 ---
 
 ## Recipes

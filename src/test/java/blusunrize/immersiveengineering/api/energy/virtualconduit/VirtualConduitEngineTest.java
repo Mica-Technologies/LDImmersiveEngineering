@@ -37,6 +37,7 @@ class VirtualConduitEngineTest
 	{
 		reg = new VirtualConduits();
 		world = new FakeWorld();
+		VirtualConduitConfig.reset();
 	}
 
 	/** What a push was asked to do, so a test can say who was offered what down which wire. */
@@ -129,6 +130,18 @@ class VirtualConduitEngineTest
 		{
 			reg.observe(0, box, WireChannel.RED, 256, "COPPER", redEnd);
 			assertEquals(0, VirtualConduitEngine.tick(reg, world, false));
+			assertTrue(world.pushes.isEmpty());
+		}
+
+		@Test
+		@DisplayName("the config switch turns the whole thing off")
+		void disabledDoesNothing()
+		{
+			//Off must restore exactly what conduit did before this existed: fine while loaded,
+			//dark otherwise.
+			reg.observe(0, box, WireChannel.RED, 256, "COPPER", redEnd);
+			VirtualConduitConfig.enabled = false;
+			assertEquals(0, VirtualConduitEngine.tick(reg, world, true));
 			assertTrue(world.pushes.isEmpty());
 		}
 

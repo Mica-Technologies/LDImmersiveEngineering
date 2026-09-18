@@ -124,7 +124,7 @@ It covers seven subsystems:
 | **Machines** | Multiblocks with nothing to do stop re-scanning the recipe list every tick, and the scan interval widens. A switched-on machine also animates steadily rather than per-batch, its energy buffer follows its redstone switch, and any delivery at all keeps it full — a fed machine runs at full speed. |
 | **Virtual grid** | Segments stop accounting for flux and switch to presence: a segment is energized or it is not, and its Service Units deliver freely. See [Virtual Power Grid](#virtual-power-grid). |
 | **Fluid pipes** | A pipe hands its fluid to the endpoints on its network in order until it runs out, instead of simulating a fill against every one of them and then splitting the result in proportion. See [Fluid Pipes](#fluid-pipes). |
-| **Conduits** | Bundles stop moving units of flux and switch to presence, exactly as the grid does: a conductor is energised or it is not. See [Conduits](#conduits). |
+| **Conduits** | Bundles stop moving units of flux and switch to presence, exactly as the grid does: a conductor is energised or it is not. A breakout that was feeding a wire also keeps feeding it while its own chunk is unloaded, so an inter-town run does not go dark the moment nobody is standing on it. See [Conduits](#conduits). |
 
 **It is on by default in this fork**, which exists for a city pack. Turning the master off means
 byte-identical to stock.

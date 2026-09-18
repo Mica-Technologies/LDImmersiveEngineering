@@ -37,6 +37,7 @@ public class CommandHandler extends CommandTreeBase
 			addSubcommand(new CommandShaders());
 			addSubcommand(new CommandGrid());
 			addSubcommand(new CommandVirtualGen());
+			addSubcommand(new CommandVirtualConduit());
 			addSubcommand(new CommandWires());
 			addSubcommand(new CommandFluidNet());
 			addSubcommand(new CommandReservoir());
