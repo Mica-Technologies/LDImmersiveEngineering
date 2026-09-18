@@ -44,6 +44,17 @@ class ConduitWorldProbe implements ConduitRoute.Probe
 		return world.isBlockLoaded(pos)?world.getTileEntity(pos): null;
 	}
 
+	/**
+	 * The question {@link #at} deliberately cannot answer: whether "nothing there" was a reading or
+	 * a refusal to look. A caller that prunes saved state against a walk needs to know the
+	 * difference -- see {@code ConduitRoute.Walk}.
+	 */
+	@Override
+	public boolean isLoaded(BlockPos pos)
+	{
+		return world.isBlockLoaded(pos);
+	}
+
 	@Override
 	public ConduitRoute.Node nodeAt(BlockPos pos)
 	{

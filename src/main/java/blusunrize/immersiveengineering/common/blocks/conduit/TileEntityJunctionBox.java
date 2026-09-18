@@ -540,23 +540,40 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return false;
 		rebuildQueued = false;
 		hardwareMask = hardwareAround();
-		Map<BlockPos, Integer> peers = ConduitRoute.junctionsFrom(getPos(), new ConduitWorldProbe(world));
+		ConduitRoute.Walk walk = ConduitRoute.walkFrom(getPos(), new ConduitWorldProbe(world));
+		Map<BlockPos, Integer> peers = walk.boxes();
 		Set<BlockPos> wanted = new HashSet<>(peers.keySet());
 		boolean changed = false;
 
 		//Drop what is no longer reachable first, so a run rerouted onto a different wall does not
 		//briefly exist twice.
-		for(Connection existing : new ArrayList<>(currentBundles()))
-		{
-			BlockPos other = existing.end;
-			if(!wanted.remove(other))
+		//
+		//Unless the walk could not see the whole run. A run is saved state and this is the only
+		//thing that deletes it, so pruning against a walk that stopped at an unloaded chunk throws
+		//away a working run because nobody happened to be standing in the middle of it -- and it
+		//stays thrown away, because the save is written from the graph. That is how a conduit
+		//between two towns came apart: fly the line and it works, leave and a rebuild somewhere
+		//along it prunes the far end off, every time (private issue #4).
+		//
+		//"Reachable" only means anything when the walk was allowed to look. When it was not, the
+		//honest reading of the result is "these are the peers I can see", which is grounds for
+		//adding one and never for forgetting one.
+		if(!walk.isTruncated())
+			for(Connection existing : new ArrayList<>(currentBundles()))
 			{
-				//removeConnection, not removeConnectionAndDrop: a bundle has no coil, and the drop
-				//variant spawned an item entity holding nothing for every run torn down.
-				ImmersiveNetHandler.INSTANCE.removeConnection(world, existing);
-				changed = true;
+				BlockPos other = existing.end;
+				if(!wanted.remove(other))
+				{
+					//removeConnection, not removeConnectionAndDrop: a bundle has no coil, and the
+					//drop variant spawned an item entity holding nothing for every run torn down.
+					ImmersiveNetHandler.INSTANCE.removeConnection(world, existing);
+					changed = true;
+				}
 			}
-		}
+		else
+			//Still not offered again below: a bundle this box already has is not a bundle to make.
+			for(Connection existing : currentBundles())
+				wanted.remove(existing.end);
 		for(BlockPos peer : wanted)
 		{
 			TileEntity te = world.getTileEntity(peer);

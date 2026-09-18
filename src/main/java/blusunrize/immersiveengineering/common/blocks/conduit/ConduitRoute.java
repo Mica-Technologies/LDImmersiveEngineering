@@ -95,6 +95,71 @@ public class ConduitRoute
 		{
 			return false;
 		}
+
+		/**
+		 * Whether that position can be seen at all, as opposed to being empty.
+		 * <p>
+		 * {@link #nodeAt} answers {@link Node#NOTHING} for both "there is nothing there" and "that
+		 * chunk is not loaded, and asking would generate it" -- deliberately, because a walk must
+		 * never drag chunks in behind it. The two are the same to the walk and emphatically not the
+		 * same to its <em>caller</em>: one means the run ends there, the other means the walk does.
+		 * A caller that prunes on the first reading will delete a perfectly good run every time part
+		 * of it happens to be out of sight. See {@link Walk#truncated}.
+		 * <p>
+		 * Defaulted to true so every probe over an imagined world -- which is all of the tests --
+		 * keeps answering as it did: a world held in a map is entirely visible.
+		 */
+		default boolean isLoaded(BlockPos pos)
+		{
+			return true;
+		}
+	}
+
+	/**
+	 * What a walk found, and whether it managed to look everywhere.
+	 * <p>
+	 * The second half is the point. A run is saved state and the boxes at its ends are pruned
+	 * against what the walk can see, so a walk that could not see the whole run must say so or the
+	 * pruning is destructive: a conduit between two towns, with nobody standing in the middle of it,
+	 * reads as a run that ends a few blocks from its own box.
+	 */
+	public static final class Walk
+	{
+		private final Map<BlockPos, Integer> boxes;
+		private final boolean truncated;
+
+		Walk(Map<BlockPos, Integer> boxes, boolean truncated)
+		{
+			this.boxes = boxes;
+			this.truncated = truncated;
+		}
+
+		/**
+		 * @return each box the walk reached, and the number of conduit blocks to it
+		 */
+		public Map<BlockPos, Integer> boxes()
+		{
+			return boxes;
+		}
+
+		/**
+		 * @return true if the walk stopped at an unloaded block somewhere, so {@link #boxes()} is
+		 * "what could be seen" rather than "what is there"
+		 */
+		public boolean isTruncated()
+		{
+			return truncated;
+		}
+	}
+
+	/**
+	 * Somewhere for the walk to record that it ran out of visible world. A one-element array rather
+	 * than a field, because everything here is static and reentrant.
+	 */
+	private static void noteIfUnseen(BlockPos pos, Probe probe, boolean[] truncated)
+	{
+		if(!truncated[0]&&!probe.isLoaded(pos))
+			truncated[0] = true;
 	}
 
 	/**
@@ -168,10 +233,22 @@ public class ConduitRoute
 	 */
 	public static Map<BlockPos, Integer> junctionsFrom(BlockPos start, Probe probe)
 	{
+		return walkFrom(start, probe).boxes();
+	}
+
+	/**
+	 * The same walk, reporting whether it could see the whole run.
+	 * <p>
+	 * Anything that <em>prunes</em> against the result has to call this one rather than
+	 * {@link #junctionsFrom}: see {@link Walk} for the run this otherwise deletes.
+	 */
+	public static Walk walkFrom(BlockPos start, Probe probe)
+	{
 		Map<BlockPos, Integer> found = new HashMap<>();
 		Set<BlockPos> visited = new HashSet<>();
 		Deque<BlockPos> open = new ArrayDeque<>();
 		Map<BlockPos, Integer> distance = new HashMap<>();
+		boolean[] truncated = {false};
 
 		for(EnumFacing dir : EnumFacing.VALUES)
 		{
@@ -179,6 +256,8 @@ public class ConduitRoute
 			if(first==null)
 				continue;
 			Node node = probe.nodeAt(first.pos);
+			if(node==Node.NOTHING)
+				noteIfUnseen(first.pos, probe, truncated);
 			//Box, feeder, box: a floor with a box either side of it. The feeder is a length of run
 			//like any other, so the two are joined. Two boxes touching each other are not -- that is
 			//the "a run ends at the first box it meets" rule, and nothing here relaxes it.
@@ -202,8 +281,8 @@ public class ConduitRoute
 			}
 		}
 
-		explore(start, open, visited, distance, found, probe);
-		return found;
+		explore(start, open, visited, distance, found, probe, truncated);
+		return new Walk(found, truncated[0]);
 	}
 
 	/**
@@ -261,7 +340,9 @@ public class ConduitRoute
 			}
 		}
 
-		explore(start, open, visited, distance, found, probe);
+		//junctionsAround only ever adds -- it wakes boxes, it never prunes -- so a walk cut short by
+		//an unloaded chunk costs it nothing and the flag is discarded.
+		explore(start, open, visited, distance, found, probe, new boolean[]{false});
 		return found.keySet();
 	}
 
@@ -278,7 +359,7 @@ public class ConduitRoute
 	 */
 	private static void explore(BlockPos start, Deque<BlockPos> open, Set<BlockPos> visited,
 								Map<BlockPos, Integer> distance, Map<BlockPos, Integer> found,
-								Probe probe)
+								Probe probe, boolean[] truncated)
 	{
 		int examined = 0;
 		while(!open.isEmpty()&&examined++ < MAX_NODES)
@@ -295,6 +376,8 @@ public class ConduitRoute
 					BlockPos next = landing.pos;
 					int step = distance.get(here)+landing.blocks;
 					Node node = probe.nodeAt(next);
+					if(node==Node.NOTHING)
+						noteIfUnseen(next, probe, truncated);
 					if(node==Node.JUNCTION)
 					{
 						//First one wins, and shorter wins over longer: two paths to the same box are

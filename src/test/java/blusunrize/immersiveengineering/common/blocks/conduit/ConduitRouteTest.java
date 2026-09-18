@@ -110,6 +110,25 @@ class ConduitRouteTest
 		{
 			return solid.contains(pos);
 		}
+
+		/**
+		 * Positions the walk is not allowed to see, standing in for an unloaded chunk. Empty by
+		 * default: a world held in a map is entirely visible, which is what every other test here
+		 * assumes.
+		 */
+		private final Set<BlockPos> unloaded = new HashSet<>();
+
+		Map3D unloaded(int x, int y, int z)
+		{
+			unloaded.add(new BlockPos(x, y, z));
+			return this;
+		}
+
+		@Override
+		public boolean isLoaded(BlockPos pos)
+		{
+			return !unloaded.contains(pos);
+		}
 	}
 
 	private Map3D world;
@@ -123,6 +142,88 @@ class ConduitRouteTest
 	private Map<BlockPos, Integer> from(int x, int y, int z)
 	{
 		return ConduitRoute.junctionsFrom(new BlockPos(x, y, z), world);
+	}
+
+	private ConduitRoute.Walk walk(int x, int y, int z)
+	{
+		return ConduitRoute.walkFrom(new BlockPos(x, y, z), world);
+	}
+
+	/**
+	 * Whether the walk could see the whole run, which is the difference between "this run ends
+	 * here" and "I stopped looking here".
+	 * <p>
+	 * It matters because a run is saved state and the only thing that deletes one prunes it against
+	 * this walk. A conduit between two towns is unloaded in the middle almost all of the time, so a
+	 * walk that reports its visible peers as if they were all of them takes the far end off a
+	 * working run and saves that -- which is how one came apart in play.
+	 */
+	@Nested
+	@DisplayName("a walk that could not see the whole run")
+	class Truncation
+	{
+		@Test
+		@DisplayName("a run in plain sight is not truncated")
+		void wholeRunIsNotTruncated()
+		{
+			world.junction(0, 0, 0).conduit(1, 0, 0, EnumFacing.DOWN)
+					.conduit(2, 0, 0, EnumFacing.DOWN).junction(3, 0, 0);
+			ConduitRoute.Walk w = walk(0, 0, 0);
+			assertFalse(w.isTruncated(), "nothing was out of sight");
+			assertTrue(w.boxes().containsKey(new BlockPos(3, 0, 0)));
+		}
+
+		@Test
+		@DisplayName("empty space is not the same as unloaded space")
+		void emptyIsNotUnloaded()
+		{
+			//A run that simply stops has been seen to stop. Nothing may be pruned on the strength of
+			//an unloaded reading, but everything may be pruned on the strength of this one.
+			world.junction(0, 0, 0).conduit(1, 0, 0, EnumFacing.DOWN);
+			assertFalse(walk(0, 0, 0).isTruncated());
+		}
+
+		@Test
+		@DisplayName("a run that walks into an unloaded block says so")
+		void unloadedBlockTruncates()
+		{
+			world.junction(0, 0, 0).conduit(1, 0, 0, EnumFacing.DOWN).unloaded(2, 0, 0);
+			ConduitRoute.Walk w = walk(0, 0, 0);
+			assertTrue(w.isTruncated(), "the walk stopped at an unloaded block and must report it");
+			assertTrue(w.boxes().isEmpty(), "and it found no box past it");
+		}
+
+		@Test
+		@DisplayName("the far box is still reported when the walk stops beyond it")
+		void truncatedWalkStillReportsWhatItSaw()
+		{
+			//Truncation is not failure. What was seen is still true and is still worth connecting;
+			//it is only the *absence* of a peer that stops meaning anything.
+			world.junction(0, 0, 0).conduit(1, 0, 0, EnumFacing.DOWN).junction(2, 0, 0)
+					.conduit(0, 0, 1, EnumFacing.DOWN).unloaded(0, 0, 2);
+			ConduitRoute.Walk w = walk(0, 0, 0);
+			assertTrue(w.isTruncated());
+			assertTrue(w.boxes().containsKey(new BlockPos(2, 0, 0)),
+					"a box the walk did reach is still a box the walk reached");
+		}
+
+		@Test
+		@DisplayName("an unloaded block right against the box truncates too")
+		void unloadedNeighbourTruncates()
+		{
+			//The first step out of the box is the one most likely to be over a chunk border, since
+			//a box on the edge of a town is exactly where a long run starts.
+			world.junction(0, 0, 0).unloaded(1, 0, 0);
+			assertTrue(walk(0, 0, 0).isTruncated());
+		}
+
+		@Test
+		@DisplayName("junctionsFrom still answers with just the boxes")
+		void theOldEntryPointIsUnchanged()
+		{
+			world.junction(0, 0, 0).conduit(1, 0, 0, EnumFacing.DOWN).junction(2, 0, 0);
+			assertEquals(walk(0, 0, 0).boxes(), from(0, 0, 0));
+		}
 	}
 
 	@Nested
