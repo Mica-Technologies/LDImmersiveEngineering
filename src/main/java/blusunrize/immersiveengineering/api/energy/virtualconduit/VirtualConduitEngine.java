@@ -12,18 +12,27 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One tick of virtual conduit: every breakout whose box is unloaded hands its conductor's offer to
- * the wire on its face, as the box itself would if it were ticking.
+ * One tick of virtual conduit: every outlet whose box is unloaded, and whose conductor the registry
+ * says is being fed, hands its offer to the network on its face, as the box itself would if it were
+ * ticking.
  * <p>
  * <strong>Only the last step is reproduced.</strong> A run is a chain of boxes passing energy along
  * one hop per tick, and none of that needs simulating while it is unloaded, because nothing loaded
  * can observe it. What has to keep happening is the end of the chain: the far box handing its
- * conductor to the wire that leaves it. So this is not a transport model, it is a record of one
- * hand-off being replayed.
+ * conductor to whatever is strung or bolted to it. So this is not a transport model, it is a record
+ * of one hand-off being replayed.
  * <p>
  * <strong>A loaded box is always skipped.</strong> It is doing the real thing, and delivering both
  * ways would double a town's supply -- which is the obvious way for this feature to be wrong, and
- * the failure that would be hardest to notice, because more power looks like everything working.
+ * the failure that would be hardest to notice, because more power looks like everything working. A
+ * loaded box on a run that is fed from somewhere unloaded holds itself lit instead; see
+ * {@code TileEntityJunctionBox.holdVirtuallyLit}.
+ * <p>
+ * <strong>And a dark one is skipped too.</strong> An outlet exists while its breakout exists, which
+ * says nothing at all about whether the circuit behind it is switched on. {@link VirtualConduits#isLive}
+ * is the other half: a conductor delivers while a feed reaches it over the bundles, and stops when
+ * the last feed goes. Without that a run would go on supplying a town from a generator somebody
+ * dismantled last week.
  *
  * @author LDImmersiveEngineering -- virtual conduit
  */
@@ -36,7 +45,8 @@ public final class VirtualConduitEngine
 	/**
 	 * @param cityMode whether conduits are running on presence rather than accounting. Outside it a
 	 *                 conduit is a thing that works while loaded, and nothing here applies -- see
-	 *                 {@code TileEntityJunctionBox.rememberVirtual}.
+	 *                 the decisions table in the plan for why metered flux through unloaded blocks
+	 *                 is not on offer.
 	 *
 	 * @return total energy delivered virtually this tick
 	 */
@@ -56,8 +66,10 @@ public final class VirtualConduitEngine
 			//The box is here and ticking: it is doing this itself.
 			if(world.isLoaded(dim, link.getBoxPos()))
 				continue;
-			int delivered = world.push(dim, link.getBoxPos(), link.getRate(),
-					link.getWireTypeName(), link.getWireEnd());
+			//Nothing is feeding this conductor anywhere on its run, so there is nothing to deliver.
+			if(!registry.isLive(dim, link.getBoxPos(), link.getChannel()))
+				continue;
+			int delivered = world.push(link);
 			if(delivered > 0)
 			{
 				link.setLastDelivered(delivered);
@@ -70,9 +82,9 @@ public final class VirtualConduitEngine
 	/**
 	 * Drop records whose breakout is gone.
 	 * <p>
-	 * Breaking a box removes its records, but not every removal breaks a block: a world edit, a
-	 * {@code /setblock}, a dye moving a conductor to another face, or wirecutters on the wire all
-	 * skip that path. A record left behind supplies a town from a circuit that no longer exists.
+	 * A box refreshes its own outlets whenever its patch or wire tables can be trusted, which covers
+	 * every change it is told about. This covers the ones nothing tells it about: a world edit, a
+	 * {@code /setblock}, or the block simply being something else the next time anybody looks.
 	 * <p>
 	 * Checked only where the box's chunk is loaded. An unloaded one cannot be inspected without
 	 * loading it, and is precisely the case the record is there to cover -- so "cannot see it" must
@@ -93,7 +105,7 @@ public final class VirtualConduitEngine
 				orphans.add(link);
 		}
 		for(VirtualConduitLink orphan : orphans)
-			registry.remove(orphan.getDimension(), orphan.getBoxPos(), orphan.getChannel());
+			registry.remove(orphan.getDimension(), orphan.getBoxPos(), orphan.getChannel(), orphan.getKind());
 		return orphans.size();
 	}
 }

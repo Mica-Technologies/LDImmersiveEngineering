@@ -33,6 +33,8 @@ import java.util.HashMap;
 import java.util.function.Predicate;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.ChannelSet;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.ConduitWireType;
+import blusunrize.immersiveengineering.api.energy.virtualconduit.VirtualConduitConfig;
+import blusunrize.immersiveengineering.api.energy.virtualconduit.VirtualConduitLink;
 import blusunrize.immersiveengineering.api.energy.virtualconduit.VirtualConduits;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
@@ -215,6 +217,33 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * directly and are one hop however many there are.
 	 */
 	private static final int CITY_HOP = Math.max(1, CHANNEL_CAPACITY/64);
+
+	/**
+	 * Which conductors this box has claimed a feed record for, one bit each, and how long each has
+	 * gone without an external credit.
+	 * <p>
+	 * A feed says "power enters the run here", and it is what lets a conductor be known to be live
+	 * with every block of its run unloaded -- see {@code VirtualConduitFeed}. The box that claimed
+	 * one is the only thing that can honestly drop it, so it watches its own: forty ticks loaded with
+	 * nothing pushing into that conductor and the claim goes.
+	 * <p>
+	 * <strong>Kept in front of the live-mask exit, not behind it.</strong> A box whose supply stops
+	 * goes dark within a second and then has nothing to do all tick; if the ageing lived with the
+	 * rest of the work it would never run again, and a town would stay lit by a circuit that was
+	 * switched off. Two integer comparisons for a box with no feed on it, which is all of them.
+	 */
+	private int feedMask;
+	private final int[] unfedFor = new int[WireChannel.VALUES.length];
+
+	/**
+	 * How long a feed claim outlives the last credit on it, in ticks.
+	 * <p>
+	 * Twice {@link #CITY_DECAY}'s twenty, so an ordinary gap -- a source that skips a tick, a line
+	 * that was momentarily saturated elsewhere -- does not take a run down and bring it back. Long
+	 * enough to be quiet, short enough that switching a plant off leaves the far town dark within a
+	 * few seconds rather than at the next reload.
+	 */
+	private static final int FEED_MEMORY = 40;
 
 	/** Per channel, what left this box last tick, for the readouts. Deliberately not saved. */
 	private final int[] lastMoved = new int[WireChannel.VALUES.length];
@@ -643,7 +672,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(changed)
 		{
 			markContainingBlockForUpdate(null);
-			//This box's own run just changed shape, so what its pushes may not reach has too.
+			//The bundle graph is what the liveness flood walks, so a run made or broken changes who
+			//a feed reaches. Cheap -- it drops a cached flood -- and the alternative is up to a
+			//second of a town being lit by a run that has just been cut.
+			VirtualConduits.INSTANCE.invalidateLiveness();
+			//And this box's own run just changed shape, so what its pushes may not reach has too.
 			runShadow = null;
 		}
 		return changed;
@@ -887,6 +920,11 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	{
 		markDirty();
 		markContainingBlockForUpdate(null);
+		//A patch change moves a conductor from one face to another, which moves an outlet with it --
+		//and the face it came off may still have hardware on it, so both halves of the table can
+		//change from one dye. See refreshOutlets for why these are written here rather than by the
+		//tick that uses them.
+		refreshOutlets();
 	}
 
 	/**
@@ -973,7 +1011,8 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		if(simulate)
 			return JunctionBoxLogic.debit(JunctionBoxLogic.credit(held[index], amount, CHANNEL_CAPACITY),
 					CityMode.conduits());
-		return credit(channel, amount);
+		//Arriving down a wire, which is by definition not this run carrying its own energy along.
+		return credit(channel, amount, true);
 	}
 
 	/**
@@ -1052,6 +1091,15 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			rebuildRuns();
 			if(reconcileWires())
 				markDirty();
+			//Here rather than in onLoad, for the reason onLoad gives at length: this is the first
+			//moment the patch and wire tables can be trusted against the wire graph, and an outlet
+			//written from a table that has not been reconciled yet describes a wire the box is about
+			//to forget it has.
+			refreshOutlets();
+			//The box picks its own feed claims back up at the same time. A claim nobody owns is a
+			//claim nobody drops, and the run it vouches for would stay live forever.
+			feedMask = VirtualConduits.INSTANCE.feedMaskAt(world.provider.getDimension(), getPos());
+			Arrays.fill(unfedFor, 0);
 		}
 		//One walk a tick, however many neighbour changes asked for it -- see queueRebuild. Cheap
 		//when nothing asked: a boolean, before the live-mask check below.
@@ -1065,8 +1113,23 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			if(patch.hasRedstone())
 				propagateSignals();
 		}
+		if(world==null||world.isRemote)
+			return;
+		//Both of these belong in front of the live-mask exit, and both for the same reason: they are
+		//the work a *dark* box still has to do. A conductor fed from a peer that is unloaded is lit
+		//by nothing here, so if the registry vouches for it this is where it comes back; and a feed
+		//claim is dropped by the box that made it, which cannot happen if a dark box stops ticking.
+		//Gated on the registry having anything in it at all, so a server with no conduit on it pays
+		//one comparison.
+		if(VirtualConduits.INSTANCE.isActive())
+		{
+			if(feedMask!=0)
+				ageFeeds();
+			if(!patch.isEmpty()&&CityMode.conduits())
+				holdVirtuallyLit();
+		}
 		//The cheap exit, and the reason a base full of idle conduit costs nothing: one comparison.
-		if(world==null||world.isRemote||liveMask==0)
+		if(liveMask==0)
 			return;
 
 		//Close the readout figures for the tick just gone: what arrived since the last update is
@@ -1127,10 +1190,12 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 				//A conductor that just went dark reads as dark, not as whatever moved last.
 				lastMoved[index] = 0;
 				lastReceived[index] = 0;
-				//And it stops supplying the far end while unloaded. This is the one moment the box
-				//is loaded and can say so: a circuit switched off must not go on feeding a town
-				//simply because nobody stayed to watch it go out.
-				forgetVirtual(index);
+				//It does *not* forget its outlet. The first version did, and that was the bug: a far box
+				//loaded on its own goes dark in a second through no fault of the circuit -- its
+				//feeder is unloaded and cannot re-light it -- so walking to the far end of a line
+				//deleted the record holding the far town up, and the two ends had to be loaded at
+				//once for the link ever to exist. Whether a conductor may deliver is now asked of
+				//the feeds instead; see VirtualConduits.isLive.
 			}
 		}
 	}
@@ -1238,33 +1303,21 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		BlockPos end = wires.endOf(face);
 		WireType wire = wireOn(face);
 		if(end==null||wire==null)
-		{
-			//No wire on this face means nothing for an unloaded box to hand an unloaded neighbour,
-			//so any record of one is stale -- a cut wire, or a breakout moved to another face.
-			forgetVirtual(index);
 			return 0;
-		}
 		int rate = wire.getTransferRate();
 		if(rate <= 0)
-		{
-			forgetVirtual(index);
 			return 0;
-		}
 		Predicate<AbstractConnection> onlyThisWire = route -> {
 			Connection first = WireNetTransfer.firstHop(route);
 			return first!=null&&first.cableType==wire&&end.equals(first.end);
 		};
 		int offer = Math.min(offered, rate);
-		//What this conductor is *capable* of handing to that wire, recorded so it can go on handing
-		//it over while this box's chunk is unloaded -- see VirtualConduitLink for why a conduit
-		//needs that and a wire does not.
-		//
-		//The offer rather than what came back. A conductor is not less able to deliver on a tick
-		//when the far end happened to be full, and recording the acceptance would have this box
-		//remember a quiet moment and supply that forever. The offer is already steady -- it is the
-		//wire's own rate, against a conductor city mode holds full -- which is why this needs none
-		//of the peak-over-a-window smoothing a generator's output does.
-		rememberVirtual(index, face, wire, end, offer);
+		//Nothing is recorded here any more. An outlet is a static fact about the box -- there is a
+		//wire on this face, of this type, going there -- and it is written by refreshOutlets when the
+		//tables that say so change, not by the tick that happened to use it. The per-tick call was
+		//both a needless cost on the busiest path in the feature and the reason a breakout served
+		//only by a bolted connector was never recorded at all: this method is not the one that runs
+		//for those.
 		//City mode's flag here is the *wire* one, because this is a push onto a wire network and the
 		//nodes on the far side of it are living by that rule. Whether the box debits itself is the
 		//conduit's own question and is asked separately, just below.
@@ -1279,6 +1332,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		lastMoved[index] += sent;
 		return sent;
 	}
+
+	// ------------------------------------------------------------------
+	// Outlets, feeds and borrowed presence
+	// ------------------------------------------------------------------
 
 	/**
 	 * The destinations this box's own pushes may not reach: its run, and everything sitting against
@@ -1308,48 +1365,205 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	}
 
 	/**
-	 * Note that this conductor is delivering into the wire on that face, so that it can go on doing
-	 * it once this box's chunk unloads.
+	 * Write down every way a conductor can leave this box, and rub out the ways it no longer can.
 	 * <p>
-	 * City mode only, and deliberately. Outside it a conductor carries real flux hop by hop and a
-	 * box debits itself for what leaves; reproducing that through unloaded blocks would be a second
-	 * transfer engine to keep honest against the first. Under presence there is nothing to
-	 * reproduce -- the conductor is energised or it is not -- so the offer is the whole of the state.
+	 * <strong>Static, and not gated on anything being lit.</strong> An outlet is a fact about the
+	 * hardware -- there is a wire on this face, there is a connector bolted to that one -- and it
+	 * stays true whether the circuit is switched on, switched off, or merely dark because the box
+	 * that feeds it is a hundred blocks away and unloaded. The first version recorded an outlet from the tick
+	 * that used it and deleted it the moment the conductor went out, which meant that visiting the
+	 * far end of a line alone -- the one thing a player is bound to do -- deleted the record holding
+	 * the far town up.
+	 * <p>
+	 * <strong>Both kinds, which is the other half of the same bug.</strong> Only the catenary path
+	 * was ever hooked, so a breakout served by a connector bolted to a box face recorded nothing at
+	 * all. Every breakout on the playtester's poles is that kind; the demo rig used a wire, so the
+	 * feature passed its own test and did nothing whatsoever in the field.
+	 * <p>
+	 * Called when the tables this reads can be trusted and have changed: the first server tick after
+	 * load, a patch change, a wire arriving or being cut, and a neighbour changing on a patched face.
+	 * Never per tick -- six faces and a handful of tile lookups is cheap once and silly sixty times a
+	 * second.
 	 */
-	private void rememberVirtual(int index, EnumFacing face, WireType wire, BlockPos end, int offer)
+	private void refreshOutlets()
 	{
-		if(world==null||world.isRemote||offer <= 0||!CityMode.conduits())
+		if(world==null||world.isRemote||!VirtualConduitConfig.enabled)
 			return;
-		VirtualConduits.INSTANCE.observe(world.provider.getDimension(), getPos(),
-				WireChannel.VALUES[index], offer, wire.getUniqueName(), end);
+		int dimension = world.provider.getDimension();
+		int wired = 0;
+		int bolted = 0;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			WireChannel channel = patch.get(face);
+			if(channel==null)
+				continue;
+			BlockPos end = wires.endOf(face);
+			WireType wire = wireOn(face);
+			if(end!=null&&wire!=null&&wire.getTransferRate() > 0)
+			{
+				//The wire's own rate, capped by what a conductor can carry in a tick. That is what
+				//makes "the tier of a circuit is the tier of the wire on it" as true while unloaded
+				//as it is while somebody is standing there.
+				VirtualConduits.INSTANCE.observeWire(dimension, getPos(), channel, face,
+						Math.min(wire.getTransferRate(), CHANNEL_CAPACITY), wire.getUniqueName(), end);
+				wired |= channel.getMask();
+			}
+			//A neighbour that cannot be seen is not a neighbour that is gone: see
+			//JunctionBoxLogic.boltedOutlet for the chunk border this used to delete an outlet over.
+			boolean visible = world.isBlockLoaded(getPos().offset(face));
+			int rate = visible?boltedRate(face): 0;
+			switch(JunctionBoxLogic.boltedOutlet(visible, rate,
+					VirtualConduits.INSTANCE.get(dimension, getPos(), channel,
+							VirtualConduitLink.Kind.NEIGHBOUR)!=null))
+			{
+				case WRITE:
+					VirtualConduits.INSTANCE.observeNeighbour(dimension, getPos(), channel, face, rate);
+					bolted |= channel.getMask();
+					break;
+				case KEEP:
+					//Marked as still wanted, so the sweep below leaves it where it is.
+					bolted |= channel.getMask();
+					break;
+				default:
+					break;
+			}
+		}
+		//And what is no longer there. A dye moving a conductor to another face, wirecutters on a
+		//wire, a connector taken down: none of those breaks a block, so none of them reaches the
+		//sweep, and a record left behind supplies a town from a circuit that does not exist.
+		for(WireChannel channel : WireChannel.VALUES)
+		{
+			if((wired&channel.getMask())==0)
+				VirtualConduits.INSTANCE.remove(dimension, getPos(), channel, VirtualConduitLink.Kind.WIRE);
+			if((bolted&channel.getMask())==0)
+				VirtualConduits.INSTANCE.remove(dimension, getPos(), channel, VirtualConduitLink.Kind.NEIGHBOUR);
+		}
 	}
 
 	/**
-	 * Is that conductor still broken out onto the wire ending at that position?
+	 * What the thing bolted against that face can take in a tick, or zero if nothing there can.
 	 * <p>
-	 * What the orphan sweep asks of a box that has come back, to decide whether a record made while
-	 * it was loaded still describes anything. A dye moving a conductor to another face, wirecutters
-	 * on the wire, or the whole block being replaced by something else all leave a record that would
-	 * otherwise supply a town from a circuit that no longer exists.
+	 * <strong>The hardware's rate, not one tick's acceptance.</strong> A connector that happened to
+	 * be full on the tick somebody looked is not a smaller connector, and recording what it took
+	 * would have the box supply that figure forever afterwards.
+	 * <p>
+	 * {@code acceptingSide} rather than the opposite face, for the reason {@link #handToNeighbour}
+	 * gives: a connector mounted on the wall beside a box takes flux on its own mounting face, and
+	 * that is the same gesture as far as a player is concerned. A relay answers null and is
+	 * correctly nothing.
 	 */
-	public boolean breaksOutOnto(@Nullable WireChannel channel, @Nullable BlockPos wireEnd)
+	private int boltedRate(EnumFacing face)
 	{
-		if(channel==null||wireEnd==null)
+		TileEntity target = Utils.getExistingTileEntity(world, getPos().offset(face));
+		if(!(target instanceof IImmersiveConnectable))
+			//Wiring hardware only, and the same rule auto-patching states: a box dropped beside a
+			//capacitor bank to turn a corner must not quietly become an outlet into it.
+			return 0;
+		EnumFacing into = EnergyHelper.acceptingSide(target, face.getOpposite());
+		if(into==null)
+			return 0;
+		int rate = target instanceof TileEntityConnectorLV
+				?((TileEntityConnectorLV)target).getMaxInput()
+				:target instanceof IFluxReceiver?((IFluxReceiver)target).getMaxEnergyStored(into): 0;
+		return Math.max(0, Math.min(rate, CHANNEL_CAPACITY));
+	}
+
+	/**
+	 * Does this box still have the outlet that record describes?
+	 * <p>
+	 * What the orphan sweep asks of a box that has come back. A box refreshes its own outlets
+	 * whenever anything tells it to, so this catches only what nothing tells it about -- a world
+	 * edit, a {@code /setblock}, the block simply being something else the next time anybody looks.
+	 */
+	public boolean breaksOutOnto(@Nullable VirtualConduitLink link)
+	{
+		if(link==null)
 			return false;
-		EnumFacing face = patch.faceOf(channel);
-		return face!=null&&wireEnd.equals(wires.endOf(face));
+		EnumFacing face = patch.faceOf(link.getChannel());
+		if(face==null)
+			return false;
+		if(link.getKind()==VirtualConduitLink.Kind.NEIGHBOUR)
+		{
+			//The sweep only asks a box that is loaded, but the connector bolted to it can still be in
+			//the next chunk over -- and boltedRate answers zero for a position it is not allowed to
+			//look at. Deleting a record on that answer is the same chunk-border bug refreshOutlets
+			//had, arriving by the other door: the record would go, and the town on the far side of
+			//the run with it. Same rule, same place: see JunctionBoxLogic.boltedOutlet.
+			boolean visible = world!=null&&world.isBlockLoaded(getPos().offset(face));
+			return JunctionBoxLogic.boltedOutlet(visible, visible?boltedRate(face): 0, true)
+					!=JunctionBoxLogic.OutletVerdict.DROP;
+		}
+		return link.getWireEnd()!=null&&link.getWireEnd().equals(wires.endOf(face));
 	}
 
 	/**
-	 * Forget one conductor's record: it went dark, or lost the wire it was feeding, while somebody
-	 * was here to see it. A record only means "this was true when last observed", so the moment it
-	 * stops being true with the box loaded is the one chance to say so.
+	 * Note that something outside this run is pushing into one of its conductors.
+	 * <p>
+	 * The claim is written once and then merely renewed, so the common case -- a conductor fed every
+	 * tick of its life -- is one array write and a bit test rather than a map lookup.
 	 */
-	private void forgetVirtual(int index)
+	private void noteFeed(int index)
 	{
-		if(world==null||world.isRemote)
+		if(world==null||world.isRemote||!VirtualConduitConfig.enabled)
 			return;
-		VirtualConduits.INSTANCE.remove(world.provider.getDimension(), getPos(), WireChannel.VALUES[index]);
+		unfedFor[index] = 0;
+		if((feedMask&(1 << index))!=0)
+			return;
+		feedMask |= 1 << index;
+		VirtualConduits.INSTANCE.addFeed(world.provider.getDimension(), getPos(),
+				WireChannel.VALUES[index]);
+	}
+
+	/**
+	 * Drop a feed claim nothing has renewed. See {@link #FEED_MEMORY}.
+	 */
+	private void ageFeeds()
+	{
+		int dimension = world.provider.getDimension();
+		for(WireChannel channel : WireChannel.VALUES)
+		{
+			if((feedMask&channel.getMask())==0)
+				continue;
+			int index = channel.ordinal();
+			if(++unfedFor[index] <= FEED_MEMORY)
+				continue;
+			feedMask &= ~channel.getMask();
+			VirtualConduits.INSTANCE.removeFeed(dimension, getPos(), channel);
+		}
+	}
+
+	/**
+	 * Hold a conductor lit because the registry says its run is being fed somewhere.
+	 * <p>
+	 * <strong>The case this exists for: one box of a long run loaded, and nothing else.</strong>
+	 * Presence travels along a run one box per tick, which needs the boxes in between to be ticking;
+	 * unloaded they are not, so a far box that is genuinely on a fed run reads as dark and stops
+	 * delivering to the town in front of it. Meanwhile the engine will not stand in for it either,
+	 * because it is loaded -- and that is right, since delivering twice is the failure nobody would
+	 * report. So the box does the delivering for real, and borrows the fact that its run is alive
+	 * from the feeds, which are global and need nothing loaded to be read.
+	 * <p>
+	 * Held one hop short of capacity, exactly as {@link #energise} leaves a peer, so that a box lit
+	 * this way looks like a box lit by the run -- it is, after all, saying the same thing. Energise
+	 * stays for the immediacy between two boxes that really are both ticking.
+	 * <p>
+	 * Only patched conductors: a conductor with nowhere to go has nothing to deliver, and looping
+	 * sixteen of them per box per tick to discover that would undo the live-mask exit above.
+	 */
+	private void holdVirtuallyLit()
+	{
+		int dimension = world.provider.getDimension();
+		int lit = CHANNEL_CAPACITY-CITY_HOP;
+		for(EnumFacing face : EnumFacing.VALUES)
+		{
+			WireChannel channel = patch.get(face);
+			if(channel==null||held[channel.ordinal()] >= lit)
+				continue;
+			if(!VirtualConduits.INSTANCE.isLive(dimension, getPos(), channel))
+				continue;
+			held[channel.ordinal()] = lit;
+			liveMask |= channel.getMask();
+		}
 	}
 
 	private void passAlong(Connection run, TileEntityJunctionBox peer, WireChannel channel)
@@ -1364,17 +1578,32 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return;
 		held[index] -= moved.taken;
 		lastMoved[index] += moved.taken;
-		peer.credit(channel, moved.delivered);
+		//Not external: this is the run handing its own energy one box further along, and a run that
+		//counted that as a supply would vouch for itself forever.
+		peer.credit(channel, moved.delivered, false);
 	}
 
 	/**
 	 * Take energy onto a channel, from a neighbour along the run or from a connector at the door.
 	 *
+	 * @param external true when the energy came from outside this run -- a wire network, or something
+	 *                 bolted against the box -- rather than from a peer passing along the run. Only
+	 *                 an external credit is a <em>feed</em>: a run carrying what it was already given
+	 *                 must not be able to vouch for its own liveness, or a circuit whose source was
+	 *                 dismantled stays live forever. Since {@code ConduitRuns} broke the latch, a
+	 *                 credit that gets in from a wire network really is from somewhere else.
+	 *
 	 * @return how much was actually taken
 	 */
-	private int credit(WireChannel channel, int amount)
+	private int credit(WireChannel channel, int amount, boolean external)
 	{
 		int index = channel.ordinal();
+		//Before the acceptance test, not after it. Something pushing into a conductor that happens
+		//to be full this tick is still something pushing into it, and under presence a lit conductor
+		//is full nearly all the time -- so a feed judged on what was taken would flicker out and
+		//back every time two sources arrived in one tick.
+		if(external&&amount > 0)
+			noteFeed(index);
 		int taken = JunctionBoxLogic.credit(held[index], amount, CHANNEL_CAPACITY);
 		if(taken <= 0)
 			return 0;
@@ -1433,7 +1662,9 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			return JunctionBoxLogic.debit(
 					JunctionBoxLogic.credit(held[channel.ordinal()], amount, CHANNEL_CAPACITY),
 					CityMode.conduits());
-		return credit(channel, amount);
+		//Something bolted against the box pushing in: a connector, a Feed Unit, a machine. Outside
+		//the run, so it is a feed.
+		return credit(channel, amount, true);
 	}
 
 	@Override
@@ -1587,7 +1818,12 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		}
 		markDirty();
 		if(world!=null)
+		{
 			markContainingBlockForUpdate(null);
+			//A cut wire is an outlet that is gone, and nothing else will say so: cutting a wire
+			//breaks no block, so the sweep never hears about it.
+			refreshOutlets();
+		}
 	}
 
 	@Override
@@ -1671,10 +1907,36 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			queueRebuild();
 		if(autoPatch())
 			patchChanged();
+		else
+		{
+			//A connector bolted to, or taken off, a face that already has a conductor on it: the
+			//patch table does not move, so autoPatch says nothing, and yet an outlet just appeared
+			//or vanished. Only for a change actually on a patched face, which is a couple of integer
+			//comparisons -- a comparator flickering on the far side of the box costs nothing.
+			EnumFacing changed = adjacentFace(other);
+			if(changed!=null&&patch.isPatched(changed))
+				refreshOutlets();
+		}
 		//A neighbour changing is the only thing that can move a redstone input, so it is the only
 		//thing that has to re-derive the run's signals. Queued for the same reason the walk is.
 		if(patch.hasRedstone())
 			signalsQueued = true;
+	}
+
+	/**
+	 * @return which of this box's faces that position is against, or null if it is not next door
+	 */
+	@Nullable
+	private EnumFacing adjacentFace(@Nullable BlockPos other)
+	{
+		if(other==null)
+			return null;
+		int dx = other.getX()-getPos().getX();
+		int dy = other.getY()-getPos().getY();
+		int dz = other.getZ()-getPos().getZ();
+		if(Math.abs(dx)+Math.abs(dy)+Math.abs(dz)!=1)
+			return null;
+		return EnumFacing.getFacingFromVector(dx, dy, dz);
 	}
 
 	// ------------------------------------------------------------------

@@ -353,4 +353,44 @@ public final class JunctionBoxLogic
 				free++;
 		return free;
 	}
+
+	/**
+	 * What to do about the outlet record for a connector bolted against a breakout face.
+	 */
+	public enum OutletVerdict
+	{
+		/** The hardware is there and this is what it can take: write the record. */
+		WRITE,
+		/** Nothing could be seen, so nothing may be concluded: leave what is on file alone. */
+		KEEP,
+		/** Looked, and there is nothing there: the record must go. */
+		DROP
+	}
+
+	/**
+	 * Whether a bolted outlet should be written, left alone, or rubbed out.
+	 *
+	 * <h3>The chunk border</h3>
+	 * A box sitting on a chunk boundary with its connector in the next chunk along is an ordinary
+	 * thing to build -- it is what the playtester's poles are -- and on the first tick after the box
+	 * loads, the chunk holding the connector may not have arrived yet. The rate then reads zero, not
+	 * because the connector is gone but because nothing is allowed to look into an unloaded chunk to
+	 * find it. Rubbing the record out on that reading deletes the outlet holding a town up, and it
+	 * stays deleted until something changes on that face, which for settled hardware is never.
+	 * <p>
+	 * So an invisible neighbour keeps whatever is on file, and never invents one: with nothing to read
+	 * a rate from there is nothing to write. The next refresh with the chunk in settles it either way.
+	 * This is the same principle the whole feature runs on -- unloaded is not gone -- and it is the one
+	 * place it was missing.
+	 *
+	 * @param neighbourVisible whether the block against that face could actually be looked at
+	 * @param rate             what it will take in a tick, when it could be looked at
+	 * @param recorded         whether there is already a record for that face
+	 */
+	public static OutletVerdict boltedOutlet(boolean neighbourVisible, int rate, boolean recorded)
+	{
+		if(!neighbourVisible)
+			return recorded?OutletVerdict.KEEP: OutletVerdict.DROP;
+		return rate > 0?OutletVerdict.WRITE: OutletVerdict.DROP;
+	}
 }

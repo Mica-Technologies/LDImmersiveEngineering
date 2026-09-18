@@ -42,7 +42,8 @@ public class VirtualConduitSaveData extends WorldSavedData
 	public void readFromNBT(NBTTagCompound nbt)
 	{
 		VirtualConduits.INSTANCE.readFromNBT(nbt);
-		IELogger.info("Virtual conduit loaded: "+VirtualConduits.INSTANCE.size()+" live breakout(s)");
+		IELogger.info("Virtual conduit loaded: "+VirtualConduits.INSTANCE.size()+" outlet(s), "
+				+VirtualConduits.INSTANCE.feedCount()+" feed(s)");
 	}
 
 	@Override
@@ -59,6 +60,10 @@ public class VirtualConduitSaveData extends WorldSavedData
 	{
 		VirtualConduits.INSTANCE.clear();
 		VirtualConduits.INSTANCE.setDirtyListener(null);
+		//The registry answers "is this conductor live" from the wire graph, so it needs the same
+		//view of the world the engine pushes through. Handed over here rather than in a static
+		//initialiser so that it is set once per world load, next to the table it applies to.
+		VirtualConduits.INSTANCE.setWorld(VirtualConduitTickHandler.port());
 		VirtualConduitSaveData data =
 				(VirtualConduitSaveData)world.loadData(VirtualConduitSaveData.class, dataName);
 		if(data==null)

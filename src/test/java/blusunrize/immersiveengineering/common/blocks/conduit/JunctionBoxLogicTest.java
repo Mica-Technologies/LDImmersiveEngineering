@@ -616,4 +616,56 @@ class JunctionBoxLogicTest
 			assertEquals(-1, JunctionBoxLogic.nextBreakout(-1, (1 << CHANNELS)-1, false, CHANNELS));
 		}
 	}
+
+	/**
+	 * Whether a bolted outlet's record is written, kept or rubbed out.
+	 * <p>
+	 * Three lines of code and worth every one of these, because the failure it fixes is silent and
+	 * expensive: a box on a chunk border deleting the outlet record that holds a town up, on the first
+	 * tick after load, because the connector bolted to it was in the chunk next door.
+	 */
+	@Nested
+	@DisplayName("the record for a connector bolted to a face")
+	class BoltedOutlet
+	{
+		@Test
+		@DisplayName("a visible connector is written down")
+		void visibleHardwareIsWritten()
+		{
+			assertEquals(JunctionBoxLogic.OutletVerdict.WRITE,
+					JunctionBoxLogic.boltedOutlet(true, 256, false));
+			assertEquals(JunctionBoxLogic.OutletVerdict.WRITE,
+					JunctionBoxLogic.boltedOutlet(true, 256, true),
+					"an existing record is rewritten, not merely kept: the rate may have changed");
+		}
+
+		@Test
+		@DisplayName("a face that was looked at and has nothing on it loses its record")
+		void anEmptyFaceDropsIt()
+		{
+			assertEquals(JunctionBoxLogic.OutletVerdict.DROP,
+					JunctionBoxLogic.boltedOutlet(true, 0, true));
+		}
+
+		@Test
+		@DisplayName("a record survives a neighbour that could not be seen")
+		void theChunkBorderKeepsIt()
+		{
+			//The bug this exists for. The box is on a chunk boundary, the connector is in the next
+			//chunk, the box ticks first -- and the rate reads zero because nothing is allowed to look
+			//into an unloaded chunk. Deleting on that reading is deleting on ignorance.
+			assertEquals(JunctionBoxLogic.OutletVerdict.KEEP,
+					JunctionBoxLogic.boltedOutlet(false, 0, true));
+		}
+
+		@Test
+		@DisplayName("but no record is invented for a neighbour that could not be seen")
+		void anInvisibleNeighbourIsNeverWritten()
+		{
+			//Nothing to read a rate from means nothing to write, and a record made up out of nothing
+			//would have the engine supplying a town from hardware that may not exist.
+			assertEquals(JunctionBoxLogic.OutletVerdict.DROP,
+					JunctionBoxLogic.boltedOutlet(false, 0, false));
+		}
+	}
 }

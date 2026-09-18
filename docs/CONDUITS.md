@@ -613,29 +613,56 @@ leaves it. That hand-off is recorded while the box is loaded and replayed by a s
 while it is not — the Generation Meter's trick applied to a transport rather than to a source, and
 written as that feature's sibling in `api/energy/virtualconduit`.
 
-Four things about it worth knowing:
+**Two tables, because there are two questions.** An **outlet** says where a conductor can leave a
+box. A **feed** says where power gets into a run. An outlet delivers when a feed reaches it — which
+is a question neither table answers alone, and which neither end of the run has to be loaded to ask.
 
-- **The offer is recorded, not the acceptance.** A conductor is not less able to deliver on a tick
-  when the far end happened to be full, and remembering what came back would have a box hold on to
-  a quiet moment and supply that forever. The offer is already steady — the wire's own rate, against
-  a conductor presence holds full — so this needs none of the peak-over-a-window smoothing a
-  generator's fluctuating output does.
-- **A loaded box is always skipped.** It is doing the real thing. Delivering both ways would double
-  a town's supply, which is the failure here nobody would report, because more power looks like
-  everything working.
-- **The record is per conductor**, which is the whole of how sixteen circuits stay sixteen with
-  nobody standing near them. The push rebuilds the same face filter `handToWire` uses, from the wire
-  type and endpoint stored beside the rate.
-- **A record is only ever judged by a box that can be seen.** It is dropped when a conductor goes
-  dark, when its wire or breakout goes, when the box is broken, and by a sweep for the ways a block
-  can leave without anything being called — but the sweep skips any box whose chunk is unloaded.
-  Reading "cannot see it" as "it is gone" is the mistake that was deleting whole runs out of the
-  wire graph (see [A box against a box](#a-box-against-a-box-is-not-a-join)'s neighbour, and
-  `ConduitRoute.Walk`).
+- **An outlet is static.** It exists while the hardware exists: there is a wire on this face, there
+  is a connector bolted to that one. Lit, dark or switched off does not come into it. The first
+  attempt at this feature recorded an outlet from the tick that used it and deleted it the moment the
+  conductor went out — and a far box loaded on its own goes dark in about a second through no fault
+  of the circuit, because the peers that would re-light it are unloaded. So walking to the far end of
+  a line, which is the one thing a player is bound to do, deleted the record holding the far town up.
+- **Both ways out of a box count.** A catenary strung at the face pushes from the box and is filtered
+  to that one wire, because a box has up to six of them and each is a different circuit. A connector
+  bolted to the face pushes from *the connector's* position and is not filtered at all, since a
+  connector has one terminal and therefore one circuit. Only the first was ever hooked up at first,
+  and every breakout on the line this was written for is the second kind: four boxes with an empty
+  wire table and an HV connector on each. The demo rig used a wire, so the feature passed its own
+  test and recorded nothing whatsoever in the field.
+- **The rate is the hardware's, not one tick's acceptance.** The wire's transfer rate, or the
+  connector's input rate. A conductor is not less able to deliver on a tick when the far end happened
+  to be full, and remembering what came back would have a box hold on to a quiet moment and supply
+  that forever.
+- **A feed is written only for an external credit.** A peer passing energy along the same run is the
+  run carrying what it was already given; counting that would let a run vouch for itself forever. A
+  box drops its own feed after forty ticks loaded with nothing pushing into that conductor, so a
+  plant switched off takes the far town down within a few seconds rather than at the next reload.
+- **Liveness is a flood over the bundles.** From every feed on a conductor, across the bundle edges
+  that carry it, to every box they reach. Bundles are connections in the wire graph, which is global
+  and saved, so this needs nothing loaded at all — and the sixteen conductors stay sixteen across the
+  flood as well as across the push. Cached, and thrown away when a feed or a run changes and once a
+  second regardless.
+- **A loaded box is always skipped by the engine**, because it is doing the real thing and delivering
+  both ways would double a town's supply — the failure here nobody would report, since more power
+  looks like everything working. A loaded box on a run the registry calls live instead *holds itself
+  lit*, so it goes on delivering for real while its peers are unloaded.
+- **Records are only ever judged by a box that can be seen.** They are dropped when the breakout
+  goes, when the box is broken, and by a sweep for the ways a block can leave without anything being
+  called — but the sweep skips any box whose chunk is unloaded. Reading "cannot see it" as "it is
+  gone" is the mistake that was deleting whole runs out of the wire graph (see
+  [A box against a box](#a-box-against-a-box-is-not-a-join)'s neighbour, and `ConduitRoute.Walk`).
+  **The same applies one block further out.** A box sitting on a chunk boundary with its connector in
+  the next chunk along reads that connector's rate as zero, because nothing may look into an unloaded
+  chunk to find it — and the box ticks before the chunk next door arrives. So a neighbour that cannot
+  be seen keeps whatever record is on file, and never has one invented for it: with no rate to read
+  there is nothing to write. `JunctionBoxLogic.boltedOutlet` owns that decision and is asserted
+  directly.
 
 City mode only: it rests on a conductor being energised or not, rather than carrying counted flux.
 Outside city mode a conduit is what it always was — fine while loaded, dark otherwise. The switch is
-`enableVirtualConduit`, and `/ie virtualconduit` lists every breakout currently holding a wire up.
+`enableVirtualConduit`, and `/ie virtualconduit` lists the feeds and the outlets, says which are live
+and which are dark, and says what each outlet delivered on the last tick.
 
 ### A run may not feed itself
 
