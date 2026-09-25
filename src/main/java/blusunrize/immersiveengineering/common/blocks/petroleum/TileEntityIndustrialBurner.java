@@ -15,6 +15,7 @@ import blusunrize.immersiveengineering.api.tool.ExternalHeaterHandler.IExternalH
 import blusunrize.immersiveengineering.common.IEContent;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IBlockOverlayText;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IComparatorOverride;
+import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.INeighbourChangeTile;
 import blusunrize.immersiveengineering.common.blocks.TileEntityMultiblockPart;
 import blusunrize.immersiveengineering.common.blocks.multiblocks.MultiblockIndustrialBurner;
 import blusunrize.immersiveengineering.common.util.CityMode;
@@ -63,7 +64,7 @@ import java.util.Map;
  * @author LDImmersiveEngineering -- petroleum
  */
 public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEntityIndustrialBurner>
-		implements IBlockOverlayText, IComparatorOverride
+		implements IBlockOverlayText, IComparatorOverride, INeighbourChangeTile
 {
 	//	=================================
 	//		FUEL
@@ -205,6 +206,16 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	 */
 	private static final int HEAT_PER_FURNACE_FLUX = 1;
 
+	/**
+	 * Ticks between re-scans of the crown and the wall when nothing has reported a change. A
+	 * backstop only: a neighbour change normally reaches the master through whichever block of
+	 * the machine it happened beside, but a tile swapped out without a block update would
+	 * otherwise be missed for good. A whole number of passes, so it always lands on one.
+	 */
+	private static final int TARGET_RECHECK_INTERVAL = 10*BURN_INTERVAL;
+
+	private static final TileEntity[] NO_TARGETS = new TileEntity[0];
+
 	public final FluidTank tank = new FluidTank(TANK_CAPACITY);
 
 	/**
@@ -223,15 +234,28 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 
 	private int stagger = -1;
 	/**
-	 * What is sitting on the crown waiting to be heated, resolved on the stoking interval and
-	 * held in between. Scanning nine positions every tick to find a furnace that has not moved
-	 * would be exactly the sort of poll this machine is meant not to do.
+	 * What is sitting on the crown waiting to be heated, resolved on a pass after a neighbour
+	 * change and held in between. Scanning nine positions every tick to find a furnace that has
+	 * not moved would be exactly the sort of poll this machine is meant not to do.
 	 */
 	/**
-	 * The tower this firebox is fuelling, if any. Cached on the stoking interval.
+	 * The tower this firebox is fuelling, if any. Cached alongside the crown targets.
 	 */
 	private TileEntityDistillationTower towerTarget;
-	private TileEntity[] heatTargets = new TileEntity[0];
+	private TileEntity[] heatTargets = NO_TARGETS;
+	/**
+	 * Set when a crown or chamber block reports a neighbour change, and on load, so the crown and
+	 * the wall are re-scanned on the next pass rather than on every one. Forty-five lookups a
+	 * second, per burner, cold or not, for an answer that changes when somebody places a furnace.
+	 * Master only.
+	 */
+	private boolean targetsDirty = true;
+	/**
+	 * The store as it stood on the last pass that saved. Consumers draw from it between passes
+	 * without marking anything, so this is how a pass tells whether it has something new to save.
+	 * Server side only; -1 so the first pass after a load always saves.
+	 */
+	private int passHeat = -1;
 
 	/**
 	 * The one block of the structure a comparator reads from: a front corner of the firebox.
@@ -338,12 +362,17 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 	 */
 	private void runPass()
 	{
-		refreshHeatTargets();
+		//Re-scanned only when a neighbour has changed, a cached target has been broken, or the
+		//backstop comes round -- see targetsDirty.
+		if(targetsDirty||(towerTarget!=null&&towerTarget.isInvalid())||hasInvalidHeatTarget()
+				||(world.getTotalWorldTime()+getStagger())%TARGET_RECHECK_INTERVAL==0)
+			refreshHeatTargets();
 
 		FluidStack fuel = tank.getFluid();
 		int heatPerBucket = fuel!=null&&fuel.getFluid()!=null
 				?getHeatPerBucket(fuel.getFluid().getName()): 0;
 		int previousRate = heatRate;
+		int previousFuel = tank.getFluidAmount();
 		heatRate = heatFromBurning(heatPerBucket, FIRING_RATE);
 
 		if(CityMode.petroleum())
@@ -360,7 +389,7 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 			else
 				heatRate = 0;
 			heatAdjacentTower();
-			finishPass(previousRate);
+			finishPass(previousRate, previousFuel);
 			return;
 		}
 
@@ -376,20 +405,29 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 			}
 		}
 		heatAdjacentTower();
-		finishPass(previousRate);
+		finishPass(previousRate, previousFuel);
 	}
 
-	private void finishPass(int previousRate)
+	private void finishPass(int previousRate, int previousFuel)
 	{
 		boolean lit = heatBuffer > 0&&heatRate > 0;
-		if(lit!=active||heatRate!=previousRate)
+		boolean changed = lit!=active||heatRate!=previousRate;
+		if(changed)
 		{
 			active = lit;
 			markContainingBlockForUpdate(null);
 		}
 		//The tank and the store both moved, and a chunk saved without them comes back holding
-		//fuel or heat it has already spent. Once a second, and only on the master.
-		markDirty();
+		//fuel or heat it has already spent. Once a second, and only on the master -- and only when
+		//one of them did. The store is compared against the last pass that saved rather than the
+		//start of this one, because consumers and the crown draw from it in between without marking
+		//anything. A cold, empty firebox has nothing new, and marking it anyway rewrote its chunk
+		//every autosave. Fuel pumped in from outside marks the master on its own.
+		if(changed||tank.getFluidAmount()!=previousFuel||heatBuffer!=passHeat)
+		{
+			passHeat = heatBuffer;
+			markDirty();
+		}
 	}
 
 	/**
@@ -482,11 +520,24 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 					found = new ArrayList<TileEntity>(4);
 				found.add(te);
 			}
-		heatTargets = found==null?new TileEntity[0]: found.toArray(new TileEntity[found.size()]);
+		heatTargets = found==null?NO_TARGETS: found.toArray(new TileEntity[found.size()]);
+		targetsDirty = false;
 	}
 
 	/**
-	 * Looks around the firebox wall for a tower to fire. Resolved on the stoking interval and
+	 * @return whether a cached crown target has since been broken, which is as good as a
+	 * neighbour change and costs a walk of an array that is almost always empty
+	 */
+	private boolean hasInvalidHeatTarget()
+	{
+		for(TileEntity target : heatTargets)
+			if(target==null||target.isInvalid())
+				return true;
+		return false;
+	}
+
+	/**
+	 * Looks around the firebox wall for a tower to fire. Resolved with the crown targets and
 	 * cached, like the crown targets, so the per-tick path never touches the world.
 	 */
 	private void refreshTowerTarget()
@@ -525,6 +576,30 @@ public class TileEntityIndustrialBurner extends TileEntityMultiblockPart<TileEnt
 		if(stagger < 0)
 			stagger = ApiUtils.positionStagger(getPos().getX(), getPos().getZ(), BURN_INTERVAL);
 		return stagger;
+	}
+
+	@Override
+	public void onLoad()
+	{
+		super.onLoad();
+		targetsDirty = true;
+	}
+
+	@Override
+	public void onNeighborBlockChange(BlockPos otherPos)
+	{
+		if(world==null||world.isRemote||!formed)
+			return;
+		//Only the crown can gain a furnace and only the chamber wall a tower, so the floor does not
+		//bother the master about its own neighbours -- the same filter the HRSG puts on its intake.
+		int layer = PetroleumGeometry.heightOf(PetroleumGeometry.BURNER_SIZE, pos);
+		if(layer!=PetroleumGeometry.BURNER_HEIGHT-1&&layer!=PetroleumGeometry.BURNER_HEIGHT/2)
+			return;
+		TileEntityIndustrialBurner master = master();
+		if(master!=null)
+			master.targetsDirty = true;
+		else
+			targetsDirty = true;
 	}
 
 	//	=================================
