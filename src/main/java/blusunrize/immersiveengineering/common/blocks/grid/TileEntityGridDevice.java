@@ -287,14 +287,23 @@ public abstract class TileEntityGridDevice extends TileEntityImmersiveConnectabl
 			}
 		}
 		int throughput = device!=null?device.getLastThroughput(): 0;
-		if(state!=clientState||!name.equals(clientSegmentName)||color!=clientSegmentColor
-				||throughput!=clientThroughput)
+		if(state!=clientState||!name.equals(clientSegmentName)||color!=clientSegmentColor)
 		{
 			clientState = state;
 			clientSegmentName = name;
 			clientSegmentColor = color;
 			clientThroughput = throughput;
 			markContainingBlockForUpdate(null);
+		}
+		else if(throughput!=clientThroughput)
+		{
+			//Only the figure moved, and the figure is overlay text: nothing drawn in the chunk depends
+			//on it. A full block update here was a block-change packet and six neighbour notifications
+			//a second for every busy device -- and a junction box next door does real work on a
+			//neighbour notification. The comparator does read it, so that is told directly.
+			clientThroughput = throughput;
+			sendUpdatePacketToWatchers();
+			world.updateComparatorOutputLevel(getPos(), getBlockType());
 		}
 	}
 

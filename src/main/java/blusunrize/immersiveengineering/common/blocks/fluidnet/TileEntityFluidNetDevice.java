@@ -272,14 +272,21 @@ public abstract class TileEntityFluidNetDevice extends TileEntityIEBase implemen
 			}
 		}
 		int throughput = device!=null?device.getLastThroughput(): 0;
-		if(state!=clientState||!name.equals(clientMainName)||color!=clientMainColor
-				||throughput!=clientThroughput)
+		if(state!=clientState||!name.equals(clientMainName)||color!=clientMainColor)
 		{
 			clientState = state;
 			clientMainName = name;
 			clientMainColor = color;
 			clientThroughput = throughput;
 			markContainingBlockForUpdate(null);
+		}
+		else if(throughput!=clientThroughput)
+		{
+			//Only the figure moved -- overlay text, and the comparator. The same change as the grid
+			//device this mirrors; see TileEntityGridDevice.pushClientState.
+			clientThroughput = throughput;
+			sendUpdatePacketToWatchers();
+			world.updateComparatorOutputLevel(getPos(), getBlockType());
 		}
 	}
 
