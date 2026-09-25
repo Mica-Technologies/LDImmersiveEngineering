@@ -112,9 +112,34 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 		protected void onContentsChanged()
 		{
 			markDirty();
-			markContainingBlockForUpdate(null);
+			//Guarded, because readCustomNBT fills the tank with no world attached yet.
+			if(world==null||world.isRemote)
+				return;
+			//Forge calls this on every real fill, including one into a full tank that took nothing,
+			//and a fluid outlet offers a full pump a fill every tick. This used to answer each one
+			//with a block update -- a block-change packet, six neighbour notifications and a chunk
+			//re-mesh on every client watching -- indefinitely, for a number only the pump's own panel
+			//draws. So: nothing at all unless something changed; a full update only when the fluid
+			//changes kind; and just the tile data, which the panel reads, when only the amount moved.
+			FluidStack now = getFluid();
+			int amount = now==null?0: now.amount;
+			String kind = now==null||amount <= 0||now.getFluid()==null?null: now.getFluid().getName();
+			if(!java.util.Objects.equals(kind, syncedKind))
+			{
+				syncedKind = kind;
+				syncedAmount = amount;
+				markContainingBlockForUpdate(null);
+			}
+			else if(amount!=syncedAmount)
+			{
+				syncedAmount = amount;
+				sendUpdatePacketToWatchers();
+			}
 		}
 	};
+	/** What the clients were last told the tank holds. See the tank's onContentsChanged. */
+	private transient String syncedKind;
+	private transient int syncedAmount = -1;
 
 	public EnumFacing facing = EnumFacing.NORTH;
 	/**

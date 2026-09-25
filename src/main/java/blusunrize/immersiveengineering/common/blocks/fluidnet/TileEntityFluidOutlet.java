@@ -89,7 +89,13 @@ public class TileEntityFluidOutlet extends TileEntityFluidNetDevice implements I
 		IFluidHandler handler = handlerAt(side);
 		if(handler==null)
 			return 0;
-		return Math.max(0, handler.fill(new FluidStack(fluid, amount), !simulate));
+		//Asked first, even when this is the real fill: a full tank handed a real fill still runs its
+		//onContentsChanged in Forge's FluidTank, and many tanks answer that with a block update. An
+		//outlet offering every tick would otherwise make every full tank next to it send one every tick.
+		int accepts = handler.fill(new FluidStack(fluid, amount), false);
+		if(accepts <= 0||simulate)
+			return Math.max(0, accepts);
+		return Math.max(0, handler.fill(new FluidStack(fluid, Math.min(amount, accepts)), true));
 	}
 
 	@Nullable
