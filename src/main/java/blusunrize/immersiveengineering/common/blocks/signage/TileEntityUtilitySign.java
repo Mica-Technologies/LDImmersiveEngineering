@@ -397,4 +397,24 @@ public class TileEntityUtilitySign extends TileEntityIEBase implements IDirectio
 		//was never legible anyway.
 		return 48*48;
 	}
+
+	/** Built once; the tag never moves. See {@link #getRenderBoundingBox}. */
+	private AxisAlignedBB renderBox;
+
+	/**
+	 * The box the lettering is culled against, stated rather than inherited.
+	 * <p>
+	 * Forge's default works it out from the collision box, and a tag has none -- it is walked through
+	 * on purpose -- so the default dereferenced a null, threw, caught its own exception and allocated
+	 * a fallback. That happens every frame, for every tag in every chunk section in view, not just the
+	 * ones near enough to draw: a pole line is dozens of them. One block's margin all round, because
+	 * a plate hangs off the face of the pole it is mounted on.
+	 */
+	@Override
+	public AxisAlignedBB getRenderBoundingBox()
+	{
+		if(renderBox==null)
+			renderBox = new AxisAlignedBB(getPos().add(-1, -1, -1), getPos().add(2, 2, 2));
+		return renderBox;
+	}
 }
