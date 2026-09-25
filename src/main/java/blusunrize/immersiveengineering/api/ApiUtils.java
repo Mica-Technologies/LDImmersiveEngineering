@@ -824,7 +824,13 @@ public class ApiUtils
 				continue;
 			IImmersiveConnectable end = toIIC(c.end, world, false);
 			if(end==null)
+			{
+				//Left out until the far end arrives, and then this connector has to be built again
+				//or its half of the wire stays missing -- see WireRedrawQueue.
+				if(world!=null&&world.isRemote)
+					WireRedrawQueue.await(world, pos, c.end);
 				continue;
+			}
 			// generate subvertices
 			c.getSubVertices(world);
 			ret.add(c);

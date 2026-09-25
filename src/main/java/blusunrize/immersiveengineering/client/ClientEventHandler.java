@@ -15,6 +15,7 @@ import blusunrize.immersiveengineering.api.crafting.BlueprintCraftingRecipe;
 import blusunrize.immersiveengineering.api.energy.immersiveflux.IFluxReceiver;
 import blusunrize.immersiveengineering.api.energy.wires.IWireCoil;
 import blusunrize.immersiveengineering.api.energy.wires.ImmersiveNetHandler.Connection;
+import blusunrize.immersiveengineering.api.energy.wires.WireRedrawQueue;
 import blusunrize.immersiveengineering.api.energy.wires.WireType;
 import blusunrize.immersiveengineering.api.shader.CapabilityShader;
 import blusunrize.immersiveengineering.api.shader.CapabilityShader.ShaderWrapper;
@@ -245,6 +246,11 @@ public class ClientEventHandler implements IResourceManagerReloadListener
 		{
 			sendCrawlerControls();
 			CrawlerHud.tick(ClientUtils.mc().player);
+			World world = ClientUtils.mc().world;
+			if(world==null)
+				WireRedrawQueue.clear();
+			else if(world.getTotalWorldTime()%WireRedrawQueue.INTERVAL==0)
+				WireRedrawQueue.poll(world);
 		}
 	}
 
