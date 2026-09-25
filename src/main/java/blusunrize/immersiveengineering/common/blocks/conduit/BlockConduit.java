@@ -8,11 +8,11 @@
 
 package blusunrize.immersiveengineering.common.blocks.conduit;
 
+import blusunrize.immersiveengineering.api.ApiUtils;
 import blusunrize.immersiveengineering.api.IEProperties;
 import blusunrize.immersiveengineering.api.energy.wires.conduit.WireChannel;
 import blusunrize.immersiveengineering.common.blocks.BlockIETileProvider;
 import blusunrize.immersiveengineering.common.blocks.IEBlockInterfaces.IColouredBlock;
-import blusunrize.immersiveengineering.common.blocks.ItemBlockIEBase;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.properties.PropertyEnum;
@@ -63,7 +63,7 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		//-- see ConduitRunModel and ConduitJunctionModel. Nothing about how any of it draws changed;
 		//the same part models are assembled from the same three arm masks, one step later.
 		super("conduit", Material.IRON, PropertyEnum.create("type", BlockTypes_Conduit.class),
-				ItemBlockIEBase.class, IEProperties.FACING_ALL,
+				ItemBlockConduit.class, IEProperties.FACING_ALL,
 				//Unlisted, and how all three metas find out what they are supposed to look like: the
 				//shape lives on the tile entity, not in the state. The feeder's disguise, the run's
 				//arm masks and the box's mount, patches and stubs all arrive this way.
@@ -287,6 +287,14 @@ public class BlockConduit extends BlockIETileProvider<BlockTypes_Conduit> implem
 		//here -- WorldEdit, /setblock with the wrong flags -- is caught by the per-chunk sweep instead.
 		if(!world.isRemote)
 			ConduitIndex.INSTANCE.forget(world.provider.getDimension(), pos);
+		//The other half of an outer corner is a diagonal neighbour and hears nothing of this, so it
+		//would go on drawing an arm round the corner to a length that is gone. Next tick, once the
+		//tile entity is really out of the world, since that is what the partner's refresh looks for.
+		if(!world.isRemote&&te instanceof TileEntityConduit)
+		{
+			BlockPos[] partners = ConduitGeometry.outerCornerCells(pos, ((TileEntityConduit)te).facing);
+			ApiUtils.addFutureServerTask(world, () -> TileEntityConduit.tell(world, partners));
+		}
 		super.breakBlock(world, pos, state);
 	}
 

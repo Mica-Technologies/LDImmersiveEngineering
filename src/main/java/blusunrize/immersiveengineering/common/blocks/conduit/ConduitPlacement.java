@@ -91,6 +91,46 @@ public final class ConduitPlacement
 			EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.WEST, EnumFacing.EAST};
 
 	/**
+	 * Where a click on the end of a run should really put the next length, when the end is at the
+	 * edge of the block the run is clipped to.
+	 * <p>
+	 * Clicking the end face of the last length is how somebody continues a run, and
+	 * {@link #mountFor} handles it -- as long as the surface carries on. At the edge of a wall or a
+	 * beam it does not: the cell the click lands in hangs off the edge with nothing to clip to, and
+	 * the new length used to mount itself on the conduit, which is not a surface. The result was a
+	 * dead cube floating off the end of the run. The length somebody wants there is the
+	 * outer corner's other half, a diagonal step away, clipped to the next face round of the same
+	 * block. Which cell the block lands in is the item's decision rather than the block's, so this
+	 * answers the item: the block to treat as clicked instead, and the item clicks
+	 * {@code clickedSide} of it. That lands the length in the corner cell, and {@link #mountFor}
+	 * then clips it to that block by its plain wall rule.
+	 *
+	 * @param clicked     the block that was clicked
+	 * @param clickedSide the face of it that was clicked
+	 *
+	 * @return the block to click instead, or null to place the ordinary way
+	 */
+	@Nullable
+	public static BlockPos wrapTarget(BlockPos clicked, EnumFacing clickedSide, Surroundings around)
+	{
+		EnumFacing mount = around.conduitMountAt(clicked);
+		//Only the end of a run, clicked along its own surface. The exposed face and the underside
+		//are other gestures, and mountFor already has them.
+		if(mount==null||!ConduitGeometry.isInPlane(mount, clickedSide))
+			return null;
+		//Where the surface carries on, this is an ordinary continuation and not a corner at all.
+		BlockPos ahead = clicked.offset(clickedSide);
+		if(around.isMountable(ahead.offset(mount), mount.getOpposite()))
+			return null;
+		//And there has to be a next face round to clip to. The block the run is on is solid on the
+		//face it is clipped to, but that says nothing about the face the corner turns onto.
+		BlockPos support = clicked.offset(mount);
+		if(!around.isMountable(support, clickedSide))
+			return null;
+		return support;
+	}
+
+	/**
 	 * @param placed      where the new conduit is going
 	 * @param clickedSide the face of the clicked block that was clicked, which is also the step from
 	 *                    that block to {@code placed}

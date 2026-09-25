@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -282,6 +283,43 @@ class ConduitPlacementTest
 			//so that a later tidy-up of these branches cannot quietly take it away.
 			world.wall(0, 0, 0).conduit(0, 1, 0, EnumFacing.DOWN);
 			assertEquals(EnumFacing.WEST, place(1, 0, 0, EnumFacing.EAST));
+		}
+
+		@Test
+		@DisplayName("clicking the end of a run at an edge puts the next length round the corner")
+		void endOfRunAtAnEdgeWraps()
+		{
+			//A run along the top of a one-block beam, and the next click is the east end of
+			//the last length. The cell that click points at hangs off the edge; the length belongs in
+			//the corner cell below it, clipped to the beam's east face.
+			world.wall(0, 0, 0).conduit(0, 1, 0, EnumFacing.DOWN);
+			BlockPos support = ConduitPlacement.wrapTarget(new BlockPos(0, 1, 0), EnumFacing.EAST, world);
+			assertEquals(new BlockPos(0, 0, 0), support);
+			//What the item then does: click the east face of that block. The piece that lands must be
+			//the other half of the outer corner, or this is just a stub in a different place.
+			BlockPos landed = support.offset(EnumFacing.EAST);
+			EnumFacing mount = ConduitPlacement.mountFor(landed, EnumFacing.EAST, world);
+			assertEquals(ConduitGeometry.outerCornerCell(new BlockPos(0, 1, 0), EnumFacing.DOWN, EnumFacing.EAST),
+					landed);
+			assertEquals(ConduitGeometry.outerCornerMount(EnumFacing.EAST), mount);
+		}
+
+		@Test
+		@DisplayName("where the surface carries on, the end of a run is continued, not wrapped")
+		void endOfRunOnAFloorDoesNotWrap()
+		{
+			world.floor(0).conduit(0, 1, 0, EnumFacing.DOWN);
+			assertNull(ConduitPlacement.wrapTarget(new BlockPos(0, 1, 0), EnumFacing.EAST, world));
+		}
+
+		@Test
+		@DisplayName("only a click on the end of a run, along its surface, is this gesture")
+		void onlyTheEndWraps()
+		{
+			world.wall(0, 0, 0).conduit(0, 1, 0, EnumFacing.DOWN);
+			//The exposed top belongs to the inner-corner rule, and bare wall to the plain one.
+			assertNull(ConduitPlacement.wrapTarget(new BlockPos(0, 1, 0), EnumFacing.UP, world));
+			assertNull(ConduitPlacement.wrapTarget(new BlockPos(0, 0, 0), EnumFacing.EAST, world));
 		}
 	}
 

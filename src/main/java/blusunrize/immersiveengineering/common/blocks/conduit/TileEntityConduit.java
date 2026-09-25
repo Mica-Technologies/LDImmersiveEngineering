@@ -27,6 +27,7 @@ import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.text.TextFormatting;
+import net.minecraft.world.World;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -242,10 +243,34 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 	{
 		if(world==null||world.isRemote)
 			return;
+		reshape();
+	}
+
+	/**
+	 * Refresh, and if that changed anything: redraw, wake the boxes, and tell the other half of any
+	 * inner corner, which may be testing the same corner block from a cell where it cannot hear it.
+	 */
+	private void reshape()
+	{
 		if(refreshConnections())
 		{
 			markContainingBlockForUpdate(null);
 			wakeBoxes();
+			tell(world, ConduitGeometry.innerCornerCells(getPos(), facing));
+		}
+	}
+
+	/**
+	 * Reshape whichever conduit is at each of those cells. For the partners Minecraft's own neighbour
+	 * updates do not reach -- see {@link ConduitGeometry#outerCornerCells} for why there are any.
+	 */
+	static void tell(World world, BlockPos[] cells)
+	{
+		for(BlockPos cell : cells)
+		{
+			TileEntity te = Utils.getExistingTileEntity(world, cell);
+			if(te instanceof TileEntityConduit&&!te.isInvalid())
+				((TileEntityConduit)te).reshape();
 		}
 	}
 
@@ -376,7 +401,13 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		//placed and then re-mounted would be remembered on the wall it was first put against, and a
 		//walk over an unloaded stretch would follow a plane that is not there any more.
 		if(world!=null&&!world.isRemote)
+		{
 			ConduitIndex.INSTANCE.rememberConduit(world.provider.getDimension(), getPos(), facing);
+			//The other half of an outer corner is a diagonal neighbour, and placing this block told
+			//only the six beside it. This length already sees that partner; the partner has to be
+			//told that it is no longer the end of a run.
+			tell(world, ConduitGeometry.outerCornerCells(getPos(), facing));
+		}
 	}
 
 	@Override
@@ -394,15 +425,23 @@ public class TileEntityConduit extends TileEntityIEBase implements IDirectionalT
 		//Clicking bare wall still means "clip to the face I clicked" -- see ConduitPlacement, which
 		//owns the rule and widens it to cover the two gestures that used to produce dead stubs:
 		//continuing a run off the end of one, and starting a run off a junction box.
-		return ConduitPlacement.mountFor(pos, side, new Surroundings());
+		return ConduitPlacement.mountFor(pos, side, new Surroundings(world));
 	}
 
 	/**
-	 * The placement rule's view of the world. An inner class rather than a lambda because the rule
-	 * asks three different questions.
+	 * The placement rule's view of the world. A class rather than a lambda because the rule asks
+	 * several different questions, and static because the item asks them too, before there is a
+	 * tile entity to ask from -- see {@link ItemBlockConduit}.
 	 */
-	private final class Surroundings implements ConduitPlacement.Surroundings
+	static final class Surroundings implements ConduitPlacement.Surroundings
 	{
+		private final World world;
+
+		Surroundings(World world)
+		{
+			this.world = world;
+		}
+
 		@Nullable
 		@Override
 		public EnumFacing conduitMountAt(BlockPos at)

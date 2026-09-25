@@ -42,6 +42,14 @@ class ConduitGeometryTest
 		return out;
 	}
 
+	private static boolean contains(BlockPos[] cells, BlockPos pos)
+	{
+		for(BlockPos cell : cells)
+			if(cell.equals(pos))
+				return true;
+		return false;
+	}
+
 	@Nested
 	@DisplayName("the plane a conduit runs in")
 	class Plane
@@ -304,6 +312,45 @@ class ConduitGeometryTest
 							"the returning arm is not in the far conduit's plane");
 					assertEquals(here, ConduitGeometry.outerCornerCell(there, thereMount, back));
 					assertEquals(mount, ConduitGeometry.outerCornerMount(back));
+				}
+		}
+
+		@Test
+		@DisplayName("each half of a corner is on the other's list of cells to tell")
+		void bothHalvesAreTold()
+		{
+			//The first half of a corner never heard that the second had been placed,
+			//because the two share only an edge and Minecraft tells faces. The list a placed or
+			//broken conduit tells by hand has to name the partner, from whichever end.
+			BlockPos here = new BlockPos(5, -2, 9);
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					BlockPos there = ConduitGeometry.outerCornerCell(here, mount, dir);
+					EnumFacing thereMount = ConduitGeometry.outerCornerMount(dir);
+					assertTrue(contains(ConduitGeometry.outerCornerCells(here, mount), there),
+							mount+"/"+dir+": this half does not tell the far one");
+					assertTrue(contains(ConduitGeometry.outerCornerCells(there, thereMount), here),
+							mount+"/"+dir+": the far half does not tell this one");
+				}
+		}
+
+		@Test
+		@DisplayName("the two halves of an inner corner are on each other's lists too")
+		void innerCornerHalvesAreTold()
+		{
+			//The corner block sits diagonally from the wall piece, so only the riser hears it
+			//change. For every pair joinsInnerCorner accepts, each end must name the other.
+			BlockPos riser = new BlockPos(1, 4, -6);
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing wallMount : ConduitGeometry.inPlane(mount))
+				{
+					BlockPos wall = riser.offset(mount.getOpposite());
+					assertTrue(ConduitGeometry.joinsInnerCorner(mount, wallMount, mount.getOpposite()));
+					assertTrue(contains(ConduitGeometry.innerCornerCells(riser, mount), wall),
+							mount+"/"+wallMount+": the riser does not tell the wall piece");
+					assertTrue(contains(ConduitGeometry.innerCornerCells(wall, wallMount), riser),
+							mount+"/"+wallMount+": the wall piece does not tell the riser");
 				}
 		}
 

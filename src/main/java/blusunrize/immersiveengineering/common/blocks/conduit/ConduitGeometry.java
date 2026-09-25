@@ -280,6 +280,54 @@ public class ConduitGeometry
 		return dir.getOpposite();
 	}
 
+	//	=================================
+	//		WHO HAS TO BE TOLD
+	//	=================================
+
+	/**
+	 * Every cell that could hold the other half of an outer corner with this conduit, one per arm.
+	 * <p>
+	 * <strong>Minecraft never tells these cells anything.</strong> A block change notifies the six
+	 * blocks sharing a face with it, and an outer corner's two halves share only an edge. So when the
+	 * second half of a corner was placed, it saw the first and drew its arm, and the first never
+	 * heard: it stayed a stub at the edge, and since its shape had not changed it never woke the boxes
+	 * either, so the run was not in the wire graph. Breaking one half left the other drawing an arm
+	 * into thin air the same way. This is the list a conduit being placed or broken tells by hand.
+	 * <p>
+	 * Only conduit clipped to {@link #outerCornerMount} of the arm pointing that way is a partner, but
+	 * the partner's own refresh asks that, so this does not have to.
+	 */
+	public static BlockPos[] outerCornerCells(BlockPos pos, EnumFacing mount)
+	{
+		EnumFacing[] plane = inPlane(mount);
+		BlockPos[] out = new BlockPos[plane.length];
+		for(int i = 0; i < plane.length; i++)
+			out[i] = outerCornerCell(pos, mount, plane[i]);
+		return out;
+	}
+
+	/**
+	 * Every cell that could hold the other half of an inner corner with this conduit: the piece a
+	 * riser meets, one cell out along the mounting axis, and the four a wall piece may meet along its
+	 * own surface.
+	 * <p>
+	 * These do share a face with this conduit, so placing or breaking it reaches them already. What
+	 * does not reach them is the <em>corner block</em> changing. It sits in front of the riser -- which
+	 * hears about it -- but diagonally from the wall piece, which does not, and both ends test that
+	 * same block. A wall built under a run that was already climbing air therefore joined at the foot
+	 * and not at the top. So a conduit whose arms changed passes the news on to these; a partner
+	 * whose arms come out the same says nothing, which is what stops that echoing back and forth.
+	 */
+	public static BlockPos[] innerCornerCells(BlockPos pos, EnumFacing mount)
+	{
+		EnumFacing[] plane = inPlane(mount);
+		BlockPos[] out = new BlockPos[plane.length+1];
+		for(int i = 0; i < plane.length; i++)
+			out[i] = pos.offset(plane[i]);
+		out[plane.length] = pos.offset(mount.getOpposite());
+		return out;
+	}
+
 	/**
 	 * Which half of an outer corner draws the little cap that fills the corner itself.
 	 * <p>
