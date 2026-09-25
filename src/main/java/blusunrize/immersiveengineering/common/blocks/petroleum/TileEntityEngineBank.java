@@ -80,11 +80,13 @@ import java.util.Map;
  * <h3>The four ways linking could go wrong, and what stops each</h3>
  * <ol>
  * <li><strong>Two banks each counting the other.</strong> A chain has exactly one leader and only
- * the leader burns fuel, computes output or pushes flux ({@link #runPass()} returns immediately for
+ * the leader burns fuel, computes output or pushes flux ({@link #runPass(boolean)} returns immediately for
  * everyone else). The other banks are inert; they do not so much as look at their own tank. A
  * removal in the middle would leave the old leader briefly working from a stale chain, so a bank
- * whose links have been invalidated runs its pass on that tick rather than waiting for its stagger
- * -- the correction lands on the same tick the block update does.</li>
+ * whose links have been invalidated re-resolves its chain and its leadership on that tick rather
+ * than waiting for its stagger -- who leads is corrected on the same tick the block update lands.
+ * The fuel, terminals and output are left to the stagger, so a flurry of updates can never bill
+ * a hall for more than one pass an interval.</li>
  * <li><strong>Disagreeing about who leads.</strong> The leader is found by walking the cached
  * low-width links to the end of the row, which every member of a chain does identically because
  * they all share a facing and therefore a width axis. Ask any bank in a hall and it names the same
@@ -597,12 +599,14 @@ public class TileEntityEngineBank extends TileEntityMultiblockPart<TileEntityEng
 			return;
 		}
 
-		//A bank whose links have been invalidated settles up on the spot instead of waiting for its
-		//stagger. That is what keeps a bank taken out of the middle of a hall from leaving the old
-		//leader working from a chain that includes a building which is no longer there: the
-		//correction lands on the same tick as the block update, not up to half a second later.
-		if(linksDirty||(world.getTotalWorldTime()+getStagger())%WORK_INTERVAL==0)
-			runPass();
+		//A bank whose links have been invalidated re-resolves on the spot instead of waiting for its
+		//stagger, so who leads is settled on the same tick as the block update. Only the stagger
+		//runs the installation, though: a redstone flicker, or the leader's own display packet,
+		//lands here too, and a full pass off the back of one would charge the hall a second
+		//interval's fuel for an interval it had already paid for.
+		boolean scheduled = (world.getTotalWorldTime()+getStagger())%WORK_INTERVAL==0;
+		if(linksDirty||scheduled)
+			runPass(scheduled);
 		//Flux has to be handed over every tick -- a connector accepts a limited amount per tick and
 		//would throw away anything delivered in a lump -- but this is a walk of an array of
 		//references resolved on the pass, done by one bank of the hall. No world lookup happens
@@ -613,8 +617,13 @@ public class TileEntityEngineBank extends TileEntityMultiblockPart<TileEntityEng
 
 	/**
 	 * One pass. Everything that costs anything happens here, on the leader, once per interval.
+	 *
+	 * @param scheduled whether this is the bank's staggered tick. A pass brought forward only by
+	 *                  {@link #linksDirty} re-resolves the chain and the leadership and stops there;
+	 *                  fuel, terminals and displays wait for the stagger, so a hall is charged
+	 *                  exactly once per {@link #WORK_INTERVAL} however many updates reach it.
 	 */
-	private void runPass()
+	private void runPass(boolean scheduled)
 	{
 		List<TileEntityEngineBank> chain = resolveChain();
 		boolean isLeader = chain.get(0)==this;
@@ -631,7 +640,7 @@ public class TileEntityEngineBank extends TileEntityMultiblockPart<TileEntityEng
 		}
 		//A follower's display is written by its leader, every leader pass. All it has to do for
 		//itself is notice the day it stops being one, which the check above has just done.
-		if(!isLeader)
+		if(!isLeader||!scheduled)
 			return;
 		runInstallation(chain);
 	}
