@@ -1,0 +1,76 @@
+{
+	"textures": {
+		"conduit": "immersiveengineering:blocks/conduit",
+		"particle": "immersiveengineering:blocks/conduit"
+	},
+	"elements": [
+		{
+			"from": [
+				6,
+				13,
+				6
+			],
+			"to": [
+				10,
+				16,
+				10
+			],
+			"faces": {
+				"down": {
+					"texture": "#conduit",
+					"uv": [
+						8.0,
+						4.0,
+						12.0,
+						0.0
+					]
+				},
+				"up": {
+					"texture": "#conduit",
+					"uv": [
+						0.0,
+						12.0,
+						4.0,
+						16.0
+					]
+				},
+				"north": {
+					"texture": "#conduit",
+					"uv": [
+						12.0,
+						7.0,
+						8.0,
+						4.0
+					]
+				},
+				"south": {
+					"texture": "#conduit",
+					"uv": [
+						8.0,
+						7.0,
+						12.0,
+						4.0
+					]
+				},
+				"west": {
+					"texture": "#conduit",
+					"uv": [
+						8.0,
+						7.0,
+						12.0,
+						4.0
+					]
+				},
+				"east": {
+					"texture": "#conduit",
+					"uv": [
+						12.0,
+						7.0,
+						8.0,
+						4.0
+					]
+				}
+			}
+		}
+	]
+}

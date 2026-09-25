@@ -273,6 +273,45 @@ class ConduitGeometryTest
 	}
 
 	@Nested
+	@DisplayName("which hub a length wears")
+	class Hubs
+	{
+		@Test
+		@DisplayName("a straight run, or the end of one, gets a coupling along the run")
+		void straightIsACoupling()
+		{
+			for(EnumFacing mount : EnumFacing.VALUES)
+				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
+				{
+					assertEquals(dir.getAxis(), ConduitGeometry.hubAxis(mount, mask(mount, dir)),
+							mount+": the end of a run going "+dir);
+					assertEquals(dir.getAxis(),
+							ConduitGeometry.hubAxis(mount, mask(mount, dir, dir.getOpposite())),
+							mount+": a straight run along "+dir.getAxis());
+				}
+		}
+
+		@Test
+		@DisplayName("anything that turns or branches, or a bare length, gets a fitting")
+		void turningIsAFitting()
+		{
+			//A coupling lies along one axis, so on a corner it would draw the tube's highlight
+			//crossways on one of the two runs meeting there.
+			for(EnumFacing mount : EnumFacing.VALUES)
+			{
+				EnumFacing[] plane = ConduitGeometry.inPlane(mount);
+				assertNull(ConduitGeometry.hubAxis(mount, 0), mount+": bare");
+				assertNull(ConduitGeometry.hubAxis(mount, 0xF), mount+": cross");
+				for(EnumFacing a : plane)
+					for(EnumFacing b : plane)
+						if(a.getAxis()!=b.getAxis())
+							assertNull(ConduitGeometry.hubAxis(mount, mask(mount, a, b)),
+									mount+": corner "+a+"/"+b);
+			}
+		}
+	}
+
+	@Nested
 	@DisplayName("outer corners: a run following an edge round")
 	class OuterCorners
 	{

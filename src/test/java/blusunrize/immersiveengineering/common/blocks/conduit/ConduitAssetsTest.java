@@ -201,7 +201,7 @@ class ConduitAssetsTest
 		}
 
 		@Test
-		@DisplayName("every part the composer can name exists: six hubs and all seventy-two arms")
+		@DisplayName("every part the composer can name exists: eighteen hubs and all seventy-two arms")
 		void everyPartTheComposerNamesExists()
 		{
 			//	=================================
@@ -218,6 +218,16 @@ class ConduitAssetsTest
 								ConduitGeometry.hubModelName(mount)))).isFile(),
 						"no hub for a conduit mounted "+mount);
 				found++;
+				//And a coupling for each way a straight run can pass through it. A missing one is a
+				//hole in the middle of every block of every run going that way.
+				for(EnumFacing.Axis axis : EnumFacing.Axis.values())
+					if(axis!=mount.getAxis())
+					{
+						assertTrue(new File(ASSETS+modelPath(partReference(
+										ConduitGeometry.couplingModelName(mount, axis)))).isFile(),
+								"no coupling along "+axis+" for a conduit mounted "+mount);
+						found++;
+					}
 				for(EnumFacing dir : ConduitGeometry.inPlane(mount))
 					for(String name : new String[]{ConduitGeometry.armModelName(mount, dir),
 							ConduitGeometry.riserModelName(mount, dir),
@@ -228,10 +238,10 @@ class ConduitAssetsTest
 						found++;
 					}
 			}
-			//Six hubs and three forms of each of four arms on each of six mounts. The count is
-			//asserted as well as the files, so an arm quietly dropped from ConduitGeometry.inPlane
-			//would fail here rather than pass by checking less.
-			assertEquals(6+3*6*ConduitGeometry.ARMS, found);
+			//Six fittings, twelve couplings, and three forms of each of four arms on each of six
+			//mounts. The count is asserted as well as the files, so an arm quietly dropped from
+			//ConduitGeometry.inPlane would fail here rather than pass by checking less.
+			assertEquals(6+6*2+3*6*ConduitGeometry.ARMS, found);
 		}
 
 		@Test

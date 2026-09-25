@@ -493,9 +493,53 @@ public class ConduitGeometry
 		return armModelName(mount, dir)+"_wrap";
 	}
 
+	/**
+	 * The hub drawn as a cast fitting: what a length looks like where its run turns, branches,
+	 * crosses, or has not started yet.
+	 */
 	public static String hubModelName(EnumFacing mount)
 	{
 		return "conduit_"+mount.getName()+"_hub";
+	}
+
+	/**
+	 * The hub drawn as a set-screw coupling lying along {@code axis}: what a length looks like in
+	 * the middle of a straight run, or at the end of one.
+	 * <p>
+	 * A separate model per axis because the tube is shaded <em>along</em> its length -- a
+	 * highlight down the exposed face, sides darkening toward the wall -- and a hub has no length
+	 * of its own to be shaded along. A single hub model would draw that highlight crossways on
+	 * one of the two directions a run can take through it, a four-pixel square of wrong shading
+	 * in every block of every run. See {@link #hubAxis} for which one a length gets.
+	 */
+	public static String couplingModelName(EnumFacing mount, EnumFacing.Axis axis)
+	{
+		return hubModelName(mount)+"_"+axis.getName();
+	}
+
+	/**
+	 * Which way the hub runs, if it runs one way at all.
+	 *
+	 * @param mask which arms are joined, one bit per {@link #inPlane} index -- any form of arm,
+	 *             since a riser or a wrap leaves along its arm just as a straight one does
+	 *
+	 * @return the axis every joined arm lies on, so the hub is a coupling along it; or null when
+	 * none is joined or they turn, and the hub is a fitting
+	 */
+	@Nullable
+	public static EnumFacing.Axis hubAxis(EnumFacing mount, int mask)
+	{
+		EnumFacing.Axis axis = null;
+		EnumFacing[] plane = IN_PLANE[mount.ordinal()];
+		for(int i = 0; i < ARMS; i++)
+			if((mask&(1 << i))!=0)
+			{
+				if(axis==null)
+					axis = plane[i].getAxis();
+				else if(axis!=plane[i].getAxis())
+					return null;
+			}
+		return axis;
 	}
 
 	/**

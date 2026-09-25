@@ -70,13 +70,16 @@ public class ConduitRunLoader implements ICustomModelLoader
 		return new RawRunModel();
 	}
 
-	/** The names of the seventy-eight parts, hub first, in the order they are baked into. */
+	/** The names of the ninety parts, hubs first, in the order they are baked into. */
 	private static List<ResourceLocation> partLocations()
 	{
 		List<ResourceLocation> out = new ArrayList<>();
 		for(EnumFacing mount : EnumFacing.VALUES)
 		{
 			out.add(ConduitParts.location(ConduitGeometry.hubModelName(mount)));
+			for(EnumFacing.Axis axis : EnumFacing.Axis.values())
+				if(axis!=mount.getAxis())
+					out.add(ConduitParts.location(ConduitGeometry.couplingModelName(mount, axis)));
 			for(EnumFacing dir : ConduitGeometry.inPlane(mount))
 			{
 				out.add(ConduitParts.location(ConduitGeometry.armModelName(mount, dir)));
@@ -114,9 +117,15 @@ public class ConduitRunLoader implements ICustomModelLoader
 								@Nonnull Function<ResourceLocation, TextureAtlasSprite> bakedTextureGetter)
 		{
 			IBakedModel[] hubs = new IBakedModel[EnumFacing.VALUES.length];
+			IBakedModel[][] couplings = new IBakedModel[EnumFacing.VALUES.length][];
 			IBakedModel[][] arms = new IBakedModel[EnumFacing.VALUES.length][];
 			for(EnumFacing mount : EnumFacing.VALUES)
 			{
+				couplings[mount.ordinal()] = new IBakedModel[EnumFacing.Axis.values().length];
+				for(EnumFacing.Axis axis : EnumFacing.Axis.values())
+					if(axis!=mount.getAxis())
+						couplings[mount.ordinal()][axis.ordinal()] = ConduitParts.bake(
+								ConduitGeometry.couplingModelName(mount, axis), state, format, bakedTextureGetter);
 				hubs[mount.ordinal()] = ConduitParts.bake(ConduitGeometry.hubModelName(mount),
 						state, format, bakedTextureGetter);
 				EnumFacing[] plane = ConduitGeometry.inPlane(mount);
@@ -136,7 +145,7 @@ public class ConduitRunLoader implements ICustomModelLoader
 			//A rebake means new sprites behind every one of those parts, so anything assembled from
 			//the old ones has to go with them.
 			ConduitRunModel.modelCache.clear();
-			return new ConduitRunModel(hubs, arms);
+			return new ConduitRunModel(hubs, couplings, arms);
 		}
 	}
 }

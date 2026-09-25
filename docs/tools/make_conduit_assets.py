@@ -35,16 +35,23 @@ import re
 from PIL import Image
 
 # ---------------------------------------------------------------------------
-# Palette -- conduit is painted steel tubing, so it is lighter and flatter than the
-# gunmetal the grid hardware uses.  It has to read as "clipped to that wall" at a
-# glance, which means a bright tube and a visibly darker clip band.
+# Palette -- galvanized steel, the finish real EMT conduit and pull boxes come in: a cool,
+# slightly blue grey with a bright specular line where the light catches the round of the
+# tube.  The couplings and fittings are die-cast zinc, a touch warmer and duller than the
+# tube they join, which is what makes them read as separate parts from across a room.
 # ---------------------------------------------------------------------------
 OUTLINE = (38, 38, 42, 255)
-TUBE_SHADE = (128, 128, 134, 255)
-TUBE = (176, 176, 182, 255)
-TUBE_LIT = (208, 208, 214, 255)
-CLIP = (86, 86, 92, 255)
-CLIP_LIT = (108, 108, 114, 255)
+STEEL_HI = (236, 240, 244, 255)
+STEEL_LIT = (196, 201, 207, 255)
+STEEL_MID = (163, 168, 175, 255)
+STEEL_SHADE = (128, 133, 140, 255)
+STEEL_DARK = (94, 98, 105, 255)
+CAST_HI = (214, 213, 207, 255)
+CAST_LIT = (180, 179, 173, 255)
+CAST_MID = (149, 148, 143, 255)
+CAST_SHADE = (117, 116, 112, 255)
+CAST_DARK = (85, 84, 81, 255)
+SCREW = (60, 60, 63, 255)
 # The patch plate is deliberately near-white rather than steel: it is the one surface in this
 # feature whose whole job is to carry a tint, and a tint multiplies whatever is under it.
 PATCH_FILL = (236, 236, 238, 255)
@@ -53,6 +60,95 @@ PATCH_SEAM = (198, 198, 202, 255)
 FACINGS = ["down", "up", "north", "south", "west", "east"]
 AXIS_OF = {"down": "y", "up": "y", "north": "z", "south": "z", "west": "x", "east": "x"}
 NEGATIVE = {"down", "north", "west"}
+
+OPPOSITE = {"down": "up", "up": "down", "north": "south", "south": "north",
+            "west": "east", "east": "west"}
+
+# ---------------------------------------------------------------------------
+# Which way a face reads its texture.
+#
+# For each face: the world axis the texture's u runs along and in which direction, then the
+# same for v.  These are the directions Minecraft's own default UVs imply (BlockPart's
+# getFaceUvs) -- the vertex at the low end of that direction gets the first coordinate of the
+# pair -- so a face given UVs through face_uv below lands the texture the right way round.
+# ---------------------------------------------------------------------------
+FACE_TEX_AXES = {
+    "down": (("x", 1), ("z", -1)),
+    "up": (("x", 1), ("z", 1)),
+    "north": (("x", -1), ("y", -1)),
+    "south": (("x", 1), ("y", -1)),
+    "west": (("z", 1), ("y", -1)),
+    "east": (("z", -1), ("y", -1)),
+}
+
+
+class Region(object):
+    """A rectangle of a sprite, painted twice: once with its rows running down the sprite, and
+    once transposed so the same rows run across it.
+
+    **This is what lets the conduit be shaded at all.**  A tube is lit along its length -- a
+    highlight down the exposed face, sides darkening toward the wall -- so every face has to read
+    the shading *across* the run whichever way the run goes.  Which of a face's two texture axes
+    lies across the run depends on the run's direction and the face, and a face cannot rotate
+    its texture freely without the `rotation` field's own rules, so instead every pattern exists
+    both ways round and each face picks the copy whose rows lie the way it needs.
+
+    `rows` is a list of rows, each a list of colours: a pattern whose row index follows one world
+    axis and whose column index follows another.  `h` is where it is painted as written, `v`
+    where it is painted transposed; both as (x, y) of the top-left texel.
+    """
+
+    def __init__(self, rows, h, v):
+        self.rows = rows
+        self.height = len(rows)
+        self.width = len(rows[0])
+        self.h = (h[0], h[1], self.width, self.height)
+        self.v = (v[0], v[1], self.height, self.width)
+
+    def paint(self, px):
+        for r, row in enumerate(self.rows):
+            for c, colour in enumerate(row):
+                px[self.h[0] + c, self.h[1] + r] = colour
+                px[self.v[0] + r, self.v[1] + c] = colour
+
+
+def face_uv(face, region, row_axis, col_axis, sprite, row_rev=False, col_rev=False):
+    """The UVs that lay `region` on `face` with its rows following `row_axis`.
+
+    Row index 0 lands at the low-coordinate end of `row_axis` unless `row_rev`, and likewise for
+    columns; the pattern is stretched to the face, so a pattern that is constant along one axis
+    can cover a face of any length on it.  `sprite` is the sprite's size in texels -- UVs are
+    always in sixteenths of the sprite, whatever its resolution.
+    """
+    (ua, us), (va, vs) = FACE_TEX_AXES[face]
+    assert {ua, va} == {row_axis, col_axis}, (face, row_axis, col_axis)
+    if va == row_axis:
+        x, y, w, h = region.h
+        u_rng, u_rev = (x, x + w), col_rev
+        v_rng, v_rev = (y, y + h), row_rev
+    else:
+        x, y, w, h = region.v
+        u_rng, u_rev = (x, x + w), row_rev
+        v_rng, v_rev = (y, y + h), col_rev
+
+    def ends(rng, sign, rev):
+        at_min, at_max = (rng[1], rng[0]) if rev else rng
+        return (at_min, at_max) if sign > 0 else (at_max, at_min)
+
+    u1, u2 = ends(u_rng, us, u_rev)
+    v1, v2 = ends(v_rng, vs, v_rev)
+    k = 16.0 / sprite
+    return [u1 * k, v1 * k, u2 * k, v2 * k]
+
+
+def other_axis(*axes):
+    """The one of x, y and z that is not among `axes`."""
+    return [a for a in "xyz" if a not in axes][0]
+
+
+def in_face_axes(face):
+    """The two world axes lying in a face, in xyz order."""
+    return [a for a in "xyz" if a != AXIS_OF[face]]
 
 # How a blockstate refers to one of the models above.
 #
@@ -179,54 +275,14 @@ def wrap_box(mount, depth, half, arm):
     breakable from a cell it does not occupy.
     """
     lo, hi = box(mount, depth, half, arm)
-    uv_lo, uv_hi = list(lo), list(hi)
     axis = "xyz".index(AXIS_OF[arm])
     if arm in NEGATIVE:
         hi[axis], lo[axis] = 0, -depth
-        uv_lo[axis], uv_hi[axis] = 0, depth
     else:
         lo[axis], hi[axis] = 16, 16 + depth
-        uv_lo[axis], uv_hi[axis] = 16 - depth, 16
-    # UVs come from where the cube *would* be if it were inside the block.  Faces are
-    # given explicit UVs taken from their own coordinates, and a coordinate outside 0..16
-    # is outside the sprite -- on an atlas that samples whatever texture happens to be
-    # next door.  Taken from the last few pixels of the arm instead, the cap carries the
-    # tube's stripe straight around the corner.
-    return (lo, hi, uv_lo, uv_hi)
-
-
-def model_json(*boxes):
-    """A model of one or more boxes, every face textured.
-
-    Faces are given explicit UVs taken from the box itself, so the tube's stripe runs
-    along the run rather than being stretched differently on each length of it.
-
-    A box may carry a second pair of corners to take its UVs from instead.  Only the
-    outer-corner cap needs it, and it needs it because it is the one piece that lies
-    outside its own block: a UV outside 0..16 samples past the edge of the sprite, which
-    on a stitched atlas means whatever texture was placed next to this one.
-    """
-    elements = []
-    for entry in boxes:
-        frm, to = entry[0], entry[1]
-        uv_frm, uv_to = (entry[2], entry[3]) if len(entry) == 4 else (frm, to)
-        faces = {}
-        for face in ("down", "up", "north", "south", "west", "east"):
-            if face in ("down", "up"):
-                uv = [uv_frm[0], uv_frm[2], uv_to[0], uv_to[2]]
-            elif face in ("north", "south"):
-                uv = [uv_frm[0], 16 - uv_to[1], uv_to[0], 16 - uv_frm[1]]
-            else:
-                uv = [uv_frm[2], 16 - uv_to[1], uv_to[2], 16 - uv_frm[1]]
-            faces[face] = {"texture": "#conduit", "uv": uv}
-        elements.append({"from": frm, "to": to, "faces": faces})
-    return {
-        "textures": {
-            "conduit": "immersiveengineering:blocks/conduit",
-            "particle": "immersiveengineering:blocks/conduit",
-        },
-        "elements": elements,
-    }
+    # Its faces are given UVs from a pattern rather than from its own coordinates (see
+    # conduit_faces), so lying outside the block does not send them outside the sprite.
+    return (lo, hi)
 
 
 def write_json(path, body):
@@ -236,45 +292,201 @@ def write_json(path, body):
         handle.write("\n")
 
 
+# ---------------------------------------------------------------------------
+# The conduit tile.
+#
+# Every pattern in it is laid out in terms of a run rather than of a block: rows follow one
+# axis of the piece and columns another, and face_uv lays each on a face the right way round.
+# Row index 0 of a *side* pattern is the exposed edge and its last row is the edge against the
+# wall; the *top* patterns run across the tube's width.  See conduit_faces for which face wears
+# which.  The widths are the tube's own -- four pixels across, three deep -- so a pattern maps
+# texel for texel onto the face it is drawn on, and only the length is ever stretched, along
+# which the tube's patterns do not change.
+# ---------------------------------------------------------------------------
+CONDUIT_SPRITE = 16
+# Across the exposed face: a bright line where the light catches the round of the tube.
+TUBE_TOP_PROFILE = [STEEL_LIT, STEEL_HI, STEEL_LIT, STEEL_MID]
+# Down each side, from the exposed edge to the wall.
+TUBE_SIDE_PROFILE = [STEEL_MID, STEEL_SHADE, STEEL_DARK]
+
+
+def _along(profile, length=4):
+    """A pattern that is `profile` across and the same all the way along."""
+    return [[colour] * length for colour in profile]
+
+
+def _coupling_top():
+    """A set-screw coupling seen from the front: two darker lips where the tubes go in, a
+    duller body between them, and the set screw."""
+    body = [CAST_LIT, CAST_HI, CAST_LIT, CAST_MID]
+    lip = [CAST_MID, CAST_LIT, CAST_MID, CAST_SHADE]
+    rows = [[lip[r], body[r], body[r], lip[r]] for r in range(4)]
+    rows[1][2] = SCREW
+    return rows
+
+
+def _coupling_side():
+    body = [CAST_MID, CAST_SHADE, CAST_DARK]
+    lip = [CAST_SHADE, CAST_DARK, OUTLINE]
+    return [[lip[r], body[r], body[r], lip[r]] for r in range(3)]
+
+
+def _fitting_top():
+    """A cast fitting's cover: a raised rim round a flat lid with its screw."""
+    return [
+        [CAST_MID, CAST_MID, CAST_MID, CAST_SHADE],
+        [CAST_MID, CAST_HI, CAST_LIT, CAST_SHADE],
+        [CAST_MID, CAST_LIT, SCREW, CAST_SHADE],
+        [CAST_SHADE, CAST_SHADE, CAST_SHADE, CAST_SHADE],
+    ]
+
+
+TUBE_TOP = Region(_along(TUBE_TOP_PROFILE), h=(0, 0), v=(4, 0))
+TUBE_SIDE = Region(_along(TUBE_SIDE_PROFILE), h=(0, 4), v=(4, 4))
+COUPLING_TOP = Region(_coupling_top(), h=(8, 0), v=(12, 0))
+COUPLING_SIDE = Region(_coupling_side(), h=(8, 4), v=(12, 4))
+FITTING_TOP = Region(_fitting_top(), h=(0, 8), v=(4, 8))
+FITTING_SIDE = Region(_along([CAST_MID, CAST_SHADE, CAST_DARK]), h=(8, 8), v=(12, 8))
+# The face against the wall.  Never seen in a world, only on a dropped item.
+CONDUIT_BACK = Region(_along([STEEL_DARK] * 4), h=(0, 12), v=(0, 12))
+CONDUIT_REGIONS = (TUBE_TOP, TUBE_SIDE, COUPLING_TOP, COUPLING_SIDE,
+                   FITTING_TOP, FITTING_SIDE, CONDUIT_BACK)
+
+
+def conduit_faces(kind, exposed, length_axis=None):
+    """The six faces of one piece of conduit.
+
+    `kind` is what the piece is:
+
+    - "tube", a length of tubing lying along `length_axis`;
+    - "coupling", the hub of a straight run, which is a set-screw coupling along `length_axis`;
+    - "fitting", the hub where a run turns or branches, which is a cast fitting with no length;
+    - "cap", the little cube that fills an outer corner, which is a fitting too.
+
+    `exposed` is the direction the piece faces away from the surface it lies on: the opposite of
+    the mount for tubing on that surface, and away from the wall being climbed for a riser.
+    """
+    e_axis = AXIS_OF[exposed]
+    # Side patterns start at the exposed edge, so on a piece facing the positive way they have to
+    # run against the world coordinate.
+    e_rev = exposed not in NEGATIVE
+    faces = {}
+    for face in FACINGS:
+        a, b = in_face_axes(face)
+        if kind == "cap":
+            uv = face_uv(face, FITTING_TOP, a, b, CONDUIT_SPRITE)
+        elif face == exposed:
+            if kind == "fitting":
+                uv = face_uv(face, FITTING_TOP, a, b, CONDUIT_SPRITE)
+            else:
+                width_axis = other_axis(length_axis, e_axis)
+                region = TUBE_TOP if kind == "tube" else COUPLING_TOP
+                uv = face_uv(face, region, width_axis, length_axis, CONDUIT_SPRITE)
+        elif face == OPPOSITE[exposed]:
+            uv = face_uv(face, CONDUIT_BACK, a, b, CONDUIT_SPRITE)
+        else:
+            across = other_axis(AXIS_OF[face], e_axis)
+            region = {"tube": TUBE_SIDE, "coupling": COUPLING_SIDE,
+                      "fitting": FITTING_SIDE}[kind]
+            uv = face_uv(face, region, e_axis, across, CONDUIT_SPRITE, row_rev=e_rev)
+        faces[face] = {"texture": "#conduit", "uv": uv}
+    return faces
+
+
+def model_json(*pieces):
+    """A model of one or more pieces, each a (from, to, faces) box from `piece`."""
+    return {
+        "textures": {
+            "conduit": "immersiveengineering:blocks/conduit",
+            "particle": "immersiveengineering:blocks/conduit",
+        },
+        "elements": [{"from": frm, "to": to, "faces": faces} for frm, to, faces in pieces],
+    }
+
+
+def piece(bounds, kind, exposed, length_axis=None):
+    frm, to = bounds
+    return frm, to, conduit_faces(kind, exposed, length_axis)
+
+
 def build_models(assets, depth, half):
-    """The seventy-eight pieces: six hubs, and each of twenty-four arms in three forms.
+    """The ninety pieces: six fittings and twelve couplings for the hub, and each of twenty-four
+    arms in three forms.
 
     An arm is straight, or it climbs the block in front of it (an inner corner), or it
     carries on a little past the block edge to cap an outer one.  Three whole models
     rather than a straight arm plus an optional extra part, because a multipart part
     either applies or it does not: straight and climbing are two states of one arm, not
     one arm with something added.
+
+    The hub comes in two kinds because the tube is shaded along its length and a hub has
+    none: a straight run's hub is a coupling lying along the run, and every other hub is a
+    fitting, which looks the same from every side.  ConduitGeometry.hubAxis picks.
     """
     out = os.path.join(assets, "models", "block", "conduit")
     written = []
     for mount in FACINGS:
+        exposed = OPPOSITE[mount]
         name = "conduit_%s_hub" % mount
         write_json(os.path.join(out, name + ".json"),
-                   model_json(box(mount, depth, half)))
+                   model_json(piece(box(mount, depth, half), "fitting", exposed)))
         written.append(name)
+        for axis in in_face_axes(mount):
+            coupling = "%s_%s" % (name, axis)
+            write_json(os.path.join(out, coupling + ".json"),
+                       model_json(piece(box(mount, depth, half), "coupling", exposed, axis)))
+            written.append(coupling)
         for arm in in_plane(mount):
             name = "conduit_%s_%s" % (mount, arm)
-            write_json(os.path.join(out, name + ".json"),
-                       model_json(box(mount, depth, half, arm)))
+            length = piece(box(mount, depth, half, arm), "tube", exposed, AXIS_OF[arm])
+            write_json(os.path.join(out, name + ".json"), model_json(length))
             written.append(name)
+            # A riser lies against the wall it climbs, so it faces away from that wall and runs
+            # along this conduit's own mounting axis.
             write_json(os.path.join(out, name + "_riser.json"),
-                       model_json(box(mount, depth, half, arm),
-                                  riser_box(mount, depth, half, arm)))
+                       model_json(length, piece(riser_box(mount, depth, half, arm), "tube",
+                                                OPPOSITE[arm], AXIS_OF[mount])))
             written.append(name + "_riser")
             write_json(os.path.join(out, name + "_wrap.json"),
-                       model_json(box(mount, depth, half, arm),
-                                  wrap_box(mount, depth, half, arm)))
+                       model_json(length, piece(wrap_box(mount, depth, half, arm), "cap",
+                                                exposed)))
             written.append(name + "_wrap")
 
     # The held item and the creative-tab icon: a straight length lying on the floor,
-    # which is what placing one actually gives you. Assembled from the same three boxes
-    # the block would use rather than drawn separately, so it cannot drift.
+    # which is what placing one actually gives you. Assembled from the same boxes the
+    # block would use rather than drawn separately, so it cannot drift.
     write_json(os.path.join(out, "conduit_item.json"), model_json(
-        box("down", depth, half),
-        box("down", depth, half, "north"),
-        box("down", depth, half, "south")))
+        piece(box("down", depth, half), "coupling", "up", "z"),
+        piece(box("down", depth, half, "north"), "tube", "up", "z"),
+        piece(box("down", depth, half, "south"), "tube", "up", "z")))
     written.append("conduit_item")
     return written
+
+
+def build_texture(assets):
+    """The conduit tile: every pattern a piece of conduit wears, once each way round.
+
+    **Faces no longer sample this at their own block coordinates.**  They did, and it forced
+    the tile to look the same read in any direction -- a vertical run read its rows and a
+    horizontal one its columns -- which is why it used to be flat steel with a ring painted as
+    both a row and a column, and why it could never be shaded like a tube.  Now each face is
+    given UVs that lay a pattern along the run it belongs to (conduit_faces), so the tile can
+    say what a tube actually looks like: a highlight down the exposed face, sides darkening to
+    the wall, couplings and fittings in duller cast metal.  Horizontal and vertical runs still
+    look alike, which was the whole point of the old tile, because every face reads its pattern
+    the same way relative to the run.
+
+    Everything not covered by a pattern is plain steel, since the breaking particles sample
+    the whole sprite.
+    """
+    img = Image.new("RGBA", (CONDUIT_SPRITE, CONDUIT_SPRITE), STEEL_MID)
+    px = img.load()
+    for region in CONDUIT_REGIONS:
+        region.paint(px)
+    out = os.path.join(assets, "textures", "blocks", "conduit.png")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    img.save(out, "PNG", optimize=True)
+    return out
 
 
 def build_blockstate(assets):
@@ -362,7 +574,6 @@ def build_junction_box(assets, depth, box_half):
     it, in `ConduitGeometry.junctionBoxMount`, and read at render time by ConduitJunctionModel.
     """
     out = os.path.join(assets, "models", "block", "conduit")
-    faces = {face: {"texture": "#box"} for face in FACINGS}
     # **None of these models is named by the blockstate any more.**  The file used to be a
     # seventy-two selector multipart -- a housing per mounting face, a coloured plate on each
     # patched face, a stub toward each face a run touches -- selected by `facing` and twelve
@@ -388,7 +599,7 @@ def build_junction_box(assets, depth, box_half):
                 "box": "immersiveengineering:blocks/conduit_junction_box",
                 "particle": "immersiveengineering:blocks/conduit_junction_box",
             },
-            "elements": [{"from": frm, "to": to, "faces": faces}],
+            "elements": [{"from": frm, "to": to, "faces": housing_faces(mount)}],
         })
         build_patch_models(assets, mount, frm, to)
         # build_run_stub_models writes nothing for the face the box already reaches on its own:
@@ -523,7 +734,7 @@ def build_run_stub_models(assets, mount, frm, to):
         if bounds is None:
             continue
         lo, hi = bounds
-        faces = {f: {"texture": "#box"} for f in FACINGS}
+        faces = stub_faces(mount, face)
         box_textures = {
             "box": "immersiveengineering:blocks/conduit_junction_box",
             "particle": "immersiveengineering:blocks/conduit_junction_box",
@@ -572,26 +783,166 @@ def build_patch_texture(assets):
     return out
 
 
-def build_junction_texture(assets):
-    """The box's face: a steel lid with four corner bolts and a dark seam.
+# ---------------------------------------------------------------------------
+# The junction box sprite: a galvanized pull box.
+#
+# Thirty-two texels square so that it has room for a lid, a side and the plain plate the stubs
+# wear, each at one texel per block pixel -- face_uv takes the sprite size and works in
+# sixteenths of it, so a 32-texel sprite simply has four times the area at the same density as
+# the conduit's.  The housing is ten pixels across and eight deep (ConduitBounds), and the
+# patterns are exactly that size, so nothing is stretched except the stubs' length.
+# ---------------------------------------------------------------------------
+BOX_SPRITE = 32
 
-    Deliberately unlike the tube texture.  A player scanning a wall has to be able to tell a
-    box from a straight run at a glance, because the box is the only part they can interact
-    with.
+
+def _lid():
+    """The cover: a darker rim, a brushed plate, and a screw in each corner."""
+    import random
+    rng = random.Random(0x1d1e)
+    rows = []
+    for r in range(10):
+        row = []
+        for c in range(10):
+            if r in (0, 9) or c in (0, 9):
+                row.append(STEEL_SHADE)
+            else:
+                # Brushed, not flat: a steel lid with no variation in it reads as plastic.
+                shift = rng.choice((-6, -3, 0, 0, 3, 6))
+                row.append(tuple(min(255, max(0, v + shift)) for v in STEEL_LIT[:3]) + (255,))
+        rows.append(row)
+    for r, c in ((2, 2), (2, 7), (7, 2), (7, 7)):
+        rows[r][c] = SCREW
+        rows[r - 1][c - 1] = STEEL_HI
+    return rows
+
+
+# Down a side of the box, from the lid to the wall: the lid's lip catching the light, the shadow
+# under it, then the body darkening toward the surface it is bolted to.
+BOX_SIDE_PROFILE = [STEEL_LIT, STEEL_SHADE, STEEL_MID, STEEL_MID, STEEL_MID,
+                    STEEL_SHADE, STEEL_SHADE, STEEL_DARK]
+
+
+def _side():
+    """A side with a knockout in it: the stamped disc a real box has on every face a conduit
+    could come in by.  Only faces with no run on them show one -- a stub covers the rest --
+    which is exactly where a real one would still be in place."""
+    rows = _along(BOX_SIDE_PROFILE, 10)
+    knockout = [".DD.", "DLMD", "DMMD", ".DD."]
+    for r, line in enumerate(knockout):
+        for c, mark in enumerate(line):
+            colour = {"D": STEEL_DARK, "L": STEEL_LIT, "M": STEEL_MID}.get(mark)
+            if colour is not None:
+                rows[2 + r][3 + c] = colour
+    return rows
+
+
+BOX_LID = Region(_lid(), h=(0, 0), v=(0, 20))
+BOX_SIDE = Region(_side(), h=(10, 0), v=(20, 0))
+# What a stub wears: the box's own plate carried out to the block edge, with no lid and no
+# knockout -- a stub is the housing reaching out to meet a run, so it is plain sheet.
+STUB_TOP = Region(_along([STEEL_SHADE] + [STEEL_LIT] * 8 + [STEEL_SHADE]), h=(0, 10), v=(4, 10))
+STUB_SIDE = Region(_along(BOX_SIDE_PROFILE), h=(14, 10), v=(18, 10))
+BOX_BACK = Region(_along([STEEL_DARK] * 4), h=(26, 10), v=(26, 10))
+BOX_REGIONS = (BOX_LID, BOX_SIDE, STUB_TOP, STUB_SIDE, BOX_BACK)
+
+
+def housing_faces(mount):
+    """The box itself: the lid on the face away from the wall, a knocked-out side on the four
+    around it."""
+    exposed = OPPOSITE[mount]
+    e_axis = AXIS_OF[exposed]
+    faces = {}
+    for face in FACINGS:
+        a, b = in_face_axes(face)
+        if face == exposed:
+            uv = face_uv(face, BOX_LID, a, b, BOX_SPRITE)
+        elif face == mount:
+            uv = face_uv(face, BOX_BACK, a, b, BOX_SPRITE)
+        else:
+            uv = face_uv(face, BOX_SIDE, e_axis, other_axis(AXIS_OF[face], e_axis), BOX_SPRITE,
+                         row_rev=exposed not in NEGATIVE)
+        faces[face] = {"texture": "#box", "uv": uv}
+    return faces
+
+
+def stub_faces(mount, toward):
+    """A stub reaching from the box toward `toward`: plain plate, shaded like the box's sides."""
+    exposed = OPPOSITE[mount]
+    e_axis = AXIS_OF[exposed]
+    length_axis = AXIS_OF[toward]
+    faces = {}
+    for face in FACINGS:
+        a, b = in_face_axes(face)
+        if face == mount:
+            uv = face_uv(face, BOX_BACK, a, b, BOX_SPRITE)
+        elif face == exposed:
+            if length_axis == e_axis:
+                # The stub standing off the lid toward a run above the box: its end is the lid.
+                uv = face_uv(face, BOX_LID, a, b, BOX_SPRITE)
+            else:
+                uv = face_uv(face, STUB_TOP, other_axis(length_axis, e_axis), length_axis,
+                             BOX_SPRITE)
+        else:
+            uv = face_uv(face, STUB_SIDE, e_axis, other_axis(AXIS_OF[face], e_axis), BOX_SPRITE,
+                         row_rev=exposed not in NEGATIVE)
+        faces[face] = {"texture": "#box", "uv": uv}
+    return faces
+
+
+def build_junction_texture(assets):
+    """The box: a galvanized pull box, deliberately unlike the tube.
+
+    A player scanning a wall has to be able to tell a box from a straight run at a glance,
+    because the box is the only part they can interact with -- so it has a lid with screws,
+    where the tube has a highlight.
     """
-    img = Image.new("RGBA", (16, 16), CLIP)
+    img = Image.new("RGBA", (BOX_SPRITE, BOX_SPRITE), STEEL_MID)
     px = img.load()
-    rect(px, 0, 0, 15, 15, CLIP)
-    rect(px, 1, 1, 14, 14, CLIP_LIT)
-    rect(px, 0, 0, 15, 0, TUBE_SHADE)
-    rect(px, 0, 15, 15, 15, OUTLINE)
-    rect(px, 0, 0, 0, 15, TUBE_SHADE)
-    rect(px, 15, 0, 15, 15, OUTLINE)
-    # The seam where a lid would come off, and the bolts holding it on.
-    rect(px, 2, 7, 13, 8, CLIP)
-    for bx, by in ((2, 2), (13, 2), (2, 13), (13, 13)):
-        px[bx, by] = TUBE_LIT
+    for region in BOX_REGIONS:
+        region.paint(px)
     out = os.path.join(assets, "textures", "blocks", "conduit_junction_box.png")
+    img.save(out, "PNG", optimize=True)
+    return out
+
+
+def build_feeder_texture(assets):
+    """The bare feeder's face: a galvanized plate with a length of conduit coming through it.
+
+    The same tile on all six faces, read at the faces' own coordinates, which is right for a
+    whole cube: every face shows all of it.  Only ever seen on a feeder that has not found
+    anything to wear yet, or in the creative tab.
+    """
+    import random
+    rng = random.Random(0xfeed)
+    img = Image.new("RGBA", (16, 16), STEEL_MID)
+    px = img.load()
+    for x in range(16):
+        for y in range(16):
+            shift = rng.choice((-6, -3, 0, 0, 3, 6))
+            px[x, y] = tuple(min(255, max(0, v + shift)) for v in STEEL_MID[:3]) + (255,)
+    # A bevel, lit from the top left, so a bare feeder does not read as a flat grey square.
+    rect(px, 0, 0, 15, 0, STEEL_LIT)
+    rect(px, 0, 0, 0, 15, STEEL_LIT)
+    rect(px, 0, 15, 15, 15, STEEL_DARK)
+    rect(px, 15, 0, 15, 15, STEEL_DARK)
+    for bx, by in ((2, 2), (13, 2), (2, 13), (13, 13)):
+        px[bx, by] = SCREW
+        px[bx - 1, by - 1] = STEEL_HI
+    # The port: an octagonal hole with the end of a tube in it -- a bright rim, and the dark
+    # of the tube's bore in the middle.  Octagonal rather than square because a square hole in
+    # a square face reads as a panel, not as something passing through.
+    rect(px, 5, 4, 10, 11, OUTLINE)
+    rect(px, 4, 5, 11, 10, OUTLINE)
+    rect(px, 6, 5, 9, 10, STEEL_LIT)
+    rect(px, 5, 6, 10, 9, STEEL_LIT)
+    rect(px, 6, 5, 9, 5, STEEL_HI)
+    rect(px, 5, 6, 5, 9, STEEL_HI)
+    rect(px, 6, 10, 9, 10, STEEL_SHADE)
+    rect(px, 10, 6, 10, 9, STEEL_SHADE)
+    rect(px, 7, 6, 8, 9, OUTLINE)
+    rect(px, 6, 7, 9, 8, OUTLINE)
+    out = os.path.join(assets, "textures", "blocks", "conduit_ground_feeder.png")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
     img.save(out, "PNG", optimize=True)
     return out
 
@@ -633,38 +984,6 @@ def build_ground_feeder(assets):
     })
 
 
-def build_feeder_texture(assets):
-    """The bare feeder's face: a steel plate with a conduit port through the middle of it.
-
-    The same tile on all six faces, which is right for a block whose whole idea is that a run
-    goes in one side and out the other.  Only ever seen on a feeder that has not found anything
-    to wear yet, or in the creative tab.
-    """
-    img = Image.new("RGBA", (16, 16), CLIP_LIT)
-    px = img.load()
-    rect(px, 0, 0, 15, 15, CLIP_LIT)
-    # A bevel, lit from the top left, so a bare feeder does not read as a flat grey square.
-    rect(px, 0, 0, 15, 0, TUBE_SHADE)
-    rect(px, 0, 0, 0, 15, TUBE_SHADE)
-    rect(px, 0, 15, 15, 15, OUTLINE)
-    rect(px, 15, 0, 15, 15, OUTLINE)
-    for bx, by in ((2, 2), (13, 2), (2, 13), (13, 13)):
-        px[bx, by] = TUBE_LIT
-    # The port: an octagonal hole, with a length of tube sitting in it.  Octagonal rather than
-    # square because a square hole in a square face reads as a panel, not as something passing
-    # through.
-    rect(px, 5, 4, 10, 11, OUTLINE)
-    rect(px, 4, 5, 11, 10, OUTLINE)
-    rect(px, 6, 5, 9, 10, TUBE)
-    rect(px, 5, 6, 10, 9, TUBE)
-    rect(px, 6, 5, 9, 5, TUBE_LIT)
-    rect(px, 6, 10, 9, 10, TUBE_SHADE)
-    out = os.path.join(assets, "textures", "blocks", "conduit_ground_feeder.png")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    img.save(out, "PNG", optimize=True)
-    return out
-
-
 def build_item_blockstate(assets):
     """The item form, in the Forge blockstate format IE looks the item model up through.
 
@@ -701,60 +1020,6 @@ def rect(px, x0, y0, x1, y1, colour):
             px[x, y] = colour
 
 
-# Where the coupling ring sits along a block, in pixels from the low end of the block on that
-# axis, and how wide it is.  It has to stay clear of every strip a face samples *across* the
-# tube: 0..depth-1 and 16-depth..15 (the sides of a run, which sample the mounting axis) and
-# 8-half..8+half-1 (the top of a run, which samples the across axis).  With depth 3 and half 2
-# that leaves 3..5 and 10..12, and one ring per block wants only one of them.
-COUPLING_AT = 3
-COUPLING_WIDTH = 3
-
-
-def build_texture(assets, depth, half):
-    """One 16x16 tile, used by every face of every piece.
-
-    Every face samples this at its own block coordinates -- see model_json -- so the tile is
-    read *along* a run on some faces and *across* it on others, and which is which depends on
-    the run's direction and the face it is clipped to.  A vertical run reads the rows, a
-    horizontal one reads the columns, and the sides of a floor run only ever see the bottom
-    three rows.  The first version of this tile was a tube seen side-on, lit along the top and
-    shaded along the bottom with clip bands at the quarter points, and under that sampling a
-    vertical run showed one seam per block and no clips while a horizontal one showed two clips
-    per block on a body that went dark on its sides.  A playtester asked for the horizontal
-    look to match the vertical one (issue #3).
-
-    So the tile is now the same whichever way it is read: a flat steel body with one coupling
-    ring per block, painted as both a column and a row at the same offset.  A face reading along
-    the run sees the ring once; a face reading across the run samples a strip the ring does not
-    cross, and sees plain tube.  The body carries no shading of its own -- the renderer's
-    per-face light does that, and does it consistently for every orientation.
-
-    The ring is a bright edge, the clip, and a dark edge, so it reads as a joint in the tubing
-    rather than as a stripe painted on it.
-    """
-    assert depth <= COUPLING_AT < 8 - half, "coupling ring would show on the sides of a run"
-    assert COUPLING_AT + COUPLING_WIDTH <= 8 - half, "coupling ring would show on the top of a run"
-    img = Image.new("RGBA", (16, 16), TUBE)
-    px = img.load()
-    rect(px, 0, 0, 15, 15, TUBE)
-    ring = (TUBE_LIT, CLIP, OUTLINE)
-    assert len(ring) == COUPLING_WIDTH
-    for offset, colour in enumerate(ring):
-        at = COUPLING_AT + offset
-        rect(px, at, 0, at, 15, colour)
-        rect(px, 0, at, 15, at, colour)
-    # Where the row and the column cross, the darker of the two wins so the ring's edges stay
-    # continuous; it is never sampled by a run anyway (both axes inside 3..5), only by the item.
-    for i in range(COUPLING_WIDTH):
-        for j in range(COUPLING_WIDTH):
-            a, b = ring[i], ring[j]
-            px[COUPLING_AT + i, COUPLING_AT + j] = a if sum(a[:3]) <= sum(b[:3]) else b
-    out = os.path.join(assets, "textures", "blocks", "conduit.png")
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    img.save(out, "PNG", optimize=True)
-    return out
-
-
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     repo = os.path.dirname(os.path.dirname(here))
@@ -769,7 +1034,7 @@ def main():
     build_junction_box(args.assets, depth, box_half)
     build_ground_feeder(args.assets)
     build_item_blockstate(args.assets)
-    texture = build_texture(args.assets, depth, half)
+    texture = build_texture(args.assets)
     build_junction_texture(args.assets)
     build_patch_texture(args.assets)
     build_feeder_texture(args.assets)

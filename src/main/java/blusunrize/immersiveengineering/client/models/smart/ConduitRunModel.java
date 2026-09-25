@@ -63,8 +63,17 @@ public class ConduitRunModel implements IBakedModel
 	 */
 	public static final Map<Integer, List<BakedQuad>[]> modelCache = new ConcurrentHashMap<>();
 
-	/** One hub per surface a conduit can be clipped to, indexed by {@code EnumFacing.ordinal()}. */
+	/**
+	 * One hub per surface a conduit can be clipped to, indexed by {@code EnumFacing.ordinal()}: the
+	 * cast fitting a run wears where it turns, branches or has not started.
+	 */
 	private final IBakedModel[] hubs = new IBakedModel[EnumFacing.VALUES.length];
+
+	/**
+	 * The coupling a straight run wears instead, indexed by mount ordinal and then by
+	 * {@code Axis.ordinal()}. The mount's own axis has none -- a run cannot lie along it.
+	 */
+	private final IBakedModel[][] couplings = new IBakedModel[EnumFacing.VALUES.length][];
 
 	/**
 	 * The arms, indexed by mount ordinal and then by
@@ -73,9 +82,10 @@ public class ConduitRunModel implements IBakedModel
 	 */
 	private final IBakedModel[][] arms = new IBakedModel[EnumFacing.VALUES.length][];
 
-	ConduitRunModel(IBakedModel[] hubs, IBakedModel[][] arms)
+	ConduitRunModel(IBakedModel[] hubs, IBakedModel[][] couplings, IBakedModel[][] arms)
 	{
 		System.arraycopy(hubs, 0, this.hubs, 0, hubs.length);
+		System.arraycopy(couplings, 0, this.couplings, 0, couplings.length);
 		System.arraycopy(arms, 0, this.arms, 0, arms.length);
 	}
 
@@ -126,7 +136,8 @@ public class ConduitRunModel implements IBakedModel
 
 	/**
 	 * The pieces a conduit on that surface is made of, in the order the blockstate used to apply
-	 * them: the hub, then each joined arm.
+	 * them: the hub, then each joined arm. The hub is a coupling where the run goes straight
+	 * through or ends, and a fitting everywhere else -- see {@link ConduitGeometry#hubAxis}.
 	 * <p>
 	 * The arm's form is asked of {@link TileEntityConduit#armMode} rather than worked out from the
 	 * masks here, so there is one statement of what a riser is and one of what a wrap is -- see
@@ -136,7 +147,8 @@ public class ConduitRunModel implements IBakedModel
 	private List<IBakedModel> assemble(EnumFacing mount, @Nullable TileEntityConduit conduit)
 	{
 		List<IBakedModel> parts = new ArrayList<>();
-		parts.add(hubs[mount.ordinal()]);
+		EnumFacing.Axis axis = conduit==null?null: ConduitGeometry.hubAxis(mount, conduit.getConnections());
+		parts.add(axis==null?hubs[mount.ordinal()]: couplings[mount.ordinal()][axis.ordinal()]);
 		if(conduit==null)
 			return parts;
 		EnumFacing[] plane = ConduitGeometry.inPlane(mount);
