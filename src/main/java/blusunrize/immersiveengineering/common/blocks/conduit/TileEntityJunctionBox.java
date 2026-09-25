@@ -544,7 +544,7 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * <strong>Free for a box whose walk was complete</strong>, which is every box on a finished
 	 * installation: one integer comparison a tick, in front of the live-mask exit and next to the
 	 * rebuild flag it shares a purpose with. A box that stays truncated pays one walk every few
-	 * seconds, bounded by {@code ConduitRoute.MAX_NODES} like every other walk, and only while it is
+	 * seconds at first and once a minute at most after that (see {@link #MAX_RETRY_TICKS}), bounded by {@code ConduitRoute.MAX_NODES} like every other walk, and only while it is
 	 * loaded -- an unloaded box does not tick, which is the whole reason this feature exists.
 	 */
 	private int retryIn;
@@ -556,6 +556,22 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	 * somebody flying a line sees it join up behind them rather than on the next reload.
 	 */
 	private static final int RETRY_TICKS = 100;
+
+	/**
+	 * The longest a box with an incomplete walk waits: a minute.
+	 * <p>
+	 * <strong>Backed off, because some walks never finish.</strong> A run lying along the edge of a
+	 * chunk nobody has visited is truncated by every walk, and before this its boxes re-walked it every
+	 * five seconds forever -- up to {@code MAX_NODES} nodes each time, to learn again that the far
+	 * chunk was still not there. So each retry that comes back just as truncated and changes nothing
+	 * waits twice as long as the last, and anything that does change -- a run made, a walk that
+	 * completes, a neighbour asking -- starts again from five seconds. A minute, not more, because this
+	 * retry is the only thing that joins a long line up while somebody flies it.
+	 */
+	private static final int MAX_RETRY_TICKS = 1200;
+
+	/** How long the next retry waits. See {@link #MAX_RETRY_TICKS}. */
+	private int retryDelay = RETRY_TICKS;
 
 	/**
 	 * Set when a neighbour change may have moved a redstone input; cleared by the next server tick,
@@ -615,7 +631,12 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 	public void queueRebuild()
 	{
 		if(world!=null&&!world.isRemote)
+		{
 			rebuildQueued = true;
+			//Something near the run changed, so a walk that kept coming back short deserves prompt
+			//retries again.
+			retryDelay = RETRY_TICKS;
+		}
 	}
 
 	/**
@@ -728,7 +749,17 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 		//before this, a run whose last gap was filled in by somebody else's chunk loading stayed
 		//unlinked until something happened to poke one of its boxes, which might be never. See
 		//RETRY_TICKS for why the idle box pays nothing for it.
-		retryIn = walk.isTruncated()?RETRY_TICKS: 0;
+		if(!walk.isTruncated())
+		{
+			retryDelay = RETRY_TICKS;
+			retryIn = 0;
+		}
+		else
+		{
+			//The same answer as last time: wait longer before asking again. See MAX_RETRY_TICKS.
+			retryIn = retryDelay;
+			retryDelay = changed?RETRY_TICKS: Math.min(retryDelay*2, MAX_RETRY_TICKS);
+		}
 		if(changed)
 		{
 			markContainingBlockForUpdate(null);
