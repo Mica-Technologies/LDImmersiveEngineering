@@ -273,6 +273,11 @@ public class TileEntitySteamTurbineHall extends TileEntityMultiblockPart<TileEnt
 	 * looked up every tick; the argument only gets stronger the bigger the structure is.
 	 */
 	private TileEntity[] terminals = NO_TERMINALS;
+	/**
+	 * The spool as it stood on the last pass, so the pass can tell a rotor still winding from one
+	 * sat still. Server side only; -1 so the first pass after a load always saves.
+	 */
+	private int passSpool = -1;
 
 	/**
 	 * The one block of the structure a comparator reads from: the foundation raft under the steam
@@ -330,6 +335,7 @@ public class TileEntitySteamTurbineHall extends TileEntityMultiblockPart<TileEnt
 		//for.
 		boolean stopped = terminals.length==0||world.getRedstonePowerFromNeighbors(getPos()) > 0;
 
+		boolean wasActive = active;
 		boolean lit;
 		if(stopped)
 			lit = false;
@@ -358,8 +364,14 @@ public class TileEntitySteamTurbineHall extends TileEntityMultiblockPart<TileEnt
 		}
 		//The tank moved and so did the spool, and a chunk saved without them comes back holding
 		//steam it already spent or claiming a rotor speed it never reached. Once every five ticks,
-		//master only.
-		markDirty();
+		//master only -- and only when one of them did move, which is every pass while it is lit and
+		//never while it stands cold, so an idle hall stops having its chunk rewritten every
+		//autosave. Steam piped in from outside marks the master on its own.
+		if(lit||active!=wasActive||spool!=passSpool)
+		{
+			passSpool = spool;
+			markDirty();
+		}
 	}
 
 	/**

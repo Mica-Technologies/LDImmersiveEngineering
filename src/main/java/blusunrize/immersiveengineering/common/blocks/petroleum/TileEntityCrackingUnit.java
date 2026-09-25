@@ -336,6 +336,7 @@ public class TileEntityCrackingUnit extends TileEntityMultiblockPart<TileEntityC
 	private void runPass()
 	{
 		int previous = status;
+		int previousCoke = cokeBuffer;
 		status = STATUS_IDLE;
 		FluidStack feed = tankFeed.getFluid();
 		Cracking recipe = feed==null?null: getCracking(feed.getFluid());
@@ -344,7 +345,11 @@ public class TileEntityCrackingUnit extends TileEntityMultiblockPart<TileEntityC
 		ejectCoke();
 		if(status!=previous)
 			markContainingBlockForUpdate(null);
-		markDirty();
+		//Only a pass that cracked moves the tanks and the coke progress, and only an ejection moves
+		//the buffer; a cracker stood idle, cold or backed up has changed nothing worth saving, and
+		//marking it anyway rewrote its chunk every autosave. Feed pumped in marks the master itself.
+		if(status==STATUS_CRACKING||status!=previous||cokeBuffer!=previousCoke)
+			markDirty();
 	}
 
 	private void crack(Cracking recipe)

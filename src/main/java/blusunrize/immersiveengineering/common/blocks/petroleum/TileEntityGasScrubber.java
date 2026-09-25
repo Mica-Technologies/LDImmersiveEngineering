@@ -431,6 +431,7 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 	private void runPass()
 	{
 		int previous = status;
+		int previousSulfur = sulfurBuffer;
 		status = STATUS_IDLE;
 		FluidStack feed = tankSour.getFluid();
 		Scrubbing recipe = feed==null?null: getScrubbing(feed.getFluid());
@@ -440,8 +441,12 @@ public class TileEntityGasScrubber extends TileEntityMultiblockPart<TileEntityGa
 		if(status!=previous)
 			markContainingBlockForUpdate(null);
 		//Both tanks and the sulfur buffer moved, and a chunk saved without them comes back holding
-		//gas it has already sweetened. Once a second, and only on the master.
-		markDirty();
+		//gas it has already sweetened. Once a second, and only on the master -- and only on a pass
+		//that scrubbed, pushed dust out or changed its status. An idle, cold or backed-up skid has
+		//nothing new to save, and marking it anyway rewrote its chunk every autosave. Gas pumped in
+		//from outside marks the master on its own.
+		if(status==STATUS_SCRUBBING||status!=previous||sulfurBuffer!=previousSulfur)
+			markDirty();
 	}
 
 	/**

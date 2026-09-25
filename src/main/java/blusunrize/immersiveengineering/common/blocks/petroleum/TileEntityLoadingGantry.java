@@ -107,6 +107,7 @@ public class TileEntityLoadingGantry extends TileEntityMultiblockPart<TileEntity
 	private void runPass()
 	{
 		int previous = status;
+		int previousFuel = tank.getFluidAmount();
 		status = STATUS_IDLE;
 		//Both chests stand in front of the gantry, one against each leg. They used to be on
 		//opposite faces -- intake in front of the left leg, output behind the right -- which is
@@ -117,7 +118,11 @@ public class TileEntityLoadingGantry extends TileEntityMultiblockPart<TileEntity
 			fill(in, out);
 		if(status!=previous)
 			markContainingBlockForUpdate(null);
-		markDirty();
+		//Only a pass that filled something moved the tank, and the status is the only other thing
+		//saved. A gantry stood waiting for empties or for fuel has nothing new, and marking it
+		//anyway rewrote its chunk every autosave. Fuel pumped in marks the master on its own.
+		if(tank.getFluidAmount()!=previousFuel||status!=previous)
+			markDirty();
 	}
 
 	/**

@@ -362,6 +362,11 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 	 * be exactly the sort of poll this machine is meant not to do.
 	 */
 	private TileEntity[] terminals = NO_TERMINALS;
+	/**
+	 * The spool as it stood on the last pass, so the pass can tell a rotor still winding up or down
+	 * from one sat still. Server side only; -1 so the first pass after a load always saves.
+	 */
+	private int passSpool = -1;
 
 	/**
 	 * The one block of the structure a comparator reads from: the intake house corner, at the fuel end of the machine.
@@ -422,6 +427,7 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 		boolean stopped = flow <= 0||terminals.length==0
 				||world.getRedstonePowerFromNeighbors(getPos()) > 0;
 
+		boolean wasActive = active;
 		boolean lit;
 		if(stopped)
 			lit = false;
@@ -449,8 +455,15 @@ public class TileEntityGasTurbine extends TileEntityMultiblockPart<TileEntityGas
 			markContainingBlockForUpdate(null);
 		}
 		//The tank moved and so did the spool, and a chunk saved without them comes back holding gas
-		//it has already burnt or claiming a rotor speed it never had. Once a second, master only.
-		markDirty();
+		//it has already burnt or claiming a rotor speed it never had. Once a second, master only --
+		//and only when one of them did move: a lit machine burns every pass, so it always saves,
+		//while a cold one stood on an empty tank has nothing new and would otherwise have its chunk
+		//rewritten every autosave. Fuel pumped in from outside marks the master on its own.
+		if(lit||active!=wasActive||spool!=passSpool)
+		{
+			passSpool = spool;
+			markDirty();
+		}
 	}
 
 	/**

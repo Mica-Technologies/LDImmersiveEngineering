@@ -302,6 +302,12 @@ public class TileEntityFuelOilBoiler extends TileEntityMultiblockPart<TileEntity
 	public int steamRate;
 
 	private int stagger = -1;
+	/**
+	 * The buffer as it stood on the last pass. Flux arriving off the wire marks nothing on its
+	 * own, so a cold boiler still charging has to notice here that it has something new to save.
+	 * Server side only; -1 so the first pass after a load always saves.
+	 */
+	private int passEnergy = -1;
 
 	/**
 	 * The one block of the structure a comparator reads from: a front corner of the firing floor.
@@ -424,8 +430,16 @@ public class TileEntityFuelOilBoiler extends TileEntityMultiblockPart<TileEntity
 		if(active!=previouslyActive||steamRate!=previousRate)
 			markContainingBlockForUpdate(null);
 		//The tanks and the energy buffer all moved, and a chunk saved without them comes back
-		//holding fuel or power it already spent. Once a second, and only on the master.
-		markDirty();
+		//holding fuel or power it already spent. Once a second, and only on the master -- and only
+		//when something did move: a lit pass always has, a cold one only if it just went out or
+		//flux came in since the last pass. Marking a cold, unfed boiler anyway rewrote its chunk
+		//every autosave. Fuel pumped in and steam drawn off mark the master on their own.
+		int energy = energyStorage.getEnergyStored();
+		if(active||active!=previouslyActive||steamRate!=previousRate||energy!=passEnergy)
+		{
+			passEnergy = energy;
+			markDirty();
+		}
 	}
 
 	/**
