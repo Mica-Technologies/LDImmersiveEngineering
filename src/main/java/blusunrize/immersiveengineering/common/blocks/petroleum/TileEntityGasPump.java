@@ -141,6 +141,18 @@ public class TileEntityGasPump extends TileEntityIEBase implements IBlockOverlay
 	private transient String syncedKind;
 	private transient int syncedAmount = -1;
 
+	/**
+	 * Thirty-two blocks, down from vanilla's sixty-four. The price and the odometer are two font
+	 * draws a frame per pump, with strings built for each, and digits a forty-eighth of a block tall
+	 * are a smudge long before this -- the utility sign stops its lettering at forty-eight for the
+	 * same reason, and its letters are bigger.
+	 */
+	@Override
+	public double getMaxRenderDistanceSquared()
+	{
+		return 32*32;
+	}
+
 	public EnumFacing facing = EnumFacing.NORTH;
 	/**
 	 * Per bucket, in whatever unit the server's economy plugin uses. Zero -- the default -- reads
