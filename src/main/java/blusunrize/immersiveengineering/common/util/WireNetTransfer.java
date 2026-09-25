@@ -221,7 +221,7 @@ public final class WireNetTransfer
 	public static int cityFromRun(World world, BlockPos pos, int available,
 								  @Nullable Predicate<AbstractConnection> only, BlockPos runBox)
 	{
-		return city(world, pos, available, only, ConduitRuns.shadowOfRunAt(world, runBox));
+		return city(world, pos, available, only, ConduitRuns.cachedShadowOfRunAt(world, runBox));
 	}
 
 	/**
@@ -267,6 +267,10 @@ public final class WireNetTransfer
 						   @Nullable Predicate<AbstractConnection> only)
 	{
 		if(world.isRemote||available <= 0)
+			return 0;
+		//Nowhere to send it, so nothing to keep it from: a breakout connector with no wire yet is
+		//topped up by its box every tick and would otherwise work its run out every tick for nothing.
+		if(ImmersiveNetHandler.INSTANCE.getIndirectEnergyConnections(pos, world, true).isEmpty())
 			return 0;
 		return city(world, pos, available, only, ConduitRuns.shadowFor(world, pos));
 	}

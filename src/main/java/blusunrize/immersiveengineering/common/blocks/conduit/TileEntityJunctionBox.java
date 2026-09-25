@@ -736,8 +736,10 @@ public class TileEntityJunctionBox extends TileEntityIEBase implements IImmersiv
 			//a feed reaches. Cheap -- it drops a cached flood -- and the alternative is up to a
 			//second of a town being lit by a run that has just been cut.
 			VirtualConduits.INSTANCE.invalidateLiveness();
-			//And this box's own run just changed shape, so what its pushes may not reach has too.
+			//And this box's own run just changed shape, so what its pushes may not reach has too --
+			//and so has what the connectors bolted along it may not reach.
 			runShadow = null;
+			ConduitRuns.forgetShadows();
 		}
 		return changed;
 	}

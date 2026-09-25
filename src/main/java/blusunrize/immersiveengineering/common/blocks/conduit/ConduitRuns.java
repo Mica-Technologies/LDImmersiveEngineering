@@ -20,7 +20,9 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -223,7 +225,67 @@ public final class ConduitRuns
 	public static Set<BlockPos> shadowFor(World world, BlockPos pos)
 	{
 		BlockPos box = runBehind(world, pos);
-		return box==null?null: shadowOfRunAt(world, box);
+		return box==null?null: cachedShadowOfRunAt(world, box);
+	}
+
+	/**
+	 * How long a remembered shadow is trusted without anything saying the run changed: the same second
+	 * the box's own copy lives for, and for the same reason -- a run made at the far end of a bundle
+	 * does not pass through any box near this one on its way into the graph.
+	 */
+	public static final int SHADOW_TTL = 20;
+
+	/**
+	 * Shadows already worked out, by dimension and then by the box they were flooded from.
+	 * <p>
+	 * <strong>A breakout connector pushes every tick, and used to flood its run every tick to do
+	 * it.</strong> In city mode the box keeps the connector topped up, so it never goes empty and never
+	 * stops pushing -- and every push walked every box on the run and built a set of seven positions
+	 * per box, to reach the same answer it reached the tick before. The box itself has cached this
+	 * since the latch fix; the connectors next to it, and the virtual push for an unloaded outlet, did
+	 * not. Server thread only.
+	 */
+	private static final Map<Integer, Map<BlockPos, CachedShadow>> CACHED = new HashMap<>();
+
+	private static final class CachedShadow
+	{
+		final Set<BlockPos> shadow;
+		final long at;
+
+		CachedShadow(Set<BlockPos> shadow, long at)
+		{
+			this.shadow = shadow;
+			this.at = at;
+		}
+	}
+
+	/**
+	 * {@link #shadowOfRunAt}, remembered for {@link #SHADOW_TTL} ticks or until {@link #forgetShadows}.
+	 */
+	public static Set<BlockPos> cachedShadowOfRunAt(World world, BlockPos boxPos)
+	{
+		long now = world.getTotalWorldTime();
+		Map<BlockPos, CachedShadow> forDim = CACHED.computeIfAbsent(world.provider.getDimension(),
+				d -> new HashMap<>());
+		CachedShadow hit = forDim.get(boxPos);
+		if(hit!=null&&now-hit.at >= 0&&now-hit.at < SHADOW_TTL)
+			return hit.shadow;
+		//Bounded without a sweeper: the entries are one per box that has pushed in the last second,
+		//and a map that has grown past what any real network has is simply started again.
+		if(forDim.size() > 4096)
+			forDim.clear();
+		Set<BlockPos> shadow = shadowOfRunAt(world, boxPos);
+		forDim.put(boxPos.toImmutable(), new CachedShadow(shadow, now));
+		return shadow;
+	}
+
+	/**
+	 * A run was made or broken somewhere, so every remembered shadow may now be the wrong shape.
+	 * Cheap: the next push from each box floods again.
+	 */
+	public static void forgetShadows()
+	{
+		CACHED.clear();
 	}
 
 	/**
